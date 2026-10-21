@@ -12,7 +12,19 @@ Committing and opening PRs stay manual — the panel only observes, and merges w
 
 ## Requirements
 
-Node 20+, `git`, and the GitHub CLI (`gh`) already authenticated (`gh auth status`). No npm dependencies, nothing to install.
+The panel shells out to `git` and the GitHub CLI, so both must be installed and working before you start. There are no npm dependencies and nothing else to install.
+
+1. **Node.js 20+** (`node --version`).
+2. **Git** on your `PATH`, with access to your repos' remotes (`git fetch` must work from the terminal).
+3. **GitHub CLI** ([install](https://cli.github.com)) logged in to the account that can see your repos:
+   ```bash
+   gh auth login
+   gh auth status     # must show "Logged in"
+   ```
+   The token needs the `repo` scope (PRs, CI status, merging) and `workflow` to re-run failed checks. `gh auth login` grants `repo` by default; add `workflow` with `gh auth refresh -s workflow`.
+4. *(Optional)* A command-line editor launcher such as `code` for the *Editor* button.
+
+Quick check that everything is ready: `node --version && git --version && gh auth status`. PRs, CI status and Merge depend on `gh`; the local git view only needs `git`.
 
 ## Quick start
 
