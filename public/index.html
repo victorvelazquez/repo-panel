@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="token" content="__TOKEN__">
+  <title>Repo Panel</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header>
+    <h1>Repo Panel</h1>
+    <input id="search" type="search" placeholder="Filter repos…">
+    <select id="groupFilter"></select>
+    <span class="spacer"></span>
+    <button data-act="refresh-all" title="Refresh everything">↻ Refresh</button>
+    <button data-act="fetch-all" title="git fetch --prune on every repo">⇣ Fetch all</button>
+    <button data-act="add-dialog" class="primary">+ Repo</button>
+  </header>
+  <main id="app"></main>
+
+  <aside id="drawer" hidden>
+    <div class="drawer-head">
+      <strong id="drawerTitle"></strong>
+      <button data-act="close-drawer">✕</button>
+    </div>
+    <div id="drawerBody"></div>
+  </aside>
+
+  <dialog id="addDialog">
+    <form method="dialog" id="addForm">
+      <h2>Add repositories</h2>
+      <label>Group
+        <input id="addGroup" list="groupList" placeholder="Personal, Work, Commercial…" required>
+        <datalist id="groupList"></datalist>
+      </label>
+      <label>Repository folder
+        <input id="addPath" placeholder="C:\Users\you\Developer\my-repo">
+      </label>
+      <div class="row">
+        <button type="button" data-act="add-one" class="primary">Add this repo</button>
+        <button type="button" data-act="scan">Scan folder for repos</button>
+      </div>
+      <div id="scanResults"></div>
+      <div class="row end">
+        <button type="button" data-act="add-selected" id="addSelected" hidden class="primary">Add selected</button>
+        <button type="button" data-act="close-dialog">Close</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toasts"></div>
+  <script src="/app.js"></script>
+</body>
+</html>

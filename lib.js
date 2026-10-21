@@ -1,0 +1,129 @@
+'use strict';
+// Pure helpers: parsing git/gh output and deciding PR readiness. No I/O here.
+const crypto = require('node:crypto');
+
+function repoId(p) {
+  return crypto.createHash('sha1').update(String(p).toLowerCase()).digest('hex').slice(0, 10);
+}
+
+// Parses `git status --porcelain=v2 -b` output.
+function parseStatus(out) {
+  const r = { branch: null, detached: false, upstream: null, hasAb: false, ahead: 0, behind: 0, files: [] };
+  for (const line of out.split('\n')) {
+    if (!line) continue;
+    if (line.startsWith('# branch.head ')) {
+      const h = line.slice('# branch.head '.length).trim();
+      if (h === '(detached)') r.detached = true;
+      else r.branch = h;
+    } else if (line.startsWith('# branch.upstream ')) {
+      r.upstream = line.slice('# branch.upstream '.length).trim();
+    } else if (line.startsWith('# branch.ab ')) {
+      const m = /\+(\d+) -(\d+)/.exec(line);
+      if (m) { r.hasAb = true; r.ahead = +m[1]; r.behind = +m[2]; }
+    } else if (line[0] === '1') {
+      const p = line.split(' ');
+      r.files.push({ xy: p[1], path: p.slice(8).join(' ') });
+    } else if (line[0] === '2') {
+      const p = line.split(' ');
+      r.files.push({ xy: p[1], path: p.slice(9).join(' ').split('\t')[0] });
+    } else if (line[0] === 'u') {
+      const p = line.split(' ');
+      r.files.push({ xy: p[1], path: p.slice(10).join(' '), conflict: true });
+    } else if (line[0] === '?') {
+      r.files.push({ xy: '??', path: line.slice(2) });
+    }
+  }
+  return r;
+}
+
+// Parses `git diff --numstat` output into a path -> {added, deleted, binary} map.
+function parseNumstat(out) {
+  const map = new Map();
+  for (const line of out.split('\n')) {
+    if (!line) continue;
+    const [a, d, ...rest] = line.split('\t');
+    const binary = a === '-' && d === '-';
+    map.set(rest.join('\t'), { added: binary ? 0 : +a, deleted: binary ? 0 : +d, binary });
+  }
+  return map;
+}
+
+// Names of local branches whose remote branch no longer exists.
+// Input format: `%(refname:short)%09%(upstream:track)`.
+function parseGoneBranches(out) {
+  return out.split('\n')
+    .map((l) => l.split('\t'))
+    .filter(([, track]) => track && track.includes('gone'))
+    .map(([name]) => name);
+}
+
+function statusLetter(xy) {
+  if (xy === '??') return '?';
+  const x = xy[0] !== '.' ? xy[0] : xy[1];
+  return x || 'M';
+}
+
+const OK_CONCLUSIONS = ['SUCCESS', 'NEUTRAL', 'SKIPPED'];
+
+// Reduces a statusCheckRollup array to one overall state.
+function summarizeChecks(rollup) {
+  const items = [];
+  const failedRuns = new Set();
+  for (const c of rollup || []) {
+    let name; let url; let state;
+    if (c.__typename === 'StatusContext' || (c.status === undefined && c.state !== undefined)) {
+      name = c.context; url = c.targetUrl;
+      state = c.state === 'SUCCESS' ? 'success' : (c.state === 'PENDING' || c.state === 'EXPECTED') ? 'pending' : 'failed';
+    } else {
+      name = c.name; url = c.detailsUrl;
+      if (c.status !== 'COMPLETED') state = 'pending';
+      else state = OK_CONCLUSIONS.includes(c.conclusion) ? 'success' : 'failed';
+    }
+    if (state === 'failed') {
+      const m = /\/actions\/runs\/(\d+)/.exec(url || '');
+      if (m) failedRuns.add(m[1]);
+    }
+    items.push({ name, state, url });
+  }
+  const count = (s) => items.filter((i) => i.state === s).length;
+  const failed = count('failed');
+  const pending = count('pending');
+  const passed = count('success');
+  const state = !items.length ? 'none' : failed ? 'failed' : pending ? 'pending' : 'success';
+  return { state, total: items.length, passed, failed, pending, failedRuns: [...failedRuns], items };
+}
+
+// Returns why a PR cannot be merged right now, or null when it can.
+function blockedReason(pr, checks) {
+  if (pr.isDraft) return 'Draft pull request';
+  if (checks.state === 'failed') return 'Some checks failed';
+  if (checks.state === 'pending') return 'Checks still running';
+  if (pr.mergeable === 'CONFLICTING' || pr.mergeStateStatus === 'DIRTY') return 'Merge conflicts with the base branch';
+  if (pr.mergeable === 'UNKNOWN' || pr.mergeStateStatus === 'UNKNOWN') return 'GitHub is still computing mergeability';
+  if (pr.mergeStateStatus === 'BEHIND') return 'Branch is behind the base branch';
+  if (pr.mergeStateStatus === 'BLOCKED') return 'Blocked by repository rules (required reviews or other protections)';
+  if (pr.mergeStateStatus !== 'CLEAN' && pr.mergeStateStatus !== 'HAS_HOOKS') return `Merge state: ${pr.mergeStateStatus}`;
+  return null;
+}
+
+function enrichPr(pr) {
+  const checks = summarizeChecks(pr.statusCheckRollup);
+  const blocked = blockedReason(pr, checks);
+  return {
+    number: pr.number, title: pr.title, url: pr.url,
+    head: pr.headRefName, base: pr.baseRefName, headOid: pr.headRefOid,
+    isDraft: !!pr.isDraft, isCrossRepository: !!pr.isCrossRepository,
+    author: pr.author && pr.author.login, reviewDecision: pr.reviewDecision || null,
+    mergeStateStatus: pr.mergeStateStatus, checks, ready: blocked === null, blockedReason: blocked,
+  };
+}
+
+// Percent-encodes each segment of a git ref path, keeping the slashes.
+function encodeRef(ref) {
+  return ref.split('/').map(encodeURIComponent).join('/');
+}
+
+module.exports = {
+  repoId, parseStatus, parseNumstat, parseGoneBranches, statusLetter,
+  summarizeChecks, blockedReason, enrichPr, encodeRef,
+};
