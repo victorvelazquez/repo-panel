@@ -87,8 +87,8 @@ dialog .row.end { justify-content: flex-end; }
 .toast.ok { border-left-color: var(--green); } .toast.bad { border-left-color: var(--red); }
 
 /* ---------- kanban board ---------- */
-main { max-width: none; padding: 12px; }
-.board { display: grid; grid-template-columns: repeat(6, minmax(280px, 1fr)); gap: 12px; align-items: start; overflow-x: auto; padding-bottom: 12px; }
+main { max-width: none; padding: 8px; }
+.board { display: grid; grid-template-columns: repeat(6, minmax(200px, 1fr)); gap: 8px; align-items: start; overflow-x: auto; padding-bottom: 12px; }
 .col { background: var(--panel); border: 1px solid var(--line); border-top: 3px solid var(--gray); border-radius: 8px; min-width: 0; }
 .col-clean { border-top-color: var(--green); }
 .col-changes { border-top-color: var(--yellow); }
@@ -110,3 +110,10 @@ main { max-width: none; padding: 12px; }
 .card .actions { margin-left: 0; margin-top: 2px; }
 .card .pr-actions { margin-left: 0; flex-wrap: wrap; }
 button.wide { width: 100%; padding: 6px; }
+
+.snoozed { margin-top: 4px; border-top: 1px dashed var(--line); padding-top: 6px; opacity: .75; }
+.snoozed-head { cursor: pointer; user-select: none; font-size: 12px; color: var(--muted); padding: 2px 4px; }
+.snoozed-row { display: flex; align-items: center; gap: 6px; padding: 2px 4px; font-size: 12px; }
+.snoozed-row a { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+.snoozed-row button { padding: 0 6px; font-size: 12px; }
+.muted { color: var(--gray); }

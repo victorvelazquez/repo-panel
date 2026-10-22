@@ -6,6 +6,7 @@ const store = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d;
 
 const S = {
   groups: [], local: {}, prs: {}, loading: {}, busy: {},
+  snoozed: new Set(), snoozedOpen: {},
   group: '', q: '',
   prefs: store('prefs', { method: 'squash', del: true }),
   lastRefresh: 0, scan: [],
@@ -48,7 +49,9 @@ function toast(msg, kind = '') {
 const allRepos = () => S.groups.flatMap((g) => g.repos.map((r) => ({ ...r, group: g.name })));
 
 async function loadConfig() {
-  S.groups = (await api('/api/config')).groups;
+  const cfg = await api('/api/config');
+  S.groups = cfg.groups;
+  S.snoozed = new Set(cfg.snoozed);
   $('#groupList').innerHTML = S.groups.map((g) => `<option value="${esc(g.name)}">`).join('');
   $('#groupFilter').innerHTML = `<option value="">All groups</option>${S.groups.map((g) => `<option ${S.group === g.name ? 'selected' : ''}>${esc(g.name)}</option>`).join('')}`;
 }
@@ -62,8 +65,15 @@ function track(id, p) {
 function refreshRepo(id) {
   return Promise.all([
     track(id, pooled(() => api(`/api/local?id=${id}`)).then((d) => { S.local[id] = d; }, (e) => { S.local[id] = { error: e.message }; })),
-    track(id, pooled(() => api(`/api/prs?id=${id}`)).then((d) => { S.prs[id] = d; }, (e) => { S.prs[id] = { error: e.message }; })),
+    track(id, pooled(() => api(`/api/prs?id=${id}`)).then((d) => { S.prs[id] = d; wakeReady(id, d); }, (e) => { S.prs[id] = { error: e.message }; })),
   ]);
+}
+
+// A snoozed PR that becomes ready to merge is worth seeing again, so it is woken up automatically.
+function wakeReady(id, d) {
+  for (const pr of d.prs || []) {
+    if (pr.ready && S.snoozed.has(snoozeKey(id, pr.number))) setSnooze(id, pr.number, false, true);
+  }
 }
 
 async function refreshAll() {
@@ -74,6 +84,22 @@ async function refreshAll() {
 async function fetchRepo(id) {
   try { await track(id, pooled(() => api('/api/fetch', { id }))); } catch (e) { toast(`${nameOf(id)}: ${e.message}`, 'bad'); }
   await refreshRepo(id);
+}
+
+const snoozeKey = (id, n) => `${id}:${n}`;
+
+async function setSnooze(id, n, on, auto = false) {
+  const key = snoozeKey(id, n);
+  if (on) S.snoozed.add(key); else S.snoozed.delete(key);
+  draw();
+  try {
+    await api('/api/snooze', { id, number: n, on });
+    if (auto) toast(`#${n} (${nameOf(id)}) is ready to merge — back on the board`, 'ok');
+  } catch (e) {
+    if (on) S.snoozed.delete(key); else S.snoozed.add(key);
+    draw();
+    toast(e.message, 'bad');
+  }
 }
 
 const nameOf = (id) => allRepos().find((r) => r.id === id)?.name || id;
@@ -118,6 +144,7 @@ function prColumn(pr) {
 // One card per pending thing: a repo can have a local card plus one card per open PR.
 function buildCards() {
   const cols = Object.fromEntries(COLUMNS.map((c) => [c.key, []]));
+  const parked = Object.fromEntries(COLUMNS.map((c) => [c.key, []]));
   for (const r of visibleRepos()) {
     if (!S.local[r.id] || !S.prs[r.id]) continue; // first load still running
     const { l, p, prs, dirty, unpushed } = info(r);
@@ -125,9 +152,29 @@ function buildCards() {
     else if (dirty) cols.changes.push(repoCard(r));
     else if (unpushed) cols.committed.push(repoCard(r));
     else if (!prs.length) cols.clean.push(repoCard(r));
-    for (const pr of prs) cols[prColumn(pr)].push(prCard(r, pr, p.repo));
+    for (const pr of prs) {
+      const key = prColumn(pr);
+      if (S.snoozed.has(snoozeKey(r.id, pr.number))) parked[key].push(snoozedRow(r, pr));
+      else cols[key].push(prCard(r, pr, p.repo));
+    }
   }
-  return cols;
+  return { cols, parked };
+}
+
+function snoozedRow(r, pr) {
+  return `<div class="snoozed-row">
+    <a href="${esc(pr.url)}" target="_blank" rel="noopener" title="${esc(`${r.name} · ${pr.title}`)}"><span class="muted">${esc(r.name)}</span> #${pr.number} ${esc(pr.title)}</a>
+    <button data-act="unsnooze" data-id="${r.id}" data-n="${pr.number}" title="Bring back to the board">⏰</button>
+  </div>`;
+}
+
+function snoozedBlock(key, rows) {
+  if (!rows.length) return '';
+  const open = !!S.snoozedOpen[key];
+  return `<div class="snoozed">
+    <div class="snoozed-head" data-act="toggle-snoozed" data-col="${key}"><span>${open ? '▾' : '▸'}</span> Snoozed (${rows.length})</div>
+    ${open ? rows.join('') : ''}
+  </div>`;
 }
 
 function render() {
@@ -135,11 +182,11 @@ function render() {
     $('#app').innerHTML = '<div class="empty">No repositories yet.<br><br><button class="primary" data-act="add-dialog">+ Add your first repo</button></div>';
     return;
   }
-  const cols = buildCards();
+  const { cols, parked } = buildCards();
   $('#app').innerHTML = `<div class="board">${COLUMNS.map((c) => `
     <section class="col col-${c.key}">
       <div class="col-head" title="${esc(c.hint)}"><h2>${c.title}</h2><span class="n">${cols[c.key].length}</span></div>
-      <div class="col-body">${cols[c.key].join('') || '<div class="col-empty">—</div>'}</div>
+      <div class="col-body">${cols[c.key].join('') || (parked[c.key].length ? '' : '<div class="col-empty">—</div>')}${snoozedBlock(c.key, parked[c.key])}</div>
     </section>`).join('')}</div>`;
 }
 
@@ -209,6 +256,7 @@ function prCard(r, pr, meta) {
       </select>
       ${autoDel ? '<span class="chip gray" title="This repo deletes merged branches automatically">branch auto-deleted</span>'
         : `<label><input type="checkbox" data-pref="del" ${S.prefs.del ? 'checked' : ''}> delete branch</label>`}
+      <button data-act="snooze" data-id="${r.id}" data-n="${pr.number}" title="Park this PR at the bottom of the column until it is ready to merge">💤 Snooze</button>
       ${pr.checks.failedRuns.length ? `<button data-act="rerun" data-id="${r.id}" data-n="${pr.number}" ${busy ? 'disabled' : ''}>Re-run failed</button>` : ''}
     </div>
     <button class="merge wide" data-act="merge" data-id="${r.id}" data-n="${pr.number}" ${pr.ready && !busy ? '' : 'disabled'}
@@ -293,6 +341,9 @@ const ACTIONS = {
   'close-drawer': () => { $('#drawer').hidden = true; },
   'editor': (el) => api('/api/editor', { id: el.dataset.id }).catch((e) => toast(e.message, 'bad')),
   'merge': (el) => doMerge(el.dataset.id, Number(el.dataset.n)),
+  'snooze': (el) => setSnooze(el.dataset.id, Number(el.dataset.n), true),
+  'unsnooze': (el) => setSnooze(el.dataset.id, Number(el.dataset.n), false),
+  'toggle-snoozed': (el) => { S.snoozedOpen[el.dataset.col] = !S.snoozedOpen[el.dataset.col]; draw(); },
   'rerun': (el) => doRerun(el.dataset.id, Number(el.dataset.n)),
   'remove': async (el) => {
     const id = el.dataset.id;
