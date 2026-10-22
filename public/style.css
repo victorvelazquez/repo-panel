@@ -85,21 +85,20 @@ dialog .row.end { justify-content: flex-end; }
 
 /* ---------- kanban board ---------- */
 main { max-width: none; padding: 8px; }
-.board { display: grid; grid-template-columns: repeat(6, minmax(200px, 1fr)); gap: 8px; align-items: start; overflow-x: auto; padding-bottom: 12px; }
+.board { display: grid; grid-template-columns: repeat(5, minmax(200px, 1fr)); gap: 8px; align-items: start; overflow-x: auto; padding-bottom: 12px; }
 .col { background: var(--panel); border: 1px solid var(--line); border-top: 3px solid var(--gray); border-radius: 8px; min-width: 0; }
 .col-clean { border-top-color: var(--green); }
 .col-changes { border-top-color: var(--yellow); }
 .col-committed { border-top-color: var(--blue); }
 .col-progress { border-top-color: #a371f7; }
 .col-ready { border-top-color: var(--green); }
-.col-attention { border-top-color: var(--red); }
 .col-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; }
 .col-head h2 { margin: 0; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; }
 .col-head .n { background: var(--line); border-radius: 10px; padding: 0 8px; font-size: 12px; }
-.col-body { display: flex; flex-direction: column; gap: 8px; padding: 0 8px 8px; }
+.col-body { display: flex; flex-direction: column; gap: 10px; padding: 0 8px 8px; }
 .col-empty { text-align: center; color: var(--muted); padding: 14px 0; }
 
-.card { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; gap: 6px; }
+.card { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
 .card-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .tag { font-size: 11px; padding: 0 7px; border-radius: 8px; }
 .pr-title { font-weight: 500; overflow-wrap: anywhere; }
@@ -119,7 +118,7 @@ header .opt { display: flex; align-items: center; gap: 6px; color: var(--muted);
 button.x { margin-left: auto; background: transparent; border-color: transparent; color: var(--muted); padding: 0 6px; }
 button.x:hover:not(:disabled) { color: var(--red); border-color: var(--red); }
 .one-line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.card .pr-title { font-weight: 400; color: var(--text); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.card .pr-title { font-weight: 400; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .card .pr-title:hover { color: var(--blue); }
 .chip-btn { cursor: pointer; font: inherit; font-size: 12px; padding: 1px 8px; }
 .chip-btn:hover { filter: brightness(1.25); }
@@ -134,3 +133,9 @@ button.x:hover:not(:disabled) { color: var(--red); border-color: var(--red); }
 .clean-row:hover .row-actions { opacity: 1; }
 .clean-row button { padding: 0 6px; font-size: 12px; }
 .warn { color: var(--yellow); }
+
+.repo-name { color: var(--text); }
+a.repo-name:hover { text-decoration: none; color: var(--blue); }
+.card.attn { border-color: #7a2a27; box-shadow: inset 3px 0 0 var(--red); }
+.alerts { color: var(--red); border-color: #5a1f1c; background: #2a1213; font-weight: 600; }
+.alerts.active { background: var(--red); color: #fff; border-color: var(--red); }

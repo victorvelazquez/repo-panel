@@ -6,7 +6,7 @@ const store = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d;
 
 const S = {
   groups: [], local: {}, prs: {}, loading: {}, busy: {},
-  snoozed: new Set(), snoozedOpen: {},
+  snoozed: new Set(), snoozedOpen: {}, onlyProblems: false,
   group: '', q: '',
   prefs: store('prefs', { method: 'squash', del: true }),
   lastRefresh: 0, scan: [],
@@ -130,35 +130,38 @@ const COLUMNS = [
   { key: 'clean', title: 'Clean', hint: 'Nothing to do' },
   { key: 'changes', title: 'Changes', hint: 'Uncommitted files' },
   { key: 'committed', title: 'Committed', hint: 'Commits not pushed yet' },
-  { key: 'progress', title: 'PR in progress', hint: 'Checks running or waiting for review' },
+  { key: 'progress', title: 'Open PRs', hint: 'Checks running, waiting for review or needing a fix (red = needs attention)' },
   { key: 'ready', title: 'Ready to merge', hint: 'All checks passed' },
-  { key: 'attention', title: 'Needs attention', hint: 'Failed checks, conflicts or outdated branch' },
 ];
 
-function prColumn(pr) {
-  if (pr.ready) return 'ready';
-  if (pr.checks.state === 'failed' || ['DIRTY', 'BEHIND'].includes(pr.mergeStateStatus)) return 'attention';
-  return 'progress';
-}
+// A PR that cannot merge because of something the user must fix.
+const isProblem = (pr) => !pr.ready && (pr.checks.state === 'failed' || ['DIRTY', 'BEHIND'].includes(pr.mergeStateStatus));
+
+const prColumn = (pr) => (pr.ready ? 'ready' : 'progress');
 
 // One card per pending thing: a repo can have a local card plus one card per open PR.
 function buildCards() {
   const cols = Object.fromEntries(COLUMNS.map((c) => [c.key, []]));
   const parked = Object.fromEntries(COLUMNS.map((c) => [c.key, []]));
+  let problems = 0;
+  // Problem cards go first in their column; with the problems filter on, only they are shown.
+  const add = (key, html, attn) => {
+    if (attn) { problems++; cols[key].unshift(html); } else if (!S.onlyProblems) cols[key].push(html);
+  };
   for (const r of visibleRepos()) {
     if (!S.local[r.id] || !S.prs[r.id]) continue; // first load still running
     const { l, p, prs, dirty, unpushed } = info(r);
-    if (l.error) cols.attention.push(repoCard(r));
-    else if (dirty) cols.changes.push(repoCard(r));
-    else if (unpushed) cols.committed.push(repoCard(r));
-    else if (!prs.length) cols.clean.push(cleanRow(r));
+    if (l.error) add('changes', repoCard(r, true), true);
+    else if (dirty) add('changes', repoCard(r), false);
+    else if (unpushed) add('committed', repoCard(r), false);
+    else if (!prs.length) add('clean', cleanRow(r), false);
     for (const pr of prs) {
       const key = prColumn(pr);
-      if (S.snoozed.has(snoozeKey(r.id, pr.number))) parked[key].push(snoozedRow(r, pr));
-      else cols[key].push(prCard(r, pr));
+      if (S.snoozed.has(snoozeKey(r.id, pr.number))) { if (!S.onlyProblems) parked[key].push(snoozedRow(r, pr)); }
+      else add(key, prCard(r, pr, p.repo), isProblem(pr));
     }
   }
-  return { cols, parked };
+  return { cols, parked, problems };
 }
 
 function snoozedRow(r, pr) {
@@ -182,7 +185,11 @@ function render() {
     $('#app').innerHTML = '<div class="empty">No repositories yet.<br><br><button class="primary" data-act="add-dialog">+ Add your first repo</button></div>';
     return;
   }
-  const { cols, parked } = buildCards();
+  const { cols, parked, problems } = buildCards();
+  const alerts = $('#alerts');
+  alerts.hidden = !problems && !S.onlyProblems;
+  alerts.textContent = `⚠ ${problems}`;
+  alerts.classList.toggle('active', S.onlyProblems);
   $('#app').innerHTML = `<div class="board">${COLUMNS.map((c) => `
     <section class="col col-${c.key}">
       <div class="col-head" title="${esc(c.hint)}"><h2>${c.title}</h2><span class="n">${cols[c.key].length}</span></div>
@@ -198,26 +205,31 @@ function groupTag(name) {
 
 const spinner = (r) => (S.loading[r.id] > 0 ? '<span class="spin" title="Refreshing…">↻</span>' : '');
 
-// Repo name + group on the left, remove (with confirmation) pinned to the right.
-function cardTop(r) {
-  return `<div class="card-top"><span class="repo-name">${esc(r.name)}</span>${groupTag(r.group)}${spinner(r)}
-    <button class="x" data-act="remove" data-id="${r.id}" title="Remove from panel (deletes nothing)">✕</button></div>`;
-}
+// The repo name is the link to the repository on GitHub (plain text when there is no GitHub remote).
+const repoName = (r, url) => (url
+  ? `<a class="repo-name" href="${esc(url)}" target="_blank" rel="noopener" title="Open ${esc(r.name)} on GitHub">${esc(r.name)}</a>`
+  : `<span class="repo-name">${esc(r.name)}</span>`);
 
-const editorBtn = (r, label) => `<button data-act="editor" data-id="${r.id}" title="Open in editor">${label}</button>`;
+const removeBtn = (r) => `<button class="x" data-act="remove" data-id="${r.id}" title="Remove from panel (deletes nothing)">✕</button>`;
+const editorBtn = (r) => `<button data-act="editor" data-id="${r.id}" title="Open in editor">&lt;/&gt;</button>`;
+
+// Repo name + group on the left, remove (with confirmation) pinned to the right.
+function cardTop(r, url) {
+  return `<div class="card-top">${repoName(r, url)}${groupTag(r.group)}${spinner(r)}${removeBtn(r)}</div>`;
+}
 
 // Clean repos have nothing to do, so they collapse to a single line.
 function cleanRow(r) {
   const { l, p } = info(r);
   const warn = p.error ? `<span class="warn" title="${esc('GitHub: ' + p.error)}">⚠</span>` : '';
   return `<div class="clean-row">
-    <span class="repo-name" title="${esc(r.name)}">${esc(r.name)}</span>${groupTag(r.group)}
+    ${repoName(r, p.repo?.url)}${groupTag(r.group)}
     <span class="branch" title="${esc(l.branch || '')}">${esc(l.branch || (l.detached ? '(detached)' : ''))}</span>${warn}${spinner(r)}
-    <span class="row-actions">${editorBtn(r, '</>')}<button class="x" data-act="remove" data-id="${r.id}" title="Remove from panel (deletes nothing)">✕</button></span>
+    <span class="row-actions">${editorBtn(r)}${removeBtn(r)}</span>
   </div>`;
 }
 
-function repoCard(r) {
+function repoCard(r, attn = false) {
   const { l, p, dirty, unpushed } = info(r);
   const chips = [];
   if (dirty) chips.push(`<button class="chip yellow chip-btn" data-act="diff" data-id="${r.id}" title="View diff">● ${l.files.length} file${l.files.length === 1 ? '' : 's'} <span class="add">+${l.added}</span> <span class="del">−${l.deleted}</span></button>`);
@@ -225,17 +237,13 @@ function repoCard(r) {
   if (l.behind) chips.push(`<span class="chip gray">↓ ${l.behind} behind</span>`);
   if (l.currentGone) chips.push('<span class="chip gray" title="The remote branch was deleted (merged PR?)">remote branch deleted</span>');
   if (p.noRemote) chips.push('<span class="chip gray">no GitHub remote</span>');
-  const gh = p.repo?.url;
-  return `<div class="card">
-    ${cardTop(r)}
+  return `<div class="card ${attn ? 'attn' : ''}">
+    ${cardTop(r, p.repo?.url)}
     <div class="branch one-line" title="${esc(l.branch || '')}">${esc(l.branch || (l.detached ? '(detached)' : ''))}</div>
     ${chips.length ? `<div class="chips">${chips.join('')}</div>` : ''}
     ${l.error ? `<div class="err">${esc(l.error)}</div>` : ''}
     ${p.error ? `<div class="err">GitHub: ${esc(p.error)}</div>` : ''}
-    <div class="actions">
-      <a class="btn ${gh ? '' : 'disabled'}" ${gh ? `href="${esc(gh)}" target="_blank" rel="noopener"` : ''} title="Open repository on GitHub">GitHub ↗</a>
-      ${editorBtn(r, 'Editor')}
-    </div>
+    <div class="actions">${editorBtn(r)}</div>
   </div>`;
 }
 
@@ -247,12 +255,12 @@ function checksChip(c) {
   return `<span class="chip yellow" title="${tip}">… ${c.pending} running · ${c.passed}/${c.total}</span>`;
 }
 
-function prCard(r, pr) {
+function prCard(r, pr, meta) {
   const busy = S.busy[`${r.id}:${pr.number}`];
   const showReason = !pr.ready && pr.blockedReason && pr.checks.state !== 'pending' && pr.checks.state !== 'failed';
   const n = `data-id="${r.id}" data-n="${pr.number}"`;
-  return `<div class="card">
-    ${cardTop(r)}
+  return `<div class="card ${isProblem(pr) ? 'attn' : ''}">
+    ${cardTop(r, meta?.url)}
     <a class="pr-title" href="${esc(pr.url)}" target="_blank" rel="noopener" title="${esc(pr.title)}">#${pr.number} ${esc(pr.title)}</a>
     <div class="branch one-line" title="${esc(pr.head + ' → ' + pr.base)}">${esc(pr.head)} → ${esc(pr.base)}</div>
     <div class="chips">
@@ -266,7 +274,7 @@ function prCard(r, pr) {
       <button class="merge" data-act="merge" ${n} ${pr.ready && !busy ? '' : 'disabled'}
         title="${esc(pr.ready ? 'Merge into ' + pr.base : pr.blockedReason)}">${busy ? 'Merging…' : `Merge · ${S.prefs.method}`}</button>
       <button data-act="snooze" ${n} title="Park this PR at the bottom of the column until it is ready to merge">💤</button>
-      ${editorBtn(r, '&lt;/&gt;')}
+      ${editorBtn(r)}
     </div>
     ${pr.checks.failedRuns.length ? `<button data-act="rerun" ${n} ${busy ? 'disabled' : ''}>Re-run failed</button>` : ''}
   </div>`;
@@ -346,6 +354,7 @@ const ACTIONS = {
   'close-drawer': () => { $('#drawer').hidden = true; },
   'editor': (el) => api('/api/editor', { id: el.dataset.id }).catch((e) => toast(e.message, 'bad')),
   'merge': (el) => doMerge(el.dataset.id, Number(el.dataset.n)),
+  'toggle-problems': () => { S.onlyProblems = !S.onlyProblems; draw(); },
   'snooze': (el) => setSnooze(el.dataset.id, Number(el.dataset.n), true),
   'unsnooze': (el) => setSnooze(el.dataset.id, Number(el.dataset.n), false),
   'toggle-snoozed': (el) => { S.snoozedOpen[el.dataset.col] = !S.snoozedOpen[el.dataset.col]; draw(); },
