@@ -32,6 +32,8 @@ function loadConfig() {
       name: String(g.name),
       repos: (g.repos || []).map((r) => ({ path: typeof r === 'string' ? r : r.path })),
     })) : [],
+    // PRs the user parked, as "<repoId>:<number>" keys.
+    snoozed: Array.isArray(cfg.snoozed) ? cfg.snoozed.filter((k) => typeof k === 'string') : [],
   };
 }
 
@@ -260,8 +262,20 @@ function removeRepo(id) {
   const cfg = loadConfig();
   for (const g of cfg.groups) g.repos = g.repos.filter((r) => lib.repoId(r.path) !== id);
   cfg.groups = cfg.groups.filter((g) => g.repos.length);
+  cfg.snoozed = cfg.snoozed.filter((k) => !k.startsWith(`${id}:`));
   saveConfig(cfg);
   metaCache.delete(id);
+}
+
+function setSnoozed(id, number, on) {
+  findRepo(id);
+  if (!Number.isInteger(number) || number < 1) throw new HttpError(400, 'Invalid PR number');
+  const key = `${id}:${number}`;
+  const cfg = loadConfig();
+  const rest = cfg.snoozed.filter((k) => k !== key);
+  cfg.snoozed = on ? [...rest, key] : rest;
+  saveConfig(cfg);
+  return { snoozed: cfg.snoozed };
 }
 
 function scanFolder(dir) {
@@ -286,6 +300,7 @@ const routes = {
     const cfg = loadConfig();
     return {
       editor: cfg.editor,
+      snoozed: cfg.snoozed,
       groups: cfg.groups.map((g) => ({
         name: g.name,
         repos: g.repos.map((r) => ({ id: lib.repoId(r.path), path: r.path, name: path.basename(r.path) })),
@@ -304,6 +319,7 @@ const routes = {
   'POST /api/merge': (q, b) => mergePr(findRepo(b.id), Number(b.number), b.method, !!b.deleteBranch),
   'POST /api/rerun': (q, b) => rerunFailed(findRepo(b.id), Number(b.number)),
   'POST /api/editor': (q, b) => { openEditor(findRepo(b.id), loadConfig().editor); return { ok: true }; },
+  'POST /api/snooze': (q, b) => setSnoozed(b.id, Number(b.number), !!b.on),
   'POST /api/repos': (q, b) => addRepo(b.path, b.group),
   'POST /api/repos/remove': (q, b) => { removeRepo(b.id); return { ok: true }; },
   'GET /api/scan': (q) => ({ repos: scanFolder(q.dir) }),
