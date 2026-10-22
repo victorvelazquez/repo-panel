@@ -8,6 +8,6 @@
   "scripts": {
     "start": "node server.js",
     "open": "node server.js --open",
-    "test": "node --test \"test/*.test.js\""
+    "test": "node --test"
   }
 }
