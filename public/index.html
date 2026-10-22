@@ -13,6 +13,10 @@
     <input id="search" type="search" placeholder="Filter repos…">
     <select id="groupFilter"></select>
     <span class="spacer"></span>
+    <label class="opt" title="Merge method used by every Merge button"><span>Merge method</span>
+      <select id="method" data-pref="method"><option>squash</option><option>merge</option><option>rebase</option></select></label>
+    <label class="opt" title="Delete the head branch after merging (ignored when the repo deletes merged branches itself)">
+      <input id="delBranch" type="checkbox" data-pref="del"> delete branch</label>
     <button data-act="refresh-all" title="Refresh everything">↻ Refresh</button>
     <button data-act="fetch-all" title="git fetch --prune on every repo">⇣ Fetch all</button>
     <button data-act="add-dialog" class="primary">+ Repo</button>
