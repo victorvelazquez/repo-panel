@@ -1,10 +1,12 @@
 {
   "name": "repo-panel",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Local single-page dashboard for uncommitted changes, open PRs and CI status across many git repos",
   "private": true,
   "license": "MIT",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "start": "node server.js",
     "open": "node server.js --open",
