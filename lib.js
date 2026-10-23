@@ -57,6 +57,25 @@ function parseGoneBranches(out) {
     .map(([name]) => name);
 }
 
+// Base branch name from `git symbolic-ref refs/remotes/origin/HEAD`; falls back to main.
+function parseBaseBranch(out) {
+  const m = /^refs\/remotes\/[^/]+\/(.+)$/.exec((out || '').trim());
+  return m ? m[1] : 'main';
+}
+
+const STALE_REASON = 'Fusionado: falta /flow-branch';
+
+// A working branch whose work already landed: its remote is gone, or a merged PR came from it.
+// The branch name may have been reused by a new open PR, which is live work and not stale.
+function staleBranch({ branch, base, gone, mergedPr, openPrs }) {
+  if (!branch || branch === base) return null;
+  if (gone) return { reason: STALE_REASON, via: 'gone', pr: null };
+  if (mergedPr && !(openPrs || []).some((p) => p.head === branch)) {
+    return { reason: STALE_REASON, via: 'merged', pr: mergedPr.number };
+  }
+  return null;
+}
+
 function statusLetter(xy) {
   if (xy === '??') return '?';
   const x = xy[0] !== '.' ? xy[0] : xy[1];
@@ -124,6 +143,6 @@ function encodeRef(ref) {
 }
 
 module.exports = {
-  repoId, parseStatus, parseNumstat, parseGoneBranches, statusLetter,
+  repoId, parseStatus, parseNumstat, parseGoneBranches, parseBaseBranch, staleBranch, statusLetter,
   summarizeChecks, blockedReason, enrichPr, encodeRef,
 };

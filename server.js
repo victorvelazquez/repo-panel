@@ -22,6 +22,12 @@ class HttpError extends Error {
 }
 
 // ---------- config ----------
+// Keeps per-repo settings (today: "base", the branch work is merged into) across a save.
+function loadRepo(r) {
+  if (typeof r === 'string') return { path: r };
+  return { path: r.path, ...(typeof r.base === 'string' && r.base ? { base: r.base } : {}) };
+}
+
 function loadConfig() {
   let cfg = {};
   try { cfg = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8')); } catch { /* first run */ }
@@ -30,7 +36,7 @@ function loadConfig() {
     editor: typeof cfg.editor === 'string' && cfg.editor ? cfg.editor : 'code',
     groups: Array.isArray(cfg.groups) ? cfg.groups.map((g) => ({
       name: String(g.name),
-      repos: (g.repos || []).map((r) => ({ path: typeof r === 'string' ? r : r.path })),
+      repos: (g.repos || []).map(loadRepo),
     })) : [],
     // PRs the user parked, as "<repoId>:<number>" keys.
     snoozed: Array.isArray(cfg.snoozed) ? cfg.snoozed.filter((k) => typeof k === 'string') : [],
@@ -178,6 +184,36 @@ async function repoMeta(repo) {
   return data;
 }
 
+// Merged PRs per repo+branch, cached briefly so a refresh does not hit the API every time.
+const mergedCache = new Map();
+const MERGED_TTL = 60 * 1000;
+
+async function mergedPrFor(repo, branch) {
+  const key = `${repo.id}:${branch}`;
+  const hit = mergedCache.get(key);
+  if (hit && Date.now() - hit.t < MERGED_TTL) return hit.pr;
+  const r = await gh(repo.path, ['pr', 'list', '--state', 'merged', '--head', branch, '--limit', '5', '--json', 'number,url,isCrossRepository']);
+  if (r.code !== 0) return null; // an unknown answer must not raise a false alarm, and is not cached
+  let pr = null;
+  try { pr = JSON.parse(r.stdout).find((p) => !p.isCrossRepository) || null; } catch { /* keep null */ }
+  mergedCache.set(key, { t: Date.now(), pr });
+  return pr;
+}
+
+// The current branch when its work already landed, so the next unit must start from a fresh branch.
+async function staleState(repo, openPrs) {
+  const b = await git(repo.path, ['symbolic-ref', '--short', '-q', 'HEAD']);
+  const branch = b.code === 0 ? b.stdout.trim() : '';
+  if (!branch) return null;
+  const sym = await git(repo.path, ['symbolic-ref', 'refs/remotes/origin/HEAD']);
+  const base = repo.base || lib.parseBaseBranch(sym.code === 0 ? sym.stdout : '');
+  if (branch === base) return null;
+  const fr = await git(repo.path, ['for-each-ref', '--format=%(refname:short)%09%(upstream:track)', 'refs/heads']);
+  const gone = fr.code === 0 && lib.parseGoneBranches(fr.stdout).includes(branch);
+  const mergedPr = gone ? null : await mergedPrFor(repo, branch);
+  return lib.staleBranch({ branch, base, gone, mergedPr, openPrs });
+}
+
 async function prState(repo) {
   if (!fs.existsSync(repo.path)) return { error: 'Folder not found' };
   let meta;
@@ -185,7 +221,8 @@ async function prState(repo) {
   if (meta.noRemote) return { noRemote: true, prs: [] };
   const r = await gh(repo.path, ['pr', 'list', '--state', 'open', '--limit', '50', '--json', PR_FIELDS]);
   if (r.code !== 0) return { repo: meta, error: firstLine(r.stderr) || 'gh pr list failed' };
-  return { repo: meta, prs: JSON.parse(r.stdout).map(lib.enrichPr) };
+  const prs = JSON.parse(r.stdout).map(lib.enrichPr);
+  return { repo: meta, prs, stale: await staleState(repo, prs) };
 }
 
 async function viewPr(repo, number) {

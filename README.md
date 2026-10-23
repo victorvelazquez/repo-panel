@@ -60,7 +60,9 @@ You can also create `config.json` by hand; copy `config.example.json` as a start
 | --- | --- | --- |
 | `port` | Port to listen on | `4310` |
 | `editor` | Command used by the *Editor* button | `code` |
-| `groups` | Named groups of repos (`{ "name", "repos": [{ "path" }] }`) | `[]` |
+| `groups` | Named groups of repos (`{ "name", "repos": [{ "path", "base" }] }`); `base` is optional | `[]` |
+
+`base` is the branch work is merged into. When omitted, the panel reads it from `origin/HEAD` and falls back to `main`.
 
 ## Merge behaviour
 
@@ -68,6 +70,7 @@ You can also create `config.json` by hand; copy `config.example.json` as a start
 - Merging goes through the GitHub API, so your local branches and working tree are never touched.
 - The server re-checks readiness right before merging and pins the merge to the PR head SHA, so a late push cancels it.
 - *Delete branch* is offered only when the repo does not already delete merged branches (`deleteBranchOnMerge`). If GitHub already removed the branch, that is treated as success, and local branches whose remote disappeared show as "remote branch deleted" instead of an error.
+- A repo whose current branch (other than the base) already landed gets a red **Fusionado: falta /flow-branch** mark and goes to the top of its column. The panel flags it when the remote branch is gone or a merged PR came from that branch, and not when a new open PR reuses the branch name.
 - Branch protection and required reviews on GitHub still apply.
 
 ## Security

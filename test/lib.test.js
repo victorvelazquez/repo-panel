@@ -77,3 +77,28 @@ test('repoId is stable and case-insensitive', () => {
   assert.equal(lib.repoId('C:\\Dev\\A'), lib.repoId('c:\\dev\\a'));
   assert.equal(lib.repoId('x').length, 10);
 });
+
+test('parseBaseBranch reads origin/HEAD and falls back to main', () => {
+  assert.equal(lib.parseBaseBranch('refs/remotes/origin/develop\n'), 'develop');
+  assert.equal(lib.parseBaseBranch('refs/remotes/origin/release/1.x\n'), 'release/1.x');
+  assert.equal(lib.parseBaseBranch(''), 'main');
+  assert.equal(lib.parseBaseBranch('garbage'), 'main');
+});
+
+test('staleBranch flags a working branch whose work was already merged', () => {
+  const merged = { number: 12, url: 'u' };
+  const gone = lib.staleBranch({ branch: 'docs/x', base: 'main', gone: true });
+  assert.deepEqual(gone, { reason: 'Fusionado: falta /flow-branch', via: 'gone', pr: null });
+  const viaPr = lib.staleBranch({ branch: 'docs/x', base: 'main', mergedPr: merged });
+  assert.deepEqual(viaPr, { reason: 'Fusionado: falta /flow-branch', via: 'merged', pr: 12 });
+});
+
+test('staleBranch stays quiet when there is nothing to start over from', () => {
+  const merged = { number: 12 };
+  assert.equal(lib.staleBranch({ branch: 'main', base: 'main', gone: true, mergedPr: merged }), null);
+  assert.equal(lib.staleBranch({ branch: null, base: 'main', gone: true }), null);
+  assert.equal(lib.staleBranch({ branch: 'docs/x', base: 'main' }), null);
+  // The branch name was reused for a new, still open PR.
+  assert.equal(lib.staleBranch({ branch: 'docs/x', base: 'main', mergedPr: merged, openPrs: [{ head: 'docs/x' }] }), null);
+  assert.notEqual(lib.staleBranch({ branch: 'docs/x', base: 'main', mergedPr: merged, openPrs: [{ head: 'other' }] }), null);
+});
