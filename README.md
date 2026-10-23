@@ -6,6 +6,7 @@ A local, single-window dashboard for the repos you work on. It answers one quest
 - Per repo: uncommitted files, `+/−` lines, unpushed commits, and a full diff viewer.
 - Per open PR: CI status and a **Merge** button that only enables when every check is green and GitHub reports the PR as mergeable. PRs with failed checks, conflicts or an outdated branch go to *Needs attention*.
 - Repos organised in groups (personal, work, commercial…), shown as a colored tag on each card, with a group filter and a name search.
+- A roadmap block on each repo card (in progress or next unit, progress bar, a problems badge and, on click, the roadmap header). It reads `docs/ROADMAP.md` from the remote base branch, not the working tree; repos without that file look unchanged.
 - Quick actions: open on GitHub, open in VS Code, `git fetch --prune`, re-run failed checks, refresh.
 
 Committing and opening PRs stay manual — the panel only observes, and merges when you click.

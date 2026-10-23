@@ -148,6 +148,9 @@ test('roadmap: the remote base branch wins over a dirty working tree', async () 
     assert.equal(r.json.sha, sh(repo.work, 'rev-parse', 'origin/main'));
     assert.deepEqual(r.json.rows.map((x) => x.id), ['A1', 'A2']);
     assert.equal(r.json.next.id, 'A2');
+    assert.deepEqual(Object.keys(r.json), ['available', 'base', 'sha', 'path', 'header', 'rows', 'problems', 'current', 'next', 'progress', 'summary']);
+    const s = r.json.summary;
+    assert.deepEqual([s.kind, s.id, s.done, s.total, s.pct], ['next', 'A2', 1, 2, 50]);
   });
 });
 

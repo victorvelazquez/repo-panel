@@ -328,3 +328,38 @@ test('parseRoadmap never throws on non-string input', () => {
   }
 });
 
+
+// ---- roadmapSummary ----
+test('roadmapSummary sample A: next unit, progress, problems and header', () => {
+  const s = lib.roadmapSummary({ available: true, ...lib.parseRoadmap(fixture('roadmap-a.md')) });
+  assert.equal(s.kind, 'next');
+  assert.equal(s.id, 'P2');
+  assert.equal(s.entrega, 'Cabecera');
+  assert.deepEqual(s.waiting, []);
+  assert.deepEqual([s.done, s.total, s.pct], [2, 5, 40]);
+  assert.deepEqual(s.problems, { total: 1, error: 0, warn: 0, info: 1 });
+  assert.deepEqual(s.header, { dondeEsta: 'esqueleto hecho.', queSigue: 'P2.', queLoBloquea: 'nada.' });
+});
+
+test('roadmapSummary prefers the unit in progress and lists its external dependencies', () => {
+  const s = lib.roadmapSummary(lib.parseRoadmap(`${HEAD}| T1 | one | — | Completada |\n| T6 | six | X9, Y1 | En curso |\n| T7 | seven | T1 | Pendiente |\n`));
+  assert.equal(s.kind, 'current');
+  assert.equal(s.id, 'T6');
+  assert.equal(s.entrega, 'six');
+  assert.deepEqual(s.waiting, ['X9', 'Y1']);
+});
+
+test('roadmapSummary kind is none without current or next; empty table gives pct 0', () => {
+  const done = lib.roadmapSummary(lib.parseRoadmap(`${HEAD}| A | a | — | Completada |\n`));
+  assert.deepEqual([done.kind, done.id, done.entrega, done.pct], ['none', null, null, 100]);
+  const empty = lib.roadmapSummary(lib.parseRoadmap(`${HEAD}`));
+  assert.deepEqual([empty.kind, empty.total, empty.pct], ['none', 0, 0]);
+});
+
+test('roadmapSummary counts problems by severity and ignores unavailable payloads', () => {
+  const s = lib.roadmapSummary(lib.parseRoadmap(`${HEAD}| A | a | — | Hecho |\n| B | b | Q | Lista |\n`));
+  assert.deepEqual(s.problems, { total: 3, error: 1, warn: 1, info: 1 });
+  assert.equal(lib.roadmapSummary({ available: false, reason: 'missing' }), null);
+  assert.equal(lib.roadmapSummary(null), null);
+  assert.equal(lib.roadmapSummary(undefined), null);
+});
