@@ -106,7 +106,8 @@ test('staleBranch stays quiet when there is nothing to start over from', () => {
 // ---- parseRoadmap ----
 const fs = require('node:fs');
 const path = require('node:path');
-const fixture = (n) => fs.readFileSync(path.join(__dirname, 'fixtures', n), 'utf8');
+// A Windows checkout may rewrite fixtures to CRLF; tests start from LF and add CRLF themselves.
+const fixture = (n) => fs.readFileSync(path.join(__dirname, 'fixtures', n), 'utf8').replace(/\r\n/g, '\n');
 const HEAD = '| ID | Entrega | Depende de | Estado |\n| --- | --- | --- | --- |\n';
 const codes = (r) => r.problems.map((p) => p.code);
 const problem = (r, code) => r.problems.find((p) => p.code === code);
