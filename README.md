@@ -41,6 +41,15 @@ npm run open       # same as start, and opens the browser (Windows only)
 npm test           # run the test suite
 ```
 
+## Start automatically at logon (Windows)
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/install-autostart.ps1    # install
+powershell -ExecutionPolicy Bypass -File scripts/uninstall-autostart.ps1  # remove
+```
+
+This registers a per-user scheduled task (no admin needed) that runs the panel hidden at every logon and retries every minute if it fails. The port never changes, so the URL stays stable and you can pin it as a browser app. Launching the panel while it is already running just exits quietly. If another program owns the port, the launch fails with a clear message instead of picking a different port.
+
 ## Configuration
 
 On first run there is nothing to configure: click **+ Repo** to add a single folder, or to scan a parent folder for every repo inside it. The panel saves your choices to `config.json`, which is git-ignored so your local paths are never committed.
