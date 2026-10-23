@@ -159,9 +159,11 @@ function buildCards() {
   for (const r of visibleRepos()) {
     if (!S.local[r.id] || !S.prs[r.id]) continue; // first load still running
     const { l, p, prs, dirty, unpushed } = info(r);
+    const stale = !!p.stale;
     if (l.error) add('changes', repoCard(r, true), true);
-    else if (dirty) add('changes', repoCard(r), false);
-    else if (unpushed) add('committed', repoCard(r), false);
+    else if (dirty) add('changes', repoCard(r, stale), stale);
+    else if (unpushed) add('committed', repoCard(r, stale), stale);
+    else if (stale) add('clean', repoCard(r, true), true);
     else if (!prs.length) add('clean', cleanRow(r), false);
     for (const pr of prs) {
       const key = prColumn(pr);
@@ -246,7 +248,8 @@ function repoCard(r, attn = false) {
   if (dirty) chips.push(`<button class="chip yellow chip-btn" data-act="diff" data-id="${r.id}" title="View diff">● ${l.files.length} file${l.files.length === 1 ? '' : 's'} <span class="add">+${l.added}</span> <span class="del">−${l.deleted}</span></button>`);
   if (unpushed) chips.push(`<span class="chip blue">↑ ${l.ahead} unpushed${l.noUpstream ? ' · no upstream' : ''}</span>`);
   if (l.behind) chips.push(`<span class="chip gray">↓ ${l.behind} behind</span>`);
-  if (l.currentGone) chips.push('<span class="chip gray" title="The remote branch was deleted (merged PR?)">remote branch deleted</span>');
+  if (p.stale) chips.push(`<span class="chip red" title="${esc(p.stale.via === 'merged' ? `PR #${p.stale.pr} from this branch was merged. Run /flow-branch to start from a fresh branch.` : 'The remote branch was deleted, so its work was merged. Run /flow-branch to start from a fresh branch.')}">${esc(p.stale.reason)}</span>`);
+  else if (l.currentGone) chips.push('<span class="chip gray" title="The remote branch was deleted (merged PR?)">remote branch deleted</span>');
   if (p.noRemote) chips.push('<span class="chip gray">no GitHub remote</span>');
   return `<div class="card ${attn ? 'attn' : ''}">
     ${cardTop(r, p.repo?.url)}

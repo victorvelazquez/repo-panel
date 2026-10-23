@@ -73,3 +73,26 @@ test('a launch exits 1 and keeps the same port when another program owns it', as
     assert.match(run.stderr, new RegExp(`Port ${port} is used by another program`));
   } finally { blocker.close(); }
 });
+
+test('per-repo settings survive a config save; plain repos stay plain', async () => {
+  const [A, B] = ['/x/a', '/x/b'];
+  const port = await freePort();
+  const file = configFor(port);
+  fs.writeFileSync(file, JSON.stringify({
+    port, groups: [{ name: 'g', repos: [{ path: A, base: 'develop' }, { path: B }] }],
+  }));
+  const child = spawn(process.execPath, [SERVER], { env: { ...process.env, REPO_PANEL_CONFIG: file }, stdio: 'pipe' });
+  try {
+    const html = (await waitFor(() => get(port, '/'))).body;
+    const token = /name="?token"? content="([0-9a-f]+)"/.exec(html)[1];
+    const id = require('../lib.js').repoId(A);
+    await new Promise((resolve, reject) => {
+      const req = http.request({ host: '127.0.0.1', port, path: '/api/snooze', method: 'POST', headers: { 'x-token': token, 'content-type': 'application/json' } }, (res) => { res.resume(); res.on('end', resolve); });
+      req.on('error', reject);
+      req.end(JSON.stringify({ id, number: 3, on: true }));
+    });
+    const saved = JSON.parse(fs.readFileSync(file, 'utf8'));
+    assert.deepEqual(saved.groups[0].repos, [{ path: A, base: 'develop' }, { path: B }]);
+    assert.equal(saved.snoozed.length, 1);
+  } finally { child.kill(); }
+});
