@@ -9,7 +9,7 @@ const { execFile, spawn } = require('node:child_process');
 const lib = require('./lib.js');
 
 const ROOT = __dirname;
-const CONFIG_PATH = path.join(ROOT, 'config.json');
+const CONFIG_PATH = process.env.REPO_PANEL_CONFIG || path.join(ROOT, 'config.json');
 const TOKEN = crypto.randomBytes(24).toString('hex');
 const MAX_PARALLEL = 8;
 const PR_FIELDS = [
@@ -344,6 +344,18 @@ const send = (res, status, body, type = 'application/json; charset=utf-8') => {
   res.end(typeof body === 'string' ? body : JSON.stringify(body));
 };
 
+function isPanelRunning(port) {
+  return new Promise((resolve) => {
+    const req = http.get({ host: '127.0.0.1', port, path: '/health', timeout: 1500 }, (res) => {
+      let data = '';
+      res.on('data', (c) => { data += c; });
+      res.on('end', () => { try { resolve(JSON.parse(data).app === 'repo-panel'); } catch { resolve(false); } });
+    });
+    req.on('timeout', () => req.destroy());
+    req.on('error', () => resolve(false));
+  });
+}
+
 function createServer(port) {
   const hostOk = new Set([`127.0.0.1:${port}`, `localhost:${port}`]);
   return http.createServer(async (req, res) => {
@@ -359,6 +371,8 @@ function createServer(port) {
         const [file, type] = STATIC[pathname];
         return send(res, 200, fs.readFileSync(path.join(ROOT, 'public', file), 'utf8'), type);
       }
+      // Lets a second launch tell "my own panel is already here" from "another project owns the port".
+      if (req.method === 'GET' && pathname === '/health') return send(res, 200, { app: 'repo-panel' });
       const handler = routes[`${req.method} ${pathname}`];
       if (!handler) throw new HttpError(404, 'Not found');
       if (req.headers['x-token'] !== TOKEN) throw new HttpError(401, 'Invalid token');
@@ -373,8 +387,14 @@ function createServer(port) {
 if (require.main === module) {
   const { port } = loadConfig();
   const server = createServer(port);
-  server.on('error', (e) => {
-    console.error(e.code === 'EADDRINUSE' ? `Port ${port} is already in use. Change "port" in config.json.` : e.message);
+  server.on('error', async (e) => {
+    if (e.code !== 'EADDRINUSE') { console.error(e.message); process.exit(1); }
+    // The URL must stay stable, so never fall back to another port.
+    if (await isPanelRunning(port)) {
+      console.log(`repo-panel is already running at http://127.0.0.1:${port}/`);
+      process.exit(0);
+    }
+    console.error(`Port ${port} is used by another program. Free it or change "port" in config.json.`);
     process.exit(1);
   });
   server.listen(port, '127.0.0.1', () => {
