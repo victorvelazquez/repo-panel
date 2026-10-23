@@ -197,9 +197,11 @@ function render() {
     </section>`).join('')}</div>`;
 }
 
+// Well-separated hues, assigned to groups by their position in config.json (wraps after 6 groups).
+const GROUP_HUES = [265, 140, 30, 185, 330, 55];
+
 function groupTag(name) {
-  let h = 0;
-  for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) % 360;
+  const h = GROUP_HUES[Math.max(0, S.groups.findIndex((g) => g.name === name)) % GROUP_HUES.length];
   return `<span class="tag" style="background:hsl(${h} 40% 20%);color:hsl(${h} 70% 78%)">${esc(name)}</span>`;
 }
 
