@@ -223,10 +223,11 @@ function cardTop(r, url) {
 // Clean repos have nothing to do, so they collapse to a single line.
 function cleanRow(r) {
   const { l, p } = info(r);
+  const behind = l.behind ? `<span class="behind" title="${l.behind} commit${l.behind === 1 ? '' : 's'} behind the remote — time to pull">↓${l.behind}</span>` : '';
   const warn = p.error ? `<span class="warn" title="${esc('GitHub: ' + p.error)}">⚠</span>` : '';
   return `<div class="clean-row">
     ${groupTag(r.group)}${repoName(r, p.repo?.url)}
-    <span class="branch" title="${esc(l.branch || '')}">${esc(l.branch || (l.detached ? '(detached)' : ''))}</span>${warn}${spinner(r)}
+    <span class="branch" title="${esc(l.branch || '')}">${esc(l.branch || (l.detached ? '(detached)' : ''))}</span>${behind}${warn}${spinner(r)}
     <span class="row-actions">${editorBtn(r)}${removeBtn(r)}</span>
   </div>`;
 }

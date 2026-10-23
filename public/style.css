@@ -141,3 +141,4 @@ a.repo-name:hover { text-decoration: none; color: var(--blue); }
 .alerts.active { background: var(--red); color: #fff; border-color: var(--red); }
 
 .chips .chip { white-space: normal; max-width: 100%; overflow-wrap: anywhere; }
+.clean-row .behind { flex: none; font-size: 12px; color: var(--muted); }
