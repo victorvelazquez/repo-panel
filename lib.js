@@ -310,7 +310,24 @@ function parseRoadmap(markdown) {
   return result(rows, next);
 }
 
+// What the repo card shows about a parsed roadmap; null when there is nothing usable to show.
+function roadmapSummary(rp) {
+  if (!rp || rp.available === false || !rp.progress) return null;
+  const unit = (rp.current && rp.current[0]) || rp.next || null;
+  const { total, completada } = rp.progress;
+  const count = (s) => (rp.problems || []).filter((p) => p.severity === s).length;
+  return {
+    kind: !unit ? 'none' : rp.current && rp.current.length ? 'current' : 'next',
+    id: unit ? unit.id : null,
+    entrega: unit ? unit.entrega : null,
+    waiting: unit ? unit.externalDeps : [],
+    done: completada, total, pct: total ? Math.round((completada / total) * 100) : 0,
+    problems: { total: (rp.problems || []).length, error: count('error'), warn: count('warn'), info: count('info') },
+    header: rp.header,
+  };
+}
+
 module.exports = {
   repoId, parseStatus, parseNumstat, parseGoneBranches, parseBaseBranch, staleBranch, statusLetter,
-  summarizeChecks, blockedReason, enrichPr, encodeRef, parseRoadmap, safeRelPath,
+  summarizeChecks, blockedReason, enrichPr, encodeRef, parseRoadmap, safeRelPath, roadmapSummary,
 };

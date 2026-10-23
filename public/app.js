@@ -5,7 +5,7 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 const store = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
 
 const S = {
-  groups: [], local: {}, prs: {}, loading: {}, busy: {},
+  groups: [], local: {}, prs: {}, roadmap: {}, rmOpen: {}, loading: {}, busy: {},
   snoozed: new Set(), keepSnoozed: new Set(), snoozedOpen: {}, onlyProblems: false,
   group: '', q: '',
   prefs: store('prefs', { method: 'squash', del: true }),
@@ -72,6 +72,8 @@ function refreshRepo(id) {
   return Promise.all([
     track(id, pooled(() => api(`/api/local?id=${id}`)).then((d) => { S.local[id] = d; }, (e) => { S.local[id] = { error: e.message }; })),
     track(id, pooled(() => api(`/api/prs?id=${id}`)).then((d) => { S.prs[id] = d; wakeReady(id, d); }, (e) => { S.prs[id] = { error: e.message }; })),
+    // The roadmap is optional: a repo without one, or a failed request, simply shows nothing extra.
+    track(id, pooled(() => api(`/api/roadmap?id=${id}`)).then((d) => { S.roadmap[id] = d; }, () => { S.roadmap[id] = null; })),
   ]);
 }
 
@@ -229,6 +231,26 @@ function cardTop(r, url) {
   return `<div class="card-top">${groupTag(r.group)}${repoName(r, url)}${spinner(r)}${removeBtn(r)}</div>`;
 }
 
+// What the project is working on, from the remote roadmap. Empty when the repo has no usable one.
+function roadmapBlock(r) {
+  const rp = S.roadmap[r.id];
+  const s = rp && rp.available ? rp.summary : null;
+  if (!s) return '';
+  const label = s.kind === 'current' ? 'In progress' : s.kind === 'next' ? 'Next' : '';
+  const text = label ? `${label}: ${s.id} ${s.entrega}${s.waiting.length ? ` · waiting: ${s.waiting.join(', ')}` : ''}` : '';
+  const p = s.problems;
+  const tip = (rp.problems || []).map((x) => `line ${x.line}: ${x.message}`).join('\n');
+  const badge = p.total > 0 ? `<span class="rm-badge ${p.error ? 'red' : p.warn ? 'yellow' : 'gray'}" title="${esc(tip)}">⚠ ${p.total}</span>` : '';
+  const open = !!S.rmOpen[r.id];
+  const h = s.header;
+  const lines = [['Where it stands:', h.dondeEsta], ['What is next:', h.queSigue], ['What blocks it:', h.queLoBloquea]].filter(([, v]) => v);
+  return `<div class="roadmap" data-act="toggle-roadmap" data-id="${r.id}" title="Click to show the roadmap header">
+    <div class="rm-line"><span class="rm-text" title="${esc(text)}">${esc(text)}</span>${badge}<span class="rm-count">${s.done}/${s.total}</span></div>
+    <div class="rm-bar"><span style="width:${s.pct}%"></span></div>
+    ${open ? `<div class="rm-header">${lines.map(([k, v]) => `<div><b>${k}</b> ${esc(v)}</div>`).join('')}</div>` : ''}
+  </div>`;
+}
+
 // Clean repos have nothing to do, so they collapse to a single line.
 function cleanRow(r) {
   const { l, p } = info(r);
@@ -238,6 +260,7 @@ function cleanRow(r) {
     ${groupTag(r.group)}${repoName(r, p.repo?.url)}
     <span class="branch" title="${esc(l.branch || '')}">${esc(l.branch || (l.detached ? '(detached)' : ''))}</span>${behind}${warn}${spinner(r)}
     <span class="row-actions">${removeBtn(r)}</span>
+    ${roadmapBlock(r)}
   </div>`;
 }
 
@@ -253,6 +276,7 @@ function repoCard(r, attn = false) {
   return `<div class="card ${attn ? 'attn' : ''}">
     ${cardTop(r, p.repo?.url)}
     <div class="branch one-line" title="${esc(l.branch || '')}">${esc(l.branch || (l.detached ? '(detached)' : ''))}</div>
+    ${roadmapBlock(r)}
     ${chips.length ? `<div class="chips">${chips.join('')}</div>` : ''}
     ${l.error ? `<div class="err">${esc(l.error)}</div>` : ''}
     ${p.error ? `<div class="err">GitHub: ${esc(p.error)}</div>` : ''}
@@ -368,6 +392,7 @@ const ACTIONS = {
   'snooze': (el) => setSnooze(el.dataset.id, Number(el.dataset.n), true),
   'unsnooze': (el) => setSnooze(el.dataset.id, Number(el.dataset.n), false),
   'toggle-snoozed': (el) => { S.snoozedOpen[el.dataset.col] = !S.snoozedOpen[el.dataset.col]; draw(); },
+  'toggle-roadmap': (el) => { S.rmOpen[el.dataset.id] = !S.rmOpen[el.dataset.id]; draw(); },
   'rerun': (el) => doRerun(el.dataset.id, Number(el.dataset.n)),
   'remove': async (el) => {
     const id = el.dataset.id;

@@ -228,6 +228,8 @@ async function staleState(repo, openPrs) {
 // Read from the remote base branch, not the working tree: a unit is done only once its PR is merged.
 const roadmapCache = new Map();
 
+const withSummary = (data) => ({ ...data, summary: lib.roadmapSummary(data) });
+
 async function roadmapState(repo) {
   if (!fs.existsSync(repo.path)) return { available: false, reason: 'no-repo' };
   const top = await git(repo.path, ['rev-parse', '--git-dir']);
@@ -243,7 +245,7 @@ async function roadmapState(repo) {
   if (hit && hit.sha === sha) return hit.data;
   const show = await git(repo.path, ['show', `${ref}:${file}`]);
   const data = show.code === 0
-    ? { available: true, base, sha, path: file, ...lib.parseRoadmap(show.stdout) }
+    ? withSummary({ available: true, base, sha, path: file, ...lib.parseRoadmap(show.stdout) })
     : { available: false, reason: 'missing', base, path: file };
   roadmapCache.set(key, { sha, data });
   return data;
