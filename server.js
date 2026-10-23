@@ -22,10 +22,15 @@ class HttpError extends Error {
 }
 
 // ---------- config ----------
-// Keeps per-repo settings (today: "base", the branch work is merged into) across a save.
+// Keeps per-repo settings ("base": the branch work is merged into; "roadmap": its plan file) across a save.
 function loadRepo(r) {
   if (typeof r === 'string') return { path: r };
-  return { path: r.path, ...(typeof r.base === 'string' && r.base ? { base: r.base } : {}) };
+  const roadmap = lib.safeRelPath(r.roadmap);
+  return {
+    path: r.path,
+    ...(typeof r.base === 'string' && r.base ? { base: r.base } : {}),
+    ...(roadmap ? { roadmap } : {}),
+  };
 }
 
 function loadConfig() {
@@ -200,18 +205,49 @@ async function mergedPrFor(repo, branch) {
   return pr;
 }
 
+// The branch work is merged into: the configured one, else origin/HEAD, else "main".
+async function baseBranchOf(repo) {
+  if (repo.base) return repo.base;
+  const sym = await git(repo.path, ['symbolic-ref', 'refs/remotes/origin/HEAD']);
+  return lib.parseBaseBranch(sym.code === 0 ? sym.stdout : '');
+}
+
 // The current branch when its work already landed, so the next unit must start from a fresh branch.
 async function staleState(repo, openPrs) {
   const b = await git(repo.path, ['symbolic-ref', '--short', '-q', 'HEAD']);
   const branch = b.code === 0 ? b.stdout.trim() : '';
   if (!branch) return null;
-  const sym = await git(repo.path, ['symbolic-ref', 'refs/remotes/origin/HEAD']);
-  const base = repo.base || lib.parseBaseBranch(sym.code === 0 ? sym.stdout : '');
+  const base = await baseBranchOf(repo);
   if (branch === base) return null;
   const fr = await git(repo.path, ['for-each-ref', '--format=%(refname:short)%09%(upstream:track)', 'refs/heads']);
   const gone = fr.code === 0 && lib.parseGoneBranches(fr.stdout).includes(branch);
   const mergedPr = gone ? null : await mergedPrFor(repo, branch);
   return lib.staleBranch({ branch, base, gone, mergedPr, openPrs });
+}
+
+// ---------- roadmap ----------
+// Read from the remote base branch, not the working tree: a unit is done only once its PR is merged.
+const roadmapCache = new Map();
+
+async function roadmapState(repo) {
+  if (!fs.existsSync(repo.path)) return { available: false, reason: 'no-repo' };
+  const top = await git(repo.path, ['rev-parse', '--git-dir']);
+  if (top.code !== 0) return { available: false, reason: 'no-repo' };
+  const base = await baseBranchOf(repo);
+  const file = repo.roadmap || 'docs/ROADMAP.md';
+  const ref = `origin/${base}`;
+  const rev = await git(repo.path, ['rev-parse', '--verify', '-q', `${ref}^{commit}`]);
+  if (rev.code !== 0) return { available: false, reason: 'no-base', base, path: file };
+  const sha = rev.stdout.trim();
+  const key = `${repo.id}|${file}`;
+  const hit = roadmapCache.get(key);
+  if (hit && hit.sha === sha) return hit.data;
+  const show = await git(repo.path, ['show', `${ref}:${file}`]);
+  const data = show.code === 0
+    ? { available: true, base, sha, path: file, ...lib.parseRoadmap(show.stdout) }
+    : { available: false, reason: 'missing', base, path: file };
+  roadmapCache.set(key, { sha, data });
+  return data;
 }
 
 async function prState(repo) {
@@ -347,6 +383,7 @@ const routes = {
   },
   'GET /api/local': (q) => localState(findRepo(q.id)),
   'GET /api/prs': (q) => prState(findRepo(q.id)),
+  'GET /api/roadmap': (q) => roadmapState(findRepo(q.id)),
   'GET /api/diff': (q) => diffText(findRepo(q.id)),
   'POST /api/fetch': async (q, b) => {
     const repo = findRepo(b.id);

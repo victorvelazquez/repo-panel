@@ -188,6 +188,14 @@ function rmState(raw) {
   return { estado, detalle };
 }
 
+// A repo-relative file path from config, with "/" separators; null when absent or unsafe.
+function safeRelPath(p) {
+  if (typeof p !== 'string') return null;
+  const s = p.trim().replace(/\\/g, '/');
+  if (!s || s.startsWith('-') || s.startsWith('/') || /^[a-z]:/i.test(s)) return null;
+  return s.split('/').includes('..') ? null : s;
+}
+
 // Parses the docs/ROADMAP.md contract: header lines plus the units table. Never throws.
 function parseRoadmap(markdown) {
   const lines = (typeof markdown === 'string' ? markdown : '').replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n')
@@ -304,5 +312,5 @@ function parseRoadmap(markdown) {
 
 module.exports = {
   repoId, parseStatus, parseNumstat, parseGoneBranches, parseBaseBranch, staleBranch, statusLetter,
-  summarizeChecks, blockedReason, enrichPr, encodeRef, parseRoadmap,
+  summarizeChecks, blockedReason, enrichPr, encodeRef, parseRoadmap, safeRelPath,
 };
