@@ -22,7 +22,6 @@ The panel shells out to `git` and the GitHub CLI, so both must be installed and 
    gh auth status     # must show "Logged in"
    ```
    The token needs the `repo` scope (PRs, CI status, merging) and `workflow` to re-run failed checks. `gh auth login` grants `repo` by default; add `workflow` with `gh auth refresh -s workflow`.
-4. *(Optional)* A command-line editor launcher such as `code` for the *Editor* button.
 
 Quick check that everything is ready: `node --version && git --version && gh auth status`. PRs, CI status and Merge depend on `gh`; the local git view only needs `git`.
 
@@ -59,7 +58,6 @@ You can also create `config.json` by hand; copy `config.example.json` as a start
 | Key | Meaning | Default |
 | --- | --- | --- |
 | `port` | Port to listen on | `4310` |
-| `editor` | Command used by the *Editor* button | `code` |
 | `groups` | Named groups of repos (`{ "name", "repos": [{ "path", "base", "roadmap" }] }`); `base` and `roadmap` are optional | `[]` |
 
 `base` is the branch work is merged into. When omitted, the panel reads it from `origin/HEAD` and falls back to `main`. `roadmap` is the repo-relative path of its plan file (default `docs/ROADMAP.md`); unsafe values (absolute, starting with `-`, or containing `..`) are ignored.
