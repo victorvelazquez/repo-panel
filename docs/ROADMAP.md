@@ -1,8 +1,8 @@
 # Hoja de ruta de repo-panel
 
-**Dónde está:** el panel muestra cambios, commits, PR y CI, marca las ramas ya fusionadas y adoptó el registro de Orquestación (RP0, RP4).
-**Qué sigue:** RP1, `parseRoadmap` puro en `lib.js`.
-**Qué lo bloquea:** que se fusione el PR de RP4.
+**Dónde está:** el panel muestra cambios, commits, PR y CI, marca las ramas ya fusionadas, adoptó el registro de Orquestación (RP0, RP4) y `parseRoadmap` ya existe en `lib.js` con pruebas (RP1).
+**Qué sigue:** RP2, el servidor lee `docs/ROADMAP.md` de la rama base remota.
+**Qué lo bloquea:** que se fusione el PR de RP1.
 
 <!-- Estado: UNA palabra entre Pendiente, En curso, Completada y Bloqueada.
      "Lista" y "En revisión" las calculan Git y el alojamiento; no se escriben.
@@ -12,7 +12,7 @@
 | ID | Entrega | Resultado visible | Depende de | Estado | Notas | Ficha |
 | --- | --- | --- | --- | --- | --- | --- |
 | RP0 | Adoptar la Orquestación (perfil «compatible con panel») | Reglas en `AGENTS.md` y esta hoja de ruta | — | Completada | | — |
-| RP1 | `parseRoadmap(markdown)` puro en `lib.js`, con pruebas | Función probada con las muestras A y B | RP0 | Pendiente | | — |
+| RP1 | `parseRoadmap(markdown)` puro en `lib.js`, con pruebas | Función probada con las muestras A y B | RP0 | Completada | | — |
 | RP2 | El servidor lee `docs/ROADMAP.md` de la rama base remota | Datos de tareas en el estado de cada repositorio | RP1 | Pendiente | Rama base: `origin/HEAD`, respaldo `main` | — |
 | RP3 | Tarjeta con en curso, siguiente, progreso, cabecera e insignia de problemas | Unidad y progreso visibles en la tarjeta | RP2 | Pendiente | | — |
 | RP3b | Estados calculados `Lista` y `En revisión` | Unidades con trabajo en marcha marcadas | RP2 | Pendiente | | — |
