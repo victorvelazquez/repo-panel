@@ -100,7 +100,7 @@ main { max-width: none; padding: 8px; }
 
 .card { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
 .card-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.tag { font-size: 11px; padding: 0 7px; border-radius: 8px; }
+.tag { font-size: 11px; padding: 0 7px; border-radius: 8px; flex: none; }
 .pr-title { font-weight: 500; overflow-wrap: anywhere; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .card .actions { margin-left: 0; margin-top: 2px; }
@@ -139,3 +139,5 @@ a.repo-name:hover { text-decoration: none; color: var(--blue); }
 .card.attn { border-color: #7a2a27; box-shadow: inset 3px 0 0 var(--red); }
 .alerts { color: var(--red); border-color: #5a1f1c; background: #2a1213; font-weight: 600; }
 .alerts.active { background: var(--red); color: #fff; border-color: var(--red); }
+
+.chips .chip { white-space: normal; max-width: 100%; overflow-wrap: anywhere; }
