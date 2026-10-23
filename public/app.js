@@ -236,8 +236,8 @@ function roadmapBlock(r) {
   const rp = S.roadmap[r.id];
   const s = rp && rp.available ? rp.summary : null;
   if (!s) return '';
-  const label = s.kind === 'current' ? 'In progress' : s.kind === 'next' ? 'Next' : '';
-  const text = label ? `${label}: ${s.id} ${s.entrega}${s.waiting.length ? ` · waiting: ${s.waiting.join(', ')}` : ''}` : '';
+  const label = { review: 'In review', ready: 'Ready', current: 'In progress', next: 'Next' }[s.kind] || '';
+  const text = label ? `${label}: ${s.id} ${s.entrega}${s.pr ? ` · PR #${s.pr}` : ''}${s.waiting.length ? ` · waiting: ${s.waiting.join(', ')}` : ''}${s.extra > 0 ? ` · +${s.extra} more` : ''}` : '';
   const p = s.problems;
   const tip = (rp.problems || []).map((x) => `line ${x.line}: ${x.message}`).join('\n');
   const badge = p.total > 0 ? `<span class="rm-badge ${p.error ? 'red' : p.warn ? 'yellow' : 'gray'}" title="${esc(tip)}">⚠ ${p.total}</span>` : '';
@@ -245,7 +245,7 @@ function roadmapBlock(r) {
   const h = s.header;
   const lines = [['Where it stands:', h.dondeEsta], ['What is next:', h.queSigue], ['What blocks it:', h.queLoBloquea]].filter(([, v]) => v);
   return `<div class="roadmap" data-act="toggle-roadmap" data-id="${r.id}" title="Click to show the roadmap header">
-    <div class="rm-line"><span class="rm-text" title="${esc(text)}">${esc(text)}</span>${badge}<span class="rm-count">${s.done}/${s.total}</span></div>
+    <div class="rm-line"><span class="rm-dot ${esc(s.kind)}"></span><span class="rm-text" title="${esc(text)}">${esc(text)}</span>${badge}<span class="rm-count">${s.done}/${s.total}</span></div>
     <div class="rm-bar"><span style="width:${s.pct}%"></span></div>
     ${open ? `<div class="rm-header">${lines.map(([k, v]) => `<div><b>${k}</b> ${esc(v)}</div>`).join('')}</div>` : ''}
   </div>`;

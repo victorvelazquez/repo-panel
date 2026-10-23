@@ -148,6 +148,10 @@ a.repo-name:hover { text-decoration: none; color: var(--blue); }
 .rm-line { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .rm-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rm-count { flex: none; }
+.rm-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--gray); }
+.rm-dot.review { background: var(--blue); }
+.rm-dot.ready { background: var(--green); }
+.rm-dot.current { background: var(--yellow); }
 .rm-bar { height: 3px; margin-top: 3px; border-radius: 2px; background: var(--line); overflow: hidden; }
 .rm-bar span { display: block; height: 100%; background: var(--green); }
 .rm-badge { flex: none; padding: 0 6px; border-radius: 10px; border: 1px solid var(--line); }

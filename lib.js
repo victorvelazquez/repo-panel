@@ -196,6 +196,40 @@ function safeRelPath(p) {
   return s.split('/').includes('..') ? null : s;
 }
 
+// Rows in a dependency cycle (DFS with colors); `report(dep, cycle)` is called once per cycle found.
+function rmFindCycles(byId, report) {
+  const cyclic = new Set();
+  const color = new Map();
+  const visit = (row, path) => {
+    color.set(row, 1);
+    path.push(row);
+    for (const id of row.dependsOn) {
+      const dep = byId.get(id);
+      if (color.get(dep) === 1) {
+        const cycle = path.slice(path.indexOf(dep));
+        cycle.forEach((r) => cyclic.add(r));
+        report(dep, cycle);
+      } else if (!color.has(dep)) visit(dep, path);
+    }
+    path.pop();
+    color.set(row, 2);
+  };
+  for (const row of byId.values()) if (!color.has(row)) visit(row, []);
+  return cyclic;
+}
+
+// First Pendiente row whose table dependencies are all Completada, skipping cycles and `skip` IDs.
+function rmNext(rows, byId, cyclic, skip) {
+  return rows.find((r) => r.estado === 'Pendiente' && !cyclic.has(r) && !skip[r.id]
+    && r.dependsOn.every((id) => byId.get(id).estado === 'Completada')) || null;
+}
+
+const rmById = (rows) => {
+  const byId = new Map();
+  for (const r of rows) if (!byId.has(r.id)) byId.set(r.id, r);
+  return byId;
+};
+
 // Parses the docs/ROADMAP.md contract: header lines plus the units table. Never throws.
 function parseRoadmap(markdown) {
   const lines = (typeof markdown === 'string' ? markdown : '').replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n')
@@ -265,8 +299,7 @@ function parseRoadmap(markdown) {
     rows.push(row);
   }
 
-  const byId = new Map();
-  for (const r of rows) if (!byId.has(r.id)) byId.set(r.id, r);
+  const byId = rmById(rows);
   rows.forEach((row, i) => {
     for (const tok of pending[i].split(/[,;]/).map((t) => t.trim())) {
       if (!tok || /^[—–-]$/.test(tok)) continue;
@@ -278,24 +311,9 @@ function parseRoadmap(markdown) {
     }
   });
 
-  // Cycles among table dependencies (DFS with colors; each cycle is reported once).
-  const cyclic = new Set();
-  const color = new Map();
-  const visit = (row, path) => {
-    color.set(row, 1);
-    path.push(row);
-    for (const id of row.dependsOn) {
-      const dep = byId.get(id);
-      if (color.get(dep) === 1) {
-        const cycle = path.slice(path.indexOf(dep));
-        cycle.forEach((r) => cyclic.add(r));
-        add(dep.line, 'error', 'circular-dependency', `Circular dependency: ${[...cycle, dep].map((r) => r.id).join(' -> ')}`);
-      } else if (!color.has(dep)) visit(dep, path);
-    }
-    path.pop();
-    color.set(row, 2);
-  };
-  for (const row of byId.values()) if (!color.has(row)) visit(row, []);
+  const cyclic = rmFindCycles(byId, (dep, cycle) => {
+    add(dep.line, 'error', 'circular-dependency', `Circular dependency: ${[...cycle, dep].map((r) => r.id).join(' -> ')}`);
+  });
 
   // A table separated from the chosen one by a blank line must itself be a valid table.
   let k = table.end;
@@ -305,22 +323,74 @@ function parseRoadmap(markdown) {
     if (stray) add(k + 1, 'error', 'row-after-blank', 'Table row after a blank line is ignored; remove the blank line');
   }
 
-  const next = rows.find((r) => r.estado === 'Pendiente' && !cyclic.has(r)
-    && r.dependsOn.every((id) => byId.get(id).estado === 'Completada')) || null;
-  return result(rows, next);
+  return result(rows, rmNext(rows, byId, cyclic, {}));
+}
+
+// True when `id` appears in `text` as a complete token, case-insensitive. Letters and digits are
+// token characters; a "." followed by one is too, so "p2" does not match "p2.1-x".
+function matchesUnitId(text, id) {
+  if (!text || !id) return false;
+  const t = String(text).toLowerCase();
+  const needle = String(id).toLowerCase();
+  const alnum = (c) => c !== undefined && /[\p{L}\p{N}]/u.test(c);
+  const joins = (c, other) => alnum(c) || (c === '.' && alnum(other));
+  for (let i = t.indexOf(needle); i !== -1; i = t.indexOf(needle, i + 1)) {
+    const end = i + needle.length;
+    if (!joins(t[i - 1], t[i - 2]) && !joins(t[end], t[end + 1])) return true;
+  }
+  return false;
+}
+
+const DERIVED_ORDER = ['En revisión', 'Lista', 'En curso'];
+
+// States computed from Git and GitHub, never written in the file. Precedence per unit:
+// En revisión (open PR) > Lista (work on a branch) > En curso (only a branch). Completada and
+// Bloqueada rows are never touched; with duplicate IDs the first row wins.
+function deriveUnitStates(rows, facts) {
+  const { current, dirty, aheadCurrent, branches = [], localBranches = [], prs = [] } = facts || {};
+  const out = {};
+  for (const [id, row] of rmById(rows || [])) {
+    if (row.estado === 'Completada' || row.estado === 'Bloqueada') continue;
+    const has = (name) => matchesUnitId(name, id);
+    const pr = prs.find((p) => has(p.title) || has(p.head));
+    if (pr) { out[id] = { state: 'En revisión', via: 'pr', pr: pr.number }; continue; }
+    const ready = current && has(current) && (dirty || aheadCurrent > 0) ? current : branches.find(has);
+    if (ready) { out[id] = { state: 'Lista', via: 'branch', branch: ready }; continue; }
+    const only = [current, ...localBranches].find((n) => n && has(n));
+    if (only && row.estado !== 'En curso') out[id] = { state: 'En curso', via: 'branch', branch: only };
+  }
+  return out;
+}
+
+// Same rule as parseRoadmap's `next`, also skipping units with a derived state.
+function nextUnit(rows, derived) {
+  const byId = rmById(rows);
+  return rmNext(rows, byId, rmFindCycles(byId, () => {}), derived || {});
 }
 
 // What the repo card shows about a parsed roadmap; null when there is nothing usable to show.
+// Unit shown: the first active one (derived state or En curso in the file) by precedence, else `next`.
 function roadmapSummary(rp) {
   if (!rp || rp.available === false || !rp.progress) return null;
-  const unit = (rp.current && rp.current[0]) || rp.next || null;
+  const derived = rp.derived || {};
+  const rows = rp.rows || [];
+  const stateOf = (r) => (derived[r.id] && derived[r.id].state) || (r.estado === 'En curso' ? 'En curso' : null);
+  const seen = new Set();
+  const active = rows.filter((r) => !seen.has(r.id) && seen.add(r.id) && stateOf(r))
+    .sort((a, b) => DERIVED_ORDER.indexOf(stateOf(a)) - DERIVED_ORDER.indexOf(stateOf(b)));
+  const unit = active[0] || (rows.length || !rp.next ? nextUnit(rows, derived) : rp.next);
+  const state = active[0] ? stateOf(unit) : null;
   const { total, completada } = rp.progress;
   const count = (s) => (rp.problems || []).filter((p) => p.severity === s).length;
+  const kinds = { 'En revisión': 'review', Lista: 'ready', 'En curso': 'current' };
   return {
-    kind: !unit ? 'none' : rp.current && rp.current.length ? 'current' : 'next',
+    kind: !unit ? 'none' : state ? kinds[state] : 'next',
+    state,
     id: unit ? unit.id : null,
     entrega: unit ? unit.entrega : null,
     waiting: unit ? unit.externalDeps : [],
+    pr: state && derived[unit.id] && derived[unit.id].pr !== undefined ? derived[unit.id].pr : null,
+    extra: Math.max(0, active.length - (active[0] ? 1 : 0)),
     done: completada, total, pct: total ? Math.round((completada / total) * 100) : 0,
     problems: { total: (rp.problems || []).length, error: count('error'), warn: count('warn'), info: count('info') },
     header: rp.header,
@@ -330,4 +400,5 @@ function roadmapSummary(rp) {
 module.exports = {
   repoId, parseStatus, parseNumstat, parseGoneBranches, parseBaseBranch, staleBranch, statusLetter,
   summarizeChecks, blockedReason, enrichPr, encodeRef, parseRoadmap, safeRelPath, roadmapSummary,
+  matchesUnitId, deriveUnitStates, nextUnit,
 };
