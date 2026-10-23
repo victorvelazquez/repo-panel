@@ -215,7 +215,7 @@ const editorBtn = (r) => `<button data-act="editor" data-id="${r.id}" title="Ope
 
 // Repo name + group on the left, remove (with confirmation) pinned to the right.
 function cardTop(r, url) {
-  return `<div class="card-top">${repoName(r, url)}${groupTag(r.group)}${spinner(r)}${removeBtn(r)}</div>`;
+  return `<div class="card-top">${groupTag(r.group)}${repoName(r, url)}${spinner(r)}${removeBtn(r)}</div>`;
 }
 
 // Clean repos have nothing to do, so they collapse to a single line.
@@ -223,7 +223,7 @@ function cleanRow(r) {
   const { l, p } = info(r);
   const warn = p.error ? `<span class="warn" title="${esc('GitHub: ' + p.error)}">⚠</span>` : '';
   return `<div class="clean-row">
-    ${repoName(r, p.repo?.url)}${groupTag(r.group)}
+    ${groupTag(r.group)}${repoName(r, p.repo?.url)}
     <span class="branch" title="${esc(l.branch || '')}">${esc(l.branch || (l.detached ? '(detached)' : ''))}</span>${warn}${spinner(r)}
     <span class="row-actions">${editorBtn(r)}${removeBtn(r)}</span>
   </div>`;
