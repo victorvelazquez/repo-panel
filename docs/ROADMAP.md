@@ -16,7 +16,7 @@
 | RP2 | El servidor lee `docs/ROADMAP.md` de la rama base remota | Datos de tareas en el estado de cada repositorio | RP1 | Pendiente | Rama base: `origin/HEAD`, respaldo `main` | — |
 | RP3 | Tarjeta con en curso, siguiente, progreso, cabecera e insignia de problemas | Unidad y progreso visibles en la tarjeta | RP2 | Pendiente | | — |
 | RP3b | Estados calculados `Lista` y `En revisión` | Unidades con trabajo en marcha marcadas | RP2 | Pendiente | | — |
-| RP4 | Razón «Fusionado: falta `/flow-branch`» | Tarjeta con marca de atención en rama ya fusionada | RP0 | Completada | Se hizo antes que RP1; suma `base` por repo en la configuración | — |
+| RP4 | Razón «Merged: run /flow-branch» | Tarjeta con marca de atención en rama ya fusionada | RP0 | Completada | Se hizo antes que RP1; suma `base` por repo en la configuración. No verificado: la vía `gh` (PR fusionado) no tiene prueba de integración; la cubren la prueba pura y una comprobación manual | — |
 | RP5 | Franja «Ir a trabajar en» y `priority` en la configuración | Lista ordenada de acciones sobre el tablero | RP3, RP3b, RP4 | Pendiente | | — |
 | RP6 | Vista de conformidad | Lista de repositorios sin `ROADMAP.md` o con problemas | RP3 | Pendiente | | — |
 | RP7 | Dependencias con prefijo de otro proyecto (`PREFIJO-ID`) | «espera: …» y estado del otro repositorio | RP2, RP3 | Pendiente | Opcional; informativa, nunca bloquea | — |

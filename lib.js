@@ -63,7 +63,7 @@ function parseBaseBranch(out) {
   return m ? m[1] : 'main';
 }
 
-const STALE_REASON = 'Fusionado: falta /flow-branch';
+const STALE_REASON = 'Merged: run /flow-branch';
 
 // A working branch whose work already landed: its remote is gone, or a merged PR came from it.
 // The branch name may have been reused by a new open PR, which is live work and not stale.
