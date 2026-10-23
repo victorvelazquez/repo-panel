@@ -267,13 +267,14 @@ function removeRepo(id) {
   metaCache.delete(id);
 }
 
-function setSnoozed(id, number, on) {
+// A key ends in ":ready" when the PR was already ready at snooze time, so it is never auto-woken.
+function setSnoozed(id, number, on, wasReady) {
   findRepo(id);
   if (!Number.isInteger(number) || number < 1) throw new HttpError(400, 'Invalid PR number');
   const key = `${id}:${number}`;
   const cfg = loadConfig();
-  const rest = cfg.snoozed.filter((k) => k !== key);
-  cfg.snoozed = on ? [...rest, key] : rest;
+  const rest = cfg.snoozed.filter((k) => k !== key && k !== `${key}:ready`);
+  cfg.snoozed = on ? [...rest, wasReady ? `${key}:ready` : key] : rest;
   saveConfig(cfg);
   return { snoozed: cfg.snoozed };
 }
@@ -319,7 +320,7 @@ const routes = {
   'POST /api/merge': (q, b) => mergePr(findRepo(b.id), Number(b.number), b.method, !!b.deleteBranch),
   'POST /api/rerun': (q, b) => rerunFailed(findRepo(b.id), Number(b.number)),
   'POST /api/editor': (q, b) => { openEditor(findRepo(b.id), loadConfig().editor); return { ok: true }; },
-  'POST /api/snooze': (q, b) => setSnoozed(b.id, Number(b.number), !!b.on),
+  'POST /api/snooze': (q, b) => setSnoozed(b.id, Number(b.number), !!b.on, !!b.wasReady),
   'POST /api/repos': (q, b) => addRepo(b.path, b.group),
   'POST /api/repos/remove': (q, b) => { removeRepo(b.id); return { ok: true }; },
   'GET /api/scan': (q) => ({ repos: scanFolder(q.dir) }),

@@ -6,7 +6,7 @@ const store = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d;
 
 const S = {
   groups: [], local: {}, prs: {}, loading: {}, busy: {},
-  snoozed: new Set(), snoozedOpen: {}, onlyProblems: false,
+  snoozed: new Set(), keepSnoozed: new Set(), snoozedOpen: {}, onlyProblems: false,
   group: '', q: '',
   prefs: store('prefs', { method: 'squash', del: true }),
   lastRefresh: 0, scan: [],
@@ -51,7 +51,13 @@ const allRepos = () => S.groups.flatMap((g) => g.repos.map((r) => ({ ...r, group
 async function loadConfig() {
   const cfg = await api('/api/config');
   S.groups = cfg.groups;
-  S.snoozed = new Set(cfg.snoozed);
+  S.snoozed = new Set();
+  S.keepSnoozed = new Set();
+  for (const k of cfg.snoozed) {
+    const base = k.replace(/:ready$/, '');
+    S.snoozed.add(base);
+    if (base !== k) S.keepSnoozed.add(base);
+  }
   $('#groupList').innerHTML = S.groups.map((g) => `<option value="${esc(g.name)}">`).join('');
   $('#groupFilter').innerHTML = `<option value="">All groups</option>${S.groups.map((g) => `<option ${S.group === g.name ? 'selected' : ''}>${esc(g.name)}</option>`).join('')}`;
 }
@@ -69,10 +75,11 @@ function refreshRepo(id) {
   ]);
 }
 
-// A snoozed PR that becomes ready to merge is worth seeing again, so it is woken up automatically.
+// A PR snoozed while still blocked is woken up when it becomes ready to merge. One snoozed while
+// already ready was parked on purpose, so it stays parked until the user brings it back.
 function wakeReady(id, d) {
   for (const pr of d.prs || []) {
-    if (pr.ready && S.snoozed.has(snoozeKey(id, pr.number))) setSnooze(id, pr.number, false, true);
+    if (pr.ready && S.snoozed.has(snoozeKey(id, pr.number)) && !S.keepSnoozed.has(snoozeKey(id, pr.number))) setSnooze(id, pr.number, false, true);
   }
 }
 
@@ -90,13 +97,14 @@ const snoozeKey = (id, n) => `${id}:${n}`;
 
 async function setSnooze(id, n, on, auto = false) {
   const key = snoozeKey(id, n);
-  if (on) S.snoozed.add(key); else S.snoozed.delete(key);
+  const wasReady = on && !!(S.prs[id]?.prs || []).find((x) => x.number === n)?.ready;
+  if (on) { S.snoozed.add(key); if (wasReady) S.keepSnoozed.add(key); } else { S.snoozed.delete(key); S.keepSnoozed.delete(key); }
   draw();
   try {
-    await api('/api/snooze', { id, number: n, on });
+    await api('/api/snooze', { id, number: n, on, wasReady });
     if (auto) toast(`#${n} (${nameOf(id)}) is ready to merge — back on the board`, 'ok');
   } catch (e) {
-    if (on) S.snoozed.delete(key); else S.snoozed.add(key);
+    if (on) { S.snoozed.delete(key); S.keepSnoozed.delete(key); } else S.snoozed.add(key);
     draw();
     toast(e.message, 'bad');
   }
@@ -223,10 +231,11 @@ function cardTop(r, url) {
 // Clean repos have nothing to do, so they collapse to a single line.
 function cleanRow(r) {
   const { l, p } = info(r);
+  const behind = l.behind ? `<span class="behind" title="${l.behind} commit${l.behind === 1 ? '' : 's'} behind the remote — time to pull">↓${l.behind}</span>` : '';
   const warn = p.error ? `<span class="warn" title="${esc('GitHub: ' + p.error)}">⚠</span>` : '';
   return `<div class="clean-row">
     ${groupTag(r.group)}${repoName(r, p.repo?.url)}
-    <span class="branch" title="${esc(l.branch || '')}">${esc(l.branch || (l.detached ? '(detached)' : ''))}</span>${warn}${spinner(r)}
+    <span class="branch" title="${esc(l.branch || '')}">${esc(l.branch || (l.detached ? '(detached)' : ''))}</span>${behind}${warn}${spinner(r)}
     <span class="row-actions">${editorBtn(r)}${removeBtn(r)}</span>
   </div>`;
 }
@@ -275,7 +284,7 @@ function prCard(r, pr, meta) {
     <div class="merge-row">
       <button class="merge" data-act="merge" ${n} ${pr.ready && !busy ? '' : 'disabled'}
         title="${esc(pr.ready ? 'Merge into ' + pr.base : pr.blockedReason)}">${busy ? 'Merging…' : `Merge · ${S.prefs.method}`}</button>
-      <button data-act="snooze" ${n} title="Park this PR at the bottom of the column until it is ready to merge">💤</button>
+      <button data-act="snooze" ${n} title="Park this PR at the bottom of the column until it is ready to merge (stays parked if it is already ready)">💤</button>
       ${editorBtn(r)}
     </div>
     ${pr.checks.failedRuns.length ? `<button data-act="rerun" ${n} ${busy ? 'disabled' : ''}>Re-run failed</button>` : ''}
