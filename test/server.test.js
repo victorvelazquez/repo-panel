@@ -148,7 +148,8 @@ test('roadmap: the remote base branch wins over a dirty working tree', async () 
     assert.equal(r.json.sha, sh(repo.work, 'rev-parse', 'origin/main'));
     assert.deepEqual(r.json.rows.map((x) => x.id), ['A1', 'A2']);
     assert.equal(r.json.next.id, 'A2');
-    assert.deepEqual(Object.keys(r.json), ['available', 'base', 'sha', 'path', 'header', 'rows', 'problems', 'current', 'next', 'progress', 'summary']);
+    assert.deepEqual(Object.keys(r.json), ['available', 'base', 'sha', 'path', 'header', 'rows', 'problems', 'current', 'next', 'progress', 'summary', 'derived']);
+    assert.deepEqual(r.json.derived, {});
     const s = r.json.summary;
     assert.deepEqual([s.kind, s.id, s.done, s.total, s.pct], ['next', 'A2', 1, 2, 50]);
   });
@@ -202,5 +203,68 @@ test('roadmap: custom path through config; unsafe paths fall back to the default
     const r = (await call()).json;
     assert.equal(r.path, 'docs/ROADMAP.md');
     assert.deepEqual(r.rows.map((x) => x.id), ['R1']);
+  });
+});
+
+// ---- derived states: Lista / En curso from Git, gh failures are silent ----
+const planP2 = () => rows(['P1', 'Completada'], ['P2', 'Pendiente'], ['P3', 'Pendiente']);
+const branchWithCommit = (repo, name) => {
+  sh(repo.work, 'checkout', '-q', '-b', name);
+  fs.writeFileSync(path.join(repo.work, `${name.replace(/\W/g, '_')}.txt`), 'x\n');
+  sh(repo.work, 'add', '-A'); sh(repo.work, 'commit', '-q', '-m', 'work');
+};
+
+test('roadmap derived: a local branch with commits over main makes the unit Lista and next skips it', async () => {
+  const repo = originAndClone({ 'docs/ROADMAP.md': planP2() });
+  branchWithCommit(repo, 'feat/p2-x');
+  sh(repo.work, 'checkout', '-q', 'main');
+  await withRoadmap(repo, async (call) => {
+    const r = await call();
+    assert.equal(r.status, 200);
+    assert.deepEqual(r.json.derived, { P2: { state: 'Lista', via: 'branch', branch: 'feat/p2-x' } });
+    assert.equal(r.json.next.id, 'P3');
+    assert.deepEqual([r.json.summary.kind, r.json.summary.id, r.json.summary.extra], ['ready', 'P2', 0]);
+  });
+});
+
+test('roadmap derived: the current branch with an uncommitted file is Lista; a clean branch-only is En curso', async () => {
+  const repo = originAndClone({ 'docs/ROADMAP.md': planP2() });
+  sh(repo.work, 'checkout', '-q', '-b', 'feat/p2-x');
+  await withRoadmap(repo, async (call) => {
+    assert.deepEqual((await call()).json.derived, { P2: { state: 'En curso', via: 'branch', branch: 'feat/p2-x' } });
+    fs.writeFileSync(path.join(repo.work, 'new.txt'), 'x\n');
+    const dirty = (await call()).json;
+    assert.deepEqual(dirty.derived, { P2: { state: 'Lista', via: 'branch', branch: 'feat/p2-x' } });
+    assert.equal(dirty.next.id, 'P3');
+    fs.rmSync(path.join(repo.work, 'new.txt'));
+    const clean = (await call()).json;
+    assert.equal(clean.derived.P2.state, 'En curso');
+    assert.equal(clean.next.id, 'P3');
+    assert.deepEqual(clean.rows.map((x) => x.estado), ['Completada', 'Pendiente', 'Pendiente']);
+  });
+});
+
+test('roadmap derived: a branch whose remote is gone is ignored', async () => {
+  const repo = originAndClone({ 'docs/ROADMAP.md': planP2() });
+  branchWithCommit(repo, 'feat/p2-x');
+  sh(repo.work, 'push', '-q', '-u', 'origin', 'feat/p2-x');
+  sh(repo.work, 'checkout', '-q', 'main');
+  sh(repo.work, 'push', '-q', 'origin', '--delete', 'feat/p2-x');
+  sh(repo.work, 'fetch', '-q', '--prune');
+  await withRoadmap(repo, async (call) => {
+    const r = (await call()).json;
+    assert.deepEqual(r.derived, {});
+    assert.equal(r.next.id, 'P2');
+  });
+});
+
+test('roadmap derived: a repo without a GitHub remote answers 200 with Git-only states', async () => {
+  const repo = originAndClone({ 'docs/ROADMAP.md': planP2() });
+  branchWithCommit(repo, 'feat/p3-y');
+  await withRoadmap(repo, async (call) => {
+    const r = await call();
+    assert.equal(r.status, 200);
+    assert.deepEqual(r.json.derived, { P3: { state: 'Lista', via: 'branch', branch: 'feat/p3-y' } });
+    assert.equal(r.json.next.id, 'P2');
   });
 });

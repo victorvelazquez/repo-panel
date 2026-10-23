@@ -7,6 +7,7 @@ A local, single-window dashboard for the repos you work on. It answers one quest
 - Per open PR: CI status and a **Merge** button that only enables when every check is green and GitHub reports the PR as mergeable. PRs with failed checks, conflicts or an outdated branch go to *Needs attention*.
 - Repos organised in groups (personal, work, commercial…), shown as a colored tag on each card, with a group filter and a name search.
 - A roadmap block on each repo card (in progress or next unit, progress bar, a problems badge and, on click, the roadmap header). It reads `docs/ROADMAP.md` from the remote base branch, not the working tree; repos without that file look unchanged.
+- The states `Lista`, `En revisión` and `En curso` (derived) are computed from Git and GitHub, never written in the file. A unit is linked to a branch or an open PR by its ID inside the branch name or the PR title; those units are skipped when picking the next one (`siguiente`).
 - Quick actions: open on GitHub, open in VS Code, `git fetch --prune`, re-run failed checks, refresh.
 
 Committing and opening PRs stay manual — the panel only observes, and merges when you click.
@@ -72,6 +73,22 @@ You can also create `config.json` by hand; copy `config.example.json` as a start
 - A repo whose current branch (other than the base) already landed gets a red **Merged: run /flow-branch** mark and goes to the top of its column. The panel flags it when the remote branch is gone or a merged PR came from that branch, and not when a new open PR reuses the branch name.
 - `GET /api/roadmap?id=<repo>` returns the parsed `docs/ROADMAP.md` read with `git show origin/<base>:<path>`, never from the working tree, so a unit counts as done only once its PR is merged. Run a fetch to see newer data. A repo without the file answers `available: false` (not an error).
 - Branch protection and required reviews on GitHub still apply.
+
+## Computed unit states
+
+The roadmap file only holds `Pendiente`, `En curso`, `Completada` and `Bloqueada`. The panel adds three states computed from Git and GitHub, never written in the file. A unit is linked to work by its ID as a complete token in a branch name or in an open PR title (`p2` matches `p2-header` and `feat/p2_x`, not `p20-x`, `p2.1-x` or `rp3b-x` for `rp3`).
+
+- Precedence per unit: `En revisión` > `Lista` > `En curso` (derived) > the state written in the file. `Completada` and `Bloqueada` units are never overridden.
+- `En revisión`: an open PR has the ID in its title or head branch.
+- `Lista`: the current branch has the ID and the tree has changes or commits over the base, or another local branch with the ID has commits over `origin/<base>`.
+- `En curso` (derived): a local branch with the ID exists, but it has no commits over the base and the tree is clean. A row written as `En curso` in the file creates no derived entry; it is only replaced when it becomes `Lista` or `En revisión`.
+- `siguiente` skips every unit that has a derived state.
+- A branch merged by squash still counts as not merged for Git, so it can only affect units that are not `Completada`, and it is ignored when its remote branch was deleted.
+
+Known limits and what is not verified:
+
+- Only the first 30 local branches are inspected; a matching branch beyond that is not seen.
+- The real GitHub path (`En revisión` from `gh pr list`) and its rendering in the browser have no automated test; pure functions cover the logic.
 
 ## Security
 

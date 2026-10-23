@@ -363,3 +363,95 @@ test('roadmapSummary counts problems by severity and ignores unavailable payload
   assert.equal(lib.roadmapSummary(null), null);
   assert.equal(lib.roadmapSummary(undefined), null);
 });
+
+// ---- matchesUnitId ----
+test('matchesUnitId matches the ID as a complete token, case-insensitive', () => {
+  const yes = [['p2', 'p2-cabecera'], ['p2', 'feat/p2_x'], ['p2', 'P2: cabecera'], ['p2', 'docs/p2'], ['P2', 'feat/p2-x'],
+    ['a-1', 'feat/a-1-x'], ['p2.1', 'feat/p2.1-x'], ['p2', 'p2'], ['p2', 'fix p2.'], ['rp3b', 'rp3b-x']];
+  for (const [id, text] of yes) assert.equal(lib.matchesUnitId(text, id), true, `${id} in ${text}`);
+  const no = [['p2', 'p20-x'], ['p2', 'xp2'], ['rp3', 'rp3b-x'], ['rp3b', 'rp3-x'], ['p2', 'p2.1-x'], ['p2', 'p3-x'], ['a.b', 'axb']];
+  for (const [id, text] of no) assert.equal(lib.matchesUnitId(text, id), false, `${id} in ${text}`);
+});
+
+test('matchesUnitId finds a later occurrence and treats empty or regex-like input safely', () => {
+  assert.equal(lib.matchesUnitId('xp2 p2', 'p2'), true);
+  assert.equal(lib.matchesUnitId('', 'p2'), false);
+  assert.equal(lib.matchesUnitId('p2', ''), false);
+  assert.equal(lib.matchesUnitId(undefined, 'p2'), false);
+  assert.equal(lib.matchesUnitId('anything', '.*'), false);
+});
+
+// ---- deriveUnitStates / nextUnit ----
+const FACTS = { current: null, dirty: false, aheadCurrent: 0, branches: [], localBranches: [], prs: [] };
+const rowsOf = (...pairs) => lib.parseRoadmap(`${HEAD}${pairs.map(([id, st, dep = '—']) => `| ${id} | e-${id} | ${dep} | ${st} |`).join('\n')}\n`).rows;
+const derive = (rows, facts) => lib.deriveUnitStates(rows, { ...FACTS, ...facts });
+
+test('deriveUnitStates: an open PR by title or by head branch means En revisión', () => {
+  const rows = rowsOf(['P2', 'Pendiente'], ['P3', 'Pendiente']);
+  const d = derive(rows, { prs: [{ number: 7, title: 'P2: header', head: 'x' }, { number: 8, title: 'other', head: 'feat/p3-y' }] });
+  assert.deepEqual(d, { P2: { state: 'En revisión', via: 'pr', pr: 7 }, P3: { state: 'En revisión', via: 'pr', pr: 8 } });
+});
+
+test('deriveUnitStates: current branch with changes or commits is Lista; clean and not ahead is En curso', () => {
+  const rows = rowsOf(['P2', 'Pendiente']);
+  const cur = { current: 'feat/p2-x', localBranches: ['main', 'feat/p2-x'] };
+  assert.deepEqual(derive(rows, { ...cur, dirty: true }), { P2: { state: 'Lista', via: 'branch', branch: 'feat/p2-x' } });
+  assert.deepEqual(derive(rows, { ...cur, aheadCurrent: 2 }), { P2: { state: 'Lista', via: 'branch', branch: 'feat/p2-x' } });
+  assert.deepEqual(derive(rows, cur), { P2: { state: 'En curso', via: 'branch', branch: 'feat/p2-x' } });
+});
+
+test('deriveUnitStates: another branch ahead of the base is Lista; a branch alone is En curso', () => {
+  const rows = rowsOf(['P2', 'Pendiente'], ['P3', 'Pendiente']);
+  const d = derive(rows, { current: 'main', dirty: true, branches: ['feat/p2-x'], localBranches: ['main', 'feat/p2-x', 'feat/p3-y'] });
+  assert.deepEqual(d, {
+    P2: { state: 'Lista', via: 'branch', branch: 'feat/p2-x' },
+    P3: { state: 'En curso', via: 'branch', branch: 'feat/p3-y' },
+  });
+});
+
+test('deriveUnitStates: precedence, untouched states, token matching and duplicate IDs', () => {
+  const rows = rowsOf(['P2', 'Pendiente'], ['P3', 'Completada'], ['P4', 'Bloqueada'], ['RP3', 'Pendiente'], ['RP3b', 'En curso']);
+  const d = derive(rows, {
+    current: 'feat/p2-x', dirty: true, localBranches: ['feat/p2-x', 'feat/p3-x', 'feat/p4-x', 'feat/rp3b-x'],
+    prs: [{ number: 1, title: 'P2 done', head: 'feat/p2-x' }, { number: 2, title: 'P3', head: 'feat/p3-x' }],
+  });
+  assert.deepEqual(d, { P2: { state: 'En revisión', via: 'pr', pr: 1 } });
+  const d2 = derive(rows, { localBranches: ['feat/rp3b-x'], branches: ['feat/rp3b-x'] });
+  assert.deepEqual(d2, { RP3b: { state: 'Lista', via: 'branch', branch: 'feat/rp3b-x' } });
+  const dup = derive(rowsOf(['P2', 'Pendiente'], ['P2', 'Pendiente']), { prs: [{ number: 4, title: 'P2', head: 'h' }] });
+  assert.deepEqual(Object.keys(dup), ['P2']);
+});
+
+test('deriveUnitStates: an En curso row stays En curso when only a branch exists', () => {
+  assert.deepEqual(derive(rowsOf(['P2', 'En curso']), { localBranches: ['feat/p2-x'] }), {});
+});
+
+test('nextUnit equals parseRoadmap next without derived and skips derived units', () => {
+  for (const f of ['roadmap-a.md', 'roadmap-b.md']) {
+    const r = lib.parseRoadmap(fixture(f));
+    assert.equal(lib.nextUnit(r.rows, {}), r.next, f);
+  }
+  const rows = rowsOf(['A', 'Completada'], ['B', 'Pendiente', 'A'], ['C', 'Pendiente', 'A']);
+  assert.equal(lib.nextUnit(rows, {}).id, 'B');
+  assert.equal(lib.nextUnit(rows, { B: { state: 'Lista' } }).id, 'C');
+  assert.equal(lib.nextUnit(rows, { B: { state: 'Lista' }, C: { state: 'En curso' } }), null);
+  const cyc = rowsOf(['A', 'Pendiente', 'B'], ['B', 'Completada', 'A']);
+  assert.equal(lib.nextUnit(cyc, {}), null);
+});
+
+test('roadmapSummary: kinds review, ready, current, next and none with pr and extra', () => {
+  const rp = lib.parseRoadmap(`${HEAD}| A | a | — | Completada |\n| B | b | A | Pendiente |\n| C | c | A | Pendiente |\n| D | d | A | En curso |\n| E | e | A | Pendiente |\n`);
+  const sum = (derived) => lib.roadmapSummary({ available: true, ...rp, derived });
+  const review = sum({ C: { state: 'En revisión', via: 'pr', pr: 9 }, B: { state: 'Lista', via: 'branch', branch: 'b' } });
+  assert.deepEqual([review.kind, review.state, review.id, review.pr, review.extra], ['review', 'En revisión', 'C', 9, 2]);
+  const ready = sum({ B: { state: 'Lista', via: 'branch', branch: 'b' } });
+  assert.deepEqual([ready.kind, ready.state, ready.id, ready.pr, ready.extra], ['ready', 'Lista', 'B', null, 1]);
+  const current = sum({});
+  assert.deepEqual([current.kind, current.state, current.id, current.pr, current.extra], ['current', 'En curso', 'D', null, 0]);
+  const nxt = lib.roadmapSummary(lib.parseRoadmap(`${HEAD}| A | a | — | Completada |\n| B | b | A | Pendiente |\n`));
+  assert.deepEqual([nxt.kind, nxt.state, nxt.id, nxt.pr, nxt.extra], ['next', null, 'B', null, 0]);
+  const none = lib.roadmapSummary({ available: true, ...lib.parseRoadmap(`${HEAD}| A | a | — | Pendiente |\n`), derived: { A: { state: 'En revisión', pr: 1 } } });
+  assert.equal(none.kind, 'review');
+  const idle = lib.roadmapSummary(lib.parseRoadmap(`${HEAD}| A | a | — | Completada |\n`));
+  assert.deepEqual([idle.kind, idle.state, idle.pr, idle.extra], ['none', null, null, 0]);
+});
