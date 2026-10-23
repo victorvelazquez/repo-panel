@@ -142,7 +142,167 @@ function encodeRef(ref) {
   return ref.split('/').map(encodeURIComponent).join('/');
 }
 
+// ---- ROADMAP.md parsing ----
+const RM_STATES = ['Pendiente', 'En curso', 'Completada', 'Bloqueada', 'Lista', 'En revisión'];
+const RM_REQUIRED = ['ID', 'Entrega', 'Depende de', 'Estado'];
+const RM_HEADER = { 'donde esta': 'dondeEsta', 'que sigue': 'queSigue', 'que lo bloquea': 'queLoBloquea' };
+const RM_STATE_RE = /(?<!\p{L})(en curso|pendiente|completada|bloqueada|lista|en revisi[oó]n)(?!\p{L})/iu;
+const rmNorm = (s) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+const rmPlain = (s) => s.replace(/\*\*|`/g, '').trim();
+
+// Cells of a table line; `\|` is a literal pipe, outer pipes are optional.
+function rmCells(line) {
+  let s = line.trim();
+  if (s.startsWith('|')) s = s.slice(1);
+  if (s.endsWith('|') && !s.endsWith('\\|')) s = s.slice(0, -1);
+  const cells = [''];
+  for (let i = 0; i < s.length; i++) {
+    if (s[i] === '\\' && s[i + 1] === '|') { cells[cells.length - 1] += '|'; i++; }
+    else if (s[i] === '|') cells.push('');
+    else cells[cells.length - 1] += s[i];
+  }
+  return cells.map((c) => c.trim());
+}
+
+// Runs of consecutive `|` lines; `valid` when the second line is a separator row.
+function rmBlocks(lines) {
+  const blocks = [];
+  for (let i = 0; i < lines.length;) {
+    if (!lines[i].trim().startsWith('|')) { i++; continue; }
+    let j = i;
+    while (j < lines.length && lines[j].trim().startsWith('|')) j++;
+    const valid = j - i >= 2 && rmCells(lines[i + 1]).every((c) => /^:?-+:?$/.test(c));
+    blocks.push({ start: i, end: j, valid });
+    i = j;
+  }
+  return blocks;
+}
+
+function rmState(raw) {
+  const m = RM_STATE_RE.exec(raw);
+  if (!m) return { estado: null, detalle: '' };
+  const estado = RM_STATES.find((s) => rmNorm(s) === rmNorm(m[1]));
+  let detalle = (raw.slice(0, m.index) + ' ' + raw.slice(m.index + m[0].length)).trim()
+    .replace(/^[\s,;:.\-–—]+|[\s,;:.\-–—]+$/g, '');
+  if (detalle.startsWith('(') && detalle.endsWith(')')) detalle = detalle.slice(1, -1).trim();
+  return { estado, detalle };
+}
+
+// Parses the docs/ROADMAP.md contract: header lines plus the units table. Never throws.
+function parseRoadmap(markdown) {
+  const lines = (typeof markdown === 'string' ? markdown : '').replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n')
+    .replace(/<!--[\s\S]*?-->/g, (c) => c.replace(/[^\n]/g, '')).split('\n');
+  const problems = [];
+  const add = (line, severity, code, message) => problems.push({ line, severity, code, message });
+  const header = { dondeEsta: null, queSigue: null, queLoBloquea: null };
+  for (const l of lines) {
+    const m = /^([^:|]+):\s*(.*)$/.exec(rmPlain(l));
+    const key = m && RM_HEADER[rmNorm(m[1])];
+    if (key && header[key] === null) header[key] = m[2].trim();
+  }
+
+  const blocks = rmBlocks(lines);
+  const colsOf = (b) => new Map(rmCells(lines[b.start]).map((c, i) => [rmNorm(c), i]).reverse());
+  const tables = blocks.filter((b) => b.valid);
+  const table = tables.find((b) => RM_REQUIRED.every((n) => colsOf(b).has(rmNorm(n))));
+  const result = (rows, next) => {
+    const count = (s) => rows.filter((r) => r.estado === s).length;
+    return {
+      header, rows, problems: problems.sort((a, b) => a.line - b.line),
+      current: rows.filter((r) => r.estado === 'En curso'), next,
+      progress: {
+        total: rows.length, completada: count('Completada'), pendiente: count('Pendiente'),
+        enCurso: count('En curso'), bloqueada: count('Bloqueada'), lista: count('Lista'),
+        enRevision: count('En revisión'), desconocido: count(null),
+      },
+    };
+  };
+  if (!table) {
+    if (!tables.length) add(1, 'error', 'no-table', 'No table found');
+    else {
+      const missing = RM_REQUIRED.filter((n) => !colsOf(tables[0]).has(rmNorm(n)));
+      add(tables[0].start + 1, 'error', 'missing-column', `Table is missing required columns: ${missing.join(', ')}`);
+    }
+    return result([], null);
+  }
+
+  const cols = colsOf(table);
+  const ncols = rmCells(lines[table.start]).length;
+  const col = (name) => cols.get(rmNorm(name));
+  const rows = [];
+  const pending = [];
+  for (let n = table.start + 2; n < table.end; n++) {
+    let cells = rmCells(lines[n]);
+    if (cells.every((c) => c === '')) continue;
+    if (cells.length > ncols) {
+      add(n + 1, 'error', 'pipe-in-cell', 'More cells than columns; escape a literal pipe as \\|');
+    }
+    cells = cells.slice(0, ncols);
+    const get = (name) => rmPlain(cells[col(name)] || '');
+    const { estado, detalle } = rmState(get('Estado'));
+    const row = {
+      id: get('ID'), entrega: get('Entrega'), resultadoVisible: get('Resultado visible'),
+      dependsOn: [], externalDeps: [], estado, estadoDetalle: detalle, declaredByHand: false,
+      notas: get('Notas'), ficha: get('Ficha'), line: n + 1,
+    };
+    if (!/^[A-Za-z][A-Za-z0-9._-]*$/.test(row.id)) add(row.line, 'error', 'bad-id', `Invalid ID "${row.id}"`);
+    else if (rows.some((r) => r.id === row.id)) add(row.line, 'error', 'duplicate-id', `Duplicate ID ${row.id}`);
+    if (estado === null) add(row.line, 'error', 'unknown-state', `Unknown state "${get('Estado')}"`);
+    if (detalle) add(row.line, 'warn', 'state-detail', `State has extra detail "${detalle}"; move it to Notas`);
+    if (estado === 'Lista' || estado === 'En revisión') {
+      row.declaredByHand = true;
+      add(row.line, 'warn', 'hand-state', `"${estado}" is computed by the panel; do not write it by hand`);
+    }
+    pending.push(get('Depende de'));
+    rows.push(row);
+  }
+
+  const byId = new Map();
+  for (const r of rows) if (!byId.has(r.id)) byId.set(r.id, r);
+  rows.forEach((row, i) => {
+    for (const tok of pending[i].split(/[,;]/).map((t) => t.trim())) {
+      if (!tok || /^[—–-]$/.test(tok)) continue;
+      if (byId.has(tok)) row.dependsOn.push(tok);
+      else {
+        row.externalDeps.push(tok);
+        add(row.line, 'info', 'missing-dependency', `Dependency "${tok}" is not a row of this table`);
+      }
+    }
+  });
+
+  // Cycles among table dependencies (DFS with colors; each cycle is reported once).
+  const cyclic = new Set();
+  const color = new Map();
+  const visit = (row, path) => {
+    color.set(row, 1);
+    path.push(row);
+    for (const id of row.dependsOn) {
+      const dep = byId.get(id);
+      if (color.get(dep) === 1) {
+        const cycle = path.slice(path.indexOf(dep));
+        cycle.forEach((r) => cyclic.add(r));
+        add(dep.line, 'error', 'circular-dependency', `Circular dependency: ${[...cycle, dep].map((r) => r.id).join(' -> ')}`);
+      } else if (!color.has(dep)) visit(dep, path);
+    }
+    path.pop();
+    color.set(row, 2);
+  };
+  for (const row of byId.values()) if (!color.has(row)) visit(row, []);
+
+  // A table separated from the chosen one by a blank line must itself be a valid table.
+  let k = table.end;
+  if (k < lines.length && lines[k].trim() === '') {
+    while (k < lines.length && lines[k].trim() === '') k++;
+    const stray = blocks.find((b) => b.start === k && !b.valid);
+    if (stray) add(k + 1, 'error', 'row-after-blank', 'Table row after a blank line is ignored; remove the blank line');
+  }
+
+  const next = rows.find((r) => r.estado === 'Pendiente' && !cyclic.has(r)
+    && r.dependsOn.every((id) => byId.get(id).estado === 'Completada')) || null;
+  return result(rows, next);
+}
+
 module.exports = {
   repoId, parseStatus, parseNumstat, parseGoneBranches, parseBaseBranch, staleBranch, statusLetter,
-  summarizeChecks, blockedReason, enrichPr, encodeRef,
+  summarizeChecks, blockedReason, enrichPr, encodeRef, parseRoadmap,
 };
