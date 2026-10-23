@@ -223,7 +223,6 @@ const repoName = (r, url) => (url
   : `<span class="repo-name">${esc(r.name)}</span>`);
 
 const removeBtn = (r) => `<button class="x" data-act="remove" data-id="${r.id}" title="Remove from panel (deletes nothing)">✕</button>`;
-const editorBtn = (r) => `<button data-act="editor" data-id="${r.id}" title="Open in editor">&lt;/&gt;</button>`;
 
 // Repo name + group on the left, remove (with confirmation) pinned to the right.
 function cardTop(r, url) {
@@ -238,7 +237,7 @@ function cleanRow(r) {
   return `<div class="clean-row">
     ${groupTag(r.group)}${repoName(r, p.repo?.url)}
     <span class="branch" title="${esc(l.branch || '')}">${esc(l.branch || (l.detached ? '(detached)' : ''))}</span>${behind}${warn}${spinner(r)}
-    <span class="row-actions">${editorBtn(r)}${removeBtn(r)}</span>
+    <span class="row-actions">${removeBtn(r)}</span>
   </div>`;
 }
 
@@ -257,7 +256,6 @@ function repoCard(r, attn = false) {
     ${chips.length ? `<div class="chips">${chips.join('')}</div>` : ''}
     ${l.error ? `<div class="err">${esc(l.error)}</div>` : ''}
     ${p.error ? `<div class="err">GitHub: ${esc(p.error)}</div>` : ''}
-    <div class="actions">${editorBtn(r)}</div>
   </div>`;
 }
 
@@ -288,7 +286,6 @@ function prCard(r, pr, meta) {
       <button class="merge" data-act="merge" ${n} ${pr.ready && !busy ? '' : 'disabled'}
         title="${esc(pr.ready ? 'Merge into ' + pr.base : pr.blockedReason)}">${busy ? 'Merging…' : `Merge · ${S.prefs.method}`}</button>
       <button data-act="snooze" ${n} title="Park this PR at the bottom of the column until it is ready to merge (stays parked if it is already ready)">💤</button>
-      ${editorBtn(r)}
     </div>
     ${pr.checks.failedRuns.length ? `<button data-act="rerun" ${n} ${busy ? 'disabled' : ''}>Re-run failed</button>` : ''}
   </div>`;
@@ -366,7 +363,6 @@ const ACTIONS = {
   'fetch-all': async () => { toast('Fetching all repos…'); await Promise.all(allRepos().map((r) => fetchRepo(r.id))); toast('Fetch done', 'ok'); },
   'diff': (el) => openDiff(el.dataset.id),
   'close-drawer': () => { $('#drawer').hidden = true; },
-  'editor': (el) => api('/api/editor', { id: el.dataset.id }).catch((e) => toast(e.message, 'bad')),
   'merge': (el) => doMerge(el.dataset.id, Number(el.dataset.n)),
   'toggle-problems': () => { S.onlyProblems = !S.onlyProblems; draw(); },
   'snooze': (el) => setSnooze(el.dataset.id, Number(el.dataset.n), true),

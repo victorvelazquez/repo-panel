@@ -1,6 +1,5 @@
 {
   "port": 4310,
-  "editor": "code",
   "groups": [
     { "name": "Personal", "repos": [{ "path": "C:\\Users\\you\\Developer\\my-project" }] },
     { "name": "Work", "repos": [] }

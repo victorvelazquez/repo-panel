@@ -38,7 +38,6 @@ function loadConfig() {
   try { cfg = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8')); } catch { /* first run */ }
   return {
     port: Number(cfg.port) || 4310,
-    editor: typeof cfg.editor === 'string' && cfg.editor ? cfg.editor : 'code',
     groups: Array.isArray(cfg.groups) ? cfg.groups.map((g) => ({
       name: String(g.name),
       repos: (g.repos || []).map(loadRepo),
@@ -361,11 +360,6 @@ function scanFolder(dir) {
   return dirs.slice(0, 200).map((p) => ({ path: p, added: known.has(lib.repoId(p)) }));
 }
 
-function openEditor(repo, editor) {
-  if (UNSAFE_PATH.test(repo.path)) throw new HttpError(400, 'Path contains unsupported characters');
-  spawn(`${editor} "${repo.path}"`, { shell: true, detached: true, stdio: 'ignore', windowsHide: true }).unref();
-}
-
 // ---------- HTTP ----------
 const query = (u) => Object.fromEntries(new URL(u, 'http://x').searchParams);
 
@@ -373,7 +367,6 @@ const routes = {
   'GET /api/config': () => {
     const cfg = loadConfig();
     return {
-      editor: cfg.editor,
       snoozed: cfg.snoozed,
       groups: cfg.groups.map((g) => ({
         name: g.name,
@@ -393,7 +386,6 @@ const routes = {
   },
   'POST /api/merge': (q, b) => mergePr(findRepo(b.id), Number(b.number), b.method, !!b.deleteBranch),
   'POST /api/rerun': (q, b) => rerunFailed(findRepo(b.id), Number(b.number)),
-  'POST /api/editor': (q, b) => { openEditor(findRepo(b.id), loadConfig().editor); return { ok: true }; },
   'POST /api/snooze': (q, b) => setSnoozed(b.id, Number(b.number), !!b.on, !!b.wasReady),
   'POST /api/repos': (q, b) => addRepo(b.path, b.group),
   'POST /api/repos/remove': (q, b) => { removeRepo(b.id); return { ok: true }; },
