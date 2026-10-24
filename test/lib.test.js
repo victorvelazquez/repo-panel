@@ -455,3 +455,76 @@ test('roadmapSummary: kinds review, ready, current, next and none with pr and ex
   const idle = lib.roadmapSummary(lib.parseRoadmap(`${HEAD}| A | a | — | Completada |\n`));
   assert.deepEqual([idle.kind, idle.state, idle.pr, idle.extra], ['none', null, null, 0]);
 });
+
+// ---------- workQueue ----------
+const repo = (name, extra = {}) => ({ id: `id-${name}`, name, ready: [], stale: false, dirty: false, unpushed: false, hasPrs: false, next: null, ...extra });
+const NEXT = { id: 'RP9', entrega: 'Next thing' };
+const kinds = (q) => q.map((a) => `${a.name}:${a.kind}`);
+
+test('workQueue orders by kind: merge, branch, deliver, start, then board order', () => {
+  const q = lib.workQueue([
+    repo('a', { next: NEXT }),
+    repo('b', { dirty: true }),
+    repo('c', { stale: true }),
+    repo('d', { ready: [{ number: 4, title: 'T' }], hasPrs: true }),
+    repo('e', { unpushed: true }),
+  ]);
+  assert.deepEqual(kinds(q), ['d:merge', 'c:branch', 'b:deliver', 'e:deliver', 'a:start']);
+});
+
+test('workQueue builds each action from the right facts', () => {
+  const q = lib.workQueue([
+    repo('m', { ready: [{ number: 7, title: 'Fix it' }], hasPrs: true }),
+    repo('s', { stale: true }),
+    repo('d', { dirty: true }),
+    repo('n', { next: NEXT }),
+  ]);
+  assert.deepEqual(q, [
+    { repoId: 'id-m', name: 'm', kind: 'merge', pr: 7, title: 'Fix it' },
+    { repoId: 'id-s', name: 's', kind: 'branch' },
+    { repoId: 'id-d', name: 'd', kind: 'deliver' },
+    { repoId: 'id-n', name: 'n', kind: 'start', unit: { id: 'RP9', entrega: 'Next thing' } },
+  ]);
+});
+
+test('workQueue starts a unit only for a clean repo without PRs', () => {
+  const q = lib.workQueue([
+    repo('stale', { stale: true, next: NEXT }),
+    repo('dirty', { dirty: true, next: NEXT }),
+    repo('ahead', { unpushed: true, next: NEXT }),
+    repo('prs', { hasPrs: true, next: NEXT }),
+    repo('clean', { next: NEXT }),
+    repo('nothing'),
+  ]);
+  assert.deepEqual(kinds(q), ['stale:branch', 'dirty:deliver', 'ahead:deliver', 'clean:start']);
+});
+
+test('workQueue gives one repo several actions, merges first', () => {
+  const q = lib.workQueue([repo('a', { dirty: true, stale: true, ready: [{ number: 2, title: 'x' }, { number: 1, title: 'y' }] })]);
+  assert.deepEqual(q.map((a) => [a.kind, a.pr]), [['merge', 2], ['merge', 1], ['branch', undefined], ['deliver', undefined]]);
+});
+
+test('workQueue puts priority repos first, case-insensitively, ignoring unknown names and duplicates', () => {
+  const items = [repo('a', { ready: [{ number: 1, title: 'x' }] }), repo('B', { dirty: true }), repo('c', { stale: true, dirty: true })];
+  assert.deepEqual(kinds(lib.workQueue(items, ['b', 'ghost', 'B', ' C '])), ['B:deliver', 'c:branch', 'c:deliver', 'a:merge']);
+  assert.deepEqual(kinds(lib.workQueue(items, ['c'])), ['c:branch', 'c:deliver', 'a:merge', 'B:deliver']);
+});
+
+test('workQueue ignores a priority that is not a list of strings', () => {
+  const items = [repo('a', { dirty: true }), repo('b', { stale: true })];
+  const auto = kinds(lib.workQueue(items));
+  for (const bad of [undefined, null, 'a', { 0: 'a' }, 5]) assert.deepEqual(kinds(lib.workQueue(items, bad)), auto);
+  assert.deepEqual(kinds(lib.workQueue(items, [3, null, 'a'])), ['a:deliver', 'b:branch']);
+});
+
+test('workQueue is stable for equal rank', () => {
+  const q = lib.workQueue(['z', 'y', 'x'].map((n) => repo(n, { dirty: true })));
+  assert.deepEqual(kinds(q), ['z:deliver', 'y:deliver', 'x:deliver']);
+});
+
+test('workQueue survives empty and malformed input', () => {
+  for (const bad of [undefined, null, 'x', 3, {}]) assert.deepEqual(lib.workQueue(bad), []);
+  assert.deepEqual(lib.workQueue([]), []);
+  const q = lib.workQueue([null, 5, 'x', { name: 1, dirty: true }, repo('ok', { dirty: true, ready: [null, { number: 'x' }, 'y'], next: { entrega: 'no id' } })]);
+  assert.deepEqual(kinds(q), ['ok:deliver']);
+});

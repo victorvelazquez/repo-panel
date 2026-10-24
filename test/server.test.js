@@ -268,3 +268,87 @@ test('roadmap derived: a repo without a GitHub remote answers 200 with Git-only 
     assert.equal(r.json.next.id, 'P2');
   });
 });
+
+// ---------- /api/queue ----------
+async function withPanel(config, fn) {
+  const port = await freePort();
+  const file = configFor(port);
+  fs.writeFileSync(file, JSON.stringify({ port, ...config }));
+  const child = spawn(process.execPath, [SERVER], { env: { ...process.env, REPO_PANEL_CONFIG: file }, stdio: 'pipe' });
+  try {
+    const token = /name="?token"? content="([0-9a-f]+)"/.exec((await waitFor(() => get(port, '/'))).body)[1];
+    const post = (p, body, raw) => new Promise((resolve, reject) => {
+      const req = http.request({ host: '127.0.0.1', port, path: p, method: 'POST', headers: { 'x-token': token, 'content-type': 'application/json' } }, (res) => {
+        let d = ''; res.on('data', (c) => { d += c; }); res.on('end', () => resolve({ status: res.statusCode, json: JSON.parse(d) }));
+      });
+      req.on('error', reject);
+      req.end(raw === undefined ? JSON.stringify(body) : raw);
+    });
+    await fn({ post, file, port });
+  } finally { child.kill(); }
+}
+
+const qitem = (name, extra = {}) => ({ id: name, name, ready: [], stale: false, dirty: false, unpushed: false, hasPrs: false, next: null, ...extra });
+
+test('POST /api/queue needs the token and orders the actions', async () => {
+  await withPanel({}, async ({ post, port }) => {
+    const bare = await new Promise((resolve, reject) => {
+      const req = http.request({ host: '127.0.0.1', port, path: '/api/queue', method: 'POST' }, (res) => { res.resume(); res.on('end', () => resolve(res.statusCode)); });
+      req.on('error', reject); req.end('{}');
+    });
+    assert.equal(bare, 401);
+    const r = await post('/api/queue', { items: [qitem('a', { dirty: true }), qitem('b', { ready: [{ number: 3, title: 'T' }], hasPrs: true })] });
+    assert.equal(r.status, 200);
+    assert.deepEqual(r.json, { queue: [
+      { repoId: 'b', name: 'b', kind: 'merge', pr: 3, title: 'T' },
+      { repoId: 'a', name: 'a', kind: 'deliver' },
+    ] });
+  });
+});
+
+test('POST /api/queue applies the priority from the config', async () => {
+  await withPanel({ priority: ['A'] }, async ({ post }) => {
+    const r = await post('/api/queue', { items: [qitem('b', { stale: true }), qitem('a', { dirty: true })] });
+    assert.deepEqual(r.json.queue.map((x) => x.name), ['a', 'b']);
+  });
+});
+
+test('POST /api/queue answers an empty queue for a bad body', async () => {
+  await withPanel({}, async ({ post }) => {
+    for (const body of [null, [], 'x', {}, { items: 'x' }, { items: {} }]) {
+      const r = await post('/api/queue', body);
+      assert.equal(r.status, 200);
+      assert.deepEqual(r.json, { queue: [] });
+    }
+  });
+});
+
+test('POST /api/queue sanitizes the items', async () => {
+  await withPanel({}, async ({ post }) => {
+    const many = Array.from({ length: 250 }, (_, i) => qitem(`r${i}`, { dirty: true }));
+    assert.equal((await post('/api/queue', { items: many })).json.queue.length, 200);
+    const r = await post('/api/queue', { items: [
+      qitem('ok', { dirty: 1, ready: [{ number: 5.7, title: 'x'.repeat(500), extra: 1 }, { number: 'a', title: 't' }, { number: 6, title: 7 }] }),
+      { id: 'n', name: 42, dirty: true },
+      { id: 9, name: 'noid', dirty: true },
+      'junk', null,
+    ] });
+    const [m, ...rest] = r.json.queue;
+    assert.deepEqual([m.kind, m.pr, m.title.length], ['merge', 5, 200]);
+    assert.deepEqual(rest.map((a) => [a.name, a.kind, a.pr, a.title]), [['ok', 'merge', 6, ''], ['ok', 'deliver', undefined, undefined]]);
+    assert.equal(Object.keys(m).sort().join(), 'kind,name,pr,repoId,title');
+  });
+});
+
+test('a top-level priority survives a config save; without it none is written', async () => {
+  const body = { groups: [{ name: 'g', repos: [{ path: '/x/a' }] }] };
+  const id = require('../lib.js').repoId('/x/a');
+  await withPanel({ ...body, priority: [' b ', 'B', 7, '', 'a'] }, async ({ post, file }) => {
+    await post('/api/snooze', { id, number: 3, on: true });
+    assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')).priority, ['b', 'a']);
+  });
+  await withPanel(body, async ({ post, file }) => {
+    await post('/api/snooze', { id, number: 3, on: true });
+    assert.equal('priority' in JSON.parse(fs.readFileSync(file, 'utf8')), false);
+  });
+});

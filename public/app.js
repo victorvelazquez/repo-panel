@@ -7,7 +7,7 @@ const store = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d;
 const S = {
   groups: [], local: {}, prs: {}, roadmap: {}, rmOpen: {}, loading: {}, busy: {},
   snoozed: new Set(), keepSnoozed: new Set(), snoozedOpen: {}, onlyProblems: false,
-  group: '', q: '',
+  group: '', q: '', queue: [], queueKey: '', queueSeq: 0,
   prefs: store('prefs', { method: 'squash', del: true }),
   lastRefresh: 0, scan: [],
 };
@@ -132,6 +132,54 @@ function visibleRepos() {
   return allRepos().filter((r) => (!S.group || r.group === S.group) && (!q || r.name.toLowerCase().includes(q)));
 }
 
+// ---------- go work on ----------
+// Per-repo facts for /api/queue, only for repos whose local and PR state have loaded.
+function queueItems() {
+  return visibleRepos().filter((r) => S.local[r.id] && S.prs[r.id]).map((r) => {
+    const { p, prs, dirty, unpushed } = info(r);
+    const rm = S.roadmap[r.id];
+    const s = rm && rm.available ? rm.summary : null;
+    return {
+      id: r.id, name: r.name, dirty, unpushed, stale: !!p.stale, hasPrs: prs.length > 0,
+      ready: prs.filter((x) => x.ready && !S.snoozed.has(snoozeKey(r.id, x.number))).map((x) => ({ number: x.number, title: x.title })),
+      next: s && s.kind === 'next' ? { id: s.id, entrega: s.entrega } : null,
+    };
+  });
+}
+
+// Asks the server only when the facts changed, so the frequent redraws never loop on requests.
+function refreshQueue() {
+  const items = queueItems();
+  const key = JSON.stringify(items);
+  if (key === S.queueKey) return;
+  S.queueKey = key;
+  const seq = ++S.queueSeq;
+  api('/api/queue', { items }).then((d) => {
+    if (seq !== S.queueSeq) return;
+    S.queue = d.queue || [];
+    draw();
+  }, () => { /* keep the previous queue */ });
+}
+
+const QUEUE_MAX = 8;
+const QUEUE_TEXT = {
+  merge: (a) => `Merge #${a.pr} ${a.title}`,
+  branch: () => '/flow-branch',
+  deliver: () => 'Deliver changes',
+  start: (a) => `Start ${a.unit.id} ${a.unit.entrega}`,
+};
+const QUEUE_COLOR = { merge: 'green', branch: 'red', deliver: 'yellow', start: 'blue' };
+
+function drawQueue() {
+  refreshQueue();
+  const el = $('#queue');
+  el.hidden = !S.queue.length;
+  el.innerHTML = S.queue.length ? `<strong>Go work on</strong>${S.queue.slice(0, QUEUE_MAX).map((a) => {
+    const text = `${a.name} · ${QUEUE_TEXT[a.kind](a)}`;
+    return `<button class="chip chip-btn ${QUEUE_COLOR[a.kind]}" data-act="queue-pick" data-name="${esc(a.name)}" title="${esc(text)}">${esc(text)}</button>`;
+  }).join('')}${S.queue.length > QUEUE_MAX ? `<span class="muted">+${S.queue.length - QUEUE_MAX} more</span>` : ''}` : '';
+}
+
 // ---------- board ----------
 let raf = 0;
 function draw() { if (!raf) raf = requestAnimationFrame(() => { raf = 0; render(); }); }
@@ -193,6 +241,7 @@ function snoozedBlock(key, rows) {
 }
 
 function render() {
+  drawQueue();
   if (!allRepos().length) {
     $('#app').innerHTML = '<div class="empty">No repositories yet.<br><br><button class="primary" data-act="add-dialog">+ Add your first repo</button></div>';
     return;
@@ -388,6 +437,7 @@ const ACTIONS = {
   'diff': (el) => openDiff(el.dataset.id),
   'close-drawer': () => { $('#drawer').hidden = true; },
   'merge': (el) => doMerge(el.dataset.id, Number(el.dataset.n)),
+  'queue-pick': (el) => { S.q = el.dataset.name; $('#search').value = S.q; draw(); },
   'toggle-problems': () => { S.onlyProblems = !S.onlyProblems; draw(); },
   'snooze': (el) => setSnooze(el.dataset.id, Number(el.dataset.n), true),
   'unsnooze': (el) => setSnooze(el.dataset.id, Number(el.dataset.n), false),

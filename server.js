@@ -33,6 +33,12 @@ function loadRepo(r) {
   };
 }
 
+function cleanPriority(list) {
+  const seen = new Set();
+  return list.filter((n) => typeof n === 'string').map((n) => n.trim())
+    .filter((n) => n && !seen.has(n.toLowerCase()) && seen.add(n.toLowerCase()));
+}
+
 function loadConfig() {
   let cfg = {};
   try { cfg = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8')); } catch { /* first run */ }
@@ -44,6 +50,8 @@ function loadConfig() {
     })) : [],
     // PRs the user parked, as "<repoId>:<number>" keys.
     snoozed: Array.isArray(cfg.snoozed) ? cfg.snoozed.filter((k) => typeof k === 'string') : [],
+    // Optional manual order of the "Go work on" strip; written back only when present.
+    ...(Array.isArray(cfg.priority) ? { priority: cleanPriority(cfg.priority) } : {}),
   };
 }
 
@@ -406,6 +414,31 @@ function scanFolder(dir) {
   return dirs.slice(0, 200).map((p) => ({ path: p, added: known.has(lib.repoId(p)) }));
 }
 
+// ---------- work queue ----------
+// The browser sends the per-repo facts it already holds; they are cleaned here and ordered by lib.workQueue.
+const MAX_QUEUE_ITEMS = 200;
+const qStr = (v) => (typeof v === 'string' ? v.trim().slice(0, 200) : null);
+
+function cleanQueueItem(it) {
+  if (!it || typeof it !== 'object') return null;
+  const id = qStr(it.id);
+  const name = qStr(it.name);
+  if (!id || !name) return null;
+  const ready = (Array.isArray(it.ready) ? it.ready : [])
+    .filter((p) => p && typeof p.number === 'number' && Number.isFinite(p.number))
+    .map((p) => ({ number: Math.trunc(p.number), title: qStr(p.title) ?? '' }));
+  const nid = it.next && qStr(it.next.id);
+  return {
+    id, name, ready, stale: !!it.stale, dirty: !!it.dirty, unpushed: !!it.unpushed, hasPrs: !!it.hasPrs,
+    next: nid ? { id: nid, entrega: qStr(it.next.entrega) ?? '' } : null,
+  };
+}
+
+function queueFor(body) {
+  const items = body && Array.isArray(body.items) ? body.items.slice(0, MAX_QUEUE_ITEMS) : [];
+  return { queue: lib.workQueue(items.map(cleanQueueItem).filter(Boolean), loadConfig().priority) };
+}
+
 // ---------- HTTP ----------
 const query = (u) => Object.fromEntries(new URL(u, 'http://x').searchParams);
 
@@ -433,6 +466,7 @@ const routes = {
   'POST /api/merge': (q, b) => mergePr(findRepo(b.id), Number(b.number), b.method, !!b.deleteBranch),
   'POST /api/rerun': (q, b) => rerunFailed(findRepo(b.id), Number(b.number)),
   'POST /api/snooze': (q, b) => setSnoozed(b.id, Number(b.number), !!b.on, !!b.wasReady),
+  'POST /api/queue': (q, b) => queueFor(b),
   'POST /api/repos': (q, b) => addRepo(b.path, b.group),
   'POST /api/repos/remove': (q, b) => { removeRepo(b.id); return { ok: true }; },
   'GET /api/scan': (q) => ({ repos: scanFolder(q.dir) }),
