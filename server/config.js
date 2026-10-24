@@ -1,5 +1,5 @@
 'use strict';
-// Config file: groups of repos, snoozed PRs and the manual priority order. REPO_PANEL_CONFIG picks the file.
+// Config file: groups of repos, snoozed PRs, dismissed warnings and the manual priority order. REPO_PANEL_CONFIG picks the file.
 const fs = require('node:fs');
 const path = require('node:path');
 const lib = require('../lib.js');
@@ -25,6 +25,11 @@ function cleanPriority(list) {
     .filter((n) => n && !seen.has(n.toLowerCase()) && seen.add(n.toLowerCase()));
 }
 
+function cleanIds(list) {
+  const seen = new Set();
+  return list.filter((n) => typeof n === 'string' && n && !seen.has(n) && seen.add(n));
+}
+
 function loadConfig() {
   let cfg = {};
   try { cfg = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8')); } catch { /* first run */ }
@@ -36,6 +41,8 @@ function loadConfig() {
     })) : [],
     // PRs the user parked, as "<repoId>:<number>" keys.
     snoozed: Array.isArray(cfg.snoozed) ? cfg.snoozed.filter((k) => typeof k === 'string') : [],
+    // Repos whose "requirements missing" warning the user hid; written back only when present.
+    ...(Array.isArray(cfg.dismissed) ? { dismissed: cleanIds(cfg.dismissed) } : {}),
     // Optional manual order of the "Go work on" strip; written back only when present.
     ...(Array.isArray(cfg.priority) ? { priority: cleanPriority(cfg.priority) } : {}),
   };

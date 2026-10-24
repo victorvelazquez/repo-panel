@@ -8,7 +8,7 @@
 }(typeof self !== 'undefined' ? self : this, () => {
   // Bump it when the client starts needing a new or changed server route. /health reports the value
   // the running server loaded at start; the page compares it with the file it just downloaded.
-  const API_VERSION = 3;
+  const API_VERSION = 4;
 
   // `health` is the parsed /health answer, or null when the request itself failed (no answer, so
   // there is nothing to warn about). Any answer without the current integer `api` is out of date:
@@ -44,5 +44,29 @@
     return { state: 'ok', summary: `${conf.ok} conform`, message: 'All repositories conform.', count: 0 };
   }
 
-  return { API_VERSION, isOutdated, conformityView };
+  // `entry` is the page's record of one repo's requirements: { state: 'loading' | 'loaded' | 'failed', data }.
+  // Nothing is claimed about a repo whose requirements are not loaded.
+  function openRequirements(entry) {
+    const results = entry && entry.state === 'loaded' && entry.data && Array.isArray(entry.data.results) ? entry.data.results : null;
+    return results && results.filter((r) => r.status !== 'pass');
+  }
+
+  // The compact card warning: only for a REQUIRED requirement that is not passing, and not hidden by the user.
+  function cardWarning(entry, dismissed) {
+    const open = openRequirements(entry);
+    const required = open ? open.filter((r) => r.level === 'required') : [];
+    if (!required.length || dismissed) return null;
+    return { count: required.length, ids: required.map((r) => r.id) };
+  }
+
+  // Items of the card's "more options" menu, as data-act names with their labels.
+  function cardMenu(entry, dismissed) {
+    const open = openRequirements(entry);
+    if (!open || !open.length) return [];
+    const items = [{ act: 'put-in-conditions', label: 'Put in conditions' }];
+    if (open.some((r) => r.level === 'required')) items.push({ act: 'toggle-warning', label: dismissed ? 'Show warning' : 'Hide warning' });
+    return items;
+  }
+
+  return { API_VERSION, isOutdated, conformityView, cardWarning, cardMenu };
 }));

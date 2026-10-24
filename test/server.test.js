@@ -612,3 +612,140 @@ test('prerequisites: runs the three fixed commands; a missing tool is ok false, 
     { id: 'orca', ok: false, detail: 'not available' },
   ]);
 });
+
+// ---------- put-in-conditions order ----------
+const { conditionsOrder } = require('../server/pi.js');
+const INSTALL = path.join(__dirname, '..', 'requirements', 'INSTALL.md');
+const res = (id, status, level = 'required') => ({ id, status, level });
+const reqsOf = (...results) => async () => ({ available: true, results });
+const MIXED = [res('base-branch', 'pass'), res('ciclo-block', 'fail', 'recommended'), res('agents-file', 'fail'), res('roadmap-header', 'unavailable'), res('registro-block', 'outdated'), res('adoption-record', 'pass', 'recommended')];
+
+test('put-in-conditions: the order is one line, not a slash command, with the quoted INSTALL.md path and only the non-pass ids, required first', () => {
+  const text = conditionsOrder(MIXED);
+  assert.equal(/[\x00-\x1f\x7f]/.test(text), false);
+  assert.equal(text.startsWith('/'), false);
+  assert.ok(text.includes(`"${INSTALL}"`), text);
+  assert.match(text, /user authorizes reading that one file outside this repo/);
+  assert.match(text, /ids: agents-file, roadmap-header, registro-block, ciclo-block\.$/);
+  for (const id of ['base-branch', 'adoption-record']) assert.equal(text.includes(id), false, id);
+});
+
+test('put-in-conditions: refuses a path with a double quote or a control character', () => {
+  for (const bad of ['C:\\x"y\\INSTALL.md', 'C:\\x\ny\\INSTALL.md', 'C:\\x\ty\\INSTALL.md']) {
+    assert.throws(() => conditionsOrder(MIXED, bad), (e) => e.status === 500 && /path/i.test(e.message));
+  }
+});
+
+test('put-in-conditions: piSend types the built order into the one idle session', async () => {
+  const f = fakeOrca();
+  assert.deepEqual(await piSend(REPO, 'put-in-conditions', f.orca, noWait, reqsOf(...MIXED)), { sent: true, confirmed: true });
+  assert.deepEqual(f.sends(), [['send', '--terminal', 'h1', '--text', conditionsOrder(MIXED), '--enter']]);
+});
+
+test('put-in-conditions: refuses with 409, touching nothing, when everything passes or the requirements are unavailable', async () => {
+  const f = fakeOrca();
+  await refuses(piSend(REPO, 'put-in-conditions', f.orca, noWait, reqsOf(res('a', 'pass'), res('b', 'pass', 'recommended'))), 409, /nothing to do/i);
+  await refuses(piSend(REPO, 'put-in-conditions', f.orca, noWait, async () => ({ available: false, results: [res('a', 'unavailable')] })), 409, /could not be (read|evaluated)/i);
+  assert.equal(f.calls.length, 0);
+  assert.equal((await piSend(REPO, 'put-in-conditions', fakeOrca().orca, noWait, reqsOf(res('a', 'fail')))).sent, true); // lock freed
+});
+
+test('put-in-conditions: keeps the session safeguards (busy prompt, several sessions) and sends nothing', async () => {
+  for (const [opts, re] of [[{ previews: ['thinking…'] }, /busy or has text/], [{ terminals: [piTerm(), piTerm({ handle: 'h2' })] }, /Several pi sessions/]]) {
+    const f = fakeOrca(opts);
+    await refuses(piSend(REPO, 'put-in-conditions', f.orca, noWait, reqsOf(res('a', 'fail'))), 409, re);
+    assert.equal(f.sends().length, 0);
+  }
+});
+
+test('piSend still types each fixed command as before', async () => {
+  for (const [key, text] of [['flow-commit', '/flow-commit'], ['flow-pr', '/flow-pr'], ['flow-branch', '/flow-branch']]) {
+    const f = fakeOrca();
+    await piSend(REPO, key, f.orca, noWait, async () => { throw new Error('requirements must not be read'); });
+    assert.deepEqual(f.sends(), [['send', '--terminal', 'h1', '--text', text, '--enter']]);
+  }
+});
+
+// ---------- dismissed warning ----------
+test('dismissed: validated on load, exposed by /api/config, saved by POST /api/dismiss and kept across other saves', async () => {
+  const groups = [{ name: 'g', repos: [{ path: '/x/a' }, { path: '/x/b' }] }];
+  const [a, b] = ['/x/a', '/x/b'].map((p) => require('../lib.js').repoId(p));
+  await withPanel({ groups, dismissed: [a, a, 7, '', b] }, async ({ post, getApi, file }) => {
+    assert.deepEqual((await getApi('/api/config')).json.dismissed, [a, b]);
+    assert.deepEqual((await post('/api/dismiss', { id: a, on: false })).json, { dismissed: [b] });
+    assert.deepEqual((await post('/api/dismiss', { id: a, on: true })).json, { dismissed: [b, a] });
+    assert.deepEqual((await post('/api/dismiss', { id: a, on: true })).json, { dismissed: [b, a] });
+    await post('/api/snooze', { id: a, number: 3, on: true });
+    assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')).dismissed, [b, a]);
+    await post('/api/repos/remove', { id: b });
+    assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')).dismissed, [a]);
+  });
+  await withPanel({ groups, dismissed: 'x' }, async ({ getApi }) => {
+    assert.deepEqual((await getApi('/api/config')).json.dismissed, []);
+  });
+  await withPanel({ groups }, async ({ post, getApi, file }) => {
+    assert.deepEqual((await getApi('/api/config')).json.dismissed, []);
+    await post('/api/snooze', { id: a, number: 3, on: true });
+    assert.equal('dismissed' in JSON.parse(fs.readFileSync(file, 'utf8')), false);
+  });
+});
+
+test('POST /api/dismiss needs the token and rejects an unknown repo', async () => {
+  await withPanel({ groups: [{ name: 'g', repos: [{ path: '/x/a' }] }] }, async ({ post, port }) => {
+    assert.equal((await post('/api/dismiss', { id: 'nope', on: true })).status, 404);
+    const raw = await new Promise((resolve) => {
+      const req = http.request({ host: '127.0.0.1', port, path: '/api/dismiss', method: 'POST' }, (r) => { r.resume(); resolve(r.statusCode); });
+      req.end('{}');
+    });
+    assert.equal(raw, 401);
+  });
+});
+
+// ---------- remoteFile: missing is not the same as a failed read ----------
+const { remoteFile } = require('../server/roadmap.js');
+const looseObject = (repo, ref) => {
+  const sha = sh(repo.work, 'rev-parse', ref);
+  return path.join(repo.work, '.git', 'objects', sha.slice(0, 2), sha.slice(2));
+};
+
+test('remoteFile: a file absent from the base branch is missing; an unreadable one is error and is not cached', async () => {
+  const repo = originAndClone({ 'docs/ROADMAP.md': rows(['A1', 'Pendiente']) });
+  const r = { id: 'rf', path: repo.work, base: 'main' };
+  try {
+    const miss = await remoteFile(r, 'nope.md');
+    assert.deepEqual([miss.available, miss.reason, miss.base], [false, 'missing', 'main']);
+    assert.equal((await remoteFile(r, 'docs/ROADMAP.md')).available, true);
+    repo.push('docs/PLAN.md', rows(['P1', 'Pendiente']), 'plan');
+    sh(repo.work, 'fetch', '-q');
+    const obj = looseObject(repo, 'origin/main:docs/PLAN.md');
+    const saved = fs.readFileSync(obj);
+    fs.rmSync(obj);
+    const bad = await remoteFile(r, 'docs/PLAN.md');
+    assert.deepEqual([bad.available, bad.reason, bad.base], [false, 'error', 'main']);
+    fs.writeFileSync(obj, saved);
+    const good = await remoteFile(r, 'docs/PLAN.md');
+    assert.equal(good.available, true);
+    assert.match(good.text, /P1/);
+  } finally { fs.rmSync(repo.tmp, { recursive: true, force: true }); }
+});
+
+test('an unreadable roadmap is reported as error, never cached, and requirements/conformity treat it as unavailable', async () => {
+  const repo = originAndClone({ 'AGENTS.md': REG_BLOCK, 'docs/ROADMAP.md': HEADER + rows(['A1', 'Pendiente']) });
+  const obj = looseObject(repo, 'origin/main:docs/ROADMAP.md');
+  const saved = fs.readFileSync(obj);
+  await withRepoPanel(repo, async ({ getApi, post, id }) => {
+    fs.rmSync(obj);
+    assert.deepEqual((await getApi(`/api/roadmap?id=${id}`)).json, { available: false, reason: 'error', base: 'main', path: 'docs/ROADMAP.md' });
+    const s = statuses((await getApi(`/api/requirements?id=${id}`)).json);
+    assert.equal(s['roadmap-file'], 'unavailable');
+    assert.equal(s['roadmap-header'], 'unavailable');
+    assert.equal(s['roadmap-table'], 'unavailable');
+    assert.equal(s['agents-file'], 'pass');
+    const conf = await post('/api/conformity', { entries: [{ id, name: 'a', roadmap: { available: false, reason: 'error' } }] });
+    assert.deepEqual(conf.json.items.map((i) => i.status), ['unavailable']);
+    fs.writeFileSync(obj, saved);
+    const again = (await getApi(`/api/roadmap?id=${id}`)).json;
+    assert.equal(again.available, true);
+    assert.equal(statuses((await getApi(`/api/requirements?id=${id}`)).json)['roadmap-header'], 'pass');
+  });
+});

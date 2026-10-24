@@ -90,3 +90,27 @@ test('view.js runs as a plain script with no require or module', () => {
   assert.equal(typeof ctx.RepoPanelView.isOutdated, 'function');
   assert.equal(ctx.RepoPanelView.API_VERSION, API_VERSION);
 });
+
+const { cardWarning, cardMenu } = require('../public/view.js');
+const loaded = (...results) => ({ state: 'loaded', data: { results } });
+const rq = (id, status, level = 'required') => ({ id, status, level });
+
+test('cardWarning: shown only when loaded, with a required gap, and not dismissed', () => {
+  assert.equal(cardWarning(undefined, false), null);
+  assert.equal(cardWarning({ state: 'failed' }, false), null);
+  assert.equal(cardWarning({ state: 'loaded' }, false), null);
+  assert.equal(cardWarning(loaded(rq('a', 'pass'), rq('b', 'pass', 'recommended')), false), null);
+  assert.equal(cardWarning(loaded(rq('a', 'pass'), rq('c', 'fail', 'recommended')), false), null);
+  assert.deepEqual(cardWarning(loaded(rq('a', 'fail'), rq('b', 'unavailable'), rq('c', 'outdated', 'recommended'), rq('d', 'pass')), false), { count: 2, ids: ['a', 'b'] });
+  assert.equal(cardWarning(loaded(rq('a', 'fail')), true), null);
+});
+
+test('cardMenu: put in conditions only with a gap; the warning toggle only with a required gap', () => {
+  const put = { act: 'put-in-conditions', label: 'Put in conditions' };
+  assert.deepEqual(cardMenu(undefined, false), []);
+  assert.deepEqual(cardMenu({ state: 'loading' }, false), []);
+  assert.deepEqual(cardMenu(loaded(rq('a', 'pass')), false), []);
+  assert.deepEqual(cardMenu(loaded(rq('a', 'fail', 'recommended')), false), [put]);
+  assert.deepEqual(cardMenu(loaded(rq('a', 'fail')), false), [put, { act: 'toggle-warning', label: 'Hide warning' }]);
+  assert.deepEqual(cardMenu(loaded(rq('a', 'fail')), true), [put, { act: 'toggle-warning', label: 'Show warning' }]);
+});

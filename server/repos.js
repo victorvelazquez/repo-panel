@@ -1,5 +1,5 @@
 'use strict';
-// Repo management: add, remove, snooze and folder scan.
+// Repo management: add, remove, snooze, dismiss and folder scan.
 const fs = require('node:fs');
 const path = require('node:path');
 const lib = require('../lib.js');
@@ -32,6 +32,7 @@ function removeRepo(id) {
   for (const g of cfg.groups) g.repos = g.repos.filter((r) => lib.repoId(r.path) !== id);
   cfg.groups = cfg.groups.filter((g) => g.repos.length);
   cfg.snoozed = cfg.snoozed.filter((k) => !k.startsWith(`${id}:`));
+  if (cfg.dismissed) cfg.dismissed = cfg.dismissed.filter((k) => k !== id);
   saveConfig(cfg);
   forgetMeta(id);
 }
@@ -48,6 +49,16 @@ function setSnoozed(id, number, on, wasReady) {
   return { snoozed: cfg.snoozed };
 }
 
+// Hides (or shows again) the "requirements missing" warning of one repo.
+function setDismissed(id, on) {
+  findRepo(id);
+  const cfg = loadConfig();
+  const rest = (cfg.dismissed || []).filter((k) => k !== id);
+  cfg.dismissed = on ? [...rest, id] : rest;
+  saveConfig(cfg);
+  return { dismissed: cfg.dismissed };
+}
+
 function scanFolder(dir) {
   if (!dir || !path.isAbsolute(dir) || !fs.existsSync(dir)) throw new HttpError(400, 'Folder not found');
   const known = new Set(loadConfig().groups.flatMap((g) => g.repos.map((r) => lib.repoId(r.path))));
@@ -57,4 +68,4 @@ function scanFolder(dir) {
   return dirs.slice(0, 200).map((p) => ({ path: p, added: known.has(lib.repoId(p)) }));
 }
 
-module.exports = { addRepo, removeRepo, setSnoozed, scanFolder };
+module.exports = { addRepo, removeRepo, setSnoozed, setDismissed, scanFolder };

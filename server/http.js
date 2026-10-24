@@ -12,7 +12,7 @@ const { loadConfig, findRepo } = require('./config.js');
 const { localState, diffText } = require('./local.js');
 const { prState, mergePr, rerunFailed } = require('./github.js');
 const { roadmapState } = require('./roadmap.js');
-const { addRepo, removeRepo, setSnoozed, scanFolder } = require('./repos.js');
+const { addRepo, removeRepo, setSnoozed, setDismissed, scanFolder } = require('./repos.js');
 const { piSend } = require('./pi.js');
 const { requirementsFor, prerequisites } = require('./requirements.js');
 const { queueFor, conformityFor } = require('./queue.js');
@@ -27,6 +27,7 @@ const routes = {
     const cfg = loadConfig();
     return {
       snoozed: cfg.snoozed,
+      dismissed: cfg.dismissed || [],
       groups: cfg.groups.map((g) => ({
         name: g.name,
         repos: g.repos.map((r) => ({ id: lib.repoId(r.path), path: r.path, name: path.basename(r.path) })),
@@ -48,6 +49,7 @@ const routes = {
   'POST /api/merge': (q, b) => mergePr(findRepo(b.id), Number(b.number), b.method, !!b.deleteBranch),
   'POST /api/rerun': (q, b) => rerunFailed(findRepo(b.id), Number(b.number)),
   'POST /api/snooze': (q, b) => setSnoozed(b.id, Number(b.number), !!b.on, !!b.wasReady),
+  'POST /api/dismiss': (q, b) => setDismissed(b.id, !!b.on),
   'POST /api/pi': (q, b) => piSend(findRepo(b.id), b.command),
   'POST /api/queue': (q, b) => queueFor(b),
   'POST /api/conformity': (q, b) => conformityFor(b),
