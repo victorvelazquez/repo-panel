@@ -8,7 +8,7 @@
 }(typeof self !== 'undefined' ? self : this, () => {
   // Bump it when the client starts needing a new or changed server route. /health reports the value
   // the running server loaded at start; the page compares it with the file it just downloaded.
-  const API_VERSION = 6;
+  const API_VERSION = 7;
 
   // `health` is the parsed /health answer, or null when the request itself failed (no answer, so
   // there is nothing to warn about). Any answer without the current integer `api` is out of date:
@@ -134,5 +134,31 @@
     return { name: room.name, dot: presenceDot(live.presence), title: `Room ${room.name} · ${presenceLabel(live.presence)} · last commit ${last}` };
   }
 
-  return { API_VERSION, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, presenceLabel, presenceDot };
+  // The state an agent declared (the answer of /api/state), or null when it cannot be relied on: not available
+  // (missing, invalid, unsafe, error), unknown state, or older than the repo's last activity (stale).
+  const STATE_DOT = { working: 'yellow', 'needs-input': 'blue', 'ready-to-commit': 'green', 'ready-to-pr': 'green', blocked: 'red' };
+
+  function usableState(data) {
+    if (!data || data.available !== true || data.stale === true) return null;
+    return Object.hasOwn(STATE_DOT, data.state) ? data : null;
+  }
+
+  // The commit button stays unless a usable state says the work is not ready to commit. No state never blocks.
+  function commitAllowed(data) {
+    const s = usableState(data);
+    return !s || s.state === 'ready-to-commit';
+  }
+
+  // The card's "what to do now" line: { kind: 'current', dot, text, title } for a usable state, { kind: 'outdated',
+  // dot: 'gray', text: '', title } for a stale one (only a marker: the old text is never shown as current), else null.
+  function stateLine(data) {
+    const s = usableState(data);
+    if (s) return { kind: 'current', dot: STATE_DOT[s.state], text: s.next, title: [s.next, s.detail, s.at].filter(Boolean).join('\n\n') };
+    if (data && data.available === true && data.stale === true && Object.hasOwn(STATE_DOT, data.state)) {
+      return { kind: 'outdated', dot: 'gray', text: '', title: 'Declared state is outdated (the repo changed after it was written); ignored' };
+    }
+    return null;
+  }
+
+  return { API_VERSION, commitAllowed, stateLine, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, presenceLabel, presenceDot };
 }));

@@ -543,9 +543,65 @@ test('GET /api/requirements: a conforming base branch passes the required ones; 
     assert.deepEqual(statuses(r.json), {
       'base-branch': 'pass', 'agents-file': 'pass', 'registro-block': 'pass', 'roadmap-file': 'pass',
       'roadmap-header': 'pass', 'roadmap-table': 'pass', 'ciclo-block': 'fail', 'adoption-record': 'fail',
+      'estado-block': 'fail', 'panel-ignored': 'fail',
     });
-    assert.deepEqual(r.json.summary, { required: { pass: 6, total: 6 }, recommended: { pass: 0, total: 2 }, ready: true });
+    assert.deepEqual(r.json.summary, { required: { pass: 6, total: 6 }, recommended: { pass: 0, total: 4 }, ready: true });
     assert.ok(r.json.results.every((x) => typeof x.remedy === 'string' && x.remedy));
+  });
+});
+
+test('GET /api/state needs the token and answers 404 for an unknown repo', async () => {
+  const repo = originAndClone({});
+  await withRepoPanel(repo, async ({ getApi, id }) => {
+    assert.equal((await getApi(`/api/state?id=${id}`, false)).status, 401);
+    assert.equal((await getApi('/api/state?id=nope')).status, 404);
+    assert.equal((await getApi('/api/state')).status, 404);
+  });
+});
+
+test('GET /api/state: missing, then a valid file, then an invalid one; /api/local does not change', async () => {
+  const repo = originAndClone({});
+  await withRepoPanel(repo, async ({ getApi, id }) => {
+    const none = await getApi(`/api/state?id=${id}`);
+    assert.equal(none.status, 200);
+    assert.deepEqual(none.json, { available: false, state: null, next: null, detail: null, at: null, stale: false, reason: 'missing' });
+    const local = (await getApi(`/api/local?id=${id}`)).json;
+    fs.mkdirSync(path.join(repo.work, '.panel'));
+    fs.appendFileSync(path.join(repo.work, '.git', 'info', 'exclude'), '\n.panel/\n');
+    const at = new Date(Date.now() + 60 * 1000).toISOString();
+    fs.writeFileSync(path.join(repo.work, '.panel', 'state.json'), JSON.stringify({ state: 'ready-to-commit', next: 'Run /flow-commit.', at }));
+    const ok = (await getApi(`/api/state?id=${id}`)).json;
+    assert.deepEqual(ok, { available: true, state: 'ready-to-commit', next: 'Run /flow-commit.', detail: null, at, stale: false, reason: null });
+    fs.writeFileSync(path.join(repo.work, '.panel', 'state.json'), '{nope');
+    assert.equal((await getApi(`/api/state?id=${id}`)).json.reason, 'invalid');
+    assert.deepEqual((await getApi(`/api/local?id=${id}`)).json, local);
+  });
+});
+
+test('GET /api/requirements: estado-block reads the panel block from the base branch, panel-ignored asks the local Git', async () => {
+  const PANEL = '# Rules\n<!-- panel:estado v1.0 -->\nrules\n<!-- /panel:estado -->\n';
+  const repo = originAndClone({ 'AGENTS.md': REG_BLOCK + PANEL, 'docs/ROADMAP.md': HEADER + rows(['A1', 'Pendiente']) });
+  await withRepoPanel(repo, async ({ getApi, id }) => {
+    const before = statuses((await getApi(`/api/requirements?id=${id}`)).json);
+    assert.equal(before['estado-block'], 'pass');
+    assert.equal(before['panel-ignored'], 'fail');
+    fs.appendFileSync(path.join(repo.work, '.git', 'info', 'exclude'), '\n.panel/\n');
+    const after = (await getApi(`/api/requirements?id=${id}`)).json;
+    assert.equal(statuses(after)['panel-ignored'], 'pass');
+    assert.equal(after.summary.ready, true);
+    assert.equal(sh(repo.work, 'status', '--porcelain'), '');
+  });
+});
+
+test('GET /api/requirements: a repo folder that vanished leaves panel-ignored unavailable, never failed', async () => {
+  const repo = originAndClone({ 'AGENTS.md': REG_BLOCK });
+  await withRepoPanel(repo, async ({ getApi, id }) => {
+    const hidden = repo.work + '-gone';
+    fs.renameSync(repo.work, hidden);
+    try {
+      const r = (await getApi(`/api/requirements?id=${id}`)).json;
+      assert.equal(statuses(r)['panel-ignored'], 'unavailable');
+    } finally { fs.renameSync(hidden, repo.work); }
   });
 });
 
@@ -848,9 +904,9 @@ test('GET /api/requirements: a room member also gets the member-only results and
       // A repo outside every room: same keys, same results (no sala-region, ciclo-block stays recommended), no room field.
       const o = (await getApi(`/api/requirements?id=${lib.repoId(outside.work)}`)).json;
       assert.deepEqual(Object.keys(o), ['available', 'base', 'results', 'summary']);
-      assert.deepEqual(o.results.map((x) => x.id), ['base-branch', 'agents-file', 'registro-block', 'roadmap-file', 'roadmap-header', 'roadmap-table', 'ciclo-block', 'adoption-record']);
+      assert.deepEqual(o.results.map((x) => x.id), ['base-branch', 'agents-file', 'registro-block', 'roadmap-file', 'roadmap-header', 'roadmap-table', 'ciclo-block', 'adoption-record', 'estado-block', 'panel-ignored']);
       assert.equal(o.results.find((x) => x.id === 'ciclo-block').level, 'recommended');
-      assert.deepEqual(o.summary, { required: { pass: 6, total: 6 }, recommended: { pass: 1, total: 2 }, ready: true });
+      assert.deepEqual(o.summary, { required: { pass: 6, total: 6 }, recommended: { pass: 1, total: 4 }, ready: true });
     });
   } finally { for (const r of [member, outside]) fs.rmSync(r.tmp, { recursive: true, force: true }); }
 });

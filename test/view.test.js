@@ -199,3 +199,40 @@ test('roomIssuesNotice: nothing when all entries are fine; otherwise a count and
   assert.equal(roomIssuesNotice(['rooms[0]: name is empty', 'rooms[1]: path must be absolute']).message, '2 entries in config.json under rooms are invalid and ignored');
   assert.equal(roomIssuesNotice(['rooms: must be a list']).message, 'rooms in config.json is not a list and is ignored');
 });
+
+// ---------- RP12a: declared state ----------
+const { commitAllowed, stateLine } = require('../public/view.js');
+const st = (state, extra = {}) => ({ available: true, state, next: 'Do the thing.', detail: null, at: '2026-10-24T11:59:00Z', stale: false, reason: null, ...extra });
+
+test('API_VERSION is 7: the page now needs GET /api/state', () => {
+  assert.equal(API_VERSION, 7);
+});
+
+test('commitAllowed: allowed with no usable state or with ready-to-commit; hidden for every other fresh state', () => {
+  for (const none of [undefined, null, {}, 'x', { available: false, reason: 'missing' }, { available: false, reason: 'invalid' }, { available: false, reason: 'unsafe' }, { available: false, reason: 'error' }]) {
+    assert.equal(commitAllowed(none), true);
+  }
+  assert.equal(commitAllowed(st('ready-to-commit', { stale: true })), true);
+  assert.equal(commitAllowed(st('needs-input', { stale: true })), true);
+  assert.equal(commitAllowed(st('mystery')), true);
+  assert.equal(commitAllowed(st('ready-to-commit')), true);
+  for (const s of ['working', 'needs-input', 'blocked', 'ready-to-pr']) assert.equal(commitAllowed(st(s)), false, s);
+});
+
+test('stateLine: a fresh state shows its next line with a dot per state and the full text in the tooltip', () => {
+  const dots = { working: 'yellow', 'needs-input': 'blue', 'ready-to-commit': 'green', 'ready-to-pr': 'green', blocked: 'red' };
+  for (const [s, dot] of Object.entries(dots)) {
+    const l = stateLine(st(s, { detail: 'More text.' }));
+    assert.deepEqual([l.kind, l.dot, l.text], ['current', dot, 'Do the thing.']);
+    assert.equal(l.title, 'Do the thing.\n\nMore text.\n\n2026-10-24T11:59:00Z');
+  }
+  assert.equal(stateLine(st('working')).title, 'Do the thing.\n\n2026-10-24T11:59:00Z');
+});
+
+test('stateLine: a stale state shows only an outdated marker, never the old text; no usable state shows nothing', () => {
+  const l = stateLine(st('needs-input', { next: 'OLD SECRET LINE', detail: 'OLD DETAIL', stale: true }));
+  assert.deepEqual([l.kind, l.dot, l.text], ['outdated', 'gray', '']);
+  assert.match(l.title, /outdated/i);
+  assert.equal(l.title.includes('OLD'), false);
+  for (const none of [undefined, null, { available: false, reason: 'missing' }, st('mystery')]) assert.equal(stateLine(none), null);
+});

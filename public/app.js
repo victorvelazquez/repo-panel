@@ -12,7 +12,7 @@ const S = {
   dismissed: new Set(), menu: null, reqPassOpen: {},
   group: '', q: '', queue: [], queueKey: '', queueSeq: 0,
   conf: { items: [], ok: 0, loaded: false, failed: false, key: '', seq: 0 }, confOpen: false,
-  req: {}, reqSeq: {}, prereq: { state: 'loading', items: [], seq: 0 },
+  req: {}, reqSeq: {}, state: {}, stateSeq: {}, prereq: { state: 'loading', items: [], seq: 0 },
   rooms: [], roomIssues: [], roomData: { state: 'loading', data: null }, roomSeq: 0,
   prefs: store('prefs', { method: 'squash', del: true }),
   lastRefresh: 0, scan: [],
@@ -85,6 +85,7 @@ function refreshRepo(id) {
     // The roadmap is optional: a repo without one, or a failed request, simply shows nothing extra.
     track(id, pooled(() => api(`/api/roadmap?id=${id}`)).then((d) => { S.roadmap[id] = d; }, () => { S.roadmap[id] = null; })),
     loadRequirements(id),
+    loadState(id),
   ]);
 }
 
@@ -94,6 +95,16 @@ function loadRequirements(id) {
   return track(id, pooled(() => api(`/api/requirements?id=${id}`)).then(
     (d) => { if (seq === S.reqSeq[id]) S.req[id] = { state: 'loaded', data: d }; },
     () => { if (seq === S.reqSeq[id]) S.req[id] = { state: 'failed' }; },
+  ));
+}
+
+// The state the agent declared for the repo (.panel/state.json). A late answer from an older request never
+// overwrites a newer one, and a failed load just means no declared state: it never breaks the card.
+function loadState(id) {
+  const seq = S.stateSeq[id] = (S.stateSeq[id] || 0) + 1;
+  return track(id, pooled(() => api(`/api/state?id=${id}`)).then(
+    (d) => { if (seq === S.stateSeq[id]) S.state[id] = d; },
+    () => { if (seq === S.stateSeq[id]) S.state[id] = null; },
   ));
 }
 
@@ -493,6 +504,14 @@ function reqWarn(r) {
   return `<div class="req-warn" title="${esc(w.ids.join(', '))}"><span>⚠ ${w.count} requirement${w.count === 1 ? '' : 's'} missing</span><button data-act="hide-warning" data-id="${r.id}" title="Hide this warning (more options → Show warning)">✕</button></div>`;
 }
 
+// The line the agent declared for "what to do now", with a dot per state; a stale state is only a small marker.
+function stateRow(r) {
+  const l = V ? V.stateLine(S.state[r.id]) : null;
+  if (!l) return '';
+  if (l.kind === 'outdated') return `<div class="state-line" title="${esc(l.title)}"><span class="dot dot-${l.dot}"></span></div>`;
+  return `<div class="state-line" title="${esc(l.title)}"><span class="dot dot-${l.dot}"></span><span class="state-text">${esc(l.text)}</span></div>`;
+}
+
 // Room tag with a status dot; only for repos assigned to a room.
 function roomTag(r) {
   const t = V ? V.roomTag(S.rooms, r.id, S.roomData) : null;
@@ -551,11 +570,12 @@ function repoCard(r, attn = false) {
     ${cardTop(r, p.repo?.url, 'repo')}
     ${reqWarn(r)}
     <div class="branch one-line" title="${esc(l.branch || '')}">${esc(l.branch || (l.detached ? '(detached)' : ''))}</div>
+    ${stateRow(r)}
     ${roadmapBlock(r)}
     ${chips.length ? `<div class="chips">${chips.join('')}</div>` : ''}
     ${l.error ? `<div class="err">${esc(l.error)}</div>` : ''}
     ${p.error ? `<div class="err">GitHub: ${esc(p.error)}</div>` : ''}
-    ${dirty || unpushed ? `<div class="actions">${piBtn(r, 'flow-commit')}</div>` : ''}
+    ${(dirty || unpushed) && (!V || V.commitAllowed(S.state[r.id])) ? `<div class="actions">${piBtn(r, 'flow-commit')}</div>` : ''}
   </div>`;
 }
 
