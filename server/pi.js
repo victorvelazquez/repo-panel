@@ -63,4 +63,19 @@ async function piSend(repo, key, orca = orcaTerminal, wait = sleep, requirements
   } finally { piBusy.delete(repo.path); }
 }
 
-module.exports = { piSend, conditionsOrder, orcaTerminal };
+// The state of the repo's pi session for the commit verdict: closed | idle | busy | ambiguous | unknown. Read-only
+// (`list` and a fresh `show`, never `send`), as the room presence does. An Orca failure is unknown, never closed;
+// a prompt with text typed in it is still a session waiting for input, so it counts as idle.
+async function piStatus(repo, orca = orcaTerminal) {
+  try {
+    const listed = (await orca(['list'])).terminals;
+    if (!Array.isArray(listed)) return { state: 'unknown' };
+    const mine = lib.piTerminalsFor(listed, repo.path);
+    if (!mine.length) return { state: 'closed' };
+    if (mine.length > 1) return { state: 'ambiguous' };
+    const shown = await orca(['show', '--terminal', mine[0].handle]);
+    return { state: lib.piPromptState((shown.terminal || {}).preview) === 'busy' ? 'busy' : 'idle' };
+  } catch { return { state: 'unknown' }; }
+}
+
+module.exports = { piSend, piStatus, conditionsOrder, orcaTerminal };

@@ -34,8 +34,8 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 | RP10b | S7, S8, S9 | worker acotado; aviso y menú, `put-in-conditions`, `requirements/`, `dismissed`, arreglo de `remoteFile`; fusionado en PR #27; falta probar la orden con una sesión real | `c419df0` |
 | RP11a | S13 | worker acotado; `rooms` en la configuración, requisitos de sala y de miembro, `server/rooms.js`, `GET /api/rooms`, etiqueta y sección Rooms; fusionado en PR #28 | `bc37320` |
 | RP11b | S13 | worker acotado; diálogo «+ Room», menú «Assign to room», rutas de gestión, `roomIssues` y entradas inválidas conservadas; fusionado en PR #29 | `502b819` |
-| RP12a | S4, S6, S7 | worker acotado; bloque `panel:estado`, requisitos, `server/state.js`, `GET /api/state`, línea `next` y acceso a `/flow-commit`; hecho y verificado | pendiente de commit |
-| RP12b | S2, S3, S5 | botón `/flow-pr` (actualizar si ya hay PR abierto), aviso «necesita acción manual» y veredicto tras `/flow-commit` | — |
+| RP12a | S4, S6, S7 | worker acotado; bloque `panel:estado`, requisitos, `server/state.js`, `GET /api/state`, línea `next` y acceso a `/flow-commit`; fusionado en PR #30 | `0021290` |
+| RP12b | S2, S3, S5 | worker acotado; `/flow-pr` con variante de actualizar, acción manual, veredicto desde Git y la sesión, `pi-status`, caducidad de `working` y arreglos de RP12a; hecho y verificado | pendiente de commit |
 | RP13 | S11 | cierre de la dependencia de `implementation-guides` (otro proyecto, con autorización) | — |
 | RP14 | S14, S17 | opcional: botón hacia la terminal de la sala; chat solo si la persona lo decide | — |
 

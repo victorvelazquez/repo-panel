@@ -206,3 +206,7 @@ a.repo-name:hover { text-decoration: none; color: var(--blue); }
 .dot-red { background: var(--red); }
 .state-line { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 12px; color: var(--text); }
 .state-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.manual-bar, .attn-bar { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 6px; font-size: 12px; color: var(--text); background: rgba(248, 81, 73, .12); border: 1px solid #7a2a27; }
+.manual-bar { font-weight: 600; }
+.attn-bar button { margin-left: auto; background: transparent; border-color: transparent; color: var(--muted); padding: 0 6px; }
+.verdict-line { font-size: 12px; color: var(--muted); font-style: italic; }

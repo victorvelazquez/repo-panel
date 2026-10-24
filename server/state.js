@@ -20,12 +20,12 @@ const absent = (e) => e && (e.code === 'ENOENT' || e.code === 'ENOTDIR');
 function validate(o, now) {
   if (!o || typeof o !== 'object' || Array.isArray(o)) return null;
   if (!STATES.includes(o.state)) return null;
-  if (typeof o.next !== 'string' || o.next.length > MAX_NEXT) return null;
+  if (typeof o.next !== 'string' || o.next.length > MAX_NEXT || !o.next.trim()) return null;
   if (o.detail !== undefined && o.detail !== null && (typeof o.detail !== 'string' || o.detail.length > MAX_DETAIL)) return null;
   if (typeof o.at !== 'string' || !/^\d{4}-\d\d-\d\dT\d\d:\d\d/.test(o.at)) return null;
   const atMs = Date.parse(o.at);
   if (Number.isNaN(atMs) || atMs > now + FUTURE_SLACK_MS) return null;
-  return { state: o.state, next: o.next, detail: typeof o.detail === 'string' ? o.detail : null, at: o.at, atMs };
+  return { state: o.state, next: o.next.trim(), detail: typeof o.detail === 'string' ? o.detail : null, at: o.at, atMs };
 }
 
 // Newest of the local HEAD commit date and the mtime of each changed or untracked file (the state file itself

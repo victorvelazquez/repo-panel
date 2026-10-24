@@ -12,7 +12,7 @@ const S = {
   dismissed: new Set(), menu: null, reqPassOpen: {},
   group: '', q: '', queue: [], queueKey: '', queueSeq: 0,
   conf: { items: [], ok: 0, loaded: false, failed: false, key: '', seq: 0 }, confOpen: false,
-  req: {}, reqSeq: {}, state: {}, stateSeq: {}, prereq: { state: 'loading', items: [], seq: 0 },
+  req: {}, reqSeq: {}, state: {}, stateSeq: {}, sent: {}, pistatus: {}, pistatusSeq: {}, showCommit: new Set(), prereq: { state: 'loading', items: [], seq: 0 },
   rooms: [], roomIssues: [], roomData: { state: 'loading', data: null }, roomSeq: 0,
   prefs: store('prefs', { method: 'squash', del: true }),
   lastRefresh: 0, scan: [],
@@ -86,6 +86,7 @@ function refreshRepo(id) {
     track(id, pooled(() => api(`/api/roadmap?id=${id}`)).then((d) => { S.roadmap[id] = d; }, () => { S.roadmap[id] = null; })),
     loadRequirements(id),
     loadState(id),
+    loadPiStatus(id),
   ]);
 }
 
@@ -105,6 +106,17 @@ function loadState(id) {
   return track(id, pooled(() => api(`/api/state?id=${id}`)).then(
     (d) => { if (seq === S.stateSeq[id]) S.state[id] = d; },
     () => { if (seq === S.stateSeq[id]) S.state[id] = null; },
+  ));
+}
+
+// The pi session state (closed | idle | busy | ambiguous | unknown), only for a repo that has a /flow-commit sent
+// from this page (S.sent). A failed request is an unknown session, never a closed one.
+function loadPiStatus(id) {
+  if (!S.sent[id]) return Promise.resolve();
+  const seq = S.pistatusSeq[id] = (S.pistatusSeq[id] || 0) + 1;
+  return track(id, pooled(() => api(`/api/pi-status?id=${id}`)).then(
+    (d) => { if (seq === S.pistatusSeq[id]) S.pistatus[id] = d.state; },
+    () => { if (seq === S.pistatusSeq[id]) S.pistatus[id] = 'unknown'; },
   ));
 }
 
@@ -400,6 +412,17 @@ const isProblem = (pr) => !pr.ready && (pr.checks.state === 'failed' || ['DIRTY'
 
 const prColumn = (pr) => (pr.ready ? 'ready' : 'progress');
 
+// The verdict of the last /flow-commit sent from this page, or null. It lives in the page only: an ok verdict
+// clears the record and the card simply lives in COMMITTED. Judged from Git and the session state, never from
+// terminal text; the panel does not judge the quality of the commits.
+function verdictOf(r) {
+  const sent = S.sent[r.id];
+  if (!sent || !V) return null;
+  const v = V.commitVerdict(sent, S.local[r.id], S.pistatus[r.id]);
+  if (v && v.state === 'ok') { delete S.sent[r.id]; delete S.pistatus[r.id]; return null; }
+  return v;
+}
+
 // One card per pending thing: a repo can have a local card plus one card per open PR.
 function buildCards() {
   const cols = Object.fromEntries(COLUMNS.map((c) => [c.key, []]));
@@ -412,11 +435,13 @@ function buildCards() {
   for (const r of visibleRepos()) {
     if (!S.local[r.id] || !S.prs[r.id]) continue; // first load still running
     const { l, p, prs, dirty, unpushed } = info(r);
-    const stale = !!p.stale;
+    // A stale branch, something that needs manual action and a failed /flow-commit all need a person.
+    const verdict = verdictOf(r);
+    const attn = !!p.stale || !!(V && V.manualAction(l, l.base)) || !!(verdict && verdict.state === 'attention');
     if (l.error) add('changes', repoCard(r, true), true);
-    else if (dirty) add('changes', repoCard(r, stale), stale);
-    else if (unpushed) add('committed', repoCard(r, stale), stale);
-    else if (stale) add('clean', repoCard(r, true), true);
+    else if (dirty) add('changes', repoCard(r, attn, verdict), attn);
+    else if (unpushed) add('committed', repoCard(r, attn, verdict), attn);
+    else if (attn) add('clean', repoCard(r, true, verdict), true);
     else if (!prs.length) add('clean', cleanRow(r), false);
     for (const pr of prs) {
       const key = prColumn(pr);
@@ -480,12 +505,12 @@ const repoName = (r, url) => (url
 const removeBtn = (r) => `<button class="x" data-act="remove" data-id="${r.id}" title="Remove from panel (deletes nothing)">✕</button>`;
 
 // Types the command into the repo's open pi session (through Orca); the server refuses when that is not safe.
-const piBtn = (r, cmd) => `<button data-act="pi" data-id="${r.id}" data-cmd="${cmd}" title="Send /${cmd} to the open pi session of this repo">/${cmd}</button>`;
+const piBtn = (r, cmd, label = `/${cmd}`) => `<button data-act="pi" data-id="${r.id}" data-cmd="${cmd}" title="Send /${cmd} to the open pi session of this repo">${esc(label)}</button>`;
 
 // "⋯" menu of a card. Its open state lives in S (the page redraws on every refresh); `slot` tells apart
 // the several cards of one repo. Empty while the requirements are not loaded or nothing is left to do.
-function moreMenu(r, slot) {
-  const items = V ? V.cardMenu(S.req[r.id], S.dismissed.has(r.id)) : [];
+function moreMenu(r, slot, extra = []) {
+  const items = [...(V ? V.cardMenu(S.req[r.id], S.dismissed.has(r.id)) : []), ...extra];
   const rooms = V ? V.roomMenu(S.rooms, r.id) : null;
   if (!items.length && !rooms) return '';
   const key = `${r.id}|${slot}`;
@@ -519,8 +544,8 @@ function roomTag(r) {
 }
 
 // Repo name + group on the left, more options and remove (with confirmation) pinned to the right.
-function cardTop(r, url, slot) {
-  return `<div class="card-top">${groupTag(r.group)}${roomTag(r)}${repoName(r, url)}${spinner(r)}${moreMenu(r, slot)}${removeBtn(r)}</div>`;
+function cardTop(r, url, slot, extra = []) {
+  return `<div class="card-top">${groupTag(r.group)}${roomTag(r)}${repoName(r, url)}${spinner(r)}${moreMenu(r, slot, extra)}${removeBtn(r)}</div>`;
 }
 
 // What the project is working on, from the remote roadmap. Empty when the repo has no usable one.
@@ -557,8 +582,21 @@ function cleanRow(r) {
   </div>`;
 }
 
-function repoCard(r, attn = false) {
+// "committing…" while the last /flow-commit runs; a red bar with the reason (and a way to dismiss it) when it went wrong.
+function verdictRow(r, verdict) {
+  if (!verdict) return '';
+  if (verdict.state === 'running') return `<div class="verdict-line" title="${esc(verdict.reason)}">committing…</div>`;
+  if (verdict.state !== 'attention') return '';
+  return `<div class="attn-bar"><span>⚠ Needs attention: ${esc(verdict.reason)}</span><button data-act="dismiss-sent" data-id="${r.id}" title="Dismiss">✕</button></div>`;
+}
+
+function repoCard(r, attn = false, verdict = null) {
   const { l, p, dirty, unpushed } = info(r);
+  const manual = V ? V.manualAction(l, l.base) : null;
+  const override = S.showCommit.has(r.id);
+  const commitOk = !manual && dirty && (!V || V.commitAllowed(S.state[r.id], { override }));
+  const pa = !manual && !dirty && unpushed && V ? V.prAction(l, p, verdict && verdict.state) : null;
+  const overrideItem = !manual && dirty && V ? V.commitOverrideItem(S.state[r.id], { override }) : null;
   const chips = [];
   if (dirty) chips.push(`<button class="chip yellow chip-btn" data-act="diff" data-id="${r.id}" title="View diff">● ${l.files.length} file${l.files.length === 1 ? '' : 's'} <span class="add">+${l.added}</span> <span class="del">−${l.deleted}</span></button>`);
   if (unpushed) chips.push(`<span class="chip blue">↑ ${l.ahead} unpushed${l.noUpstream ? ' · no upstream' : ''}</span>`);
@@ -567,7 +605,9 @@ function repoCard(r, attn = false) {
   else if (l.currentGone) chips.push('<span class="chip gray" title="The remote branch was deleted (merged PR?)">remote branch deleted</span>');
   if (p.noRemote) chips.push('<span class="chip gray">no GitHub remote</span>');
   return `<div class="card ${attn ? 'attn' : ''}">
-    ${cardTop(r, p.repo?.url, 'repo')}
+    ${cardTop(r, p.repo?.url, 'repo', overrideItem ? [overrideItem] : [])}
+    ${manual ? `<div class="manual-bar">⚠ Needs manual action: ${esc(manual)}</div>` : ''}
+    ${verdictRow(r, verdict)}
     ${reqWarn(r)}
     <div class="branch one-line" title="${esc(l.branch || '')}">${esc(l.branch || (l.detached ? '(detached)' : ''))}</div>
     ${stateRow(r)}
@@ -575,7 +615,8 @@ function repoCard(r, attn = false) {
     ${chips.length ? `<div class="chips">${chips.join('')}</div>` : ''}
     ${l.error ? `<div class="err">${esc(l.error)}</div>` : ''}
     ${p.error ? `<div class="err">GitHub: ${esc(p.error)}</div>` : ''}
-    ${(dirty || unpushed) && (!V || V.commitAllowed(S.state[r.id])) ? `<div class="actions">${piBtn(r, 'flow-commit')}</div>` : ''}
+    ${commitOk ? `<div class="actions">${piBtn(r, 'flow-commit')}</div>` : ''}
+    ${pa && pa.show ? `<div class="actions">${piBtn(r, 'flow-pr', pa.update ? '/flow-pr (update PR)' : '/flow-pr')}</div>` : ''}
   </div>`;
 }
 
@@ -708,9 +749,19 @@ const ACTIONS = {
   'close-drawer': () => { S.confOpen = false; $('#drawer').hidden = true; },
   'conformity': () => openConformity(),
   'pi': async (el) => {
+    const { id, cmd } = el.dataset;
     el.disabled = true;
     try {
-      const d = await api('/api/pi', { id: el.dataset.id, command: el.dataset.cmd });
+      // The baseline of the verdict is read fresh, right before sending, so a stale card cannot fake "HEAD changed".
+      const before = cmd === 'flow-commit' ? await api(`/api/local?id=${id}`).catch(() => null) : null;
+      const d = await api('/api/pi', { id, command: cmd });
+      if (before && !before.error && d.sent) {
+        S.local[id] = before;
+        S.sent[id] = { at: Date.now(), head: before.head ?? null, files: before.files.length };
+        delete S.pistatus[id];
+        draw();
+        loadPiStatus(id);
+      }
       toast(d.confirmed ? `Sent /${el.dataset.cmd} to pi` : `Sent /${el.dataset.cmd}, not confirmed: check the pi session`, d.confirmed ? 'ok' : '');
     } catch (e) { toast(e.message, 'bad'); }
     el.disabled = false;
@@ -740,6 +791,9 @@ const ACTIONS = {
       await reloadRooms();
     } catch (e) { toast(e.message, 'bad'); }
   },
+  // Page session only (never persisted): lifts the declared-state gating of the /flow-commit button for this repo.
+  'show-commit': (el) => { S.menu = null; S.showCommit.add(el.dataset.id); draw(); },
+  'dismiss-sent': (el) => { delete S.sent[el.dataset.id]; delete S.pistatus[el.dataset.id]; draw(); },
   'toggle-menu': (el) => { S.menu = S.menu === el.dataset.menu ? null : el.dataset.menu; draw(); },
   'hide-warning': (el) => setDismissed(el.dataset.id, true),
   'toggle-warning': (el) => { S.menu = null; return setDismissed(el.dataset.id, !S.dismissed.has(el.dataset.id)); },
