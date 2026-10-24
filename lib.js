@@ -397,8 +397,40 @@ function roadmapSummary(rp) {
   };
 }
 
+const QUEUE_RANK = { merge: 0, branch: 1, deliver: 2, start: 3 };
+
+// The ordered "go work on" actions for repos given in board order. Per repo: one `merge` per ready PR,
+// `branch` when stale, `deliver` when it has local changes, `start` when clean with a next unit.
+// Repos named in `priority` (case-insensitive, in that order) come first; ties keep board order.
+function workQueue(items, priority) {
+  if (!Array.isArray(items)) return [];
+  const rankOf = new Map();
+  for (const n of Array.isArray(priority) ? priority : []) {
+    const k = typeof n === 'string' ? n.trim().toLowerCase() : '';
+    if (k && !rankOf.has(k)) rankOf.set(k, rankOf.size);
+  }
+  const out = [];
+  for (const it of items) {
+    if (!it || typeof it !== 'object' || typeof it.name !== 'string') continue;
+    const base = { repoId: it.id, name: it.name };
+    const group = rankOf.has(it.name.trim().toLowerCase()) ? rankOf.get(it.name.trim().toLowerCase()) : Infinity;
+    const add = (a) => out.push({ a, group, rank: QUEUE_RANK[a.kind], seq: out.length });
+    for (const pr of Array.isArray(it.ready) ? it.ready : []) {
+      if (pr && Number.isInteger(pr.number)) add({ ...base, kind: 'merge', pr: pr.number, title: String(pr.title ?? '') });
+    }
+    if (it.stale) add({ ...base, kind: 'branch' });
+    if (it.dirty || it.unpushed) add({ ...base, kind: 'deliver' });
+    const n = it.next;
+    if (!it.dirty && !it.unpushed && !it.stale && !it.hasPrs && n && typeof n.id === 'string') {
+      add({ ...base, kind: 'start', unit: { id: n.id, entrega: String(n.entrega ?? '') } });
+    }
+  }
+  const cmp = (x, y) => (x === y ? 0 : x < y ? -1 : 1);
+  return out.sort((x, y) => cmp(x.group, y.group) || cmp(x.rank, y.rank) || cmp(x.seq, y.seq)).map((e) => e.a);
+}
+
 module.exports = {
   repoId, parseStatus, parseNumstat, parseGoneBranches, parseBaseBranch, staleBranch, statusLetter,
   summarizeChecks, blockedReason, enrichPr, encodeRef, parseRoadmap, safeRelPath, roadmapSummary,
-  matchesUnitId, deriveUnitStates, nextUnit,
+  matchesUnitId, deriveUnitStates, nextUnit, workQueue,
 };
