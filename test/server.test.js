@@ -780,12 +780,12 @@ test('rooms config: bad entries are dropped, names trimmed and unique, a repo ke
   });
 });
 
-test('rooms config survives a config save; without it none is written', async () => {
+test('rooms config survives a config save (valid rooms cleaned, ignored entries kept in place); without it none is written', async () => {
   const groups = [{ name: 'g', repos: [{ path: '/x/a' }] }];
   const id = require('../lib.js').repoId('/x/a');
   await withPanel({ groups, rooms: ROOMS_IN }, async ({ post, file }) => {
     await post('/api/snooze', { id, number: 3, on: true });
-    assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')).rooms, ROOMS_OUT);
+    assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')).rooms, [ROOMS_OUT[0], ...ROOMS_IN.slice(1, 6), ROOMS_OUT[1], ROOMS_OUT[2]]);
   });
   await withPanel({ groups }, async ({ post, file }) => {
     await post('/api/snooze', { id, number: 3, on: true });

@@ -8,14 +8,14 @@ const lib = require('../lib.js');
 const view = require('../public/view.js');
 const { HttpError } = require('./errors.js');
 const { git, firstLine } = require('./exec.js');
-const { loadConfig, findRepo } = require('./config.js');
+const { loadConfig, findRepo, roomIssues } = require('./config.js');
 const { localState, diffText } = require('./local.js');
 const { prState, mergePr, rerunFailed } = require('./github.js');
 const { roadmapState } = require('./roadmap.js');
 const { addRepo, removeRepo, setSnoozed, setDismissed, scanFolder } = require('./repos.js');
 const { piSend } = require('./pi.js');
 const { requirementsFor, prerequisites } = require('./requirements.js');
-const { roomsState } = require('./rooms.js');
+const { roomsState, createRoom, removeRoom, assignRoom } = require('./rooms.js');
 const { queueFor, conformityFor } = require('./queue.js');
 
 const ROOT = path.join(__dirname, '..');
@@ -30,6 +30,7 @@ const routes = {
       snoozed: cfg.snoozed,
       dismissed: cfg.dismissed || [],
       rooms: cfg.rooms || [],
+      roomIssues: roomIssues(cfg),
       groups: cfg.groups.map((g) => ({
         name: g.name,
         repos: g.repos.map((r) => ({ id: lib.repoId(r.path), path: r.path, name: path.basename(r.path) })),
@@ -58,6 +59,9 @@ const routes = {
   'POST /api/conformity': (q, b) => conformityFor(b),
   'POST /api/repos': (q, b) => addRepo(b.path, b.group),
   'POST /api/repos/remove': (q, b) => { removeRepo(b.id); return { ok: true }; },
+  'POST /api/rooms/create': (q, b) => createRoom(b.name, b.path),
+  'POST /api/rooms/remove': (q, b) => removeRoom(b.name),
+  'POST /api/rooms/assign': (q, b) => assignRoom(b.id, b.room),
   'GET /api/scan': (q) => ({ repos: scanFolder(q.dir) }),
 };
 

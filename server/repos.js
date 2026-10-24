@@ -33,6 +33,7 @@ function removeRepo(id) {
   cfg.groups = cfg.groups.filter((g) => g.repos.length);
   cfg.snoozed = cfg.snoozed.filter((k) => !k.startsWith(`${id}:`));
   if (cfg.dismissed) cfg.dismissed = cfg.dismissed.filter((k) => k !== id);
+  if (cfg.rooms) cfg.rooms = cfg.rooms.map((r) => ({ ...r, repos: r.repos.filter((x) => x !== id) }));
   saveConfig(cfg);
   forgetMeta(id);
 }

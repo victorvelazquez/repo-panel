@@ -165,3 +165,37 @@ test('conformityView: never ok while the rooms load or fail, or while a room has
   assert.equal(ok.message, 'All repositories conform.');
   assert.equal(conformityView({ ...roadmapOk, req: roomsReq('loaded', []) }).state, 'ok');
 });
+
+// ---------- room management ----------
+const { roomMenu, roomIssuesNotice } = require('../public/view.js');
+
+test('roomMenu: one item per room with the current one marked, plus "No room"', () => {
+  const m = roomMenu(ROOMS, 'a');
+  assert.equal(m.title, 'Assign to room');
+  assert.deepEqual(m.items.map((i) => [i.act, i.room, i.label, i.current]), [
+    ['assign-room', 'UPEN', 'UPEN', true],
+    ['assign-room', 'TOOLS', 'TOOLS', false],
+    ['assign-room', null, 'No room', false],
+  ]);
+  assert.deepEqual(roomMenu(ROOMS, 'c').items.map((i) => i.current), [false, true, false]);
+});
+
+test('roomMenu: a repo in no room has "No room" marked', () => {
+  assert.deepEqual(roomMenu(ROOMS, 'z').items.map((i) => i.current), [false, false, true]);
+});
+
+test('roomMenu: with no rooms there is no assign group, only "Create a room…"', () => {
+  for (const rooms of [[], undefined, null]) {
+    assert.deepEqual(roomMenu(rooms, 'a'), { title: '', items: [{ act: 'room-dialog', label: 'Create a room…', current: false }] });
+  }
+});
+
+test('roomIssuesNotice: nothing when all entries are fine; otherwise a count and the reasons', () => {
+  assert.equal(roomIssuesNotice([]), null);
+  assert.equal(roomIssuesNotice(undefined), null);
+  assert.deepEqual(roomIssuesNotice(['rooms[2]: path must be absolute']), {
+    message: '1 entry in config.json under rooms is invalid and ignored', reasons: ['rooms[2]: path must be absolute'],
+  });
+  assert.equal(roomIssuesNotice(['rooms[0]: name is empty', 'rooms[1]: path must be absolute']).message, '2 entries in config.json under rooms are invalid and ignored');
+  assert.equal(roomIssuesNotice(['rooms: must be a list']).message, 'rooms in config.json is not a list and is ignored');
+});
