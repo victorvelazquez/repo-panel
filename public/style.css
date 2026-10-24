@@ -75,6 +75,8 @@ dialog label { display: block; margin: 10px 0; color: var(--muted); font-size: 1
 dialog input { width: 100%; margin-top: 4px; }
 dialog .row { display: flex; gap: 8px; margin: 10px 0; }
 dialog .row.end { justify-content: flex-end; }
+.form-error { color: var(--red); font-size: 12px; margin: 6px 0; }
+.conf-title button { margin-left: 8px; font-size: 11px; padding: 0 6px; }
 #scanResults label { display: flex; gap: 8px; align-items: center; margin: 2px 0; color: var(--text); font-size: 13px; }
 #scanResults input { width: auto; margin: 0; }
 #scanResults .done { color: var(--muted); }
@@ -187,6 +189,8 @@ a.repo-name:hover { text-decoration: none; color: var(--blue); }
 .more + button.x { margin-left: 0; }
 .more > button { background: transparent; border-color: transparent; color: var(--muted); padding: 0 6px; }
 .more-menu { position: absolute; right: 0; top: 100%; z-index: 20; display: flex; flex-direction: column; min-width: 150px; padding: 4px; background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 6px 18px rgba(0, 0, 0, .4); }
+.more-head { margin: 4px 0 2px; padding: 4px 8px 0; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; text-transform: uppercase; }
+.more-head:first-child { border-top: 0; margin-top: 0; }
 .more-menu button { text-align: left; background: transparent; border-color: transparent; white-space: nowrap; }
 .clean-row .row-actions:has(.more-menu) { opacity: 1; }
 .clean-row .more { margin-left: 0; }

@@ -8,7 +8,7 @@
 }(typeof self !== 'undefined' ? self : this, () => {
   // Bump it when the client starts needing a new or changed server route. /health reports the value
   // the running server loaded at start; the page compares it with the file it just downloaded.
-  const API_VERSION = 5;
+  const API_VERSION = 6;
 
   // `health` is the parsed /health answer, or null when the request itself failed (no answer, so
   // there is nothing to warn about). Any answer without the current integer `api` is out of date:
@@ -77,6 +77,33 @@
     return (Array.isArray(rooms) ? rooms : []).find((r) => r && Array.isArray(r.repos) && r.repos.includes(id)) || null;
   }
 
+  // The "Assign to room" group of the card menu, from the rooms of /api/config: { title, items }. Each item is
+  // { act, label, current, room? }; `room` is the room name, or null for "No room". With no rooms there is no group
+  // (empty title) and the only item offers to create one.
+  function roomMenu(rooms, id) {
+    const list = (Array.isArray(rooms) ? rooms : []).filter((r) => r && typeof r.name === 'string');
+    if (!list.length) return { title: '', items: [{ act: 'room-dialog', label: 'Create a room…', current: false }] };
+    const mine = roomOfRepo(list, id);
+    return {
+      title: 'Assign to room',
+      items: [
+        ...list.map((r) => ({ act: 'assign-room', room: r.name, label: r.name, current: r === mine })),
+        { act: 'assign-room', room: null, label: 'No room', current: !mine },
+      ],
+    };
+  }
+
+  // The warning for `roomIssues` of /api/config (config.json entries under rooms that the panel ignores), or null.
+  function roomIssuesNotice(issues) {
+    const reasons = (Array.isArray(issues) ? issues : []).filter((s) => typeof s === 'string' && s);
+    if (!reasons.length) return null;
+    const n = reasons.length;
+    const message = reasons.every((s) => s.startsWith('rooms['))
+      ? `${n} entr${n === 1 ? 'y' : 'ies'} in config.json under rooms ${n === 1 ? 'is' : 'are'} invalid and ignored`
+      : 'rooms in config.json is not a list and is ignored';
+    return { message, reasons };
+  }
+
   const PRESENCE_TEXT = {
     closed: () => 'no pi session open in the room folder',
     idle: () => 'pi session open, idle',
@@ -107,5 +134,5 @@
     return { name: room.name, dot: presenceDot(live.presence), title: `Room ${room.name} · ${presenceLabel(live.presence)} · last commit ${last}` };
   }
 
-  return { API_VERSION, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, presenceLabel, presenceDot };
+  return { API_VERSION, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, presenceLabel, presenceDot };
 }));

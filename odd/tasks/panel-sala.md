@@ -32,8 +32,8 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 | RP9 | S12 | worker acotado; 10 módulos en `server/` (errors, exec, config, local, github, roadmap, repos, pi, queue, http); hecho y verificado | pendiente de commit |
 | RP10a | S7, S8, S9, S10 | worker acotado; `requirements.json`, `checks.js`, `server/requirements.js`, lector `remoteFile`, rutas `/api/requirements` y `/api/prerequisites`, cajón de Conformity; fusionado en PR #26 | `9aadd01` |
 | RP10b | S7, S8, S9 | worker acotado; aviso y menú, `put-in-conditions`, `requirements/`, `dismissed`, arreglo de `remoteFile`; fusionado en PR #27; falta probar la orden con una sesión real | `c419df0` |
-| RP11a | S13 | worker acotado; `rooms` en la configuración, requisitos de sala y de miembro, `server/rooms.js`, `GET /api/rooms`, etiqueta y sección Rooms; hecho y verificado | pendiente de commit |
-| RP11b | S13 | diálogo para crear la sala y elegir su carpeta, y ítem «⋯» para asignar un repo | — |
+| RP11a | S13 | worker acotado; `rooms` en la configuración, requisitos de sala y de miembro, `server/rooms.js`, `GET /api/rooms`, etiqueta y sección Rooms; fusionado en PR #28 | `bc37320` |
+| RP11b | S13 | worker acotado; diálogo «+ Room», menú «Assign to room», rutas de gestión, `roomIssues` y entradas inválidas conservadas; hecho y verificado | pendiente de commit |
 | RP12 | S2, S3, S4, S5 | archivo de estado, veredicto desde Git, botón `/flow-pr`, aviso de acción manual | — |
 | RP13 | S11 | cierre de la dependencia de `implementation-guides` (otro proyecto, con autorización) | — |
 | RP14 | S14, S17 | opcional: botón hacia la terminal de la sala; chat solo si la persona lo decide | — |

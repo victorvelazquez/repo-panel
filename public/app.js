@@ -13,7 +13,7 @@ const S = {
   group: '', q: '', queue: [], queueKey: '', queueSeq: 0,
   conf: { items: [], ok: 0, loaded: false, failed: false, key: '', seq: 0 }, confOpen: false,
   req: {}, reqSeq: {}, prereq: { state: 'loading', items: [], seq: 0 },
-  rooms: [], roomData: { state: 'loading', data: null }, roomSeq: 0,
+  rooms: [], roomIssues: [], roomData: { state: 'loading', data: null }, roomSeq: 0,
   prefs: store('prefs', { method: 'squash', del: true }),
   lastRefresh: 0, scan: [],
 };
@@ -66,6 +66,8 @@ async function loadConfig() {
   }
   S.dismissed = new Set(cfg.dismissed || []);
   S.rooms = cfg.rooms || [];
+  S.roomIssues = cfg.roomIssues || [];
+  $('#roomPathList').innerHTML = allRepos().map((r) => `<option value="${esc(r.path)}">`).join('');
   $('#groupList').innerHTML = S.groups.map((g) => `<option value="${esc(g.name)}">`).join('');
   $('#groupFilter').innerHTML = `<option value="">All groups</option>${S.groups.map((g) => `<option ${S.group === g.name ? 'selected' : ''}>${esc(g.name)}</option>`).join('')}`;
 }
@@ -103,7 +105,7 @@ function loadPrerequisites() {
   );
 }
 
-// The rooms are edited by hand in config.json (reload the page to see a change); with none there is nothing to ask.
+// With no rooms there is nothing to ask. The room list itself (S.rooms) comes from /api/config.
 function loadRooms() {
   const seq = ++S.roomSeq;
   if (!S.rooms.length) { S.roomData = { state: 'loaded', data: { rooms: [] } }; return Promise.resolve(); }
@@ -328,7 +330,7 @@ function reqBlock(r) {
 function roomBlock(m) {
   const last = m.lastCommit ? m.lastCommit.slice(0, 10) : 'unknown';
   const members = m.repos.length ? m.repos.map((id) => (allRepos().some((r) => r.id === id) ? nameOf(id) : `${id} (not in the panel)`)).join(', ') : 'none yet';
-  return `<div class="conf-item"><div class="conf-title"><span class="dot dot-${V.presenceDot(m.presence)}"></span> ${esc(m.name)}</div>
+  return `<div class="conf-item"><div class="conf-title"><span class="dot dot-${V.presenceDot(m.presence)}"></span> ${esc(m.name)}<button data-act="remove-room" data-name="${esc(m.name)}" title="Only removes the room from the panel; its folder and repos are not touched">Remove room</button></div>
     <div class="conf-line">${esc(m.path)}</div>
     <div class="conf-line">Session: ${esc(V.presenceLabel(m.presence))} · last commit ${esc(last)}</div>
     ${m.available ? '' : '<div class="conf-line">The room folder is not a repository with a base branch</div>'}
@@ -336,11 +338,18 @@ function roomBlock(m) {
     <div class="conf-line">Members: ${esc(members)}</div></div>`;
 }
 
+// The config.json entries under rooms that the panel ignores (it keeps them in the file untouched).
+function roomIssuesBlock() {
+  const n = V ? V.roomIssuesNotice(S.roomIssues) : null;
+  return n ? `<div class="conf-item"><div class="conf-error">${esc(n.message)}</div>${n.reasons.map((x) => `<div class="conf-line">${esc(x)}</div>`).join('')}</div>` : '';
+}
+
 function roomsBlock() {
-  if (!S.rooms.length) return '';
+  const issues = roomIssuesBlock();
+  if (!S.rooms.length) return issues ? `<div class="conf-heading">Rooms</div>${issues}` : '';
   const e = S.roomData;
   const body = e.state === 'loaded' ? e.data.rooms.map(roomBlock).join('') : `<div class="conf-item"><div class="conf-line">${e.state === 'failed' ? 'Could not read the rooms' : 'Checking the rooms…'}</div></div>`;
-  return `<div class="conf-heading">Rooms</div>${body}`;
+  return `<div class="conf-heading">Rooms</div>${issues}${body}`;
 }
 
 function drawConformity() {
@@ -466,10 +475,14 @@ const piBtn = (r, cmd) => `<button data-act="pi" data-id="${r.id}" data-cmd="${c
 // the several cards of one repo. Empty while the requirements are not loaded or nothing is left to do.
 function moreMenu(r, slot) {
   const items = V ? V.cardMenu(S.req[r.id], S.dismissed.has(r.id)) : [];
-  if (!items.length) return '';
+  const rooms = V ? V.roomMenu(S.rooms, r.id) : null;
+  if (!items.length && !rooms) return '';
   const key = `${r.id}|${slot}`;
   const open = S.menu === key;
-  const list = items.map((i) => `<button role="menuitem" data-act="${i.act}" data-id="${r.id}">${esc(i.label)}</button>`).join('');
+  const list = items.map((i) => `<button role="menuitem" data-act="${i.act}" data-id="${r.id}">${esc(i.label)}</button>`).join('')
+    + (rooms ? `${rooms.title ? `<div class="more-head">${esc(rooms.title)}</div>` : ''}${rooms.items.map((i) => (i.act === 'assign-room'
+      ? `<button role="menuitemradio" aria-checked="${i.current}" data-act="assign-room" data-id="${r.id}" data-room="${esc(i.room ?? '')}">${i.current ? '✓ ' : ''}${esc(i.label)}</button>`
+      : `<button role="menuitem" data-act="${i.act}">${esc(i.label)}</button>`)).join('')}` : '');
   return `<span class="more"><button data-act="toggle-menu" data-menu="${esc(key)}" title="More options" aria-haspopup="true" aria-expanded="${open}">⋯</button>${open ? `<div class="more-menu" role="menu">${list}</div>` : ''}</span>`;
 }
 
@@ -647,6 +660,27 @@ async function addRepos(paths) {
   refreshAll();
 }
 
+// Re-reads the rooms after the server changed them; the board and the drawer follow.
+async function reloadRooms() {
+  await loadConfig();
+  draw();
+  loadRooms();
+}
+
+async function createRoom() {
+  const err = $('#roomError');
+  const btn = $('#roomSubmit');
+  err.hidden = true;
+  btn.disabled = true;
+  try {
+    await api('/api/rooms/create', { name: $('#roomName').value, path: $('#roomPath').value.trim() });
+    $('#roomDialog').close();
+    toast('Room added', 'ok');
+    await reloadRooms();
+  } catch (e) { err.textContent = e.message; err.hidden = false; }
+  btn.disabled = false;
+}
+
 const ACTIONS = {
   'refresh-all': () => refreshAll(),
   'fetch-all': async () => { toast('Fetching all repos…'); await Promise.all(allRepos().map((r) => fetchRepo(r.id))); toast('Fetch done', 'ok'); },
@@ -660,6 +694,31 @@ const ACTIONS = {
       toast(d.confirmed ? `Sent /${el.dataset.cmd} to pi` : `Sent /${el.dataset.cmd}, not confirmed: check the pi session`, d.confirmed ? 'ok' : '');
     } catch (e) { toast(e.message, 'bad'); }
     el.disabled = false;
+  },
+  'room-dialog': () => {
+    S.menu = null;
+    draw();
+    $('#roomForm').reset();
+    $('#roomError').hidden = true;
+    $('#roomDialog').showModal();
+    $('#roomName').focus();
+  },
+  'close-room-dialog': () => $('#roomDialog').close(),
+  'assign-room': async (el) => {
+    S.menu = null;
+    draw();
+    try {
+      await api('/api/rooms/assign', { id: el.dataset.id, room: el.dataset.room || null });
+      await reloadRooms();
+    } catch (e) { toast(e.message, 'bad'); }
+  },
+  'remove-room': async (el) => {
+    const name = el.dataset.name;
+    if (!confirm(`Remove the room "${name}" from the panel?\nThis only removes its registration: the room folder and the repos are not touched, and its members become unassigned.`)) return;
+    try {
+      await api('/api/rooms/remove', { name });
+      await reloadRooms();
+    } catch (e) { toast(e.message, 'bad'); }
   },
   'toggle-menu': (el) => { S.menu = S.menu === el.dataset.menu ? null : el.dataset.menu; draw(); },
   'hide-warning': (el) => setDismissed(el.dataset.id, true),
@@ -714,6 +773,13 @@ document.addEventListener('click', (e) => {
   if (!el || el.disabled) return;
   if (el.tagName === 'A') return;
   ACTIONS[el.dataset.act]?.(el);
+});
+
+// Enter in the room form adds the room (the form is not a method=dialog form, which would just close it).
+document.addEventListener('submit', (e) => {
+  if (e.target.id !== 'roomForm') return;
+  e.preventDefault();
+  createRoom();
 });
 
 document.addEventListener('keydown', (e) => {

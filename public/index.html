@@ -22,6 +22,7 @@
       <input id="delBranch" type="checkbox" data-pref="del"> delete branch</label>
     <button data-act="refresh-all" title="Refresh everything">↻ Refresh</button>
     <button data-act="fetch-all" title="git fetch --prune on every repo">⇣ Fetch all</button>
+    <button data-act="room-dialog" title="Register a room: a repo where you coordinate a group of repos">+ Room</button>
     <button data-act="add-dialog" class="primary">+ Repo</button>
   </header>
   <div id="queue" class="queue" hidden></div>
@@ -53,6 +54,25 @@
       <div class="row end">
         <button type="button" data-act="add-selected" id="addSelected" hidden class="primary">Add selected</button>
         <button type="button" data-act="close-dialog">Close</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="roomDialog">
+    <form id="roomForm">
+      <h2>Add a room</h2>
+      <p class="muted">A room is a repo where you coordinate a group of repos. This only registers it in the panel: its folder is never changed.</p>
+      <label>Room name
+        <input id="roomName" maxlength="60" autocomplete="off" placeholder="UPEN, H2O, TOOLS…">
+      </label>
+      <label>Room folder
+        <input id="roomPath" list="roomPathList" autocomplete="off" placeholder="C:\Users\you\Developer\my-room">
+        <datalist id="roomPathList"></datalist>
+      </label>
+      <div id="roomError" class="form-error" role="alert" hidden></div>
+      <div class="row end">
+        <button type="submit" id="roomSubmit" class="primary">Add room</button>
+        <button type="button" data-act="close-room-dialog">Close</button>
       </div>
     </form>
   </dialog>
