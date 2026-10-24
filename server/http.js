@@ -15,6 +15,7 @@ const { roadmapState } = require('./roadmap.js');
 const { addRepo, removeRepo, setSnoozed, setDismissed, scanFolder } = require('./repos.js');
 const { piSend } = require('./pi.js');
 const { requirementsFor, prerequisites } = require('./requirements.js');
+const { roomsState } = require('./rooms.js');
 const { queueFor, conformityFor } = require('./queue.js');
 
 const ROOT = path.join(__dirname, '..');
@@ -28,6 +29,7 @@ const routes = {
     return {
       snoozed: cfg.snoozed,
       dismissed: cfg.dismissed || [],
+      rooms: cfg.rooms || [],
       groups: cfg.groups.map((g) => ({
         name: g.name,
         repos: g.repos.map((r) => ({ id: lib.repoId(r.path), path: r.path, name: path.basename(r.path) })),
@@ -38,6 +40,7 @@ const routes = {
   'GET /api/prs': (q) => prState(findRepo(q.id)),
   'GET /api/roadmap': (q) => roadmapState(findRepo(q.id)),
   'GET /api/requirements': (q) => requirementsFor(findRepo(q.id)),
+  'GET /api/rooms': () => roomsState(),
   'GET /api/prerequisites': () => prerequisites(),
   'GET /api/diff': (q) => diffText(findRepo(q.id)),
   'POST /api/fetch': async (q, b) => {

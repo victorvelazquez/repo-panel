@@ -5,7 +5,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 const checks = require('../checks.js');
 const { HttpError } = require('./errors.js');
+const lib = require('../lib.js');
 const { run, firstLine } = require('./exec.js');
+const { roomOf } = require('./config.js');
 const { remoteFile } = require('./roadmap.js');
 
 const REGISTRY_PATH = path.join(__dirname, '..', 'requirements.json');
@@ -20,9 +22,9 @@ function loadRegistry() {
   return registry;
 }
 
-async function requirementsFor(repo) {
+// Reads the files of `paths` ({ role: relative path }) from the remote base branch and evaluates `list` of the registry.
+async function evaluateRepo(repo, paths, list, room) {
   const reg = loadRegistry();
-  const paths = { agents: 'AGENTS.md', roadmap: repo.roadmap || 'docs/ROADMAP.md', adoption: 'docs/ORQUESTACION.md' };
   const roles = Object.keys(paths);
   const read = await Promise.all(roles.map((role) => remoteFile(repo, paths[role])));
   const files = Object.fromEntries(roles.map((role, i) => [role, { ...read[i], path: paths[role] }]));
@@ -30,8 +32,21 @@ async function requirementsFor(repo) {
   const first = read[0];
   const status = first.reason === 'no-repo' || first.reason === 'no-base' ? first.reason : 'ok';
   const base = { status, name: first.base };
-  const { results, summary } = checks.evaluate(reg, { base, files });
+  const { results, summary } = checks.evaluate(reg, { base, files, room }, list);
   return { available: status === 'ok', base: first.base || null, results, summary };
+}
+
+// A repo that belongs to a room also gets the member-only requirements and a `room` field; any other repo's answer is unchanged.
+async function requirementsFor(repo, room = roomOf(repo.id)) {
+  const paths = { agents: 'AGENTS.md', roadmap: repo.roadmap || 'docs/ROADMAP.md', adoption: 'docs/ORQUESTACION.md' };
+  const out = await evaluateRepo(repo, paths, 'requirements', room ? { name: room.name } : null);
+  return room ? { ...out, room: { name: room.name } } : out;
+}
+
+// The room repo itself: AGENTS.md and the link map, which lives at the root or under estrategia/.
+function roomRequirementsFor(room) {
+  const repo = { id: room.id || lib.repoId(room.path), path: room.path };
+  return evaluateRepo(repo, { agents: 'AGENTS.md', enlaces: 'ENLACES.md', enlacesAlt: 'estrategia/ENLACES.md' }, 'roomRequirements', null);
 }
 
 const TOOLS = [
@@ -51,4 +66,4 @@ async function prerequisites(runner = run) {
   return { items };
 }
 
-module.exports = { requirementsFor, prerequisites };
+module.exports = { requirementsFor, roomRequirementsFor, prerequisites };

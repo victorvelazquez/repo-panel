@@ -749,3 +749,108 @@ test('an unreadable roadmap is reported as error, never cached, and requirements
     assert.equal(statuses((await getApi(`/api/requirements?id=${id}`)).json)['roadmap-header'], 'pass');
   });
 });
+
+// ---------- rooms: config, /api/config, /api/rooms and member requirements ----------
+const ABS = (n) => path.join(os.tmpdir(), 'rp-room', n);
+const ROOMS_IN = [
+  { name: ' UPEN ', path: ABS('ceo'), repos: ['a', 'a', 7, '', 'b'] },
+  { name: 'upen', path: ABS('other'), repos: ['c'] },
+  { name: 'REL', path: 'rel/dir', repos: [] },
+  { name: '   ', path: ABS('blank'), repos: [] },
+  { name: 'x'.repeat(61), path: ABS('long'), repos: [] },
+  'junk',
+  { name: 'H2O', path: ABS('h2o'), repos: ['b', 'd'] },
+  { name: 'NoRepos', path: ABS('none') },
+];
+const ROOMS_OUT = [
+  { name: 'UPEN', path: ABS('ceo'), repos: ['a', 'b'] },
+  { name: 'H2O', path: ABS('h2o'), repos: ['d'] },
+  { name: 'NoRepos', path: ABS('none'), repos: [] },
+];
+
+test('rooms config: bad entries are dropped, names trimmed and unique, a repo keeps only its first room; exposed by /api/config', async () => {
+  await withPanel({ rooms: ROOMS_IN }, async ({ getApi }) => {
+    assert.deepEqual((await getApi('/api/config')).json.rooms, ROOMS_OUT);
+  });
+  await withPanel({ rooms: 'x' }, async ({ getApi }) => {
+    assert.deepEqual((await getApi('/api/config')).json.rooms, []);
+  });
+  await withPanel({}, async ({ getApi }) => {
+    assert.deepEqual((await getApi('/api/config')).json.rooms, []);
+  });
+});
+
+test('rooms config survives a config save; without it none is written', async () => {
+  const groups = [{ name: 'g', repos: [{ path: '/x/a' }] }];
+  const id = require('../lib.js').repoId('/x/a');
+  await withPanel({ groups, rooms: ROOMS_IN }, async ({ post, file }) => {
+    await post('/api/snooze', { id, number: 3, on: true });
+    assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')).rooms, ROOMS_OUT);
+  });
+  await withPanel({ groups }, async ({ post, file }) => {
+    await post('/api/snooze', { id, number: 3, on: true });
+    assert.equal('rooms' in JSON.parse(fs.readFileSync(file, 'utf8')), false);
+  });
+});
+
+test('GET /api/rooms needs the token and answers an empty list when no room is configured', async () => {
+  await withPanel({}, async ({ getApi }) => {
+    assert.equal((await getApi('/api/rooms', false)).status, 401);
+    const r = await getApi('/api/rooms');
+    assert.equal(r.status, 200);
+    assert.deepEqual(r.json, { rooms: [] });
+  });
+});
+
+const ENLACES_MD = '# Enlaces\n## Proyectos\n## Contratos\n## Dependencias\n## Cola de órdenes\n## Último barrido\n';
+const CICLO_SALA = '<!-- orquestacion:ciclo v1.0 -->\nx\n<!-- SALA -->\ny\n<!-- /SALA -->\n<!-- /orquestacion:ciclo -->\n';
+
+test('roomRequirementsFor: reads AGENTS.md and ENLACES.md (root or estrategia/) from the room base branch', async () => {
+  const { roomRequirementsFor } = require('../server/requirements.js');
+  const under = originAndClone({ 'AGENTS.md': '# Room\n', 'estrategia/ENLACES.md': ENLACES_MD });
+  const bare = originAndClone({ 'AGENTS.md': '# Room\n' });
+  const root = originAndClone({ 'AGENTS.md': '# Room\n', 'ENLACES.md': '# Enlaces\n## Proyectos\n' });
+  try {
+    const ok = await roomRequirementsFor({ id: 'r1', path: under.work });
+    assert.deepEqual([ok.available, ok.base, ok.summary.ready], [true, 'main', true]);
+    assert.deepEqual(Object.fromEntries(ok.results.map((x) => [x.id, x.status])), {
+      'room-base-branch': 'pass', 'room-agents-file': 'pass', 'room-enlaces-file': 'pass', 'room-enlaces-sections': 'pass',
+    });
+    const none = await roomRequirementsFor({ id: 'r2', path: bare.work });
+    assert.equal(none.results.find((x) => x.id === 'room-enlaces-file').status, 'fail');
+    assert.equal(none.summary.ready, false);
+    const part = await roomRequirementsFor({ id: 'r3', path: root.work });
+    assert.equal(part.results.find((x) => x.id === 'room-enlaces-file').status, 'pass');
+    assert.match(part.results.find((x) => x.id === 'room-enlaces-sections').detail, /missing: contracts/);
+    const lost = await roomRequirementsFor({ id: 'r4', path: path.join(under.tmp, 'nope') });
+    assert.deepEqual([lost.available, lost.base], [false, null]);
+    assert.equal(lost.results.find((x) => x.id === 'room-base-branch').status, 'unavailable');
+  } finally { for (const r of [under, bare, root]) fs.rmSync(r.tmp, { recursive: true, force: true }); }
+});
+
+test('GET /api/requirements: a room member also gets the member-only results and its room; others are unchanged', async () => {
+  const lib = require('../lib.js');
+  const member = originAndClone({ 'AGENTS.md': REG_BLOCK, 'docs/ROADMAP.md': HEADER + rows(['A1', 'Pendiente']) });
+  const outside = originAndClone({ 'AGENTS.md': REG_BLOCK + CICLO_SALA, 'docs/ROADMAP.md': HEADER + rows(['A1', 'Pendiente']) });
+  const config = {
+    groups: [{ name: 'g', repos: [{ path: member.work, base: 'main' }, { path: outside.work, base: 'main' }] }],
+    rooms: [{ name: 'UPEN', path: ABS('ceo'), repos: [lib.repoId(member.work)] }],
+  };
+  try {
+    await withPanel(config, async ({ getApi }) => {
+      const m = (await getApi(`/api/requirements?id=${lib.repoId(member.work)}`)).json;
+      assert.deepEqual(m.room, { name: 'UPEN' });
+      const s = statuses(m);
+      assert.equal(s['sala-region'], 'fail');
+      assert.equal(s['ciclo-block'], 'fail');
+      assert.equal(m.results.find((x) => x.id === 'ciclo-block').level, 'required');
+      assert.equal(m.summary.ready, false);
+      // A repo outside every room: same keys, same results (no sala-region, ciclo-block stays recommended), no room field.
+      const o = (await getApi(`/api/requirements?id=${lib.repoId(outside.work)}`)).json;
+      assert.deepEqual(Object.keys(o), ['available', 'base', 'results', 'summary']);
+      assert.deepEqual(o.results.map((x) => x.id), ['base-branch', 'agents-file', 'registro-block', 'roadmap-file', 'roadmap-header', 'roadmap-table', 'ciclo-block', 'adoption-record']);
+      assert.equal(o.results.find((x) => x.id === 'ciclo-block').level, 'recommended');
+      assert.deepEqual(o.summary, { required: { pass: 6, total: 6 }, recommended: { pass: 1, total: 2 }, ready: true });
+    });
+  } finally { for (const r of [member, outside]) fs.rmSync(r.tmp, { recursive: true, force: true }); }
+});

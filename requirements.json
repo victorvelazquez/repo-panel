@@ -55,8 +55,18 @@
       "title": "Orquestación 'ciclo' block in AGENTS.md",
       "category": "verificable",
       "level": "recommended",
+      "levelInRoom": "required",
       "check": { "type": "block", "file": "agents", "name": "ciclo" },
       "remedy": "Add the Orquestación 'ciclo' block (version 1.0) to AGENTS.md exactly as in requirements/blocks/ciclo.md, between <!-- orquestacion:ciclo v1.0 --> and <!-- /orquestacion:ciclo -->; if AGENTS.md has rules that conflict, stop and ask the user."
+    },
+    {
+      "id": "sala-region",
+      "title": "SALA region inside the 'ciclo' block",
+      "category": "verificable",
+      "level": "required",
+      "onlyInRoom": true,
+      "check": { "type": "block-markers", "file": "agents", "name": "ciclo", "markers": ["<!-- SALA -->", "<!-- /SALA -->"] },
+      "remedy": "Restore every region between <!-- SALA --> and <!-- /SALA --> (markers included) inside the 'ciclo' block of AGENTS.md exactly as in requirements/blocks/ciclo.md; this repo belongs to a room, so those lines must stay."
     },
     {
       "id": "adoption-record",
@@ -65,6 +75,50 @@
       "level": "recommended",
       "check": { "type": "file-exists", "file": "adoption" },
       "remedy": "Create docs/ORQUESTACION.md recording how this repo adopted the Orquestación profile and which blocks it uses."
+    }
+  ],
+  "roomRequirements": [
+    {
+      "id": "room-base-branch",
+      "title": "Remote base branch exists",
+      "category": "verificable",
+      "level": "required",
+      "check": { "type": "base-branch" },
+      "remedy": "Make sure the room repo has a remote called origin and that its base branch (usually main) is pushed there."
+    },
+    {
+      "id": "room-agents-file",
+      "title": "AGENTS.md on the base branch",
+      "category": "verificable",
+      "level": "required",
+      "check": { "type": "file-exists", "file": "agents" },
+      "remedy": "Create AGENTS.md at the root of the room repo with the rules of the room, then the user commits it with /flow-commit and opens a PR with /flow-pr."
+    },
+    {
+      "id": "room-enlaces-file",
+      "title": "Link map ENLACES.md on the base branch",
+      "category": "verificable",
+      "level": "required",
+      "check": { "type": "file-exists", "files": ["enlaces", "enlacesAlt"] },
+      "remedy": "Create the link map ENLACES.md at the root of the room repo (or under estrategia/) with the projects, contracts, dependencies, orders queue and last sweep of the room."
+    },
+    {
+      "id": "room-enlaces-sections",
+      "title": "Link map sections",
+      "category": "verificable",
+      "level": "required",
+      "check": {
+        "type": "headings",
+        "files": ["enlaces", "enlacesAlt"],
+        "sections": [
+          { "label": "projects", "match": "Proyectos" },
+          { "label": "contracts", "match": "Contratos" },
+          { "label": "dependencies", "match": "Dependencias" },
+          { "label": "queue", "match": "Cola" },
+          { "label": "sweep", "match": "barrido" }
+        ]
+      },
+      "remedy": "Give the link map one markdown heading for each of: Proyectos, Contratos, Dependencias, Cola (de órdenes) and (último) barrido."
     }
   ]
 }

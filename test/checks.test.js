@@ -133,3 +133,81 @@ test('evaluate: an unknown check type is unavailable; an empty registry is not r
   assert.equal(evaluate({ requirements: [] }, GOOD).summary.ready, false);
   assert.deepEqual(evaluate(null, GOOD).results, []);
 });
+
+// ---------- rooms: member-only requirements and the room's own requirements ----------
+const REAL = require('../requirements.json');
+const SALA_REGION = '<!-- SALA -->\nthe room line\n<!-- /SALA -->\n';
+const ciclo = (inner) => `<!-- orquestacion:ciclo v1.0 -->\nrules\n${inner}<!-- /orquestacion:ciclo -->\n`;
+const registro = block('1.0');
+const memberFacts = (agents, room = { name: 'UPEN' }) => ({ ...GOOD, room, files: { ...GOOD.files, agents: file(agents) } });
+const ids = (out) => out.results.map((r) => r.id);
+
+test('onlyInRoom: a requirement marked for members is omitted outside a room and present inside one', () => {
+  const outside = evaluate(REAL, memberFacts(registro + ciclo(SALA_REGION), null));
+  assert.equal(ids(outside).includes('sala-region'), false);
+  assert.equal(ids(evaluate(REAL, memberFacts(registro + ciclo(SALA_REGION)))).includes('sala-region'), true);
+});
+
+test('levelInRoom: ciclo-block is recommended outside a room and required for members only', () => {
+  const agents = registro; // no ciclo block
+  const outside = evaluate(REAL, memberFacts(agents, null));
+  assert.equal(by(outside, 'ciclo-block').level, 'recommended');
+  assert.equal(by(outside, 'ciclo-block').status, 'fail');
+  assert.equal(outside.summary.ready, true);
+  const member = evaluate(REAL, memberFacts(agents));
+  assert.equal(by(member, 'ciclo-block').level, 'required');
+  assert.equal(member.summary.ready, false);
+  assert.equal(evaluate(REAL, memberFacts(registro + ciclo(SALA_REGION))).summary.ready, true);
+});
+
+test('sala-region: passes only when the ciclo block holds both SALA markers', () => {
+  const status = (agents) => by(evaluate(REAL, memberFacts(agents)), 'sala-region').status;
+  assert.equal(status(registro + ciclo(SALA_REGION)), 'pass');
+  assert.equal(status(registro + ciclo('')), 'fail');
+  assert.equal(status(registro + ciclo('<!-- SALA -->\nonly open\n')), 'fail');
+  assert.equal(status(registro + ciclo('<!-- /SALA -->\n<!-- SALA -->\nswapped\n')), 'fail');
+  assert.equal(status(`${registro}<!-- SALA -->\n<!-- /SALA -->\n`), 'fail'); // markers outside the ciclo block do not count
+  assert.equal(status(registro), 'fail');
+  const gone = evaluate(REAL, { ...memberFacts(''), files: { ...GOOD.files, agents: { available: false, reason: 'missing', path: 'AGENTS.md' } } });
+  assert.equal(by(gone, 'sala-region').status, 'unavailable');
+});
+
+const ENLACES = '# Enlaces\n\n## 1. Proyectos\n- a\n## 2. Contratos\n## 3. Dependencias entre unidades\n## 4. Cola de órdenes\n## 5. Último barrido\n';
+const roomFacts = (files) => ({ base: { status: 'ok', name: 'main' }, files: { agents: file('# Room\n'), ...files } });
+const gone = { available: false, reason: 'missing', path: 'x' };
+const roomOut = (facts) => evaluate(REAL, facts, 'roomRequirements');
+
+test('room requirements: the registry lists the five checks, all required and verifiable', () => {
+  assert.deepEqual(REAL.roomRequirements.map((r) => r.id), ['room-base-branch', 'room-agents-file', 'room-enlaces-file', 'room-enlaces-sections']);
+  assert.ok(REAL.roomRequirements.every((r) => r.level === 'required' && r.category === 'verificable' && r.remedy));
+});
+
+test('room requirements: ENLACES.md is accepted at the root or under estrategia/, otherwise it fails', () => {
+  const at = (files) => by(roomOut(roomFacts(files)), 'room-enlaces-file');
+  assert.equal(at({ enlaces: file(ENLACES), enlacesAlt: gone }).status, 'pass');
+  assert.equal(at({ enlaces: gone, enlacesAlt: file(ENLACES) }).status, 'pass');
+  assert.equal(at({ enlaces: gone, enlacesAlt: gone }).status, 'fail');
+  assert.equal(at({ enlaces: gone, enlacesAlt: { available: false, reason: 'error' } }).status, 'unavailable');
+  assert.equal(by(roomOut(roomFacts({ enlaces: gone, enlacesAlt: gone })), 'room-agents-file').status, 'pass');
+});
+
+test('room requirements: the link map needs headings for projects, contracts, dependencies, queue and sweep', () => {
+  const sections = (text) => by(roomOut(roomFacts({ enlaces: gone, enlacesAlt: file(text) })), 'room-enlaces-sections');
+  assert.equal(sections(ENLACES).status, 'pass');
+  assert.equal(sections(ENLACES.toUpperCase()).status, 'pass'); // case-insensitive
+  const missing = sections('## Proyectos\n## Contratos\ntext about dependencias, cola and barrido but not as headings\n');
+  assert.equal(missing.status, 'fail');
+  assert.match(missing.detail, /missing: .*dependencies.*queue.*sweep/);
+  assert.doesNotMatch(missing.detail, /projects|contracts/);
+  const none = by(roomOut(roomFacts({ enlaces: gone, enlacesAlt: gone })), 'room-enlaces-sections');
+  assert.equal(none.status, 'unavailable');
+  assert.equal(roomOut(roomFacts({ enlaces: file(ENLACES), enlacesAlt: gone })).summary.ready, true);
+  assert.equal(roomOut(roomFacts({ enlaces: gone, enlacesAlt: gone })).summary.ready, false);
+});
+
+test('room requirements: a room without a base branch is unavailable or failed, never ready', () => {
+  const out = roomOut({ base: { status: 'no-base', name: 'main' }, files: {} });
+  assert.equal(by(out, 'room-base-branch').status, 'fail');
+  assert.equal(by(out, 'room-agents-file').status, 'unavailable');
+  assert.equal(out.summary.ready, false);
+});
