@@ -1,5 +1,5 @@
 'use strict';
-// Config file: groups of repos, snoozed PRs, dismissed warnings and the manual priority order. REPO_PANEL_CONFIG picks the file.
+// Config file: groups of repos, rooms, snoozed PRs, dismissed warnings and the manual priority order. REPO_PANEL_CONFIG picks the file.
 const fs = require('node:fs');
 const path = require('node:path');
 const lib = require('../lib.js');
@@ -30,6 +30,26 @@ function cleanIds(list) {
   return list.filter((n) => typeof n === 'string' && n && !seen.has(n) && seen.add(n));
 }
 
+const ROOM_NAME_MAX = 60;
+
+// A room is a repo where the user coordinates a group of repos: { name, path (absolute), repos: [repoId] }.
+// Invalid entries are dropped, names are unique (case-insensitive, first wins) and a repo id belongs to at most one room.
+function cleanRooms(list) {
+  const names = new Set();
+  const members = new Set();
+  const rooms = [];
+  for (const r of list) {
+    if (!r || typeof r !== 'object' || typeof r.name !== 'string' || typeof r.path !== 'string') continue;
+    const name = r.name.trim();
+    if (!name || name.length > ROOM_NAME_MAX || !path.isAbsolute(r.path) || names.has(name.toLowerCase())) continue;
+    names.add(name.toLowerCase());
+    const repos = cleanIds(Array.isArray(r.repos) ? r.repos : []).filter((id) => !members.has(id));
+    for (const id of repos) members.add(id);
+    rooms.push({ name, path: r.path, repos });
+  }
+  return rooms;
+}
+
 function loadConfig() {
   let cfg = {};
   try { cfg = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8')); } catch { /* first run */ }
@@ -43,6 +63,8 @@ function loadConfig() {
     snoozed: Array.isArray(cfg.snoozed) ? cfg.snoozed.filter((k) => typeof k === 'string') : [],
     // Repos whose "requirements missing" warning the user hid; written back only when present.
     ...(Array.isArray(cfg.dismissed) ? { dismissed: cleanIds(cfg.dismissed) } : {}),
+    // Rooms the user declared by hand; written back only when present.
+    ...(Array.isArray(cfg.rooms) ? { rooms: cleanRooms(cfg.rooms) } : {}),
     // Optional manual order of the "Go work on" strip; written back only when present.
     ...(Array.isArray(cfg.priority) ? { priority: cleanPriority(cfg.priority) } : {}),
   };
@@ -61,4 +83,9 @@ function findRepo(id) {
   throw new HttpError(404, 'Unknown repository');
 }
 
-module.exports = { loadConfig, saveConfig, findRepo };
+// The room a repo belongs to, or null.
+function roomOf(id) {
+  return (loadConfig().rooms || []).find((r) => r.repos.includes(id)) || null;
+}
+
+module.exports = { loadConfig, saveConfig, findRepo, roomOf };

@@ -63,4 +63,4 @@ async function piSend(repo, key, orca = orcaTerminal, wait = sleep, requirements
   } finally { piBusy.delete(repo.path); }
 }
 
-module.exports = { piSend, conditionsOrder };
+module.exports = { piSend, conditionsOrder, orcaTerminal };

@@ -3,8 +3,10 @@
 //
 // facts = {
 //   base:  { status: 'ok' | 'no-repo' | 'no-base', name },
-//   files: { <role>: { available, reason, text, path } }   // roles: agents, roadmap, adoption; the shape
-// };                                                        // is what server/roadmap.js remoteFile returns
+//   files: { <role>: { available, reason, text, path } },  // roles: agents, roadmap, adoption (a repo) or agents,
+//                                                           // enlaces, enlacesAlt (a room); the shape is what
+//   room:  { name } | null                                  // server/roadmap.js remoteFile returns; the room the
+// };                                                        // repo belongs to (null or absent: none)
 const lib = require('./lib.js');
 
 const stripBom = (t) => (typeof t === 'string' ? t : '').replace(/^\uFEFF/, '');
@@ -38,6 +40,19 @@ function headerCheck(text) {
   return { ok: missing.length === 0 && ordered, missing, ordered };
 }
 
+// The text between a block's markers, or null when it is missing or unclosed.
+function blockBody(text, name) {
+  const t = stripBom(text);
+  const open = new RegExp(`<!-- orquestacion:${escapeRe(name)} v\\d+(?:\\.\\d+)* -->`).exec(t);
+  if (!open) return null;
+  const from = open.index + open[0].length;
+  const end = t.indexOf(`<!-- /orquestacion:${name} -->`, from);
+  return end === -1 ? null : t.slice(from, end);
+}
+
+// Text of the markdown heading lines (`# ...` to `###### ...`).
+const headingLines = (text) => stripBom(text).split(/\r?\n/).map((l) => /^#{1,6}\s+(.*?)\s*#*\s*$/.exec(l)).filter(Boolean).map((m) => m[1]);
+
 const BLOCK_DETAIL = {
   outdated: (b) => `version ${b.version} found, ${b.expected} expected`,
   legacy: () => 'unversioned legacy section found; update it',
@@ -58,6 +73,18 @@ function fileOf(facts, role) {
   return { result: unavailable(f.reason || 'not-read') };
 }
 
+// Like fileOf for a file that may live under any of several roles: the first readable one wins. Absence is
+// proven only when every role is missing; one unreadable role leaves the answer unavailable.
+function fileOfAny(facts, roles) {
+  const found = roles.map((role) => fileOf(facts, role));
+  const hit = found.find((f) => typeof f.text === 'string');
+  if (hit) return hit;
+  if (found.every((f) => f.absent)) return { absent: true, path: found.map((f) => f.path).filter(Boolean).join(' or ') };
+  return found.find((f) => f.result) || { result: unavailable('not-read') };
+}
+
+const rolesOf = (c) => (Array.isArray(c.files) ? c.files : [c.file]);
+
 const TYPES = {
   'base-branch': (c, facts) => {
     const s = facts.base && facts.base.status;
@@ -66,9 +93,34 @@ const TYPES = {
     return unavailable(s || 'no-repo');
   },
   'file-exists': (c, facts) => {
-    const f = fileOf(facts, c.file);
+    const f = fileOfAny(facts, rolesOf(c));
     if (f.result) return f.result;
     return f.absent ? make('fail', `${f.path || c.file} not found on the base branch`) : make('pass', `${f.path || c.file} found`);
+  },
+  // The named block must hold every marker, in order (the SALA region of the ciclo block).
+  'block-markers': (c, facts) => {
+    const f = fileOf(facts, c.file);
+    if (f.result) return f.result;
+    if (f.absent) return unavailable('missing');
+    const body = blockBody(f.text, c.name);
+    if (body === null) return make('fail', `${c.name} block not found or not closed`);
+    let from = 0;
+    const missing = c.markers.filter((m) => {
+      const at = body.indexOf(m, from);
+      if (at === -1) return true;
+      from = at + m.length;
+      return false;
+    });
+    return missing.length ? make('fail', `missing in the ${c.name} block: ${missing.join(', ')}`) : make('pass', `${c.markers.join(' ... ')} found in the ${c.name} block`);
+  },
+  // The file needs a markdown heading for each section (case-insensitive match on the heading text).
+  headings: (c, facts) => {
+    const f = fileOfAny(facts, rolesOf(c));
+    if (f.result) return f.result;
+    if (f.absent) return unavailable('missing');
+    const heads = headingLines(f.text).map((h) => h.toLowerCase());
+    const missing = c.sections.filter((s) => !heads.some((h) => h.includes(s.match.toLowerCase())));
+    return missing.length ? make('fail', `missing: ${missing.map((s) => s.label).join(', ')}`) : make('pass', `headings found for ${c.sections.map((s) => s.label).join(', ')}`);
   },
   block: (c, facts, registry) => {
     const f = fileOf(facts, c.file);
@@ -98,18 +150,24 @@ const TYPES = {
   },
 };
 
+// Members of a room may get a stricter level than the rest.
+const levelFor = (req, facts) => (facts.room && req.levelInRoom ? req.levelInRoom : req.level);
+
 function evaluateOne(req, facts, registry) {
   let r;
   if (req.category !== 'verificable') r = make('unavailable', 'needs a person to confirm; never reported as passing', 'manual');
   else if (!req.check || !Object.hasOwn(TYPES, req.check.type)) r = make('unavailable', 'unknown check type', 'unknown-check');
   else r = TYPES[req.check.type](req.check, facts, registry);
-  return { id: req.id, title: req.title, category: req.category, level: req.level, status: r.status, detail: r.detail, remedy: req.remedy };
+  return { id: req.id, title: req.title, category: req.category, level: levelFor(req, facts), status: r.status, detail: r.detail, remedy: req.remedy };
 }
 
-function evaluate(registry, facts) {
+// `list` names the registry array to evaluate: 'requirements' (a repo) or 'roomRequirements' (a room repo).
+// A requirement marked `onlyInRoom` is left out entirely unless facts.room is set.
+function evaluate(registry, facts, list = 'requirements') {
   const reg = registry && typeof registry === 'object' ? registry : {};
-  const reqs = Array.isArray(reg.requirements) ? reg.requirements : [];
-  const results = reqs.map((req) => evaluateOne(req, facts || {}, reg));
+  const f = facts || {};
+  const reqs = (Array.isArray(reg[list]) ? reg[list] : []).filter((req) => f.room || !req.onlyInRoom);
+  const results = reqs.map((req) => evaluateOne(req, f, reg));
   const count = (level) => {
     const own = results.filter((r) => r.level === level);
     return { pass: own.filter((r) => r.status === 'pass').length, total: own.length };

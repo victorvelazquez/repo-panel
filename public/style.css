@@ -193,3 +193,8 @@ a.repo-name:hover { text-decoration: none; color: var(--blue); }
 .req-warn { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--yellow); }
 .req-warn button { margin-left: auto; background: transparent; border-color: transparent; color: var(--muted); padding: 0 6px; }
 .clean-row .req-warn { flex: 1 0 100%; }
+.room-tag { display: inline-flex; align-items: center; gap: 4px; background: var(--panel); border: 1px solid var(--line); color: var(--muted); }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--gray); }
+.dot-green { background: var(--green); }
+.dot-yellow { background: var(--yellow); }
+.dot-gray { background: var(--gray); }

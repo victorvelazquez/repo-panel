@@ -13,6 +13,7 @@ const S = {
   group: '', q: '', queue: [], queueKey: '', queueSeq: 0,
   conf: { items: [], ok: 0, loaded: false, failed: false, key: '', seq: 0 }, confOpen: false,
   req: {}, reqSeq: {}, prereq: { state: 'loading', items: [], seq: 0 },
+  rooms: [], roomData: { state: 'loading', data: null }, roomSeq: 0,
   prefs: store('prefs', { method: 'squash', del: true }),
   lastRefresh: 0, scan: [],
 };
@@ -64,6 +65,7 @@ async function loadConfig() {
     if (base !== k) S.keepSnoozed.add(base);
   }
   S.dismissed = new Set(cfg.dismissed || []);
+  S.rooms = cfg.rooms || [];
   $('#groupList').innerHTML = S.groups.map((g) => `<option value="${esc(g.name)}">`).join('');
   $('#groupFilter').innerHTML = `<option value="">All groups</option>${S.groups.map((g) => `<option ${S.group === g.name ? 'selected' : ''}>${esc(g.name)}</option>`).join('')}`;
 }
@@ -101,6 +103,16 @@ function loadPrerequisites() {
   );
 }
 
+// The rooms are edited by hand in config.json (reload the page to see a change); with none there is nothing to ask.
+function loadRooms() {
+  const seq = ++S.roomSeq;
+  if (!S.rooms.length) { S.roomData = { state: 'loaded', data: { rooms: [] } }; return Promise.resolve(); }
+  return pooled(() => api('/api/rooms')).then(
+    (d) => { if (seq === S.roomSeq) { S.roomData = { state: 'loaded', data: d }; draw(); } },
+    () => { if (seq === S.roomSeq) { S.roomData = { state: 'failed', data: null }; draw(); } },
+  );
+}
+
 // A PR snoozed while still blocked is woken up when it becomes ready to merge. One snoozed while
 // already ready was parked on purpose, so it stays parked until the user brings it back.
 function wakeReady(id, d) {
@@ -120,7 +132,7 @@ async function refreshAll() {
   checkHealth();
   if (S.conf.failed) S.conf.key = ''; // ask again once per refresh, never on every redraw
   S.lastRefresh = Date.now();
-  await Promise.all([loadPrerequisites(), ...allRepos().map((r) => refreshRepo(r.id))]);
+  await Promise.all([loadPrerequisites(), loadRooms(), ...allRepos().map((r) => refreshRepo(r.id))]);
 }
 
 async function fetchRepo(id) {
@@ -269,8 +281,13 @@ const REQ_CATEGORY = { verificable: 'verifiable', parcial: 'partial', criterio: 
 const REQ_MARK = { pass: '✓', fail: '✗', outdated: '↻', unavailable: '?' };
 
 // What the conformity view knows about requirements: a repo that has not answered yet is "loading", never ready.
+// Rooms are the same: until /api/rooms answered they are "loading".
 const reqSummary = () => ({
   prereq: S.prereq.state,
+  rooms: {
+    state: S.roomData.state,
+    list: ((S.roomData.data && S.roomData.data.rooms) || []).map((m) => ({ name: m.name, ready: !!(m.summary && m.summary.ready) })),
+  },
   repos: allRepos().map((r) => {
     const e = S.req[r.id];
     return { id: r.id, state: e ? e.state : 'loading', ready: !!(e && e.data && e.data.summary && e.data.summary.ready) };
@@ -290,16 +307,40 @@ function reqLine(x) {
   return `<div class="conf-line req-${esc(x.status)}" title="${esc(x.remedy)}">${REQ_MARK[x.status] || '?'} ${esc(x.title)} · ${esc(x.level)} · ${esc(REQ_CATEGORY[x.category] || x.category)} · ${esc(x.status)} (${esc(x.detail)})<div class="req-remedy">${esc(x.remedy)}</div></div>`;
 }
 
+// The status line, the requirements that are not passing (with their remedy) and the collapsed passing list.
+// `key` identifies the list in S.reqPassOpen, so it stays open or closed across redraws.
+function reqResults(key, { results, summary }) {
+  const bad = results.filter((x) => x.status !== 'pass');
+  const good = results.filter((x) => x.status === 'pass');
+  const status = summary.ready ? 'Ready' : `Not ready · required ${summary.required.pass}/${summary.required.total}`;
+  const passing = good.length ? `<details class="req-passing" data-id="${esc(key)}"${S.reqPassOpen[key] ? ' open' : ''}><summary>${good.length} passing</summary>${good.map((x) => `<div class="conf-line req-pass">✓ ${esc(x.title)} · ${esc(x.level)}</div>`).join('')}</details>` : '';
+  return `<div class="conf-status">${esc(status)}</div>${bad.map(reqLine).join('')}${passing}`;
+}
+
 function reqBlock(r) {
   const e = S.req[r.id];
   const name = `<button class="repo-name" data-act="queue-pick" data-close="1" data-name="${esc(r.name)}" title="Filter the board to this repo">${esc(r.name)}</button>`;
   if (!e || e.state !== 'loaded') return `<div class="conf-item">${name}<div class="conf-line">${e ? 'Could not read the requirements' : 'Checking the requirements…'}</div></div>`;
-  const { results, summary } = e.data;
-  const bad = results.filter((x) => x.status !== 'pass');
-  const good = results.filter((x) => x.status === 'pass');
-  const status = summary.ready ? 'Ready' : `Not ready · required ${summary.required.pass}/${summary.required.total}`;
-  const passing = good.length ? `<details class="req-passing" data-id="${esc(r.id)}"${S.reqPassOpen[r.id] ? ' open' : ''}><summary>${good.length} passing</summary>${good.map((x) => `<div class="conf-line req-pass">✓ ${esc(x.title)} · ${esc(x.level)}</div>`).join('')}</details>` : '';
-  return `<div class="conf-item">${name}<div class="conf-status">${esc(status)}</div>${bad.map(reqLine).join('')}${passing}</div>`;
+  return `<div class="conf-item">${name}${reqResults(r.id, e.data)}</div>`;
+}
+
+// A room: its folder, whether a pi session is open there, its own requirements and the repos assigned to it.
+function roomBlock(m) {
+  const last = m.lastCommit ? m.lastCommit.slice(0, 10) : 'unknown';
+  const members = m.repos.length ? m.repos.map((id) => (allRepos().some((r) => r.id === id) ? nameOf(id) : `${id} (not in the panel)`)).join(', ') : 'none yet';
+  return `<div class="conf-item"><div class="conf-title"><span class="dot dot-${V.presenceDot(m.presence)}"></span> ${esc(m.name)}</div>
+    <div class="conf-line">${esc(m.path)}</div>
+    <div class="conf-line">Session: ${esc(V.presenceLabel(m.presence))} · last commit ${esc(last)}</div>
+    ${m.available ? '' : '<div class="conf-line">The room folder is not a repository with a base branch</div>'}
+    ${reqResults(`room:${m.name}`, m)}
+    <div class="conf-line">Members: ${esc(members)}</div></div>`;
+}
+
+function roomsBlock() {
+  if (!S.rooms.length) return '';
+  const e = S.roomData;
+  const body = e.state === 'loaded' ? e.data.rooms.map(roomBlock).join('') : `<div class="conf-item"><div class="conf-line">${e.state === 'failed' ? 'Could not read the rooms' : 'Checking the rooms…'}</div></div>`;
+  return `<div class="conf-heading">Rooms</div>${body}`;
 }
 
 function drawConformity() {
@@ -311,7 +352,7 @@ function drawConformity() {
   if (!S.confOpen) return;
   const sum = v.summary ? `<div class="conf-sum">${esc(v.summary)}</div>` : '';
   const body = v.state === 'issues' ? S.conf.items.map(confBlock).join('') : `<div class="${v.state === 'error' ? 'conf-error' : 'empty'}">${esc(v.message)}</div>`;
-  const reqs = V ? `<div class="conf-heading">Requirements</div>${allRepos().map(reqBlock).join('')}` : '';
+  const reqs = V ? `<div class="conf-heading">Requirements</div>${allRepos().map(reqBlock).join('')}${roomsBlock()}` : '';
   $('#drawerBody').innerHTML = sum + prereqBlock() + body + reqs;
 }
 
@@ -439,9 +480,15 @@ function reqWarn(r) {
   return `<div class="req-warn" title="${esc(w.ids.join(', '))}"><span>⚠ ${w.count} requirement${w.count === 1 ? '' : 's'} missing</span><button data-act="hide-warning" data-id="${r.id}" title="Hide this warning (more options → Show warning)">✕</button></div>`;
 }
 
+// Room tag with a status dot; only for repos assigned to a room.
+function roomTag(r) {
+  const t = V ? V.roomTag(S.rooms, r.id, S.roomData) : null;
+  return t ? `<span class="tag room-tag" title="${esc(t.title)}"><span class="dot dot-${t.dot}"></span>${esc(t.name)}</span>` : '';
+}
+
 // Repo name + group on the left, more options and remove (with confirmation) pinned to the right.
 function cardTop(r, url, slot) {
-  return `<div class="card-top">${groupTag(r.group)}${repoName(r, url)}${spinner(r)}${moreMenu(r, slot)}${removeBtn(r)}</div>`;
+  return `<div class="card-top">${groupTag(r.group)}${roomTag(r)}${repoName(r, url)}${spinner(r)}${moreMenu(r, slot)}${removeBtn(r)}</div>`;
 }
 
 // What the project is working on, from the remote roadmap. Empty when the repo has no usable one.
@@ -470,7 +517,7 @@ function cleanRow(r) {
   const behind = l.behind ? `<span class="behind" title="${l.behind} commit${l.behind === 1 ? '' : 's'} behind the remote — time to pull">↓${l.behind}</span>` : '';
   const warn = p.error ? `<span class="warn" title="${esc('GitHub: ' + p.error)}">⚠</span>` : '';
   return `<div class="clean-row">
-    ${groupTag(r.group)}${repoName(r, p.repo?.url)}
+    ${groupTag(r.group)}${roomTag(r)}${repoName(r, p.repo?.url)}
     <span class="branch" title="${esc(l.branch || '')}">${esc(l.branch || (l.detached ? '(detached)' : ''))}</span>${behind}${warn}${spinner(r)}
     <span class="row-actions">${moreMenu(r, 'row')}${removeBtn(r)}</span>
     ${reqWarn(r)}
