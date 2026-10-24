@@ -220,8 +220,9 @@ function queueItems() {
     const { p, prs, dirty, unpushed } = info(r);
     const rm = S.roadmap[r.id];
     const s = rm && rm.available ? rm.summary : null;
+    const flags = V ? V.queueFlags(S.local[r.id], S.state[r.id], verdictOf(r), { override: S.showCommit.has(r.id) }) : {};
     return {
-      id: r.id, name: r.name, dirty, unpushed, stale: !!p.stale, hasPrs: prs.length > 0,
+      id: r.id, name: r.name, dirty, unpushed, stale: !!p.stale, hasPrs: prs.length > 0, ...flags,
       ready: prs.filter((x) => x.ready && !S.snoozed.has(snoozeKey(r.id, x.number))).map((x) => ({ number: x.number, title: x.title })),
       next: s && s.kind === 'next' ? { id: s.id, entrega: s.entrega } : null,
     };
@@ -243,13 +244,22 @@ function refreshQueue() {
 }
 
 const QUEUE_MAX = 8;
+const QUEUE_CLIP = 80;
+const clip = (s, n) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 const QUEUE_TEXT = {
   merge: (a) => `Merge #${a.pr} ${a.title}`,
   branch: () => '/flow-branch',
   deliver: () => 'Deliver changes',
   start: (a) => `Start ${a.unit.id} ${a.unit.entrega}`,
+  manual: (a) => `Manual action: ${clip(a.reason, QUEUE_CLIP)}`,
+  waiting: (a) => `Waiting for you: ${clip(a.next || (a.state === 'blocked' ? 'blocked' : 'needs input'), QUEUE_CLIP)}`,
 };
-const QUEUE_COLOR = { merge: 'green', branch: 'red', deliver: 'yellow', start: 'blue' };
+// The tooltip keeps the full text of the kinds that clip theirs.
+const QUEUE_TITLE = {
+  manual: (a) => `Manual action: ${a.reason}`,
+  waiting: (a) => `Waiting for you: ${a.next || a.state}`,
+};
+const QUEUE_COLOR = { merge: 'green', branch: 'red', deliver: 'yellow', start: 'blue', manual: 'red', waiting: 'blue' };
 
 function drawQueue() {
   refreshQueue();
@@ -257,7 +267,8 @@ function drawQueue() {
   el.hidden = !S.queue.length;
   el.innerHTML = S.queue.length ? `<strong>Go work on</strong>${S.queue.slice(0, QUEUE_MAX).map((a) => {
     const text = `${a.name} · ${QUEUE_TEXT[a.kind](a)}`;
-    return `<button class="chip chip-btn ${QUEUE_COLOR[a.kind]}" data-act="queue-pick" data-name="${esc(a.name)}" title="${esc(text)}">${esc(text)}</button>`;
+    const title = QUEUE_TITLE[a.kind] ? `${a.name} · ${QUEUE_TITLE[a.kind](a)}` : text;
+    return `<button class="chip chip-btn ${QUEUE_COLOR[a.kind]}" data-act="queue-pick" data-name="${esc(a.name)}" title="${esc(title)}">${esc(text)}</button>`;
   }).join('')}${S.queue.length > QUEUE_MAX ? `<span class="muted">+${S.queue.length - QUEUE_MAX} more</span>` : ''}` : '';
 }
 

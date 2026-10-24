@@ -205,10 +205,6 @@ const { commitAllowed, stateLine } = require('../public/view.js');
 const CLOCK = { now: Date.parse('2026-10-24T12:00:00Z') }; // a fixed clock: a working state expires after 30 minutes
 const st = (state, extra = {}) => ({ available: true, state, next: 'Do the thing.', detail: null, at: '2026-10-24T11:59:00Z', stale: false, reason: null, ...extra });
 
-test('API_VERSION is 8: the page now needs the head, inProgress and base of /api/local and GET /api/pi-status', () => {
-  assert.equal(API_VERSION, 8);
-});
-
 test('commitAllowed: allowed with no usable state or with ready-to-commit; hidden for every other fresh state', () => {
   for (const none of [undefined, null, {}, 'x', { available: false, reason: 'missing' }, { available: false, reason: 'invalid' }, { available: false, reason: 'unsafe' }, { available: false, reason: 'error' }]) {
     assert.equal(commitAllowed(none, CLOCK), true);
@@ -236,4 +232,50 @@ test('stateLine: a stale state shows only an outdated marker, never the old text
   assert.match(l.title, /outdated/i);
   assert.equal(l.title.includes('OLD'), false);
   for (const none of [undefined, null, { available: false, reason: 'missing' }, st('mystery')]) assert.equal(stateLine(none), null);
+});
+
+// ---------- RP12c: what the "Go work on" strip says ----------
+const { queueFlags } = require('../public/view.js');
+const NOW = { now: Date.parse('2026-10-24T12:00:00Z') };
+const clean = { files: [], branch: 'task', base: 'main', ahead: 0, behind: 0, head: 'h1' };
+const fresh = (state, extra = {}) => ({ available: true, state, next: 'Answer the question.', detail: null, at: '2026-10-24T11:59:00Z', stale: false, reason: null, ...extra });
+
+test('API_VERSION is 9: the queue request now carries manual and waiting', () => {
+  assert.equal(API_VERSION, 9);
+});
+
+test('index.html has an empty data: icon so the browser does not ask for /favicon.ico', () => {
+  const html = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'public', 'index.html'), 'utf8');
+  assert.ok(html.includes('<link rel="icon" href="data:,">'));
+});
+
+test('queueFlags: manual comes from manualAction', () => {
+  assert.deepEqual(queueFlags({ ...clean, detached: true }, null, null, NOW), { manual: 'Detached HEAD: switch to a task branch' });
+  assert.deepEqual(queueFlags({ ...clean, branch: 'main', ahead: 2 }, null, null, NOW), { manual: 'Commits on main: move them to a task branch' });
+  assert.deepEqual(queueFlags({ ...clean, inProgress: 'rebase' }, null, null, NOW), { manual: 'A rebase is in progress: finish or abort it' });
+  assert.deepEqual(queueFlags({ ...clean, ahead: 1, behind: 1, upstream: 'origin/task' }, null, null, NOW), { manual: 'Diverged from origin/task: reconcile it by hand' });
+});
+
+test('queueFlags: manual comes from an attention verdict and manualAction wins', () => {
+  assert.deepEqual(queueFlags(clean, null, { state: 'attention', reason: '2 files still uncommitted after /flow-commit' }, NOW), { manual: '2 files still uncommitted after /flow-commit' });
+  assert.deepEqual(queueFlags({ ...clean, detached: true }, null, { state: 'attention', reason: 'r' }, NOW), { manual: 'Detached HEAD: switch to a task branch' });
+  for (const v of [null, { state: 'running', reason: 'r' }, { state: 'ok', reason: 'r' }]) assert.deepEqual(queueFlags(clean, null, v, NOW), {});
+});
+
+test('queueFlags: waiting only for a fresh usable needs-input or blocked state', () => {
+  assert.deepEqual(queueFlags(clean, fresh('needs-input'), null, NOW), { waiting: { state: 'needs-input', next: 'Answer the question.' } });
+  assert.deepEqual(queueFlags(clean, fresh('blocked'), null, NOW), { waiting: { state: 'blocked', next: 'Answer the question.' } });
+  for (const s of ['working', 'ready-to-commit', 'ready-to-pr']) assert.deepEqual(queueFlags(clean, fresh(s), null, NOW), {});
+  for (const bad of [null, undefined, {}, { available: false, reason: 'missing' }, fresh('needs-input', { stale: true }), fresh('nonsense')]) assert.deepEqual(queueFlags(clean, bad, null, NOW), {});
+});
+
+test('queueFlags: no waiting when the person chose to show /flow-commit anyway', () => {
+  assert.deepEqual(queueFlags(clean, fresh('blocked'), null, { ...NOW, override: true }), {});
+  assert.deepEqual(queueFlags({ ...clean, detached: true }, fresh('blocked'), null, { ...NOW, override: true }), { manual: 'Detached HEAD: switch to a task branch' });
+});
+
+test('queueFlags: an expired working state is not waiting, and a missing local state flags nothing', () => {
+  assert.deepEqual(queueFlags(clean, fresh('working', { at: '2026-10-24T10:00:00Z' }), null, NOW), {});
+  assert.deepEqual(queueFlags(undefined, null, null, NOW), {});
+  assert.deepEqual(queueFlags({ error: 'x' }, null, null, NOW), {});
 });

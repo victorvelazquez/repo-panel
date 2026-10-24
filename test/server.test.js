@@ -969,3 +969,41 @@ test('GET /api/requirements: a room member also gets the member-only results and
     });
   } finally { for (const r of [member, outside]) fs.rmSync(r.tmp, { recursive: true, force: true }); }
 });
+
+// ---------- RP12c: manual and waiting on /api/queue ----------
+test('POST /api/queue needs the token for the new fields too', async () => {
+  await withPanel({}, async ({ port }) => {
+    const status = await new Promise((resolve, reject) => {
+      const req = http.request({ host: '127.0.0.1', port, path: '/api/queue', method: 'POST' }, (res) => { res.resume(); res.on('end', () => resolve(res.statusCode)); });
+      req.on('error', reject); req.end(JSON.stringify({ items: [qitem('a', { manual: 'm' })] }));
+    });
+    assert.equal(status, 401);
+  });
+});
+
+test('POST /api/queue cleans manual and waiting and drops deliver and start for them', async () => {
+  await withPanel({}, async ({ post }) => {
+    const r = await post('/api/queue', { items: [
+      qitem('m', { dirty: true, manual: `  ${'x'.repeat(500)}  ` }),
+      qitem('w', { dirty: true, waiting: { state: 'needs-input', next: ` ${'y'.repeat(500)} `, extra: 1 } }),
+      qitem('s', { next: { id: 'RP1', entrega: 'e' }, manual: 7, waiting: { state: 'working', next: 'n' } }),
+      qitem('d', { dirty: true, waiting: 'blocked' }),
+    ] });
+    assert.equal(r.status, 200);
+    assert.deepEqual(r.json.queue.map((a) => `${a.name}:${a.kind}`), ['m:manual', 'w:waiting', 'd:deliver', 's:start']);
+    assert.equal(r.json.queue[0].reason, 'x'.repeat(200));
+    assert.deepEqual(r.json.queue[1], { repoId: 'w', name: 'w', kind: 'waiting', state: 'needs-input', next: 'y'.repeat(200) });
+  });
+});
+
+test('POST /api/queue keeps the exact answer for an old-shape body', async () => {
+  await withPanel({}, async ({ post }) => {
+    const r = await post('/api/queue', { items: [qitem('a', { dirty: true }), qitem('b', { stale: true }), qitem('c', { next: { id: 'RP9', entrega: 'E' } }), qitem('d', { ready: [{ number: 3, title: 'T' }], hasPrs: true })] });
+    assert.deepEqual(r.json, { queue: [
+      { repoId: 'd', name: 'd', kind: 'merge', pr: 3, title: 'T' },
+      { repoId: 'b', name: 'b', kind: 'branch' },
+      { repoId: 'a', name: 'a', kind: 'deliver' },
+      { repoId: 'c', name: 'c', kind: 'start', unit: { id: 'RP9', entrega: 'E' } },
+    ] });
+  });
+});

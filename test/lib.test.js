@@ -625,3 +625,81 @@ test('piPromptState is idle only for an empty prompt and fails closed otherwise'
 test('PI_COMMANDS only offers the flow commands', () => {
   assert.deepEqual(lib.PI_COMMANDS, { 'flow-commit': '/flow-commit', 'flow-pr': '/flow-pr', 'flow-branch': '/flow-branch' });
 });
+
+// ---------- RP12c: manual and waiting actions ----------
+test('workQueue: manual emits a manual action and suppresses deliver and start', () => {
+  const q = lib.workQueue([
+    repo('a', { dirty: true, unpushed: true, manual: 'Detached HEAD: switch to a task branch' }),
+    repo('b', { next: NEXT, manual: '  Diverged  ' }),
+  ]);
+  assert.deepEqual(q, [
+    { repoId: 'id-a', name: 'a', kind: 'manual', reason: 'Detached HEAD: switch to a task branch' },
+    { repoId: 'id-b', name: 'b', kind: 'manual', reason: 'Diverged' },
+  ]);
+});
+
+test('workQueue: waiting emits a waiting action and suppresses deliver and start', () => {
+  const q = lib.workQueue([
+    repo('a', { dirty: true, unpushed: true, waiting: { state: 'needs-input', next: ' Pick the schema. ' } }),
+    repo('b', { next: NEXT, waiting: { state: 'blocked', next: 'Fix the token.' } }),
+  ]);
+  assert.deepEqual(q, [
+    { repoId: 'id-a', name: 'a', kind: 'waiting', state: 'needs-input', next: 'Pick the schema.' },
+    { repoId: 'id-b', name: 'b', kind: 'waiting', state: 'blocked', next: 'Fix the token.' },
+  ]);
+});
+
+test('workQueue: manual wins over waiting, and neither hides merge or branch', () => {
+  const q = lib.workQueue([repo('a', { dirty: true, stale: true, ready: [{ number: 2, title: 'x' }], manual: 'm', waiting: { state: 'blocked', next: 'n' } })]);
+  assert.deepEqual(kinds(q), ['a:merge', 'a:branch', 'a:manual']);
+});
+
+test('workQueue ranks: merge, branch and manual, waiting, deliver, start', () => {
+  const q = lib.workQueue([
+    repo('s', { next: NEXT }),
+    repo('d', { dirty: true }),
+    repo('w', { waiting: { state: 'needs-input', next: 'n' } }),
+    repo('m', { manual: 'm' }),
+    repo('b', { stale: true }),
+    repo('p', { ready: [{ number: 1, title: 't' }], hasPrs: true }),
+  ]);
+  assert.deepEqual(kinds(q), ['p:merge', 'm:manual', 'b:branch', 'w:waiting', 'd:deliver', 's:start']);
+});
+
+test('workQueue: priority still puts named repos first with the new kinds', () => {
+  const items = [repo('a', { dirty: true }), repo('b', { manual: 'm' }), repo('c', { waiting: { state: 'blocked', next: 'n' } })];
+  assert.deepEqual(kinds(lib.workQueue(items, ['c', 'a'])), ['c:waiting', 'a:deliver', 'b:manual']);
+});
+
+test('workQueue ignores bad manual and waiting values and clips long text', () => {
+  const plain = kinds(lib.workQueue([repo('a', { dirty: true })]));
+  for (const manual of [undefined, null, '', '   ', 5, true, {}, ['x']]) {
+    assert.deepEqual(kinds(lib.workQueue([repo('a', { dirty: true, manual })])), plain);
+  }
+  for (const waiting of [undefined, null, 'blocked', 7, {}, { state: 'working', next: 'n' }, { state: 'ready-to-commit', next: 'n' }, { next: 'n' }, { state: 'blocked' }, { state: 'blocked', next: 5 }]) {
+    const k = kinds(lib.workQueue([repo('a', { dirty: true, waiting })]));
+    assert.ok(k.length === 1 && (k[0] === 'a:deliver' || k[0] === 'a:waiting'), JSON.stringify(waiting));
+  }
+  for (const waiting of [{ state: 'working', next: 'n' }, { next: 'n' }, 'blocked', {}]) {
+    assert.deepEqual(kinds(lib.workQueue([repo('a', { dirty: true, waiting })])), plain);
+  }
+  const [m] = lib.workQueue([repo('a', { manual: 'x'.repeat(500) })]);
+  assert.equal(m.reason.length, 200);
+  const [w] = lib.workQueue([repo('a', { waiting: { state: 'blocked', next: 'y'.repeat(500) } })]);
+  assert.equal(w.next.length, 200);
+});
+
+test('workQueue without manual or waiting is unchanged: deliver, stale branch, start and merge', () => {
+  const q = lib.workQueue([
+    repo('a', { dirty: true, unpushed: true }),
+    repo('b', { stale: true }),
+    repo('c', { next: NEXT }),
+    repo('d', { ready: [{ number: 4, title: 'T' }], hasPrs: true }),
+  ]);
+  assert.deepEqual(q, [
+    { repoId: 'id-d', name: 'd', kind: 'merge', pr: 4, title: 'T' },
+    { repoId: 'id-b', name: 'b', kind: 'branch' },
+    { repoId: 'id-a', name: 'a', kind: 'deliver' },
+    { repoId: 'id-c', name: 'c', kind: 'start', unit: { id: 'RP9', entrega: 'Next thing' } },
+  ]);
+});
