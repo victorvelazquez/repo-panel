@@ -211,3 +211,66 @@ test('room requirements: a room without a base branch is unavailable or failed, 
   assert.equal(by(out, 'room-agents-file').status, 'unavailable');
   assert.equal(out.summary.ready, false);
 });
+
+// ---------- RP12a: namespaces, estado-block and panel-ignored ----------
+const pblock = (v) => `# A\n<!-- panel:estado v${v} -->\nrules\n<!-- /panel:estado -->\n`;
+
+test('parseBlock: the namespace defaults to orquestacion and a panel block is only seen with namespace panel', () => {
+  assert.equal(parseBlock(pblock('1.0'), 'estado', '1.0').status, 'missing');
+  assert.equal(parseBlock(block('1.0', 'estado'), 'estado', '1.0', 'orquestacion').status, 'ok');
+  assert.deepEqual(parseBlock(pblock('1.0'), 'estado', '1.0', 'panel'), { status: 'ok', version: '1.0' });
+  assert.equal(parseBlock(block('1.0', 'estado'), 'estado', '1.0', 'panel').status, 'missing');
+});
+
+test('parseBlock: a panel block can be outdated or unclosed, and never legacy', () => {
+  assert.deepEqual(parseBlock(pblock('0.9'), 'estado', '1.0', 'panel'), { status: 'outdated', version: '0.9' });
+  assert.equal(parseBlock('<!-- panel:estado v1.0 -->\nrules\n', 'estado', '1.0', 'panel').status, 'unclosed');
+  assert.equal(parseBlock('## Orquestación\nold\n', 'estado', '1.0', 'panel').status, 'missing');
+});
+
+test('estado-block: the registry asks for a closed panel:estado block at version 1.0, recommended', () => {
+  const req = REAL.requirements.find((r) => r.id === 'estado-block');
+  assert.equal(REAL.blocks.estado, '1.0');
+  assert.deepEqual([req.category, req.level], ['verificable', 'recommended']);
+  const status = (agents) => by(evaluate(REAL, { ...GOOD, files: { ...GOOD.files, agents: file(agents) } }), 'estado-block').status;
+  assert.equal(status(pblock('1.0')), 'pass');
+  assert.equal(status(pblock('0.9')), 'outdated');
+  assert.equal(status(block('1.0')), 'fail');
+  assert.equal(status('<!-- panel:estado v1.0 -->\nrules\n'), 'fail');
+  assert.match(by(evaluate(REAL, { ...GOOD, files: { ...GOOD.files, agents: file('<!-- panel:estado v1.0 -->\nx') } }), 'estado-block').detail, /closing marker/);
+});
+
+const ignored = (v) => ({ ...GOOD, local: { panelIgnored: v } });
+
+test('panel-ignored: passes when ignored, fails when not, unavailable when git could not say', () => {
+  const req = REAL.requirements.find((r) => r.id === 'panel-ignored');
+  assert.deepEqual([req.category, req.level], ['verificable', 'recommended']);
+  const res = (v) => by(evaluate(REAL, ignored(v)), 'panel-ignored');
+  assert.equal(res({ available: true, ignored: true }).status, 'pass');
+  assert.equal(res({ available: true, ignored: false }).status, 'fail');
+  const gone = res({ available: false, reason: 'error' });
+  assert.deepEqual([gone.status, gone.detail], ['unavailable', 'could not be read (error)']);
+  assert.equal(by(evaluate(REAL, GOOD), 'panel-ignored').status, 'unavailable');
+  assert.equal(by(evaluate(REAL, { base: { status: 'no-repo' }, files: {}, local: { panelIgnored: { available: true, ignored: true } } }), 'panel-ignored').status, 'pass');
+});
+
+test('the two panel requirements are recommended: failing them never makes a ready repo not ready', () => {
+  const out = evaluate(REAL, { ...GOOD, files: { ...GOOD.files, agents: file(block('1.0')) }, local: { panelIgnored: { available: true, ignored: false } } });
+  assert.equal(by(out, 'estado-block').status, 'fail');
+  assert.equal(by(out, 'panel-ignored').status, 'fail');
+  assert.equal(out.summary.ready, true);
+  assert.deepEqual(out.summary.recommended.total, REAL.requirements.filter((r) => r.level === 'recommended').length);
+});
+
+test('panel-ignored is not part of the room requirements; an unknown check type is still unavailable', () => {
+  assert.equal(REAL.roomRequirements.some((r) => r.id === 'panel-ignored' || r.id === 'estado-block'), false);
+  const reg = { ...REG, requirements: [{ id: 'u', title: 'U', category: 'verificable', level: 'required', check: { type: 'git-ignored-nope' }, remedy: 'r' }] };
+  assert.equal(by(evaluate(reg, GOOD), 'u').detail, 'unknown check type');
+});
+
+test('requirements/blocks/estado.md is a closed panel:estado block at the registry version and names the file, the states and the closing line', () => {
+  const text = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'requirements', 'blocks', 'estado.md'), 'utf8');
+  assert.deepEqual(parseBlock(text, 'estado', REAL.blocks.estado, 'panel'), { status: 'ok', version: '1.0' });
+  assert.ok(text.trimEnd().split('\n').length <= 25);
+  for (const needle of ['.panel/state.json', '.git/info/exclude', 'Siguiente:', 'working', 'needs-input', 'ready-to-commit', 'ready-to-pr', 'blocked']) assert.ok(text.includes(needle), needle);
+});

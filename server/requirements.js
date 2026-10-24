@@ -6,7 +6,7 @@ const path = require('node:path');
 const checks = require('../checks.js');
 const { HttpError } = require('./errors.js');
 const lib = require('../lib.js');
-const { run, firstLine } = require('./exec.js');
+const { run, git, firstLine } = require('./exec.js');
 const { roomOf } = require('./config.js');
 const { remoteFile } = require('./roadmap.js');
 
@@ -22,8 +22,17 @@ function loadRegistry() {
   return registry;
 }
 
+// Whether Git ignores .panel/state.json in the repo's working tree (a local fact, not read from the base branch):
+// `git check-ignore -q` exits 0 when ignored and 1 when not; anything else (no repo, no folder, git missing) is unavailable.
+async function panelIgnored(repo, gitRun) {
+  const r = await gitRun(repo.path, ['check-ignore', '-q', '.panel/state.json']).catch(() => null);
+  if (r && r.code === 0) return { available: true, ignored: true };
+  if (r && r.code === 1) return { available: true, ignored: false };
+  return { available: false, reason: 'error' };
+}
+
 // Reads the files of `paths` ({ role: relative path }) from the remote base branch and evaluates `list` of the registry.
-async function evaluateRepo(repo, paths, list, room) {
+async function evaluateRepo(repo, paths, list, room, local = null) {
   const reg = loadRegistry();
   const roles = Object.keys(paths);
   const read = await Promise.all(roles.map((role) => remoteFile(repo, paths[role])));
@@ -32,14 +41,15 @@ async function evaluateRepo(repo, paths, list, room) {
   const first = read[0];
   const status = first.reason === 'no-repo' || first.reason === 'no-base' ? first.reason : 'ok';
   const base = { status, name: first.base };
-  const { results, summary } = checks.evaluate(reg, { base, files, room }, list);
+  const { results, summary } = checks.evaluate(reg, { base, files, room, local }, list);
   return { available: status === 'ok', base: first.base || null, results, summary };
 }
 
 // A repo that belongs to a room also gets the member-only requirements and a `room` field; any other repo's answer is unchanged.
-async function requirementsFor(repo, room = roomOf(repo.id)) {
+async function requirementsFor(repo, room = roomOf(repo.id), { git: gitRun = git } = {}) {
   const paths = { agents: 'AGENTS.md', roadmap: repo.roadmap || 'docs/ROADMAP.md', adoption: 'docs/ORQUESTACION.md' };
-  const out = await evaluateRepo(repo, paths, 'requirements', room ? { name: room.name } : null);
+  const local = { panelIgnored: await panelIgnored(repo, gitRun) };
+  const out = await evaluateRepo(repo, paths, 'requirements', room ? { name: room.name } : null, local);
   return room ? { ...out, room: { name: room.name } } : out;
 }
 

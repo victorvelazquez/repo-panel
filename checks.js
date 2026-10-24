@@ -5,27 +5,30 @@
 //   base:  { status: 'ok' | 'no-repo' | 'no-base', name },
 //   files: { <role>: { available, reason, text, path } },  // roles: agents, roadmap, adoption (a repo) or agents,
 //                                                           // enlaces, enlacesAlt (a room); the shape is what
-//   room:  { name } | null                                  // server/roadmap.js remoteFile returns; the room the
-// };                                                        // repo belongs to (null or absent: none)
+//   room:  { name } | null,                                 // server/roadmap.js remoteFile returns; the room the
+//                                                           // repo belongs to (null or absent: none)
+//   local: { panelIgnored: { available, ignored, reason } } // from the local worktree, not the base branch: whether
+// };                                                        // Git ignores .panel/state.json (absent: not read)
 const lib = require('./lib.js');
 
 const stripBom = (t) => (typeof t === 'string' ? t : '').replace(/^\uFEFF/, '');
 const escapeRe = (s) => s.replace(/\W/g, '\\$&');
 
-// A block is `<!-- orquestacion:NAME vN.N -->` ... `<!-- /orquestacion:NAME -->`. `expected` is the version
-// the registry asks for; without it any closed block is ok. The unversioned section older repos carry
+// A block is `<!-- NAMESPACE:NAME vN.N -->` ... `<!-- /NAMESPACE:NAME -->`, with namespace orquestacion unless the
+// caller names another one (the panel's own blocks use panel). `expected` is the version the registry asks for;
+// without it any closed block is ok. The unversioned section older repos carry
 // (a `## Orquestación` heading or the `orquestacion:bloque` marker) is legacy for registro: outdated, not missing.
-function parseBlock(text, name, expected) {
+function parseBlock(text, name, expected, namespace = 'orquestacion') {
   const t = stripBom(text);
-  const open = new RegExp(`<!-- orquestacion:${escapeRe(name)} v(\\d+(?:\\.\\d+)*) -->`).exec(t);
+  const open = new RegExp(`<!-- ${escapeRe(namespace)}:${escapeRe(name)} v(\\d+(?:\\.\\d+)*) -->`).exec(t);
   if (open) {
-    const closed = t.indexOf(`<!-- /orquestacion:${name} -->`, open.index + open[0].length) !== -1;
+    const closed = t.indexOf(`<!-- /${namespace}:${name} -->`, open.index + open[0].length) !== -1;
     if (!closed) return { status: 'unclosed', version: open[1] };
     return { status: expected && open[1] !== expected ? 'outdated' : 'ok', version: open[1] };
   }
   // Only the registro block had a legacy form, and a heading next to any versioned block is that block's own title.
   const versioned = /<!-- orquestacion:\w+ v\d/.test(t);
-  if (name === 'registro' && !versioned && (/^## Orquestaci[oó]n/m.test(t) || t.includes('orquestacion:bloque'))) return { status: 'legacy', version: null };
+  if (namespace === 'orquestacion' && name === 'registro' && !versioned && (/^## Orquestaci[oó]n/m.test(t) || t.includes('orquestacion:bloque'))) return { status: 'legacy', version: null };
   return { status: 'missing', version: null };
 }
 
@@ -127,10 +130,16 @@ const TYPES = {
     if (f.result) return f.result;
     if (f.absent) return unavailable('missing');
     const expected = registry.blocks && registry.blocks[c.name];
-    const b = parseBlock(f.text, c.name, expected);
+    const b = parseBlock(f.text, c.name, expected, c.namespace);
     if (b.status === 'ok') return make('pass', `${c.name} block version ${b.version}`);
     const detail = BLOCK_DETAIL[b.status]({ ...b, expected });
     return make(b.status === 'outdated' || b.status === 'legacy' ? 'outdated' : 'fail', detail);
+  },
+  // A local fact, not a file of the base branch: Git must ignore .panel/state.json in the working tree.
+  'panel-ignored': (c, facts) => {
+    const f = facts.local && facts.local.panelIgnored;
+    if (!f || f.available !== true) return unavailable((f && f.reason) || 'not-read');
+    return f.ignored ? make('pass', '.panel/state.json is ignored by Git') : make('fail', '.panel/state.json is not ignored by Git');
   },
   'roadmap-header': (c, facts) => {
     const f = fileOf(facts, c.file);
