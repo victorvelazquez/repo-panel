@@ -1,6 +1,6 @@
 {
   "name": "repo-panel",
-  "version": "0.0.2",
+  "version": "0.1.0",
   "description": "Local single-page dashboard for uncommitted changes, open PRs and CI status across many git repos",
   "private": true,
   "license": "MIT",
