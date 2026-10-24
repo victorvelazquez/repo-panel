@@ -397,10 +397,13 @@ function roadmapSummary(rp) {
   };
 }
 
-const QUEUE_RANK = { merge: 0, branch: 1, deliver: 2, start: 3 };
+const QUEUE_RANK = { merge: 0, branch: 1, manual: 1, waiting: 2, deliver: 3, start: 4 };
+const WAITING_STATES = ['needs-input', 'blocked'];
 
 // The ordered "go work on" actions for repos given in board order. Per repo: one `merge` per ready PR,
-// `branch` when stale, `deliver` when it has local changes, `start` when clean with a next unit.
+// `branch` when stale, `deliver` when it has local changes, `start` when clean with a next unit. A repo flagged
+// `manual` (a reason string) gets a `manual` action and a repo with `waiting` ({ state, next }) a `waiting` one:
+// neither is told to deliver or start. Both fields are optional and ignored when absent or malformed.
 // Repos named in `priority` (case-insensitive, in that order) come first; ties keep board order.
 function workQueue(items, priority) {
   if (!Array.isArray(items)) return [];
@@ -419,9 +422,15 @@ function workQueue(items, priority) {
       if (pr && Number.isInteger(pr.number)) add({ ...base, kind: 'merge', pr: pr.number, title: String(pr.title ?? '') });
     }
     if (it.stale) add({ ...base, kind: 'branch' });
-    if (it.dirty || it.unpushed) add({ ...base, kind: 'deliver' });
+    const manual = typeof it.manual === 'string' ? it.manual.trim().slice(0, 200) : '';
+    const w = it.waiting;
+    const waiting = !manual && w && typeof w === 'object' && WAITING_STATES.includes(w.state)
+      ? { state: w.state, next: typeof w.next === 'string' ? w.next.trim().slice(0, 200) : '' } : null;
+    if (manual) add({ ...base, kind: 'manual', reason: manual });
+    else if (waiting) add({ ...base, kind: 'waiting', ...waiting });
+    else if (it.dirty || it.unpushed) add({ ...base, kind: 'deliver' });
     const n = it.next;
-    if (!it.dirty && !it.unpushed && !it.stale && !it.hasPrs && n && typeof n.id === 'string') {
+    if (!manual && !waiting && !it.dirty && !it.unpushed && !it.stale && !it.hasPrs && n && typeof n.id === 'string') {
       add({ ...base, kind: 'start', unit: { id: n.id, entrega: String(n.entrega ?? '') } });
     }
   }

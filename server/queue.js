@@ -15,9 +15,14 @@ function cleanQueueItem(it) {
     .filter((p) => p && typeof p.number === 'number' && Number.isFinite(p.number))
     .map((p) => ({ number: Math.trunc(p.number), title: qStr(p.title) ?? '' }));
   const nid = it.next && qStr(it.next.id);
+  const manual = qStr(it.manual);
+  const w = it.waiting;
+  const waiting = w && typeof w === 'object' && (w.state === 'needs-input' || w.state === 'blocked') ? { state: w.state, next: qStr(w.next) ?? '' } : null;
   return {
     id, name, ready, stale: !!it.stale, dirty: !!it.dirty, unpushed: !!it.unpushed, hasPrs: !!it.hasPrs,
     next: nid ? { id: nid, entrega: qStr(it.next.entrega) ?? '' } : null,
+    ...(manual ? { manual } : {}),
+    ...(waiting ? { waiting } : {}),
   };
 }
 

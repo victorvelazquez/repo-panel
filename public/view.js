@@ -8,7 +8,7 @@
 }(typeof self !== 'undefined' ? self : this, () => {
   // Bump it when the client starts needing a new or changed server route. /health reports the value
   // the running server loaded at start; the page compares it with the file it just downloaded.
-  const API_VERSION = 8;
+  const API_VERSION = 9;
 
   // `health` is the parsed /health answer, or null when the request itself failed (no answer, so
   // there is nothing to warn about). Any answer without the current integer `api` is out of date:
@@ -192,6 +192,19 @@
     return null;
   }
 
+  // The optional facts the "Go work on" strip sends for a repo, so it never says "Deliver changes" for work that
+  // must not be delivered: `manual` (why the repo needs a person's hands: manualAction, else the reason of an
+  // attention verdict) and `waiting` ({ state, next } of a usable needs-input or blocked declared state, not when
+  // the person lifted the gating with `override`). Keys are absent when they do not apply.
+  function queueFlags(local, stateData, verdict, { now = Date.now(), override = false } = {}) {
+    const out = {};
+    const manual = manualAction(local, local && local.base) || (verdict && verdict.state === 'attention' ? verdict.reason : null);
+    if (manual) out.manual = manual;
+    const s = override ? null : usableState(stateData, now);
+    if (s && (s.state === 'needs-input' || s.state === 'blocked')) out.waiting = { state: s.state, next: typeof s.next === 'string' ? s.next : '' };
+    return out;
+  }
+
   // Whether the COMMITTED card offers /flow-pr. `verdict` is the state of commitVerdict ('running' | 'ok' |
   // 'attention' | null). /flow-pr creates the PR or updates the open one, so `update` only changes the label.
   function prAction(local, prInfo, verdict) {
@@ -238,5 +251,5 @@
     return attention(changed ? 'HEAD changed but no commits are left to deliver' : 'No change 15 minutes after /flow-commit and the pi session state is unknown');
   }
 
-  return { API_VERSION, commitAllowed, commitOverrideItem, stateLine, manualAction, prAction, commitVerdict, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, presenceLabel, presenceDot };
+  return { API_VERSION, commitAllowed, commitOverrideItem, stateLine, manualAction, prAction, commitVerdict, queueFlags, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, presenceLabel, presenceDot };
 }));

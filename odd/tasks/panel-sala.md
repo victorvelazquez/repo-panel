@@ -35,7 +35,8 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 | RP11a | S13 | worker acotado; `rooms` en la configuración, requisitos de sala y de miembro, `server/rooms.js`, `GET /api/rooms`, etiqueta y sección Rooms; fusionado en PR #28 | `bc37320` |
 | RP11b | S13 | worker acotado; diálogo «+ Room», menú «Assign to room», rutas de gestión, `roomIssues` y entradas inválidas conservadas; fusionado en PR #29 | `502b819` |
 | RP12a | S4, S6, S7 | worker acotado; bloque `panel:estado`, requisitos, `server/state.js`, `GET /api/state`, línea `next` y acceso a `/flow-commit`; fusionado en PR #30 | `0021290` |
-| RP12b | S2, S3, S5 | worker acotado; `/flow-pr` con variante de actualizar, acción manual, veredicto desde Git y la sesión, `pi-status`, caducidad de `working` y arreglos de RP12a; hecho y verificado | pendiente de commit |
+| RP12b | S2, S3, S5 | worker acotado; `/flow-pr` con variante de actualizar, acción manual, veredicto desde Git y la sesión, `pi-status`, caducidad de `working` y arreglos de RP12a; fusionado en PR #31 | `9936f86` |
+| RP12c | S3, S4 | worker acotado; la franja «Go work on» con tipos `manual` y `waiting`, `API_VERSION` 9 y icono; arreglo de un defecto visto en navegador real; hecho y verificado | pendiente de commit |
 | RP13 | S11 | cierre de la dependencia de `implementation-guides` (otro proyecto, con autorización) | — |
 | RP14 | S14, S17 | opcional: botón hacia la terminal de la sala; chat solo si la persona lo decide | — |
 
