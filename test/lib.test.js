@@ -528,3 +528,70 @@ test('workQueue survives empty and malformed input', () => {
   const q = lib.workQueue([null, 5, 'x', { name: 1, dirty: true }, repo('ok', { dirty: true, ready: [null, { number: 'x' }, 'y'], next: { entrega: 'no id' } })]);
   assert.deepEqual(kinds(q), ['ok:deliver']);
 });
+
+// ---------- conformityReport ----------
+const CH = '| ID | Entrega | Resultado visible | Depende de | Estado | Notas | Ficha |\n|---|---|---|---|---|---|---|\n';
+const rm = (rows) => ({ available: true, ...lib.parseRoadmap(CH + rows) });
+const GOOD = rm('| A | a | r | — | Pendiente | | — |\n');
+const ent = (name, roadmap) => ({ id: `id-${name}`, name, roadmap });
+
+test('conformityReport counts conforming repos and lists none', () => {
+  assert.deepEqual(lib.conformityReport([ent('a', GOOD), ent('b', GOOD)]), { ok: 2, items: [] });
+});
+
+test('conformityReport maps unavailable roadmaps to a status', () => {
+  const r = lib.conformityReport([
+    ent('a', { available: false, reason: 'missing' }),
+    ent('b', { available: false, reason: 'no-base' }),
+    ent('c', { available: false, reason: 'no-repo' }),
+    ent('d', { available: false, reason: 'weird' }),
+    ent('e', { available: false }),
+  ]);
+  assert.equal(r.ok, 0);
+  assert.deepEqual(r.items.map((i) => [i.name, i.status, i.id, i.problems]),
+    [['a', 'missing', 'id-a', []], ['b', 'no-base', 'id-b', []], ['c', 'no-repo', 'id-c', []], ['d', 'unavailable', 'id-d', []], ['e', 'unavailable', 'id-e', []]]);
+});
+
+test('conformityReport skips repos whose roadmap has not loaded or is malformed', () => {
+  const r = lib.conformityReport([ent('a', null), ent('b', undefined), ent('c', 'x'), ent('d', {}), ent('f', GOOD)]);
+  assert.deepEqual(r, { ok: 1, items: [] });
+});
+
+test('conformityReport lists only error and warn problems, sorted by line', () => {
+  const bad = rm('| A | a | r | — | Pendiente | | — |\n| A | dup | r | X-1 | Pendiente (hoy) | | — |\n| B | b | r | — | Raro | | — |\n');
+  const r = lib.conformityReport([ent('a', bad)]);
+  assert.equal(r.ok, 0);
+  assert.equal(r.items[0].status, 'problems');
+  const p = r.items[0].problems;
+  assert.ok(p.length >= 3);
+  assert.ok(p.every((x) => x.severity === 'error' || x.severity === 'warn'));
+  assert.ok(!p.some((x) => x.code === 'missing-dependency'));
+  assert.deepEqual(p.map((x) => x.line), [...p.map((x) => x.line)].sort((a, b) => a - b));
+  assert.deepEqual(Object.keys(p[0]).sort(), ['code', 'line', 'message', 'severity']);
+  assert.ok(p.some((x) => x.code === 'duplicate-id' && x.line === 4));
+});
+
+test('conformityReport reports a missing column as a problem', () => {
+  const r = lib.conformityReport([ent('a', { available: true, ...lib.parseRoadmap('| ID | Entrega |\n|---|---|\n| A | a |\n') })]);
+  assert.equal(r.items[0].status, 'problems');
+  assert.equal(r.items[0].problems[0].code, 'missing-column');
+});
+
+test('conformityReport counts info-only problems as conforming', () => {
+  const info = rm('| A | a | r | OTHER-1 | Pendiente | | — |\n');
+  assert.ok(info.problems.length > 0 && info.problems.every((p) => p.severity === 'info'));
+  assert.deepEqual(lib.conformityReport([ent('a', info)]), { ok: 1, items: [] });
+});
+
+test('conformityReport keeps input order across repos', () => {
+  const bad = rm('| A | a | r | — | Raro | | — |\n');
+  const r = lib.conformityReport([ent('z', bad), ent('y', GOOD), ent('x', { available: false, reason: 'missing' }), ent('w', bad)]);
+  assert.equal(r.ok, 1);
+  assert.deepEqual(r.items.map((i) => i.name), ['z', 'x', 'w']);
+});
+
+test('conformityReport is defensive about its input', () => {
+  assert.deepEqual(lib.conformityReport(null), { ok: 0, items: [] });
+  assert.deepEqual(lib.conformityReport('x'), { ok: 0, items: [] });
+  assert.deepEqual(lib.conformityReport([null, 5, 'a', { roadmap: GOOD }, { id: 'i', name: 3, roadmap: GOOD }]), { ok: 0, items: [] });
+});

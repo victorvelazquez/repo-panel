@@ -13,6 +13,7 @@
     <input id="search" type="search" placeholder="Filter repos…">
     <select id="groupFilter"></select>
     <button id="alerts" class="alerts" data-act="toggle-problems" title="PRs that need a fix (failed checks, conflicts, outdated branch) — click to show only those" hidden></button>
+    <button id="conformity" data-act="conformity" title="Repositories without a usable docs/ROADMAP.md or whose file has problems">Conformity <span id="confBadge" class="badge" hidden></span></button>
     <span class="spacer"></span>
     <label class="opt" title="Merge method used by every Merge button"><span>Merge method</span>
       <select id="method" data-pref="method"><option>squash</option><option>merge</option><option>rebase</option></select></label>

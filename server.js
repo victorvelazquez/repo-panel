@@ -439,6 +439,11 @@ function queueFor(body) {
   return { queue: lib.workQueue(items.map(cleanQueueItem).filter(Boolean), loadConfig().priority) };
 }
 
+// The browser sends each repo's roadmap availability and problems; lib.conformityReport audits them.
+function conformityFor(body) {
+  return lib.conformityReport(body && Array.isArray(body.entries) ? body.entries.slice(0, MAX_QUEUE_ITEMS) : []);
+}
+
 // ---------- HTTP ----------
 const query = (u) => Object.fromEntries(new URL(u, 'http://x').searchParams);
 
@@ -467,6 +472,7 @@ const routes = {
   'POST /api/rerun': (q, b) => rerunFailed(findRepo(b.id), Number(b.number)),
   'POST /api/snooze': (q, b) => setSnoozed(b.id, Number(b.number), !!b.on, !!b.wasReady),
   'POST /api/queue': (q, b) => queueFor(b),
+  'POST /api/conformity': (q, b) => conformityFor(b),
   'POST /api/repos': (q, b) => addRepo(b.path, b.group),
   'POST /api/repos/remove': (q, b) => { removeRepo(b.id); return { ok: true }; },
   'GET /api/scan': (q) => ({ repos: scanFolder(q.dir) }),
