@@ -449,7 +449,32 @@ function conformityReport(entries) {
   return out;
 }
 
+// ---------- pi sessions in Orca terminals ----------
+// The only texts the browser can ask the panel to type into a pi session (it sends the key, never the text).
+const PI_COMMANDS = { 'flow-commit': '/flow-commit', 'flow-pr': '/flow-pr', 'flow-branch': '/flow-branch' };
+
+// Orca reports the same folder as C:/x or C:\\x; compare them without caring about separators or case.
+const normPath = (p) => String(p || '').replace(/[\\/]+/g, '/').replace(/\/$/, '').toLowerCase();
+
+// Live, writable pi terminals whose worktree is exactly this repo.
+function piTerminalsFor(terminals, repoPath) {
+  const want = normPath(repoPath);
+  return (Array.isArray(terminals) ? terminals : []).filter((t) => t && typeof t.handle === 'string'
+    && typeof t.title === 'string' && t.title.startsWith('π') && t.connected === true && t.writable === true
+    && t.orphaned !== true && normPath(t.worktreePath) === want);
+}
+
+// Reads the end of a terminal preview: 'idle' (waiting with an empty prompt), 'typed' (waiting but the prompt
+// holds text) or 'busy' (anything else, including a screen this does not recognise: it fails closed).
+function piPromptState(preview) {
+  const lines = String(preview || '').split('\n').map((l) => l.trim()).filter(Boolean).slice(-8);
+  const at = lines.map((l) => /waiting for input/i.test(l)).lastIndexOf(true);
+  if (at < 0) return 'busy';
+  return /^▎\s*type, or \/ for commands/.test(lines[at + 1] || '') ? 'idle' : 'typed';
+}
+
 module.exports = {
+  PI_COMMANDS, normPath, piTerminalsFor, piPromptState,
   repoId, parseStatus, parseNumstat, parseGoneBranches, parseBaseBranch, staleBranch, statusLetter,
   summarizeChecks, blockedReason, enrichPr, encodeRef, parseRoadmap, safeRelPath, roadmapSummary,
   matchesUnitId, deriveUnitStates, nextUnit, workQueue, conformityReport,

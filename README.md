@@ -11,9 +11,10 @@ A local, single-window dashboard for the repos you work on. It answers one quest
 - A **Go work on** strip above the board lists the next actions in order: a PR ready to merge, a repo whose branch already merged (`/flow-branch`), changes not delivered yet, and a clean repo with a next roadmap unit. Clicking a chip filters the board to that repo. A manual order in `priority` (see Configuration) wins over the automatic one.
 - A **Conformity** button (with a count badge) opens a drawer listing every repo, whatever the filters, that has no usable `docs/ROADMAP.md` or whose file has problems, with the line of each problem. Info-level problems (such as a dependency outside the table) are not listed. It is built from the roadmap read from the remote base branch, so unpushed edits do not show. Opening the panel at `http://127.0.0.1:<port>/#conformity` opens that drawer on load.
 - A red banner at the top of the page appears when the server process is older than the page (for example after `git pull` without a restart). `GET /health` answers `{ "app": "repo-panel", "api": <n> }`; the page compares `api` with its own version and warns on a mismatch or a missing field. If the Conformity report cannot be computed, the drawer says so instead of claiming conformity.
-- Quick actions: open on GitHub, open in VS Code, `git fetch --prune`, re-run failed checks, refresh.
+- A **/flow-commit** button on cards with changes types that command into the pi session you already have open for that repo, through the Orca CLI. It sends only when exactly one pi terminal (title `π - …`) has that repo as its worktree and it is idle with an empty prompt; otherwise it refuses and says why (no session, several sessions, busy, text already typed, Orca not running). Orca cannot confirm delivery, so the panel checks that the session left the idle prompt and says `not confirmed` when it did not. The browser sends a command key, never text, and only `/flow-commit`, `/flow-pr` and `/flow-branch` exist on the server.
+- Quick actions: open on GitHub, `git fetch --prune`, re-run failed checks, refresh.
 
-Committing and opening PRs stay manual — the panel only observes, and merges when you click.
+The panel observes, merges when you click, and can hand `/flow-commit` to your open pi session; committing and opening PRs are still done by that session, not by the panel.
 
 ## Requirements
 
@@ -27,6 +28,8 @@ The panel shells out to `git` and the GitHub CLI, so both must be installed and 
    gh auth status     # must show "Logged in"
    ```
    The token needs the `repo` scope (PRs, CI status, merging) and `workflow` to re-run failed checks. `gh auth login` grants `repo` by default; add `workflow` with `gh auth refresh -s workflow`.
+
+4. *(Optional)* The `orca` CLI on your `PATH`, only for the `/flow-commit` button.
 
 Quick check that everything is ready: `node --version && git --version && gh auth status`. PRs, CI status and Merge depend on `gh`; the local git view only needs `git`.
 
