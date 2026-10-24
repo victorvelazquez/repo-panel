@@ -202,31 +202,32 @@ test('roomIssuesNotice: nothing when all entries are fine; otherwise a count and
 
 // ---------- RP12a: declared state ----------
 const { commitAllowed, stateLine } = require('../public/view.js');
+const CLOCK = { now: Date.parse('2026-10-24T12:00:00Z') }; // a fixed clock: a working state expires after 30 minutes
 const st = (state, extra = {}) => ({ available: true, state, next: 'Do the thing.', detail: null, at: '2026-10-24T11:59:00Z', stale: false, reason: null, ...extra });
 
-test('API_VERSION is 7: the page now needs GET /api/state', () => {
-  assert.equal(API_VERSION, 7);
+test('API_VERSION is 8: the page now needs the head, inProgress and base of /api/local and GET /api/pi-status', () => {
+  assert.equal(API_VERSION, 8);
 });
 
 test('commitAllowed: allowed with no usable state or with ready-to-commit; hidden for every other fresh state', () => {
   for (const none of [undefined, null, {}, 'x', { available: false, reason: 'missing' }, { available: false, reason: 'invalid' }, { available: false, reason: 'unsafe' }, { available: false, reason: 'error' }]) {
-    assert.equal(commitAllowed(none), true);
+    assert.equal(commitAllowed(none, CLOCK), true);
   }
-  assert.equal(commitAllowed(st('ready-to-commit', { stale: true })), true);
-  assert.equal(commitAllowed(st('needs-input', { stale: true })), true);
-  assert.equal(commitAllowed(st('mystery')), true);
-  assert.equal(commitAllowed(st('ready-to-commit')), true);
-  for (const s of ['working', 'needs-input', 'blocked', 'ready-to-pr']) assert.equal(commitAllowed(st(s)), false, s);
+  assert.equal(commitAllowed(st('ready-to-commit', { stale: true }), CLOCK), true);
+  assert.equal(commitAllowed(st('needs-input', { stale: true }), CLOCK), true);
+  assert.equal(commitAllowed(st('mystery'), CLOCK), true);
+  assert.equal(commitAllowed(st('ready-to-commit'), CLOCK), true);
+  for (const s of ['working', 'needs-input', 'blocked', 'ready-to-pr']) assert.equal(commitAllowed(st(s), CLOCK), false, s);
 });
 
 test('stateLine: a fresh state shows its next line with a dot per state and the full text in the tooltip', () => {
   const dots = { working: 'yellow', 'needs-input': 'blue', 'ready-to-commit': 'green', 'ready-to-pr': 'green', blocked: 'red' };
   for (const [s, dot] of Object.entries(dots)) {
-    const l = stateLine(st(s, { detail: 'More text.' }));
+    const l = stateLine(st(s, { detail: 'More text.' }), CLOCK);
     assert.deepEqual([l.kind, l.dot, l.text], ['current', dot, 'Do the thing.']);
     assert.equal(l.title, 'Do the thing.\n\nMore text.\n\n2026-10-24T11:59:00Z');
   }
-  assert.equal(stateLine(st('working')).title, 'Do the thing.\n\n2026-10-24T11:59:00Z');
+  assert.equal(stateLine(st('working'), CLOCK).title, 'Do the thing.\n\n2026-10-24T11:59:00Z');
 });
 
 test('stateLine: a stale state shows only an outdated marker, never the old text; no usable state shows nothing', () => {

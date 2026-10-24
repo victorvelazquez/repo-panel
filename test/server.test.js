@@ -513,6 +513,65 @@ test('POST /api/pi needs the token and rejects an unknown command or repo', asyn
   });
 });
 
+// ---------- RP12b: GET /api/pi-status ----------
+const { piStatus } = require('../server/pi.js');
+
+test('piStatus: closed with no pi terminal in the repo folder, from a list only', async () => {
+  for (const terminals of [[], [piTerm({ worktreePath: 'C:/dev/elsewhere' })]]) {
+    const f = fakeOrca({ terminals });
+    assert.deepEqual(await piStatus(REPO, f.orca), { state: 'closed' });
+    assert.deepEqual(f.calls, [['list']]);
+  }
+});
+
+test('piStatus: idle, busy (a fresh show of the one session) and ambiguous with several sessions', async () => {
+  const idle = fakeOrca({ previews: [IDLE_PI] });
+  assert.deepEqual(await piStatus(REPO, idle.orca), { state: 'idle' });
+  assert.deepEqual(idle.calls, [['list'], ['show', '--terminal', 'h1']]);
+  assert.deepEqual(await piStatus(REPO, fakeOrca({ previews: ['thinking…'] }).orca), { state: 'busy' });
+  assert.deepEqual(await piStatus(REPO, fakeOrca({ previews: [IDLE_PI.replace('type, or / for commands', 'half typed')] }).orca), { state: 'idle' });
+  const two = fakeOrca({ terminals: [piTerm(), piTerm({ handle: 'h2' })] });
+  assert.deepEqual(await piStatus(REPO, two.orca), { state: 'ambiguous' });
+  assert.deepEqual(two.calls, [['list']]);
+});
+
+test('piStatus: an Orca failure is unknown, never closed, and nothing is ever sent', async () => {
+  const boom = async () => { throw new Error('Orca CLI is unavailable'); };
+  assert.deepEqual(await piStatus(REPO, boom), { state: 'unknown' });
+  const showFails = async (args) => { if (args[0] === 'show') throw new Error('nope'); return { terminals: [piTerm()] }; };
+  assert.deepEqual(await piStatus(REPO, showFails), { state: 'unknown' });
+  assert.deepEqual(await piStatus(REPO, async () => ({})), { state: 'unknown' });
+  const f = fakeOrca();
+  await piStatus(REPO, f.orca);
+  assert.equal(f.sends().length, 0);
+});
+
+test('GET /api/pi-status needs the token, answers 404 for an unknown repo and one of the known states otherwise', async () => {
+  const repo = originAndClone({});
+  await withRepoPanel(repo, async ({ getApi, id }) => {
+    assert.equal((await getApi(`/api/pi-status?id=${id}`, false)).status, 401);
+    assert.equal((await getApi('/api/pi-status?id=nope')).status, 404);
+    assert.equal((await getApi('/api/pi-status')).status, 404);
+    const ok = await getApi(`/api/pi-status?id=${id}`);
+    assert.equal(ok.status, 200);
+    assert.deepEqual(Object.keys(ok.json), ['state']);
+    assert.ok(['closed', 'idle', 'busy', 'ambiguous', 'unknown'].includes(ok.json.state), ok.json.state);
+  });
+});
+
+test('GET /api/local carries head, inProgress and base next to the unchanged fields', async () => {
+  const repo = originAndClone({});
+  await withRepoPanel(repo, async ({ getApi, id }) => {
+    const l = (await getApi(`/api/local?id=${id}`)).json;
+    assert.equal(l.head, execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repo.work, encoding: 'utf8' }).trim());
+    assert.equal(l.inProgress, null);
+    assert.equal(l.base, 'main');
+    assert.equal(l.branch, 'main');
+    assert.equal(l.ahead, 0);
+    assert.deepEqual(l.files, []);
+  });
+});
+
 // ---------- /api/requirements and /api/prerequisites ----------
 const REG_BLOCK = '# Rules\n<!-- orquestacion:registro v1.0 -->\nrules\n<!-- /orquestacion:registro -->\n';
 const HEADER = '**Dónde está:** a\n**Qué sigue:** b\n**Qué lo bloquea:** c\n\n';

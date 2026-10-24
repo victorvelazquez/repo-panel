@@ -207,3 +207,21 @@ test('requirementsFor: panel-ignored comes from git check-ignore: 0 pass, 1 fail
   assert.equal((await ask(-1)).status, 'unavailable');
   assert.equal((await ask(0, true)).status, 'unavailable');
 });
+
+// ---------- RP12b: next must say something ----------
+test('readState: an empty or whitespace-only next is invalid', async () => {
+  for (const next of ['', ' ', '   ', '\t\n ']) bad(await readState(repoWith({ ...GOOD, next }), opts()), 'invalid');
+});
+
+test('readState: next is trimmed; an inner space is kept', async () => {
+  const r = await readState(repoWith({ ...GOOD, next: '  Decide the   database.\n' }), opts());
+  assert.equal(r.available, true);
+  assert.equal(r.next, 'Decide the   database.');
+});
+
+test('readState: a next that only fits the length limit before trimming is still valid; one over it is not', async () => {
+  const padded = `${'x'.repeat(300)}   `;
+  assert.equal((await readState(repoWith({ ...GOOD, next: 'x'.repeat(300) }), opts())).next, 'x'.repeat(300));
+  bad(await readState(repoWith({ ...GOOD, next: 'x'.repeat(301) }), opts()), 'invalid');
+  bad(await readState(repoWith({ ...GOOD, next: padded }), opts()), 'invalid');
+});
