@@ -171,3 +171,6 @@ a.repo-name:hover { text-decoration: none; color: var(--blue); }
 .queue { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 16px 0; font-size: 12px; }
 .queue strong { color: var(--muted); margin-right: 4px; }
 .queue .chip-btn { max-width: 360px; overflow: hidden; text-overflow: ellipsis; }
+.outdated { position: sticky; top: 0; z-index: 6; padding: 8px 16px; background: #2a1213; color: var(--red); border-bottom: 2px solid var(--red); font-weight: 600; }
+.outdated[hidden] { display: none; }
+.conf-error { color: var(--red); padding: 12px 0; }

@@ -2,13 +2,15 @@
 const TOKEN = document.querySelector('meta[name=token]').content;
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+// view.js is missing when an old server (which does not serve it) answers: the page must still run.
+const V = window.RepoPanelView || null;
 const store = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
 
 const S = {
   groups: [], local: {}, prs: {}, roadmap: {}, rmOpen: {}, loading: {}, busy: {},
   snoozed: new Set(), keepSnoozed: new Set(), snoozedOpen: {}, onlyProblems: false,
   group: '', q: '', queue: [], queueKey: '', queueSeq: 0,
-  conf: { items: [], ok: 0, key: '', seq: 0 }, confOpen: false,
+  conf: { items: [], ok: 0, loaded: false, failed: false, key: '', seq: 0 }, confOpen: false,
   prefs: store('prefs', { method: 'squash', del: true }),
   lastRefresh: 0, scan: [],
 };
@@ -86,7 +88,16 @@ function wakeReady(id, d) {
   }
 }
 
+// /health is public and tokenless. A failed request shows nothing; an answer from an old server warns.
+async function checkHealth() {
+  let health = null;
+  try { health = await (await fetch('/health')).json(); } catch { /* unreachable: nothing to compare */ }
+  $('#outdated').hidden = V ? !V.isOutdated(health) : false; // no view.js: the server cannot be current
+}
+
 async function refreshAll() {
+  checkHealth();
+  if (S.conf.failed) S.conf.key = ''; // ask again once per refresh, never on every redraw
   S.lastRefresh = Date.now();
   await Promise.all(allRepos().map((r) => refreshRepo(r.id)));
 }
@@ -196,8 +207,14 @@ function refreshConformity() {
     if (seq !== S.conf.seq) return;
     S.conf.items = d.items || [];
     S.conf.ok = d.ok || 0;
+    S.conf.loaded = true;
+    S.conf.failed = false;
     draw();
-  }, () => { /* keep the previous report */ });
+  }, () => {
+    if (seq !== S.conf.seq) return;
+    S.conf.failed = true;
+    draw();
+  });
 }
 
 const CONF_STATUS = {
@@ -218,11 +235,14 @@ function confBlock(it) {
 
 function drawConformity() {
   refreshConformity();
-  const n = S.conf.items.length;
+  const v = V ? V.conformityView(S.conf) : { state: 'error', summary: '', message: 'Could not compute the report (is the panel server out of date? restart it)' };
+  const n = v.state === 'issues' ? S.conf.items.length : 0;
   $('#confBadge').hidden = !n;
   $('#confBadge').textContent = n;
   if (!S.confOpen) return;
-  $('#drawerBody').innerHTML = `<div class="conf-sum">${S.conf.ok} conform · ${n} need attention</div>${n ? S.conf.items.map(confBlock).join('') : '<div class="empty">All repositories conform.</div>'}`;
+  const sum = v.summary ? `<div class="conf-sum">${esc(v.summary)}</div>` : '';
+  const body = v.state === 'issues' ? S.conf.items.map(confBlock).join('') : `<div class="${v.state === 'error' ? 'conf-error' : 'empty'}">${esc(v.message)}</div>`;
+  $('#drawerBody').innerHTML = sum + body;
 }
 
 function openConformity() {

@@ -7,6 +7,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { execFile, spawn } = require('node:child_process');
 const lib = require('./lib.js');
+const view = require('./public/view.js');
 
 const ROOT = __dirname;
 const CONFIG_PATH = process.env.REPO_PANEL_CONFIG || path.join(ROOT, 'config.json');
@@ -479,6 +480,7 @@ const routes = {
 };
 
 const STATIC = {
+  '/view.js': ['view.js', 'text/javascript; charset=utf-8'],
   '/app.js': ['app.js', 'text/javascript; charset=utf-8'],
   '/style.css': ['style.css', 'text/css; charset=utf-8'],
 };
@@ -524,7 +526,7 @@ function createServer(port) {
         return send(res, 200, fs.readFileSync(path.join(ROOT, 'public', file), 'utf8'), type);
       }
       // Lets a second launch tell "my own panel is already here" from "another project owns the port".
-      if (req.method === 'GET' && pathname === '/health') return send(res, 200, { app: 'repo-panel' });
+      if (req.method === 'GET' && pathname === '/health') return send(res, 200, { app: 'repo-panel', api: view.API_VERSION });
       const handler = routes[`${req.method} ${pathname}`];
       if (!handler) throw new HttpError(404, 'Not found');
       if (req.headers['x-token'] !== TOKEN) throw new HttpError(401, 'Invalid token');

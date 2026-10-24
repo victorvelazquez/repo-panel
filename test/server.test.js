@@ -8,7 +8,11 @@ const http = require('node:http');
 const net = require('node:net');
 const { spawn, spawnSync, execFileSync } = require('node:child_process');
 
+const vm = require('node:vm');
+
 const SERVER = path.join(__dirname, '..', 'server.js');
+const PUBLIC = path.join(__dirname, '..', 'public');
+const { API_VERSION } = require('../public/view.js');
 
 function freePort() {
   return new Promise((resolve) => {
@@ -47,8 +51,33 @@ test('GET /health identifies the panel without a token', async () => {
   try {
     const res = await waitFor(() => get(port, '/health'));
     assert.equal(res.status, 200);
-    assert.deepEqual(JSON.parse(res.body), { app: 'repo-panel' });
+    assert.deepEqual(JSON.parse(res.body), { app: 'repo-panel', api: API_VERSION });
     assert.equal((await get(port, '/api/config')).status, 401);
+  } finally { child.kill(); }
+});
+
+test('GET /view.js is served and /health reports the api of that same file', async () => {
+  const port = await freePort();
+  const child = launch(port);
+  try {
+    const health = JSON.parse((await waitFor(() => get(port, '/health'))).body);
+    const res = await get(port, '/view.js');
+    assert.equal(res.status, 200);
+    const ctx = vm.createContext({});
+    vm.runInContext(res.body, ctx);
+    assert.equal(health.api, ctx.RepoPanelView.API_VERSION);
+    assert.equal(res.body, fs.readFileSync(path.join(PUBLIC, 'view.js'), 'utf8'));
+  } finally { child.kill(); }
+});
+
+test('the page loads view.js before app.js and has the outdated banner', async () => {
+  const port = await freePort();
+  const child = launch(port);
+  try {
+    const html = (await waitFor(() => get(port, '/'))).body;
+    assert.ok(html.indexOf('<script src="/view.js">') > -1);
+    assert.ok(html.indexOf('/view.js') < html.indexOf('/app.js'));
+    assert.match(html, /id="outdated"[^>]*hidden/);
   } finally { child.kill(); }
 });
 
