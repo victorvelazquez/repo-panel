@@ -28,8 +28,8 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 
 | ID | Specs | Ruta | Commit |
 | --- | --- | --- | --- |
-| RP8 | S1, S6 | inline (hecho y probado; pendiente `/flow-commit` y `/flow-pr` de la persona) | — |
-| RP9 | S12 | inline, sin cambio de comportamiento; módulos `git`, `github`, `pi`, `roadmap`, `http`, `config` | — |
+| RP8 | S1, S6 | inline; fusionado en PR #24 | `e0295a7`, `be39369` |
+| RP9 | S12 | worker acotado; 10 módulos en `server/` (errors, exec, config, local, github, roadmap, repos, pi, queue, http); hecho y verificado | pendiente de commit |
 | RP10 | S7, S8, S9, S10 | archivo de requisitos con chequeos legibles por máquina y conformidad ampliada | — |
 | RP11 | S13 | salas en la configuración, pertenencia por tarjeta, presencia por Orca, requisitos de sala | — |
 | RP12 | S2, S3, S4, S5 | archivo de estado, veredicto desde Git, botón `/flow-pr`, aviso de acción manual | — |
