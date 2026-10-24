@@ -8,6 +8,7 @@ const S = {
   groups: [], local: {}, prs: {}, roadmap: {}, rmOpen: {}, loading: {}, busy: {},
   snoozed: new Set(), keepSnoozed: new Set(), snoozedOpen: {}, onlyProblems: false,
   group: '', q: '', queue: [], queueKey: '', queueSeq: 0,
+  conf: { items: [], ok: 0, key: '', seq: 0 }, confOpen: false,
   prefs: store('prefs', { method: 'squash', del: true }),
   lastRefresh: 0, scan: [],
 };
@@ -180,6 +181,57 @@ function drawQueue() {
   }).join('')}${S.queue.length > QUEUE_MAX ? `<span class="muted">+${S.queue.length - QUEUE_MAX} more</span>` : ''}` : '';
 }
 
+// ---------- conformity ----------
+// Audits every repo (filters do not apply). Asks the server only when the roadmap facts changed.
+function refreshConformity() {
+  const entries = allRepos().map((r) => {
+    const rp = S.roadmap[r.id];
+    return { id: r.id, name: r.name, roadmap: rp ? { available: rp.available, reason: rp.reason, problems: rp.problems } : null };
+  });
+  const key = JSON.stringify(entries);
+  if (key === S.conf.key) return;
+  S.conf.key = key;
+  const seq = ++S.conf.seq;
+  api('/api/conformity', { entries }).then((d) => {
+    if (seq !== S.conf.seq) return;
+    S.conf.items = d.items || [];
+    S.conf.ok = d.ok || 0;
+    draw();
+  }, () => { /* keep the previous report */ });
+}
+
+const CONF_STATUS = {
+  missing: 'No docs/ROADMAP.md on the base branch',
+  'no-base': 'Base branch not found',
+  'no-repo': 'Folder or repository not found',
+  unavailable: 'Roadmap unavailable',
+};
+
+function confBlock(it) {
+  const status = it.status === 'problems' ? `${it.problems.length} problem${it.problems.length === 1 ? '' : 's'}` : CONF_STATUS[it.status];
+  return `<div class="conf-item">
+    <button class="repo-name" data-act="queue-pick" data-close="1" data-name="${esc(it.name)}" title="Filter the board to this repo">${esc(it.name)}</button>
+    <div class="conf-status">${esc(status)}</div>
+    ${it.problems.map((p) => `<div class="conf-line">line ${esc(p.line)} · ${esc(p.severity)} · ${esc(p.message)}</div>`).join('')}
+  </div>`;
+}
+
+function drawConformity() {
+  refreshConformity();
+  const n = S.conf.items.length;
+  $('#confBadge').hidden = !n;
+  $('#confBadge').textContent = n;
+  if (!S.confOpen) return;
+  $('#drawerBody').innerHTML = `<div class="conf-sum">${S.conf.ok} conform · ${n} need attention</div>${n ? S.conf.items.map(confBlock).join('') : '<div class="empty">All repositories conform.</div>'}`;
+}
+
+function openConformity() {
+  S.confOpen = true;
+  $('#drawerTitle').textContent = 'Roadmap conformity';
+  $('#drawer').hidden = false;
+  drawConformity();
+}
+
 // ---------- board ----------
 let raf = 0;
 function draw() { if (!raf) raf = requestAnimationFrame(() => { raf = 0; render(); }); }
@@ -242,6 +294,7 @@ function snoozedBlock(key, rows) {
 
 function render() {
   drawQueue();
+  drawConformity();
   if (!allRepos().length) {
     $('#app').innerHTML = '<div class="empty">No repositories yet.<br><br><button class="primary" data-act="add-dialog">+ Add your first repo</button></div>';
     return;
@@ -383,6 +436,7 @@ function renderDiff(text) {
 }
 
 async function openDiff(id) {
+  S.confOpen = false;
   const l = S.local[id] || {};
   $('#drawerTitle').textContent = `${nameOf(id)} · ${l.branch || ''}`;
   $('#drawerBody').innerHTML = '<div class="empty">Loading diff…</div>';
@@ -435,9 +489,13 @@ const ACTIONS = {
   'refresh-all': () => refreshAll(),
   'fetch-all': async () => { toast('Fetching all repos…'); await Promise.all(allRepos().map((r) => fetchRepo(r.id))); toast('Fetch done', 'ok'); },
   'diff': (el) => openDiff(el.dataset.id),
-  'close-drawer': () => { $('#drawer').hidden = true; },
+  'close-drawer': () => { S.confOpen = false; $('#drawer').hidden = true; },
+  'conformity': () => openConformity(),
   'merge': (el) => doMerge(el.dataset.id, Number(el.dataset.n)),
-  'queue-pick': (el) => { S.q = el.dataset.name; $('#search').value = S.q; draw(); },
+  'queue-pick': (el) => {
+    if (el.dataset.close) ACTIONS['close-drawer']();
+    S.q = el.dataset.name; $('#search').value = S.q; draw();
+  },
   'toggle-problems': () => { S.onlyProblems = !S.onlyProblems; draw(); },
   'snooze': (el) => setSnooze(el.dataset.id, Number(el.dataset.n), true),
   'unsnooze': (el) => setSnooze(el.dataset.id, Number(el.dataset.n), false),
@@ -499,5 +557,6 @@ document.addEventListener('visibilitychange', () => {
   $('#method').value = S.prefs.method;
   $('#delBranch').checked = S.prefs.del;
   draw();
+  if (location.hash === '#conformity') openConformity(); // deep link
   refreshAll();
 })();

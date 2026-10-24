@@ -429,8 +429,28 @@ function workQueue(items, priority) {
   return out.sort((x, y) => cmp(x.group, y.group) || cmp(x.rank, y.rank) || cmp(x.seq, y.seq)).map((e) => e.a);
 }
 
+// Which repos do not have a usable roadmap. `entries` are { id, name, roadmap } in board order, with the
+// /api/roadmap payload (null while unknown, which skips the repo). Only error and warn problems count.
+function conformityReport(entries) {
+  const out = { ok: 0, items: [] };
+  if (!Array.isArray(entries)) return out;
+  const REASONS = ['missing', 'no-base', 'no-repo'];
+  for (const e of entries) {
+    if (!e || typeof e !== 'object' || typeof e.id !== 'string' || typeof e.name !== 'string') continue;
+    const rp = e.roadmap;
+    if (!rp || typeof rp !== 'object') continue;
+    const item = (status, problems = []) => out.items.push({ id: e.id, name: e.name, status, problems });
+    if (rp.available === false) { item(REASONS.includes(rp.reason) ? rp.reason : 'unavailable'); continue; }
+    if (rp.available !== true || !Array.isArray(rp.problems)) continue;
+    const bad = rp.problems.filter((p) => p && (p.severity === 'error' || p.severity === 'warn'))
+      .map(({ line, severity, code, message }) => ({ line, severity, code, message })).sort((a, b) => a.line - b.line);
+    if (bad.length) item('problems', bad); else out.ok++;
+  }
+  return out;
+}
+
 module.exports = {
   repoId, parseStatus, parseNumstat, parseGoneBranches, parseBaseBranch, staleBranch, statusLetter,
   summarizeChecks, blockedReason, enrichPr, encodeRef, parseRoadmap, safeRelPath, roadmapSummary,
-  matchesUnitId, deriveUnitStates, nextUnit, workQueue,
+  matchesUnitId, deriveUnitStates, nextUnit, workQueue, conformityReport,
 };

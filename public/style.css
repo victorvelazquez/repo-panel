@@ -161,6 +161,13 @@ a.repo-name:hover { text-decoration: none; color: var(--blue); }
 .rm-header { margin-top: 4px; white-space: normal; }
 .rm-header b { color: var(--text); font-weight: 600; }
 
+#conformity .badge { margin-left: 4px; padding: 0 6px; border-radius: 10px; background: var(--yellow); color: #000; font-size: 12px; font-weight: 600; }
+.conf-sum { color: var(--muted); margin-bottom: 12px; }
+.conf-item { border: 1px solid var(--line); border-radius: 6px; padding: 8px 12px; margin-bottom: 8px; background: var(--panel); }
+.conf-item .repo-name { background: none; border: 0; padding: 0; cursor: pointer; }
+.conf-item .repo-name:hover { color: var(--blue); }
+.conf-status { color: var(--yellow); font-size: 13px; margin: 2px 0; }
+.conf-line { font: 12px/1.6 ui-monospace, Consolas, monospace; color: var(--muted); overflow-wrap: anywhere; }
 .queue { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 16px 0; font-size: 12px; }
 .queue strong { color: var(--muted); margin-right: 4px; }
 .queue .chip-btn { max-width: 360px; overflow: hidden; text-overflow: ellipsis; }

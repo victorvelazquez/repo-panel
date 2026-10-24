@@ -340,6 +340,38 @@ test('POST /api/queue sanitizes the items', async () => {
   });
 });
 
+test('POST /api/conformity needs the token and lists the repos that do not conform', async () => {
+  await withPanel({}, async ({ post, port }) => {
+    const bare = await new Promise((resolve, reject) => {
+      const req = http.request({ host: '127.0.0.1', port, path: '/api/conformity', method: 'POST' }, (res) => { res.resume(); res.on('end', () => resolve(res.statusCode)); });
+      req.on('error', reject); req.end('{}');
+    });
+    assert.equal(bare, 401);
+    const bad = { available: true, problems: [{ line: 4, severity: 'error', code: 'bad-id', message: 'm' }, { line: 2, severity: 'info', code: 'x', message: 'i' }] };
+    const r = await post('/api/conformity', { entries: [
+      { id: 'a', name: 'a', roadmap: { available: true, problems: [] } },
+      { id: 'b', name: 'b', roadmap: { available: false, reason: 'missing' } },
+      { id: 'c', name: 'c', roadmap: bad },
+      { id: 'd', name: 'd', roadmap: null },
+    ] });
+    assert.equal(r.status, 200);
+    assert.deepEqual(r.json, { ok: 1, items: [
+      { id: 'b', name: 'b', status: 'missing', problems: [] },
+      { id: 'c', name: 'c', status: 'problems', problems: [{ line: 4, severity: 'error', code: 'bad-id', message: 'm' }] },
+    ] });
+  });
+});
+
+test('POST /api/conformity answers an empty report for a bad body', async () => {
+  await withPanel({}, async ({ post }) => {
+    for (const body of [null, [], 'x', {}, { entries: 'x' }, { entries: {} }]) {
+      const r = await post('/api/conformity', body);
+      assert.equal(r.status, 200);
+      assert.deepEqual(r.json, { ok: 0, items: [] });
+    }
+  });
+});
+
 test('a top-level priority survives a config save; without it none is written', async () => {
   const body = { groups: [{ name: 'g', repos: [{ path: '/x/a' }] }] };
   const id = require('../lib.js').repoId('/x/a');

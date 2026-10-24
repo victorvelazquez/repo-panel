@@ -9,6 +9,7 @@ A local, single-window dashboard for the repos you work on. It answers one quest
 - A roadmap block on each repo card (in progress or next unit, progress bar, a problems badge and, on click, the roadmap header). It reads `docs/ROADMAP.md` from the remote base branch, not the working tree; repos without that file look unchanged.
 - The states `Lista`, `En revisión` and `En curso` (derived) are computed from Git and GitHub, never written in the file. A unit is linked to a branch or an open PR by its ID inside the branch name or the PR title; those units are skipped when picking the next one (`siguiente`).
 - A **Go work on** strip above the board lists the next actions in order: a PR ready to merge, a repo whose branch already merged (`/flow-branch`), changes not delivered yet, and a clean repo with a next roadmap unit. Clicking a chip filters the board to that repo. A manual order in `priority` (see Configuration) wins over the automatic one.
+- A **Conformity** button (with a count badge) opens a drawer listing every repo, whatever the filters, that has no usable `docs/ROADMAP.md` or whose file has problems, with the line of each problem. Info-level problems (such as a dependency outside the table) are not listed. It is built from the roadmap read from the remote base branch, so unpushed edits do not show. Opening the panel at `http://127.0.0.1:<port>/#conformity` opens that drawer on load.
 - Quick actions: open on GitHub, open in VS Code, `git fetch --prune`, re-run failed checks, refresh.
 
 Committing and opening PRs stay manual — the panel only observes, and merges when you click.
@@ -64,7 +65,7 @@ You can also create `config.json` by hand; copy `config.example.json` as a start
 | `priority` | Optional list of repo names (e.g. `["repo-panel", "api"]`) that go first in the "Go work on" strip, in that order; case-insensitive, unknown names ignored | none |
 | `groups` | Named groups of repos (`{ "name", "repos": [{ "path", "base", "roadmap" }] }`); `base` and `roadmap` are optional | `[]` |
 
-`POST /api/queue` takes the per-repo facts from the browser (it does not rerun any git or gh command) and orders them: repos in `priority` first, then merge, branch, deliver and start, keeping board order within each kind.
+`POST /api/queue` takes the per-repo facts from the browser (it does not rerun any git or gh command) and orders them: repos in `priority` first, then merge, branch, deliver and start, keeping board order within each kind. `POST /api/conformity` takes each repo's roadmap availability and problems and returns the repos that do not conform.
 
 `base` is the branch work is merged into. When omitted, the panel reads it from `origin/HEAD` and falls back to `main`. `roadmap` is the repo-relative path of its plan file (default `docs/ROADMAP.md`); unsafe values (absolute, starting with `-`, or containing `..`) are ignored.
 
