@@ -1,5 +1,6 @@
 'use strict';
 const test = require('node:test');
+const { after } = test;
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -23,8 +24,15 @@ function freePort() {
   });
 }
 
+// Every config folder is removed when the file's tests finish, so a run leaves nothing in the temp dir.
+const configDirs = [];
+after(() => {
+  for (const d of configDirs) fs.rmSync(d, { recursive: true, force: true, maxRetries: 5 });
+});
+
 function configFor(port) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'repo-panel-'));
+  configDirs.push(dir);
   const file = path.join(dir, 'config.json');
   fs.writeFileSync(file, JSON.stringify({ port }));
   return file;
