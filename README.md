@@ -94,6 +94,7 @@ Known limits and what is not verified:
 
 - Only the first 30 local branches are inspected; a matching branch beyond that is not seen.
 - The real GitHub path (`En revisión` from `gh pr list`) and its rendering in the browser have no automated test; pure functions cover the logic.
+- The conformity view was only checked with a headless screenshot of the open drawer. Not verified in a browser: clicking the button and a repo name, closing the drawer, the `All repositories conform.` message, the `no-base` and `no-repo` statuses, and a repo whose only problems are info-level. Unit tests cover the report logic.
 
 ## Security
 
