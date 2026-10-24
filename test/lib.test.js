@@ -595,3 +595,33 @@ test('conformityReport is defensive about its input', () => {
   assert.deepEqual(lib.conformityReport('x'), { ok: 0, items: [] });
   assert.deepEqual(lib.conformityReport([null, 5, 'a', { roadmap: GOOD }, { id: 'i', name: 3, roadmap: GOOD }]), { ok: 0, items: [] });
 });
+
+const IDLE = 'earlier output\n▎ ✿ waiting for input\n▎   type, or / for commands\n▎\n5h 78% ↻12:40';
+const term = (o = {}) => ({ handle: 'h1', title: 'π - repo', worktreePath: 'C:/dev/repo', connected: true, writable: true, orphaned: false, ...o });
+
+test('normPath ignores separator style, trailing slash and case', () => {
+  assert.equal(lib.normPath('C:\\Dev\\Repo\\'), 'c:/dev/repo');
+  assert.equal(lib.normPath('C:/dev/repo'), 'c:/dev/repo');
+});
+
+test('piTerminalsFor keeps only live, writable pi terminals of exactly that repo', () => {
+  const list = [
+    term(), term({ handle: 'h2', worktreePath: 'C:\\DEV\\repo\\' }), term({ handle: 'other', worktreePath: 'C:/dev/repo2' }),
+    term({ handle: 'plain', title: 'Terminal 1' }), term({ handle: 'dead', connected: false }),
+    term({ handle: 'ro', writable: false }), term({ handle: 'orphan', orphaned: true }), null, { title: 'π' },
+  ];
+  assert.deepEqual(lib.piTerminalsFor(list, 'c:\\dev\\repo').map((t) => t.handle), ['h1', 'h2']);
+  assert.deepEqual(lib.piTerminalsFor('x', 'C:/dev/repo'), []);
+});
+
+test('piPromptState is idle only for an empty prompt and fails closed otherwise', () => {
+  assert.equal(lib.piPromptState(IDLE), 'idle');
+  assert.equal(lib.piPromptState(IDLE.replace('type, or / for commands', 'half a sentence')), 'typed');
+  assert.equal(lib.piPromptState('thinking…\n▎ working'), 'busy');
+  assert.equal(lib.piPromptState(`${IDLE}\nnew output`.replace('waiting for input', 'busy')), 'busy');
+  for (const v of ['', null, undefined, 7]) assert.equal(lib.piPromptState(v), 'busy');
+});
+
+test('PI_COMMANDS only offers the flow commands', () => {
+  assert.deepEqual(lib.PI_COMMANDS, { 'flow-commit': '/flow-commit', 'flow-pr': '/flow-pr', 'flow-branch': '/flow-branch' });
+});

@@ -421,3 +421,89 @@ test('a top-level priority survives a config save; without it none is written', 
     assert.equal('priority' in JSON.parse(fs.readFileSync(file, 'utf8')), false);
   });
 });
+
+// ---------- pi sessions ----------
+const { piSend } = require('../server.js');
+const IDLE_PI = '▎ ✿ waiting for input\n▎   type, or / for commands\n▎\n';
+const piTerm = (o = {}) => ({ handle: 'h1', title: 'π - repo', worktreePath: 'C:/dev/repo', connected: true, writable: true, ...o });
+
+// A fake Orca: `terminals` is what `list` returns, `previews` the successive `show` previews (the last one repeats).
+function fakeOrca({ terminals = [piTerm()], previews = [IDLE_PI, IDLE_PI, 'working'] } = {}) {
+  const calls = [];
+  let n = 0;
+  const orca = async (args) => {
+    calls.push(args);
+    if (args[0] === 'list') return { terminals };
+    if (args[0] === 'show') return { terminal: { preview: previews[Math.min(n++, previews.length - 1)] } };
+    return { send: { accepted: true } };
+  };
+  return { orca, calls, sends: () => calls.filter((c) => c[0] === 'send') };
+}
+const REPO = { path: 'C:\\dev\\repo' };
+const noWait = async () => {};
+const refuses = (p, status, re) => assert.rejects(p, (e) => e.status === status && re.test(e.message));
+
+test('piSend types the fixed command and Enter into the one idle pi session and confirms it started', async () => {
+  const f = fakeOrca();
+  assert.deepEqual(await piSend(REPO, 'flow-commit', f.orca, noWait), { sent: true, confirmed: true });
+  assert.deepEqual(f.sends(), [['send', '--terminal', 'h1', '--text', '/flow-commit', '--enter']]);
+});
+
+test('piSend says not confirmed when the session never leaves the idle prompt', async () => {
+  const f = fakeOrca({ previews: [IDLE_PI] });
+  assert.deepEqual(await piSend(REPO, 'flow-pr', f.orca, noWait), { sent: true, confirmed: false });
+  assert.equal(f.sends().length, 1);
+});
+
+test('piSend refuses an unknown command before touching Orca', async () => {
+  const f = fakeOrca();
+  for (const c of ['rm -rf', '/flow-commit', 'constructor', '__proto__', undefined]) await refuses(piSend(REPO, c, f.orca, noWait), 400, /Unknown command/);
+  assert.equal(f.calls.length, 0);
+});
+
+test('piSend refuses, and sends nothing, with no session, several sessions, a busy prompt or typed text', async () => {
+  const cases = [
+    [{ terminals: [] }, /No open pi session/],
+    [{ terminals: [piTerm({ worktreePath: 'C:/dev/elsewhere' })] }, /No open pi session/],
+    [{ terminals: [piTerm(), piTerm({ handle: 'h2' })] }, /Several pi sessions/],
+    [{ previews: ['thinking…'] }, /busy or has text/],
+    [{ previews: [IDLE_PI.replace('type, or / for commands', 'half typed')] }, /busy or has text/],
+  ];
+  for (const [opts, re] of cases) {
+    const f = fakeOrca(opts);
+    await refuses(piSend(REPO, 'flow-commit', f.orca, noWait), 409, re);
+    assert.equal(f.sends().length, 0);
+  }
+});
+
+test('piSend refuses a second send to the same repo while one is in flight, then frees the repo', async () => {
+  let release;
+  const gate = new Promise((r) => { release = r; });
+  const f = fakeOrca();
+  const slow = async (args) => { if (args[0] === 'send') await gate; return f.orca(args); };
+  const first = piSend(REPO, 'flow-commit', slow, noWait);
+  await new Promise((r) => setImmediate(r));
+  await refuses(piSend(REPO, 'flow-commit', f.orca, noWait), 409, /already being sent/);
+  release();
+  await first;
+  assert.equal((await piSend(REPO, 'flow-commit', fakeOrca().orca, noWait)).sent, true);
+});
+
+test('piSend frees the repo when Orca fails', async () => {
+  const boom = async () => { throw Object.assign(new Error('Orca CLI is unavailable'), { status: 503 }); };
+  await refuses(piSend(REPO, 'flow-commit', boom, noWait), 503, /Orca/);
+  assert.equal((await piSend(REPO, 'flow-commit', fakeOrca().orca, noWait)).sent, true);
+});
+
+test('POST /api/pi needs the token and rejects an unknown command or repo', async () => {
+  await withPanel({ groups: [{ name: 'g', repos: [{ path: '/x/a' }] }] }, async ({ post, port }) => {
+    const id = require('../lib.js').repoId('/x/a');
+    assert.equal((await post('/api/pi', { id, command: 'rm -rf' })).status, 400);
+    assert.notEqual((await post('/api/pi', { id: 'nope', command: 'flow-commit' })).status, 200);
+    const raw = await new Promise((resolve) => {
+      const req = http.request({ host: '127.0.0.1', port, path: '/api/pi', method: 'POST' }, (res) => { res.resume(); resolve(res.statusCode); });
+      req.end('{}');
+    });
+    assert.equal(raw, 401);
+  });
+});

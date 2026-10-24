@@ -348,6 +348,9 @@ const repoName = (r, url) => (url
 
 const removeBtn = (r) => `<button class="x" data-act="remove" data-id="${r.id}" title="Remove from panel (deletes nothing)">✕</button>`;
 
+// Types the command into the repo's open pi session (through Orca); the server refuses when that is not safe.
+const piBtn = (r, cmd) => `<button data-act="pi" data-id="${r.id}" data-cmd="${cmd}" title="Send /${cmd} to the open pi session of this repo">/${cmd}</button>`;
+
 // Repo name + group on the left, remove (with confirmation) pinned to the right.
 function cardTop(r, url) {
   return `<div class="card-top">${groupTag(r.group)}${repoName(r, url)}${spinner(r)}${removeBtn(r)}</div>`;
@@ -402,6 +405,7 @@ function repoCard(r, attn = false) {
     ${chips.length ? `<div class="chips">${chips.join('')}</div>` : ''}
     ${l.error ? `<div class="err">${esc(l.error)}</div>` : ''}
     ${p.error ? `<div class="err">GitHub: ${esc(p.error)}</div>` : ''}
+    ${dirty || unpushed ? `<div class="actions">${piBtn(r, 'flow-commit')}</div>` : ''}
   </div>`;
 }
 
@@ -511,6 +515,14 @@ const ACTIONS = {
   'diff': (el) => openDiff(el.dataset.id),
   'close-drawer': () => { S.confOpen = false; $('#drawer').hidden = true; },
   'conformity': () => openConformity(),
+  'pi': async (el) => {
+    el.disabled = true;
+    try {
+      const d = await api('/api/pi', { id: el.dataset.id, command: el.dataset.cmd });
+      toast(d.confirmed ? `Sent /${el.dataset.cmd} to pi` : `Sent /${el.dataset.cmd}, not confirmed: check the pi session`, d.confirmed ? 'ok' : '');
+    } catch (e) { toast(e.message, 'bad'); }
+    el.disabled = false;
+  },
   'merge': (el) => doMerge(el.dataset.id, Number(el.dataset.n)),
   'queue-pick': (el) => {
     if (el.dataset.close) ACTIONS['close-drawer']();

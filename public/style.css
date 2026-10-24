@@ -102,6 +102,7 @@ main { max-width: none; padding: 8px; }
 .card-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .tag { font-size: 11px; padding: 0 7px; border-radius: 8px; flex: none; }
 .pr-title { font-weight: 500; overflow-wrap: anywhere; }
+.card .actions { margin-left: 0; margin-top: 2px; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 
 .snoozed { margin-top: 4px; border-top: 1px dashed var(--line); padding-top: 6px; opacity: .75; }
