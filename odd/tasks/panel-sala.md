@@ -30,14 +30,14 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 | --- | --- | --- | --- |
 | RP8 | S1, S6 | inline; fusionado en PR #24 | `e0295a7`, `be39369` |
 | RP9 | S12 | worker acotado; 10 módulos en `server/` (errors, exec, config, local, github, roadmap, repos, pi, queue, http); hecho y verificado | pendiente de commit |
-| RP10a | S7, S8, S9, S10 | worker acotado; `requirements.json`, `checks.js`, `server/requirements.js`, lector `remoteFile`, rutas `/api/requirements` y `/api/prerequisites`, cajón de Conformity; hecho y verificado | pendiente de commit |
-| RP10b | S7, S8 | aviso ocultable, menú «⋯», orden a la sesión de pi y bloques propios; antes, probar con una sesión real | — |
+| RP10a | S7, S8, S9, S10 | worker acotado; `requirements.json`, `checks.js`, `server/requirements.js`, lector `remoteFile`, rutas `/api/requirements` y `/api/prerequisites`, cajón de Conformity; fusionado en PR #26 | `9aadd01` |
+| RP10b | S7, S8, S9 | worker acotado; aviso y menú, `put-in-conditions`, `requirements/`, `dismissed`, arreglo de `remoteFile`; hecho y verificado; falta probar la orden con una sesión real | pendiente de commit |
 | RP11 | S13 | salas en la configuración, pertenencia por tarjeta, presencia por Orca, requisitos de sala | — |
 | RP12 | S2, S3, S4, S5 | archivo de estado, veredicto desde Git, botón `/flow-pr`, aviso de acción manual | — |
 | RP13 | S11 | cierre de la dependencia de `implementation-guides` (otro proyecto, con autorización) | — |
 | RP14 | S14, S17 | opcional: botón hacia la terminal de la sala; chat solo si la persona lo decide | — |
 
-Orden: RP8 → RP9 → RP10a → RP10b → RP11 → RP12 → RP13 → RP14. RP12 puede ir antes de RP11 si la persona lo prefiere.
+Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11 → RP12 → RP13 → RP14. RP12 puede ir antes de RP11 si la persona lo prefiere.
 
 ## Sin verificar (heredado del análisis)
 

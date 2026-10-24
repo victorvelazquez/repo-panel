@@ -12,7 +12,8 @@ const roadmapCache = new Map();
 const withSummary = (data) => ({ ...data, summary: lib.roadmapSummary(data) });
 
 // One file of a repo as it is on origin/<base>. The text is cached by the sha of the base commit, so an
-// unchanged base costs one rev-parse. reason: no-repo | no-base | missing.
+// unchanged base costs one rev-parse. reason: no-repo | no-base | missing (the file is not on the ref) |
+// error (any other failure: not cached, and never to be read as a verified failure or pass).
 async function remoteFile(repo, file) {
   if (!fs.existsSync(repo.path)) return { available: false, reason: 'no-repo' };
   const top = await git(repo.path, ['rev-parse', '--git-dir']);
@@ -27,7 +28,13 @@ async function remoteFile(repo, file) {
   let text = hit && hit.sha === sha ? hit.text : undefined;
   if (text === undefined) {
     const show = await git(repo.path, ['show', `${ref}:${file}`]);
-    text = show.code === 0 ? show.stdout : null;
+    if (show.code === 0) text = show.stdout;
+    else {
+      // Only an empty listing proves the path is not on the ref; anything else may be a transient failure.
+      const listed = await git(repo.path, ['ls-tree', '--name-only', ref, '--', file]);
+      if (listed.code !== 0 || listed.stdout.trim() !== '') return { available: false, reason: 'error', base, sha };
+      text = null;
+    }
     fileCache.set(key, { sha, text });
   }
   return text === null ? { available: false, reason: 'missing', base, sha } : { available: true, reason: null, base, sha, text };
@@ -38,6 +45,7 @@ async function roadmapState(repo) {
   const rf = await remoteFile(repo, file);
   if (rf.reason === 'no-repo') return { available: false, reason: 'no-repo' };
   if (rf.reason === 'no-base') return { available: false, reason: 'no-base', base: rf.base, path: file };
+  if (rf.reason === 'error') return { available: false, reason: 'error', base: rf.base, path: file };
   const { base, sha } = rf;
   const key = `${repo.id}|${file}`;
   const hit = roadmapCache.get(key);

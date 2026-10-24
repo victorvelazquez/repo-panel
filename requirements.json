@@ -16,7 +16,7 @@
       "category": "verificable",
       "level": "required",
       "check": { "type": "file-exists", "file": "agents" },
-      "remedy": "Create AGENTS.md at the repo root with the project rules, then commit it with /flow-commit and open a PR with /flow-pr."
+      "remedy": "Create AGENTS.md at the repo root with the project rules, then the user commits it with /flow-commit and opens a PR with /flow-pr."
     },
     {
       "id": "registro-block",
@@ -24,7 +24,7 @@
       "category": "verificable",
       "level": "required",
       "check": { "type": "block", "file": "agents", "name": "registro" },
-      "remedy": "Add the Orquestación 'registro' block (version 1.0) to AGENTS.md, between <!-- orquestacion:registro v1.0 --> and <!-- /orquestacion:registro -->; if AGENTS.md has rules that conflict, stop and ask the user."
+      "remedy": "Add the Orquestación 'registro' block (version 1.0) to AGENTS.md exactly as in requirements/blocks/registro.md, between <!-- orquestacion:registro v1.0 --> and <!-- /orquestacion:registro -->; if AGENTS.md has rules that conflict, stop and ask the user."
     },
     {
       "id": "roadmap-file",
@@ -32,7 +32,7 @@
       "category": "verificable",
       "level": "required",
       "check": { "type": "file-exists", "file": "roadmap" },
-      "remedy": "Create docs/ROADMAP.md (or the roadmap path configured for this repo) with the three header lines and the units table described in the registro block."
+      "remedy": "Create docs/ROADMAP.md (or the roadmap path configured for this repo) with the three header lines and the units table described in requirements/blocks/registro.md."
     },
     {
       "id": "roadmap-header",
@@ -56,7 +56,7 @@
       "category": "verificable",
       "level": "recommended",
       "check": { "type": "block", "file": "agents", "name": "ciclo" },
-      "remedy": "Add the Orquestación 'ciclo' block (version 1.0) to AGENTS.md, between <!-- orquestacion:ciclo v1.0 --> and <!-- /orquestacion:ciclo -->; if AGENTS.md has rules that conflict, stop and ask the user."
+      "remedy": "Add the Orquestación 'ciclo' block (version 1.0) to AGENTS.md exactly as in requirements/blocks/ciclo.md, between <!-- orquestacion:ciclo v1.0 --> and <!-- /orquestacion:ciclo -->; if AGENTS.md has rules that conflict, stop and ask the user."
     },
     {
       "id": "adoption-record",

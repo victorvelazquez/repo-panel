@@ -9,6 +9,7 @@ const store = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d;
 const S = {
   groups: [], local: {}, prs: {}, roadmap: {}, rmOpen: {}, loading: {}, busy: {},
   snoozed: new Set(), keepSnoozed: new Set(), snoozedOpen: {}, onlyProblems: false,
+  dismissed: new Set(), menu: null, reqPassOpen: {},
   group: '', q: '', queue: [], queueKey: '', queueSeq: 0,
   conf: { items: [], ok: 0, loaded: false, failed: false, key: '', seq: 0 }, confOpen: false,
   req: {}, reqSeq: {}, prereq: { state: 'loading', items: [], seq: 0 },
@@ -62,6 +63,7 @@ async function loadConfig() {
     S.snoozed.add(base);
     if (base !== k) S.keepSnoozed.add(base);
   }
+  S.dismissed = new Set(cfg.dismissed || []);
   $('#groupList').innerHTML = S.groups.map((g) => `<option value="${esc(g.name)}">`).join('');
   $('#groupFilter').innerHTML = `<option value="">All groups</option>${S.groups.map((g) => `<option ${S.group === g.name ? 'selected' : ''}>${esc(g.name)}</option>`).join('')}`;
 }
@@ -138,6 +140,17 @@ async function setSnooze(id, n, on, auto = false) {
     if (auto) toast(`#${n} (${nameOf(id)}) is ready to merge — back on the board`, 'ok');
   } catch (e) {
     if (on) { S.snoozed.delete(key); S.keepSnoozed.delete(key); } else S.snoozed.add(key);
+    draw();
+    toast(e.message, 'bad');
+  }
+}
+
+// Hides or shows again the "requirements missing" warning of a repo; the choice is kept in config.json.
+async function setDismissed(id, on) {
+  if (on) S.dismissed.add(id); else S.dismissed.delete(id);
+  draw();
+  try { await api('/api/dismiss', { id, on }); } catch (e) {
+    if (on) S.dismissed.delete(id); else S.dismissed.add(id);
     draw();
     toast(e.message, 'bad');
   }
@@ -285,7 +298,7 @@ function reqBlock(r) {
   const bad = results.filter((x) => x.status !== 'pass');
   const good = results.filter((x) => x.status === 'pass');
   const status = summary.ready ? 'Ready' : `Not ready · required ${summary.required.pass}/${summary.required.total}`;
-  const passing = good.length ? `<details class="req-passing"><summary>${good.length} passing</summary>${good.map((x) => `<div class="conf-line req-pass">✓ ${esc(x.title)} · ${esc(x.level)}</div>`).join('')}</details>` : '';
+  const passing = good.length ? `<details class="req-passing" data-id="${esc(r.id)}"${S.reqPassOpen[r.id] ? ' open' : ''}><summary>${good.length} passing</summary>${good.map((x) => `<div class="conf-line req-pass">✓ ${esc(x.title)} · ${esc(x.level)}</div>`).join('')}</details>` : '';
   return `<div class="conf-item">${name}<div class="conf-status">${esc(status)}</div>${bad.map(reqLine).join('')}${passing}</div>`;
 }
 
@@ -408,9 +421,27 @@ const removeBtn = (r) => `<button class="x" data-act="remove" data-id="${r.id}" 
 // Types the command into the repo's open pi session (through Orca); the server refuses when that is not safe.
 const piBtn = (r, cmd) => `<button data-act="pi" data-id="${r.id}" data-cmd="${cmd}" title="Send /${cmd} to the open pi session of this repo">/${cmd}</button>`;
 
-// Repo name + group on the left, remove (with confirmation) pinned to the right.
-function cardTop(r, url) {
-  return `<div class="card-top">${groupTag(r.group)}${repoName(r, url)}${spinner(r)}${removeBtn(r)}</div>`;
+// "⋯" menu of a card. Its open state lives in S (the page redraws on every refresh); `slot` tells apart
+// the several cards of one repo. Empty while the requirements are not loaded or nothing is left to do.
+function moreMenu(r, slot) {
+  const items = V ? V.cardMenu(S.req[r.id], S.dismissed.has(r.id)) : [];
+  if (!items.length) return '';
+  const key = `${r.id}|${slot}`;
+  const open = S.menu === key;
+  const list = items.map((i) => `<button role="menuitem" data-act="${i.act}" data-id="${r.id}">${esc(i.label)}</button>`).join('');
+  return `<span class="more"><button data-act="toggle-menu" data-menu="${esc(key)}" title="More options" aria-haspopup="true" aria-expanded="${open}">⋯</button>${open ? `<div class="more-menu" role="menu">${list}</div>` : ''}</span>`;
+}
+
+// Compact warning for a repo that lacks a required requirement; the drawer lists the rest.
+function reqWarn(r) {
+  const w = V ? V.cardWarning(S.req[r.id], S.dismissed.has(r.id)) : null;
+  if (!w) return '';
+  return `<div class="req-warn" title="${esc(w.ids.join(', '))}"><span>⚠ ${w.count} requirement${w.count === 1 ? '' : 's'} missing</span><button data-act="hide-warning" data-id="${r.id}" title="Hide this warning (more options → Show warning)">✕</button></div>`;
+}
+
+// Repo name + group on the left, more options and remove (with confirmation) pinned to the right.
+function cardTop(r, url, slot) {
+  return `<div class="card-top">${groupTag(r.group)}${repoName(r, url)}${spinner(r)}${moreMenu(r, slot)}${removeBtn(r)}</div>`;
 }
 
 // What the project is working on, from the remote roadmap. Empty when the repo has no usable one.
@@ -441,7 +472,8 @@ function cleanRow(r) {
   return `<div class="clean-row">
     ${groupTag(r.group)}${repoName(r, p.repo?.url)}
     <span class="branch" title="${esc(l.branch || '')}">${esc(l.branch || (l.detached ? '(detached)' : ''))}</span>${behind}${warn}${spinner(r)}
-    <span class="row-actions">${removeBtn(r)}</span>
+    <span class="row-actions">${moreMenu(r, 'row')}${removeBtn(r)}</span>
+    ${reqWarn(r)}
     ${roadmapBlock(r)}
   </div>`;
 }
@@ -456,7 +488,8 @@ function repoCard(r, attn = false) {
   else if (l.currentGone) chips.push('<span class="chip gray" title="The remote branch was deleted (merged PR?)">remote branch deleted</span>');
   if (p.noRemote) chips.push('<span class="chip gray">no GitHub remote</span>');
   return `<div class="card ${attn ? 'attn' : ''}">
-    ${cardTop(r, p.repo?.url)}
+    ${cardTop(r, p.repo?.url, 'repo')}
+    ${reqWarn(r)}
     <div class="branch one-line" title="${esc(l.branch || '')}">${esc(l.branch || (l.detached ? '(detached)' : ''))}</div>
     ${roadmapBlock(r)}
     ${chips.length ? `<div class="chips">${chips.join('')}</div>` : ''}
@@ -479,7 +512,8 @@ function prCard(r, pr, meta) {
   const showReason = !pr.ready && pr.blockedReason && pr.checks.state !== 'pending' && pr.checks.state !== 'failed';
   const n = `data-id="${r.id}" data-n="${pr.number}"`;
   return `<div class="card ${isProblem(pr) ? 'attn' : ''}">
-    ${cardTop(r, meta?.url)}
+    ${cardTop(r, meta?.url, `pr${pr.number}`)}
+    ${reqWarn(r)}
     <a class="pr-title" href="${esc(pr.url)}" target="_blank" rel="noopener" title="${esc(pr.title)}">#${pr.number} ${esc(pr.title)}</a>
     <div class="branch one-line" title="${esc(pr.head + ' → ' + pr.base)}">${esc(pr.head)} → ${esc(pr.base)}</div>
     <div class="chips">
@@ -580,6 +614,18 @@ const ACTIONS = {
     } catch (e) { toast(e.message, 'bad'); }
     el.disabled = false;
   },
+  'toggle-menu': (el) => { S.menu = S.menu === el.dataset.menu ? null : el.dataset.menu; draw(); },
+  'hide-warning': (el) => setDismissed(el.dataset.id, true),
+  'toggle-warning': (el) => { S.menu = null; return setDismissed(el.dataset.id, !S.dismissed.has(el.dataset.id)); },
+  // The server builds the order from the repo's requirements; `confirmed` only means the prompt left idle.
+  'put-in-conditions': async (el) => {
+    S.menu = null;
+    draw();
+    try {
+      const d = await api('/api/pi', { id: el.dataset.id, command: 'put-in-conditions' });
+      toast(d.confirmed ? 'Sent the put-in-conditions order to pi' : 'Sent the put-in-conditions order, not confirmed: check the pi session', d.confirmed ? 'ok' : '');
+    } catch (e) { toast(e.message, 'bad'); }
+  },
   'merge': (el) => doMerge(el.dataset.id, Number(el.dataset.n)),
   'queue-pick': (el) => {
     if (el.dataset.close) ACTIONS['close-drawer']();
@@ -616,11 +662,21 @@ const ACTIONS = {
 };
 
 document.addEventListener('click', (e) => {
+  if (S.menu && !e.target.closest('.more')) { S.menu = null; draw(); }
   const el = e.target.closest('[data-act]');
   if (!el || el.disabled) return;
   if (el.tagName === 'A') return;
   ACTIONS[el.dataset.act]?.(el);
 });
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && S.menu) { S.menu = null; draw(); }
+});
+
+// The passing list of a repo stays open (or closed) across redraws. `toggle` does not bubble, so capture it.
+document.addEventListener('toggle', (e) => {
+  if (e.target.matches && e.target.matches('details.req-passing')) S.reqPassOpen[e.target.dataset.id] = e.target.open;
+}, true);
 
 document.addEventListener('change', (e) => {
   const key = e.target.dataset.pref;
