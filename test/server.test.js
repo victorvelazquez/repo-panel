@@ -321,7 +321,12 @@ async function withPanel(config, fn) {
       req.on('error', reject);
       req.end(raw === undefined ? JSON.stringify(body) : raw);
     });
-    await fn({ post, file, port });
+    const getApi = (p, withToken = true) => new Promise((resolve, reject) => {
+      http.get({ host: '127.0.0.1', port, path: p, headers: withToken ? { 'x-token': token } : {} }, (res) => {
+        let d = ''; res.on('data', (c) => { d += c; }); res.on('end', () => resolve({ status: res.statusCode, json: JSON.parse(d) }));
+      }).on('error', reject);
+    });
+    await fn({ post, getApi, file, port });
   } finally { child.kill(); }
 }
 
@@ -506,4 +511,104 @@ test('POST /api/pi needs the token and rejects an unknown command or repo', asyn
     });
     assert.equal(raw, 401);
   });
+});
+
+// ---------- /api/requirements and /api/prerequisites ----------
+const REG_BLOCK = '# Rules\n<!-- orquestacion:registro v1.0 -->\nrules\n<!-- /orquestacion:registro -->\n';
+const HEADER = '**Dónde está:** a\n**Qué sigue:** b\n**Qué lo bloquea:** c\n\n';
+const statuses = (json) => Object.fromEntries(json.results.map((r) => [r.id, r.status]));
+
+async function withRepoPanel(repo, fn) {
+  const repoId = require('../lib.js').repoId(repo.work);
+  await withPanel({ groups: [{ name: 'g', repos: [{ path: repo.work, base: 'main', ...repo.extra }] }] }, async (ctx) => {
+    try { await fn({ ...ctx, id: repoId }); } finally { fs.rmSync(repo.tmp, { recursive: true, force: true }); }
+  });
+}
+
+test('GET /api/requirements needs the token and answers 404 for an unknown repo', async () => {
+  const repo = originAndClone({});
+  await withRepoPanel(repo, async ({ getApi, id }) => {
+    assert.equal((await getApi(`/api/requirements?id=${id}`, false)).status, 401);
+    assert.equal((await getApi('/api/requirements?id=nope')).status, 404);
+  });
+});
+
+test('GET /api/requirements: a conforming base branch passes the required ones; recommended gaps do not block', async () => {
+  const repo = originAndClone({ 'AGENTS.md': REG_BLOCK, 'docs/ROADMAP.md': HEADER + rows(['A1', 'Pendiente']) });
+  await withRepoPanel(repo, async ({ getApi, id }) => {
+    const r = await getApi(`/api/requirements?id=${id}`);
+    assert.equal(r.status, 200);
+    assert.equal(r.json.available, true);
+    assert.equal(r.json.base, 'main');
+    assert.deepEqual(statuses(r.json), {
+      'base-branch': 'pass', 'agents-file': 'pass', 'registro-block': 'pass', 'roadmap-file': 'pass',
+      'roadmap-header': 'pass', 'roadmap-table': 'pass', 'ciclo-block': 'fail', 'adoption-record': 'fail',
+    });
+    assert.deepEqual(r.json.summary, { required: { pass: 6, total: 6 }, recommended: { pass: 0, total: 2 }, ready: true });
+    assert.ok(r.json.results.every((x) => typeof x.remedy === 'string' && x.remedy));
+  });
+});
+
+test('GET /api/requirements: reads the remote base branch, flags legacy and a roadmap without header', async () => {
+  const repo = originAndClone({ 'AGENTS.md': '# A\n\n## Orquestación\nold\n', 'docs/ROADMAP.md': rows(['A1', 'Pendiente']) });
+  fs.writeFileSync(path.join(repo.work, 'AGENTS.md'), REG_BLOCK); // a dirty working tree must not count
+  await withRepoPanel(repo, async ({ getApi, id }) => {
+    const r = await getApi(`/api/requirements?id=${id}`);
+    assert.equal(statuses(r.json)['registro-block'], 'outdated');
+    assert.equal(statuses(r.json)['roadmap-header'], 'fail');
+    assert.equal(statuses(r.json)['roadmap-table'], 'pass');
+    assert.equal(r.json.summary.ready, false);
+  });
+});
+
+test('GET /api/requirements: files missing on the base branch fail or leave content checks unavailable', async () => {
+  const repo = originAndClone({});
+  await withRepoPanel(repo, async ({ getApi, id }) => {
+    const s = statuses((await getApi(`/api/requirements?id=${id}`)).json);
+    assert.equal(s['agents-file'], 'fail');
+    assert.equal(s['roadmap-file'], 'fail');
+    assert.equal(s['registro-block'], 'unavailable');
+    assert.equal(s['roadmap-header'], 'unavailable');
+  });
+});
+
+test('GET /api/requirements: an unknown base branch makes the dependent checks unavailable, not failed', async () => {
+  const repo = originAndClone({ 'AGENTS.md': REG_BLOCK });
+  repo.extra = { base: 'nope' };
+  await withRepoPanel(repo, async ({ getApi, id }) => {
+    const r = await getApi(`/api/requirements?id=${id}`);
+    assert.equal(r.json.available, false);
+    const s = statuses(r.json);
+    assert.equal(s['base-branch'], 'fail');
+    for (const k of ['agents-file', 'registro-block', 'roadmap-file', 'roadmap-header', 'roadmap-table']) assert.equal(s[k], 'unavailable', k);
+    assert.equal(r.json.summary.ready, false);
+  });
+});
+
+test('GET /api/prerequisites needs the token and answers git, gh and orca without failing', async () => {
+  await withPanel({}, async ({ getApi }) => {
+    assert.equal((await getApi('/api/prerequisites', false)).status, 401);
+    const r = await getApi('/api/prerequisites');
+    assert.equal(r.status, 200);
+    assert.deepEqual(r.json.items.map((i) => i.id), ['git', 'gh', 'orca']);
+    for (const i of r.json.items) { assert.equal(typeof i.ok, 'boolean'); assert.equal(typeof i.detail, 'string'); }
+  });
+});
+
+test('prerequisites: runs the three fixed commands; a missing tool is ok false, never a throw', async () => {
+  const { prerequisites } = require('../server/requirements.js');
+  const calls = [];
+  const runner = async (cmd, args) => {
+    calls.push([cmd, ...args].join(' '));
+    if (cmd === 'git') return { code: 0, stdout: 'git version 2.50.0\n', stderr: '' };
+    if (cmd === 'gh') return { code: 1, stdout: '', stderr: 'You are not logged into any GitHub hosts.\n' };
+    return { code: -1, stdout: '', stderr: '' };
+  };
+  const { items } = await prerequisites(runner);
+  assert.deepEqual(calls, ['git --version', 'gh auth status', 'orca --version']);
+  assert.deepEqual(items, [
+    { id: 'git', ok: true, detail: 'git version 2.50.0' },
+    { id: 'gh', ok: false, detail: 'You are not logged into any GitHub hosts.' },
+    { id: 'orca', ok: false, detail: 'not available' },
+  ]);
 });

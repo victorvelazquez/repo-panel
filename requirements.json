@@ -1,0 +1,70 @@
+{
+  "version": 1,
+  "blocks": { "registro": "1.0", "ciclo": "1.0" },
+  "requirements": [
+    {
+      "id": "base-branch",
+      "title": "Remote base branch exists",
+      "category": "verificable",
+      "level": "required",
+      "check": { "type": "base-branch" },
+      "remedy": "Make sure the repo has a remote called origin and that its base branch (usually main) is pushed there; if the base branch is not main, set \"base\" for this repo in the panel config."
+    },
+    {
+      "id": "agents-file",
+      "title": "AGENTS.md on the base branch",
+      "category": "verificable",
+      "level": "required",
+      "check": { "type": "file-exists", "file": "agents" },
+      "remedy": "Create AGENTS.md at the repo root with the project rules, then commit it with /flow-commit and open a PR with /flow-pr."
+    },
+    {
+      "id": "registro-block",
+      "title": "Orquestación 'registro' block in AGENTS.md",
+      "category": "verificable",
+      "level": "required",
+      "check": { "type": "block", "file": "agents", "name": "registro" },
+      "remedy": "Add the Orquestación 'registro' block (version 1.0) to AGENTS.md, between <!-- orquestacion:registro v1.0 --> and <!-- /orquestacion:registro -->; if AGENTS.md has rules that conflict, stop and ask the user."
+    },
+    {
+      "id": "roadmap-file",
+      "title": "Roadmap file on the base branch",
+      "category": "verificable",
+      "level": "required",
+      "check": { "type": "file-exists", "file": "roadmap" },
+      "remedy": "Create docs/ROADMAP.md (or the roadmap path configured for this repo) with the three header lines and the units table described in the registro block."
+    },
+    {
+      "id": "roadmap-header",
+      "title": "Roadmap header lines",
+      "category": "verificable",
+      "level": "required",
+      "check": { "type": "roadmap-header", "file": "roadmap" },
+      "remedy": "Start the roadmap with three lines, in this order: **Dónde está:** ..., **Qué sigue:** ... and **Qué lo bloquea:** ... (exact labels, each at the start of its line)."
+    },
+    {
+      "id": "roadmap-table",
+      "title": "Roadmap units table without errors",
+      "category": "verificable",
+      "level": "required",
+      "check": { "type": "roadmap-table", "file": "roadmap" },
+      "remedy": "Fix the units table in the roadmap so it has no errors (required columns, one-word states, unique IDs); the panel's Conformity drawer lists the problems."
+    },
+    {
+      "id": "ciclo-block",
+      "title": "Orquestación 'ciclo' block in AGENTS.md",
+      "category": "verificable",
+      "level": "recommended",
+      "check": { "type": "block", "file": "agents", "name": "ciclo" },
+      "remedy": "Add the Orquestación 'ciclo' block (version 1.0) to AGENTS.md, between <!-- orquestacion:ciclo v1.0 --> and <!-- /orquestacion:ciclo -->; if AGENTS.md has rules that conflict, stop and ask the user."
+    },
+    {
+      "id": "adoption-record",
+      "title": "Adoption record docs/ORQUESTACION.md",
+      "category": "verificable",
+      "level": "recommended",
+      "check": { "type": "file-exists", "file": "adoption" },
+      "remedy": "Create docs/ORQUESTACION.md recording how this repo adopted the Orquestación profile and which blocks it uses."
+    }
+  ]
+}

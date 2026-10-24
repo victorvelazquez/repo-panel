@@ -14,6 +14,7 @@ const { prState, mergePr, rerunFailed } = require('./github.js');
 const { roadmapState } = require('./roadmap.js');
 const { addRepo, removeRepo, setSnoozed, scanFolder } = require('./repos.js');
 const { piSend } = require('./pi.js');
+const { requirementsFor, prerequisites } = require('./requirements.js');
 const { queueFor, conformityFor } = require('./queue.js');
 
 const ROOT = path.join(__dirname, '..');
@@ -35,6 +36,8 @@ const routes = {
   'GET /api/local': (q) => localState(findRepo(q.id)),
   'GET /api/prs': (q) => prState(findRepo(q.id)),
   'GET /api/roadmap': (q) => roadmapState(findRepo(q.id)),
+  'GET /api/requirements': (q) => requirementsFor(findRepo(q.id)),
+  'GET /api/prerequisites': () => prerequisites(),
   'GET /api/diff': (q) => diffText(findRepo(q.id)),
   'POST /api/fetch': async (q, b) => {
     const repo = findRepo(b.id);

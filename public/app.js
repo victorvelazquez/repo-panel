@@ -11,6 +11,7 @@ const S = {
   snoozed: new Set(), keepSnoozed: new Set(), snoozedOpen: {}, onlyProblems: false,
   group: '', q: '', queue: [], queueKey: '', queueSeq: 0,
   conf: { items: [], ok: 0, loaded: false, failed: false, key: '', seq: 0 }, confOpen: false,
+  req: {}, reqSeq: {}, prereq: { state: 'loading', items: [], seq: 0 },
   prefs: store('prefs', { method: 'squash', del: true }),
   lastRefresh: 0, scan: [],
 };
@@ -77,7 +78,25 @@ function refreshRepo(id) {
     track(id, pooled(() => api(`/api/prs?id=${id}`)).then((d) => { S.prs[id] = d; wakeReady(id, d); }, (e) => { S.prs[id] = { error: e.message }; })),
     // The roadmap is optional: a repo without one, or a failed request, simply shows nothing extra.
     track(id, pooled(() => api(`/api/roadmap?id=${id}`)).then((d) => { S.roadmap[id] = d; }, () => { S.roadmap[id] = null; })),
+    loadRequirements(id),
   ]);
+}
+
+// A late answer from an older request never overwrites a newer one. Until one arrives the repo is unverified.
+function loadRequirements(id) {
+  const seq = S.reqSeq[id] = (S.reqSeq[id] || 0) + 1;
+  return track(id, pooled(() => api(`/api/requirements?id=${id}`)).then(
+    (d) => { if (seq === S.reqSeq[id]) S.req[id] = { state: 'loaded', data: d }; },
+    () => { if (seq === S.reqSeq[id]) S.req[id] = { state: 'failed' }; },
+  ));
+}
+
+function loadPrerequisites() {
+  const seq = ++S.prereq.seq;
+  return pooled(() => api('/api/prerequisites')).then(
+    (d) => { if (seq === S.prereq.seq) { S.prereq.state = 'loaded'; S.prereq.items = d.items || []; draw(); } },
+    () => { if (seq === S.prereq.seq) { S.prereq.state = 'failed'; draw(); } },
+  );
 }
 
 // A PR snoozed while still blocked is woken up when it becomes ready to merge. One snoozed while
@@ -99,7 +118,7 @@ async function refreshAll() {
   checkHealth();
   if (S.conf.failed) S.conf.key = ''; // ask again once per refresh, never on every redraw
   S.lastRefresh = Date.now();
-  await Promise.all(allRepos().map((r) => refreshRepo(r.id)));
+  await Promise.all([loadPrerequisites(), ...allRepos().map((r) => refreshRepo(r.id))]);
 }
 
 async function fetchRepo(id) {
@@ -233,16 +252,54 @@ function confBlock(it) {
   </div>`;
 }
 
+const REQ_CATEGORY = { verificable: 'verifiable', parcial: 'partial', criterio: 'judgment' };
+const REQ_MARK = { pass: '✓', fail: '✗', outdated: '↻', unavailable: '?' };
+
+// What the conformity view knows about requirements: a repo that has not answered yet is "loading", never ready.
+const reqSummary = () => ({
+  prereq: S.prereq.state,
+  repos: allRepos().map((r) => {
+    const e = S.req[r.id];
+    return { id: r.id, state: e ? e.state : 'loading', ready: !!(e && e.data && e.data.summary && e.data.summary.ready) };
+  }),
+});
+
+function prereqBlock() {
+  const p = S.prereq;
+  const lines = p.state === 'loaded'
+    ? p.items.map((i) => `<div class="conf-line req-${i.ok ? 'pass' : 'fail'}">${i.ok ? '✓' : '✗'} ${esc(i.id)} · ${esc(i.detail)}</div>`).join('')
+    : `<div class="conf-line">${p.state === 'failed' ? 'Could not check the prerequisites' : 'Checking the prerequisites…'}</div>`;
+  return `<div class="conf-item"><div class="conf-title">Prerequisites on this machine</div>${lines}</div>`;
+}
+
+// The remedy is the instruction an AI agent applies in the repo; the panel only shows it.
+function reqLine(x) {
+  return `<div class="conf-line req-${esc(x.status)}" title="${esc(x.remedy)}">${REQ_MARK[x.status] || '?'} ${esc(x.title)} · ${esc(x.level)} · ${esc(REQ_CATEGORY[x.category] || x.category)} · ${esc(x.status)} (${esc(x.detail)})<div class="req-remedy">${esc(x.remedy)}</div></div>`;
+}
+
+function reqBlock(r) {
+  const e = S.req[r.id];
+  const name = `<button class="repo-name" data-act="queue-pick" data-close="1" data-name="${esc(r.name)}" title="Filter the board to this repo">${esc(r.name)}</button>`;
+  if (!e || e.state !== 'loaded') return `<div class="conf-item">${name}<div class="conf-line">${e ? 'Could not read the requirements' : 'Checking the requirements…'}</div></div>`;
+  const { results, summary } = e.data;
+  const bad = results.filter((x) => x.status !== 'pass');
+  const good = results.filter((x) => x.status === 'pass');
+  const status = summary.ready ? 'Ready' : `Not ready · required ${summary.required.pass}/${summary.required.total}`;
+  const passing = good.length ? `<details class="req-passing"><summary>${good.length} passing</summary>${good.map((x) => `<div class="conf-line req-pass">✓ ${esc(x.title)} · ${esc(x.level)}</div>`).join('')}</details>` : '';
+  return `<div class="conf-item">${name}<div class="conf-status">${esc(status)}</div>${bad.map(reqLine).join('')}${passing}</div>`;
+}
+
 function drawConformity() {
   refreshConformity();
-  const v = V ? V.conformityView(S.conf) : { state: 'error', summary: '', message: 'Could not compute the report (is the panel server out of date? restart it)' };
-  const n = v.state === 'issues' ? S.conf.items.length : 0;
+  const v = V ? V.conformityView({ ...S.conf, req: reqSummary() }) : { state: 'error', summary: '', message: 'Could not compute the report (is the panel server out of date? restart it)', count: 0 };
+  const n = v.count;
   $('#confBadge').hidden = !n;
   $('#confBadge').textContent = n;
   if (!S.confOpen) return;
   const sum = v.summary ? `<div class="conf-sum">${esc(v.summary)}</div>` : '';
   const body = v.state === 'issues' ? S.conf.items.map(confBlock).join('') : `<div class="${v.state === 'error' ? 'conf-error' : 'empty'}">${esc(v.message)}</div>`;
-  $('#drawerBody').innerHTML = sum + body;
+  const reqs = V ? `<div class="conf-heading">Requirements</div>${allRepos().map(reqBlock).join('')}` : '';
+  $('#drawerBody').innerHTML = sum + prereqBlock() + body + reqs;
 }
 
 function openConformity() {
