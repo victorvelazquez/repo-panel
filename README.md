@@ -10,6 +10,7 @@ A local, single-window dashboard for the repos you work on. It answers one quest
 - The states `Lista`, `En revisión` and `En curso` (derived) are computed from Git and GitHub, never written in the file. A unit is linked to a branch or an open PR by its ID inside the branch name or the PR title; those units are skipped when picking the next one (`siguiente`).
 - A **Go work on** strip above the board lists the next actions in order: a PR ready to merge, a repo whose branch already merged (`/flow-branch`), changes not delivered yet, and a clean repo with a next roadmap unit. Clicking a chip filters the board to that repo. A manual order in `priority` (see Configuration) wins over the automatic one.
 - A **Conformity** button (with a count badge) opens a drawer listing every repo, whatever the filters, that has no usable `docs/ROADMAP.md` or whose file has problems, with the line of each problem. Info-level problems (such as a dependency outside the table) are not listed. It is built from the roadmap read from the remote base branch, so unpushed edits do not show. Opening the panel at `http://127.0.0.1:<port>/#conformity` opens that drawer on load.
+- The Conformity drawer also shows the **requirements** a repo must meet to show well in the panel, listed in `requirements.json` at the panel root, and the **prerequisites** of this machine (`git`, `gh` logged in, `orca`). Failing, outdated and unavailable requirements come first, with their level (`required` or `recommended`), their category and a remedy (the instruction an AI agent applies in that repo, shown as a second line); passing ones are collapsed. The panel only **detects**: it reads the remote base branch and never edits a file of another repo; applying a remedy is the agent's job, through `/flow-commit` and `/flow-pr`. Whether `flow-skills` is registered in pi is not checked.
 - A red banner at the top of the page appears when the server process is older than the page (for example after `git pull` without a restart). `GET /health` answers `{ "app": "repo-panel", "api": <n> }`; the page compares `api` with its own version and warns on a mismatch or a missing field. If the Conformity report cannot be computed, the drawer says so instead of claiming conformity.
 - A **/flow-commit** button on cards with changes types that command into the pi session you already have open for that repo, through the Orca CLI. It sends only when exactly one pi terminal (title `π - …`) has that repo as its worktree and it is idle with an empty prompt; otherwise it refuses and says why (no session, several sessions, busy, text already typed, Orca not running). Orca cannot confirm delivery, so the panel checks that the session left the idle prompt and says `not confirmed` when it did not. The browser sends a command key, never text, and only `/flow-commit`, `/flow-pr` and `/flow-branch` exist on the server.
 - Quick actions: open on GitHub, `git fetch --prune`, re-run failed checks, refresh.
@@ -83,6 +84,16 @@ You can also create `config.json` by hand; copy `config.example.json` as a start
 
 `POST /api/queue` takes the per-repo facts from the browser (it does not rerun any git or gh command) and orders them: repos in `priority` first, then merge, branch, deliver and start, keeping board order within each kind. `POST /api/conformity` takes each repo's roadmap availability and problems and returns the repos that do not conform.
 
+### Requirements
+
+`requirements.json` is `{ "version", "blocks", "requirements": [{ "id", "title", "category", "level", "check", "remedy" }] }`. `blocks` holds the version each Orquestación block must have (`<!-- orquestacion:NAME vX.Y -->` ... `<!-- /orquestacion:NAME -->`). The checks are pure functions in `checks.js`; the server reads the files from `origin/<base>` (`AGENTS.md`, the roadmap, `docs/ORQUESTACION.md`) and `checks.js` decides.
+
+- Categories: `verificable` (the panel decides and can show it as passing), `parcial` (shows evidence, a person confirms) and `criterio` (never passing, only a reminder). Only `verificable` requirements can pass; a repo is `ready` only when every `required` one passes. `recommended` ones never affect `ready`.
+- Result status: `pass`, `fail`, `outdated` (the block has another version, or is the old unversioned section), `unavailable` (could not be read: no repo, no base branch, missing file, or an unknown check type). Unavailable is never shown as passing or as failing.
+- The old unversioned `## Orquestación` section (or the `orquestacion:bloque` marker) counts as an outdated `registro` block that asks to be updated, not as a missing one.
+- `GET /api/requirements?id=<repoId>` returns `{ available, base, results, summary }`; `GET /api/prerequisites` returns `{ items: [{ id, ok, detail }] }` for `git`, `gh` and `orca` (a missing tool is `ok: false`, not an error).
+- The drawer says "All repositories conform." only when the roadmap report is empty **and** the requirements of every repo and the prerequisites were loaded and every repo is `ready`. While they load it says it is computing; if they fail to load it says so.
+
 `base` is the branch work is merged into. When omitted, the panel reads it from `origin/HEAD` and falls back to `main`. `roadmap` is the repo-relative path of its plan file (default `docs/ROADMAP.md`); unsafe values (absolute, starting with `-`, or containing `..`) are ignored.
 
 ## Merge behaviour
@@ -110,6 +121,7 @@ Known limits and what is not verified:
 
 - Only the first 30 local branches are inspected; a matching branch beyond that is not seen.
 - The real GitHub path (`En revisión` from `gh pr list`) and its rendering in the browser have no automated test; pure functions cover the logic.
+- The requirements and prerequisites blocks of the Conformity drawer have no browser test: their rendering (collapsed passing list, remedy lines, loading and failed messages) and the badge count were not seen on screen. Unit tests cover the checks, the routes and `conformityView`.
 - The conformity view was only checked with a headless screenshot of the open drawer. Not verified in a browser: clicking the button and a repo name, closing the drawer, the `All repositories conform.` message, the `no-base` and `no-repo` statuses, and a repo whose only problems are info-level. Unit tests cover the report logic.
 
 ## Security

@@ -30,13 +30,14 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 | --- | --- | --- | --- |
 | RP8 | S1, S6 | inline; fusionado en PR #24 | `e0295a7`, `be39369` |
 | RP9 | S12 | worker acotado; 10 módulos en `server/` (errors, exec, config, local, github, roadmap, repos, pi, queue, http); hecho y verificado | pendiente de commit |
-| RP10 | S7, S8, S9, S10 | archivo de requisitos con chequeos legibles por máquina y conformidad ampliada | — |
+| RP10a | S7, S8, S9, S10 | worker acotado; `requirements.json`, `checks.js`, `server/requirements.js`, lector `remoteFile`, rutas `/api/requirements` y `/api/prerequisites`, cajón de Conformity; hecho y verificado | pendiente de commit |
+| RP10b | S7, S8 | aviso ocultable, menú «⋯», orden a la sesión de pi y bloques propios; antes, probar con una sesión real | — |
 | RP11 | S13 | salas en la configuración, pertenencia por tarjeta, presencia por Orca, requisitos de sala | — |
 | RP12 | S2, S3, S4, S5 | archivo de estado, veredicto desde Git, botón `/flow-pr`, aviso de acción manual | — |
 | RP13 | S11 | cierre de la dependencia de `implementation-guides` (otro proyecto, con autorización) | — |
 | RP14 | S14, S17 | opcional: botón hacia la terminal de la sala; chat solo si la persona lo decide | — |
 
-Orden: RP8 → RP9 → RP10 → RP11 → RP12 → RP13 → RP14. RP12 puede ir antes de RP11 si la persona lo prefiere.
+Orden: RP8 → RP9 → RP10a → RP10b → RP11 → RP12 → RP13 → RP14. RP12 puede ir antes de RP11 si la persona lo prefiere.
 
 ## Sin verificar (heredado del análisis)
 
@@ -117,3 +118,11 @@ Orden: RP8 → RP9 → RP10 → RP11 → RP12 → RP13 → RP14. RP12 puede ir a
 > - pefco, me gusta todo, y no quiero que pierdas ingundetalle de lo acordado y planificado. guarda todo y empecemos paso a apaso con el trabajo hasta dejar todo listo y funcionando con sala incluido. vamos!
 
 *Decisiones de la persona incorporadas: se evoluciona este mismo proyecto (no un proyecto nuevo); sin base de datos; sin compilar; se parte `server.js` primero.*
+
+**L13.** Decisiones de la persona para RP10 (respuestas a tres preguntas):
+
+> 1. ¿El bloque de Ciclo (orquestacion:ciclo) es requerido para todos los repos o solo recomendado? — Solo recomendado (Recomendado)
+> 2. Los repos de upen tienen una sección '## Orquestación' vieja, sin marcador ni versión. ¿Cómo la tratamos? — Pide actualizar (Recomendado)
+> 3. ¿Cómo entregamos RP10? — Dos PR: RP10a y RP10b (Recomendado)
+
+*Aplicado: Ciclo recomendado (requerido solo al pertenecer a una sala, RP11); la sección vieja es «desactualizada»; RP10 se parte en RP10a y RP10b.*

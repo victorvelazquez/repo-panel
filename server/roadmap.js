@@ -6,27 +6,45 @@ const { git, gh } = require('./exec.js');
 const { baseBranchOf } = require('./local.js');
 
 // Read from the remote base branch, not the working tree: a unit is done only once its PR is merged.
+const fileCache = new Map();
 const roadmapCache = new Map();
 
 const withSummary = (data) => ({ ...data, summary: lib.roadmapSummary(data) });
 
-async function roadmapState(repo) {
+// One file of a repo as it is on origin/<base>. The text is cached by the sha of the base commit, so an
+// unchanged base costs one rev-parse. reason: no-repo | no-base | missing.
+async function remoteFile(repo, file) {
   if (!fs.existsSync(repo.path)) return { available: false, reason: 'no-repo' };
   const top = await git(repo.path, ['rev-parse', '--git-dir']);
   if (top.code !== 0) return { available: false, reason: 'no-repo' };
   const base = await baseBranchOf(repo);
-  const file = repo.roadmap || 'docs/ROADMAP.md';
   const ref = `origin/${base}`;
   const rev = await git(repo.path, ['rev-parse', '--verify', '-q', `${ref}^{commit}`]);
-  if (rev.code !== 0) return { available: false, reason: 'no-base', base, path: file };
+  if (rev.code !== 0) return { available: false, reason: 'no-base', base };
   const sha = rev.stdout.trim();
+  const key = `${repo.id}|${file}`;
+  const hit = fileCache.get(key);
+  let text = hit && hit.sha === sha ? hit.text : undefined;
+  if (text === undefined) {
+    const show = await git(repo.path, ['show', `${ref}:${file}`]);
+    text = show.code === 0 ? show.stdout : null;
+    fileCache.set(key, { sha, text });
+  }
+  return text === null ? { available: false, reason: 'missing', base, sha } : { available: true, reason: null, base, sha, text };
+}
+
+async function roadmapState(repo) {
+  const file = repo.roadmap || 'docs/ROADMAP.md';
+  const rf = await remoteFile(repo, file);
+  if (rf.reason === 'no-repo') return { available: false, reason: 'no-repo' };
+  if (rf.reason === 'no-base') return { available: false, reason: 'no-base', base: rf.base, path: file };
+  const { base, sha } = rf;
   const key = `${repo.id}|${file}`;
   const hit = roadmapCache.get(key);
   let data = hit && hit.sha === sha ? hit.data : null;
   if (!data) {
-    const show = await git(repo.path, ['show', `${ref}:${file}`]);
-    data = show.code === 0
-      ? withSummary({ available: true, base, sha, path: file, ...lib.parseRoadmap(show.stdout) })
+    data = rf.available
+      ? withSummary({ available: true, base, sha, path: file, ...lib.parseRoadmap(rf.text) })
       : { available: false, reason: 'missing', base, path: file };
     roadmapCache.set(key, { sha, data });
   }
@@ -75,4 +93,4 @@ async function derivedFacts(repo, base) {
   };
 }
 
-module.exports = { roadmapState };
+module.exports = { roadmapState, remoteFile };

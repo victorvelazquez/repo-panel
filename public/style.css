@@ -175,3 +175,11 @@ a.repo-name:hover { text-decoration: none; color: var(--blue); }
 .outdated { position: sticky; top: 0; z-index: 6; padding: 8px 16px; background: #2a1213; color: var(--red); border-bottom: 2px solid var(--red); font-weight: 600; }
 .outdated[hidden] { display: none; }
 .conf-error { color: var(--red); padding: 12px 0; }
+.conf-title, .conf-heading { font-weight: 600; margin: 2px 0; }
+.conf-heading { margin: 16px 0 8px; color: var(--muted); }
+.req-pass { color: var(--green); }
+.req-fail { color: var(--red); }
+.req-outdated { color: var(--yellow); }
+.req-remedy { color: var(--muted); font: 12px/1.5 system-ui, sans-serif; margin: 0 0 4px 16px; }
+.req-passing { margin-top: 4px; }
+.req-passing summary { cursor: pointer; color: var(--muted); font-size: 13px; }

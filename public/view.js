@@ -8,7 +8,7 @@
 }(typeof self !== 'undefined' ? self : this, () => {
   // Bump it when the client starts needing a new or changed server route. /health reports the value
   // the running server loaded at start; the page compares it with the file it just downloaded.
-  const API_VERSION = 2;
+  const API_VERSION = 3;
 
   // `health` is the parsed /health answer, or null when the request itself failed (no answer, so
   // there is nothing to warn about). Any answer without the current integer `api` is out of date:
@@ -18,13 +18,30 @@
     return !(typeof health === 'object' && Number.isInteger(health.api) && health.api === API_VERSION);
   }
 
-  // Single place that decides what the conformity drawer says. conf = { loaded, failed, ok, items }.
-  // Only a report that was computed and came back empty may claim conformity.
+  // Single place that decides what the conformity drawer says.
+  // conf = { loaded, failed, ok, items, req: { prereq, repos: [{ id, state, ready }] } } where prereq and
+  // each repo state are 'loading' | 'loaded' | 'failed'. Conformity is claimed only when the roadmap report
+  // came back empty AND the requirements of every repo and the prerequisites were loaded and ready: never
+  // on data that is missing or unverified.
   function conformityView(conf) {
-    if (conf.failed) return { state: 'error', summary: '', message: 'Could not compute the report (is the panel server out of date? restart it)' };
-    if (!conf.loaded) return { state: 'computing', summary: '', message: 'Computing the report…' };
-    if (conf.items.length) return { state: 'issues', summary: `${conf.ok} conform · ${conf.items.length} need attention`, message: '' };
-    return { state: 'ok', summary: `${conf.ok} conform`, message: 'All repositories conform.' };
+    if (conf.failed) return { state: 'error', summary: '', message: 'Could not compute the report (is the panel server out of date? restart it)', count: 0 };
+    if (!conf.loaded) return { state: 'computing', summary: '', message: 'Computing the report…', count: 0 };
+    const req = conf.req || { prereq: 'loading', repos: [] };
+    const repos = req.repos || [];
+    const notReady = repos.filter((r) => r.state === 'loaded' && !r.ready);
+    const itemIds = new Set(conf.items.map((i) => i.id).filter((id) => id !== undefined));
+    const count = conf.items.length + notReady.filter((r) => !itemIds.has(r.id)).length;
+    if (count) {
+      const parts = [`${conf.ok} conform`];
+      if (conf.items.length) parts.push(`${conf.items.length} need attention`);
+      if (notReady.length) parts.push(`${notReady.length} not ready`);
+      return { state: 'issues', summary: parts.join(' · '), message: '', count };
+    }
+    if (req.prereq === 'failed' || repos.some((r) => r.state === 'failed')) {
+      return { state: 'error', summary: '', message: 'Could not check the requirements (is the panel server out of date? restart it)', count: 0 };
+    }
+    if (req.prereq !== 'loaded' || repos.some((r) => r.state !== 'loaded')) return { state: 'computing', summary: '', message: 'Computing the report…', count: 0 };
+    return { state: 'ok', summary: `${conf.ok} conform`, message: 'All repositories conform.', count: 0 };
   }
 
   return { API_VERSION, isOutdated, conformityView };

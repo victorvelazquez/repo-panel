@@ -43,13 +43,45 @@ test('conformityView: items are issues with the summary', () => {
   const v = conformityView({ loaded: true, failed: false, ok: 4, items: [{}, {}] });
   assert.equal(v.state, 'issues');
   assert.equal(v.summary, '4 conform · 2 need attention');
+  assert.equal(v.count, 2);
 });
 
+const REQ_OK = { prereq: 'loaded', repos: [{ id: 'a', state: 'loaded', ready: true }, { id: 'b', state: 'loaded', ready: true }] };
+const reqWith = (...repos) => ({ prereq: 'loaded', repos });
+const roadmapOk = { loaded: true, failed: false, ok: 5, items: [] };
+
 test('conformityView: a computed report without items is ok', () => {
-  const v = conformityView({ loaded: true, failed: false, ok: 5, items: [] });
+  const v = conformityView({ ...roadmapOk, req: REQ_OK });
   assert.equal(v.state, 'ok');
   assert.equal(v.summary, '5 conform');
   assert.equal(v.message, 'All repositories conform.');
+});
+
+test('conformityView: without requirement data it never claims conformity', () => {
+  assert.equal(conformityView(roadmapOk).state, 'computing');
+  assert.equal(conformityView({ ...roadmapOk, req: { prereq: 'loading', repos: [] } }).state, 'computing');
+});
+
+test('conformityView: requirements still loading are computing, even when prerequisites are loaded', () => {
+  assert.equal(conformityView({ ...roadmapOk, req: reqWith({ id: 'a', state: 'loaded', ready: true }, { id: 'b', state: 'loading' }) }).state, 'computing');
+  assert.equal(conformityView({ ...roadmapOk, req: { ...REQ_OK, prereq: 'loading' } }).state, 'computing');
+});
+
+test('conformityView: requirements or prerequisites that failed to load are error', () => {
+  const failed = conformityView({ ...roadmapOk, req: reqWith({ id: 'a', state: 'failed' }) });
+  assert.equal(failed.state, 'error');
+  assert.equal(conformityView({ ...roadmapOk, req: { ...REQ_OK, prereq: 'failed' } }).state, 'error');
+});
+
+test('conformityView: a repo that is not ready makes issues, counted once with its roadmap problems', () => {
+  const req = reqWith({ id: 'a', state: 'loaded', ready: true }, { id: 'b', state: 'loaded', ready: false });
+  const v = conformityView({ ...roadmapOk, req });
+  assert.equal(v.state, 'issues');
+  assert.equal(v.summary, '5 conform · 1 not ready');
+  assert.equal(v.count, 1);
+  const both = conformityView({ loaded: true, failed: false, ok: 1, items: [{ id: 'b' }], req });
+  assert.equal(both.count, 1);
+  assert.equal(both.summary, '1 conform · 1 need attention · 1 not ready');
 });
 
 test('view.js runs as a plain script with no require or module', () => {
