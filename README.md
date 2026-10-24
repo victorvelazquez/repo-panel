@@ -10,6 +10,7 @@ A local, single-window dashboard for the repos you work on. It answers one quest
 - The states `Lista`, `En revisión` and `En curso` (derived) are computed from Git and GitHub, never written in the file. A unit is linked to a branch or an open PR by its ID inside the branch name or the PR title; those units are skipped when picking the next one (`siguiente`).
 - A **Go work on** strip above the board lists the next actions in order: a PR ready to merge, a repo whose branch already merged (`/flow-branch`), changes not delivered yet, and a clean repo with a next roadmap unit. Clicking a chip filters the board to that repo. A manual order in `priority` (see Configuration) wins over the automatic one.
 - A **Conformity** button (with a count badge) opens a drawer listing every repo, whatever the filters, that has no usable `docs/ROADMAP.md` or whose file has problems, with the line of each problem. Info-level problems (such as a dependency outside the table) are not listed. It is built from the roadmap read from the remote base branch, so unpushed edits do not show. Opening the panel at `http://127.0.0.1:<port>/#conformity` opens that drawer on load.
+- A red banner at the top of the page appears when the server process is older than the page (for example after `git pull` without a restart). `GET /health` answers `{ "app": "repo-panel", "api": <n> }`; the page compares `api` with its own version and warns on a mismatch or a missing field. If the Conformity report cannot be computed, the drawer says so instead of claiming conformity.
 - Quick actions: open on GitHub, open in VS Code, `git fetch --prune`, re-run failed checks, refresh.
 
 Committing and opening PRs stay manual — the panel only observes, and merges when you click.
@@ -52,6 +53,18 @@ powershell -ExecutionPolicy Bypass -File scripts/uninstall-autostart.ps1  # remo
 ```
 
 This registers a per-user scheduled task (no admin needed) that runs the panel hidden at every logon and retries every minute if it fails. The port never changes, so the URL stays stable and you can pin it as a browser app. Launching the panel while it is already running just exits quietly. If another program owns the port, the launch fails with a clear message instead of picking a different port.
+
+### Restart after an update
+
+The page files are read from disk on every request, but the server code is loaded only when the process starts. After `git pull` (or any update of the panel) the server must be restarted, or the page will talk to old code and show the red out-of-date banner.
+
+The autostart task is called `repo-panel` (it runs `conhost.exe --headless node server.js`). `Stop-ScheduledTask` alone does **not** stop the Node process: it stays alive holding the port, and a new start exits silently with "repo-panel is already running". Restart by ending the process that listens on the port and then starting the task:
+
+```powershell
+Get-NetTCPConnection -LocalPort 4310 -State Listen | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }; Start-ScheduledTask -TaskName repo-panel
+```
+
+Use the `port` from `config.json` if you changed it. To check: open `/health`, it must show the current `api`, and the red banner must disappear after reloading the page.
 
 ## Configuration
 
