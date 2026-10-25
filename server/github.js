@@ -34,14 +34,16 @@ async function repoMeta(repo) {
   return data;
 }
 
-// Merged PRs per repo+branch, cached briefly so a refresh does not hit the API every time.
+// Merged PRs per repo+branch, cached briefly so a refresh does not hit the API every time. A merged PR does not un-merge,
+// so a found one is kept for a minute; "no merged PR" is kept only briefly, so a merge shows up within seconds.
 const mergedCache = new Map();
-const MERGED_TTL = 60 * 1000;
+const MERGED_TTL_FOUND = 60 * 1000;
+const MERGED_TTL_NONE = 15 * 1000;
 
 async function mergedPrFor(repo, branch) {
   const key = `${repo.id}:${branch}`;
   const hit = mergedCache.get(key);
-  if (hit && Date.now() - hit.t < MERGED_TTL) return hit.pr;
+  if (hit && Date.now() - hit.t < (hit.pr ? MERGED_TTL_FOUND : MERGED_TTL_NONE)) return hit.pr;
   const r = await gh(repo.path, ['pr', 'list', '--state', 'merged', '--head', branch, '--limit', '5', '--json', 'number,url,isCrossRepository']);
   if (r.code !== 0) return null; // an unknown answer must not raise a false alarm, and is not cached
   let pr = null;
@@ -59,7 +61,8 @@ async function staleState(repo, openPrs) {
   if (branch === base) return null;
   const fr = await git(repo.path, ['for-each-ref', '--format=%(refname:short)%09%(upstream:track)', 'refs/heads']);
   const gone = fr.code === 0 && lib.parseGoneBranches(fr.stdout).includes(branch);
-  const mergedPr = gone ? null : await mergedPrFor(repo, branch);
+  // An open PR from this branch makes it live work whatever merged before (see lib.staleBranch): skip the lookup.
+  const mergedPr = gone || openPrs.some((p) => p.head === branch) ? null : await mergedPrFor(repo, branch);
   return lib.staleBranch({ branch, base, gone, mergedPr, openPrs });
 }
 
@@ -124,4 +127,4 @@ async function rerunFailed(repo, number) {
   return { rerun: ok };
 }
 
-module.exports = { prState, mergePr, rerunFailed, forgetMeta: (id) => metaCache.delete(id) };
+module.exports = { MERGED_TTL_FOUND, MERGED_TTL_NONE, mergedPrFor, prState, mergePr, rerunFailed, forgetMeta: (id) => metaCache.delete(id) };

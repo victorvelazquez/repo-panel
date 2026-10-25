@@ -62,7 +62,7 @@ test('page: while /flow-pr runs the COMMITTED card says "creating pull request�
   setup(page, local({ ahead: 1 }), { sent: { cmd: 'flow-pr', ahead: 1 }, session: 'busy' });
   const html = cardOf(page);
   // RP20 wraps the dot and the ellipsis in animated spans; the plain text is unchanged.
-  assert.match(html.replace(/<span class="(?:pulse-dot|ell)"[^>]*>(…)?<\/span>/g, '$1'), /<div class="verdict-line" role="status" aria-live="polite" title="[^"]*">creating pull request…<\/div>/);
+  assert.match(html.replace(/<span class="(?:pulse-dot|ell)"[^>]*>(…)?<\/span>/g, '$1'), /<div class="verdict-line" role="status" aria-live="polite" title="[^"]*" data-run="green">creating pull request…<\/div>/);
   assert.ok(html.includes(btn('flow-pr', '/flow-pr', 'Running /flow-pr (creating pull request…): wait for it to finish', true)), html);
 });
 

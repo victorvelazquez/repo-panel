@@ -15,7 +15,7 @@ const S = {
   req: {}, reqSeq: {}, state: {}, stateSeq: {}, sent: {}, pistatus: {}, pistatusSeq: {}, live: {}, liveBusy: {}, pitail: {}, piask: {}, tailFor: {}, finishing: {}, showCommit: new Set(), prereq: { state: 'loading', items: [], seq: 0 },
   rooms: [], roomIssues: [], roomData: { state: 'loading', data: null }, roomSeq: 0,
   prefs: store('prefs', { method: 'squash', del: true }),
-  lastRefresh: 0, scan: [],
+  lastRefresh: 0, lastAt: {}, scan: [],
 };
 
 // ---------- api + request pool ----------
@@ -79,10 +79,21 @@ function track(id, p) {
 }
 
 // `poll: false` leaves the pi session status alone (the status poll itself refreshes the repo when a session finishes).
+const loadLocal = (id) => track(id, pooled(() => api(`/api/local?id=${id}`)).then((d) => { S.local[id] = d; }, (e) => { S.local[id] = { error: e.message }; }));
+const loadPrs = (id) => track(id, pooled(() => api(`/api/prs?id=${id}`)).then((d) => { S.prs[id] = d; wakeReady(id, d); }, (e) => { S.prs[id] = { error: e.message }; }));
+
+// When each kind of data of a repo was last asked for: the periodic tick (refreshTick) plans from it.
+function markAsked(id, now, { prs = true } = {}) {
+  const at = S.lastAt[id] || (S.lastAt[id] = {});
+  at.local = now;
+  if (prs) at.prs = now;
+}
+
 function refreshRepo(id, { poll = true } = {}) {
+  markAsked(id, Date.now());
   return Promise.all([
-    track(id, pooled(() => api(`/api/local?id=${id}`)).then((d) => { S.local[id] = d; }, (e) => { S.local[id] = { error: e.message }; })),
-    track(id, pooled(() => api(`/api/prs?id=${id}`)).then((d) => { S.prs[id] = d; wakeReady(id, d); }, (e) => { S.prs[id] = { error: e.message }; })),
+    loadLocal(id),
+    loadPrs(id),
     // The roadmap is optional: a repo without one, or a failed request, simply shows nothing extra.
     track(id, pooled(() => api(`/api/roadmap?id=${id}`)).then((d) => { S.roadmap[id] = d; }, () => { S.roadmap[id] = null; })),
     loadRequirements(id),
@@ -231,6 +242,19 @@ async function refreshAll() {
   S.lastRefresh = Date.now();
   await Promise.all([loadPrerequisites(), loadRooms(), ...allRepos().map((r) => refreshRepo(r.id))]);
   pollLive();
+}
+
+// Every few seconds, while the tab is visible and nothing is being merged: git-only data (local + declared state) of
+// every repo about every 10 s, and local + PRs of the "hot" repos about every 20 s (view.js decides). No GitHub traffic
+// for a cold repo: the 60 s full refresh covers it.
+function refreshTick(now = Date.now()) {
+  if (!V) return;
+  const ids = allRepos().map((r) => r.id);
+  for (const { id, kind } of V.refreshPlan({ now, ids, local: S.local, prs: S.prs, sent: S.sent, last: S.lastAt, loading: S.loading, hidden: document.hidden, busy: S.busy })) {
+    markAsked(id, now, { prs: kind === 'hot' });
+    if (kind === 'hot') Promise.all([loadLocal(id), loadPrs(id), loadState(id)]);
+    else Promise.all([loadLocal(id), loadState(id)]);
+  }
 }
 
 async function fetchRepo(id) {
@@ -690,7 +714,7 @@ function verdictRow(r, verdict) {
   if (verdict.state === 'running') {
     const label = verdict.label || 'committing…';
     const dots = label.endsWith('…') ? `${esc(label.slice(0, -1))}<span class="ell" ${animStyle()}>…</span>` : esc(label);
-    return `<div class="verdict-line" role="status" aria-live="polite" title="${esc(verdict.reason)}"><span class="pulse-dot" aria-hidden="true" ${animStyle()}></span>${dots}</div>`;
+    return `<div class="verdict-line" role="status" aria-live="polite" title="${esc(verdict.reason)}" data-run="${V ? V.runColor(verdict.cmd) : 'gray'}"><span class="pulse-dot" aria-hidden="true" ${animStyle()}></span>${dots}</div>`;
   }
   if (verdict.state !== 'attention') return '';
   const tail = S.pitail[r.id];
@@ -1003,10 +1027,12 @@ document.addEventListener('change', (e) => {
 $('#search').addEventListener('input', (e) => { S.q = e.target.value; draw(); });
 $('#groupFilter').addEventListener('change', (e) => { S.group = e.target.value; draw(); });
 
-// Auto-refresh while the tab is visible and nothing is being merged.
+// Auto-refresh while the tab is visible and nothing is being merged: everything every minute, plus the lighter
+// refreshes planned by refreshTick in between.
 setInterval(() => {
   if (!document.hidden && !Object.keys(S.busy).length) refreshAll();
-}, 60000);
+}, V ? V.FULL_REFRESH_MS : 60000);
+setInterval(() => refreshTick(), 2000);
 setInterval(pollLive, 10000);
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden && Date.now() - S.lastRefresh > 30000) refreshAll();

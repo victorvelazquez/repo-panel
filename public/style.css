@@ -1,6 +1,7 @@
 :root {
   --bg: #0f1216; --panel: #171b21; --panel2: #1e242c; --line: #2a323c; --text: #d7dde5; --muted: #8b96a3;
   --green: #3fb950; --red: #f85149; --yellow: #d29922; --blue: #58a6ff; --gray: #6e7681;
+  --purple: #a371f7; --orange: #db6d28;
 }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, "Segoe UI", sans-serif; }
@@ -90,11 +91,11 @@ dialog .row.end { justify-content: flex-end; }
 main { max-width: none; padding: 8px; }
 .board { display: grid; grid-template-columns: repeat(5, minmax(200px, 1fr)); gap: 8px; align-items: start; overflow-x: auto; padding-bottom: 12px; }
 .col { background: var(--panel); border: 1px solid var(--line); border-top: 3px solid var(--gray); border-radius: 8px; min-width: 0; }
-.col-clean { border-top-color: var(--green); }
+.col-clean { border-top-color: var(--gray); }
 .col-changes { border-top-color: var(--yellow); }
 .col-committed { border-top-color: var(--blue); }
-.col-progress { border-top-color: #a371f7; }
-.col-ready { border-top-color: var(--green); }
+.col-progress { border-top-color: var(--green); }
+.col-ready { border-top-color: #238636; }
 .col-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; }
 .col-head h2 { margin: 0; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; }
 .col-head .n { background: var(--line); border-radius: 10px; padding: 0 8px; font-size: 12px; }
@@ -216,6 +217,11 @@ a.repo-name:hover { text-decoration: none; color: var(--blue); }
 .staged-bar { padding: 6px 8px; border-radius: 6px; font-size: 12px; color: var(--text); background: rgba(210, 153, 34, .12); border: 1px solid #6e5516; }
 .verdict-line { display: flex; align-items: center; gap: 6px; }
 .pulse-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; flex: none; background: currentColor; animation: pulse-dot 1.2s ease-in-out infinite; }
+.verdict-line[data-run="blue"] { color: var(--blue); }
+.verdict-line[data-run="green"] { color: var(--green); }
+.verdict-line[data-run="purple"] { color: var(--purple); }
+.verdict-line[data-run="orange"] { color: var(--orange); }
+.verdict-line[data-run="gray"] { color: var(--gray); }
 .ell { display: inline-block; animation: ell 1.2s ease-in-out infinite; }
 .chip-verify { display: inline-flex; align-items: center; gap: 6px; }
 .ask-line { padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: 600; color: var(--text); background: rgba(88, 166, 255, .14); border: 1px solid #1d3a5f; border-left: 3px solid var(--yellow); }
