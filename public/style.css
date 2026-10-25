@@ -36,7 +36,8 @@ main { padding: 16px; max-width: 1200px; margin: 0 auto; }
 .actions a.btn, .actions button { font-size: 12px; padding: 3px 8px; }
 a.btn { display: inline-block; background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; color: var(--text); }
 a.btn.disabled { opacity: .45; pointer-events: none; }
-.spin { display: inline-block; animation: spin 1s linear infinite; }
+button .ico { display: inline-block; }
+button.loading .ico { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .chip { font-size: 12px; padding: 1px 8px; border-radius: 10px; border: 1px solid var(--line); white-space: nowrap; }
@@ -221,5 +222,5 @@ a.repo-name:hover { text-decoration: none; color: var(--blue); }
 @keyframes pulse-dot { 0%, 100% { opacity: .25; transform: scale(.8); } 50% { opacity: 1; transform: scale(1.1); } }
 @keyframes ell { 0%, 100% { opacity: .2; } 50% { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
-  .pulse-dot, .ell { animation: none; }
+  .pulse-dot, .ell, button.loading .ico { animation: none; }
 }

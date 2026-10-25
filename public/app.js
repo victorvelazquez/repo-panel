@@ -561,6 +561,7 @@ function snoozedBlock(key, rows) {
 }
 
 function render() {
+  syncRefreshIcon();
   drawQueue();
   drawConformity();
   if (!allRepos().length) {
@@ -587,7 +588,11 @@ function groupTag(name) {
   return `<span class="tag" style="background:hsl(${h} 40% 20%);color:hsl(${h} 70% 78%)">${esc(name)}</span>`;
 }
 
-const spinner = (r) => (S.loading[r.id] > 0 ? '<span class="spin" title="Refreshing…">↻</span>' : '');
+// The only refresh signal: the icon of the top Refresh button spins while any repo is refreshing. Cards show nothing.
+function syncRefreshIcon() {
+  const on = V ? V.isRefreshing(S.loading) : Object.values(S.loading).some((n) => n > 0);
+  $('[data-act="refresh-all"]').classList.toggle('loading', on);
+}
 
 // The repo name is the link to the repository on GitHub (plain text when there is no GitHub remote).
 const repoName = (r, url) => (url
@@ -637,7 +642,7 @@ function roomTag(r) {
 
 // Repo name + group on the left, more options and remove (with confirmation) pinned to the right.
 function cardTop(r, url, slot, extra = []) {
-  return `<div class="card-top">${groupTag(r.group)}${roomTag(r)}${repoName(r, url)}${spinner(r)}${moreMenu(r, slot, extra)}${removeBtn(r)}</div>`;
+  return `<div class="card-top">${groupTag(r.group)}${roomTag(r)}${repoName(r, url)}${moreMenu(r, slot, extra)}${removeBtn(r)}</div>`;
 }
 
 // What the project is working on, from the remote roadmap. Empty when the repo has no usable one.
@@ -667,7 +672,7 @@ function cleanRow(r) {
   const warn = p.error ? `<span class="warn" title="${esc('GitHub: ' + p.error)}">⚠</span>` : '';
   return `<div class="clean-row">
     ${groupTag(r.group)}${roomTag(r)}${repoName(r, p.repo?.url)}
-    <span class="branch" title="${esc(l.branch || '')}">${esc(l.branch || (l.detached ? '(detached)' : ''))}</span>${behind}${warn}${spinner(r)}
+    <span class="branch" title="${esc(l.branch || '')}">${esc(l.branch || (l.detached ? '(detached)' : ''))}</span>${behind}${warn}
     <span class="row-actions">${moreMenu(r, 'row')}${removeBtn(r)}</span>
     ${reqWarn(r)}
     ${roadmapBlock(r)}
