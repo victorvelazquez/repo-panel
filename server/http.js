@@ -57,7 +57,7 @@ const routes = {
   'POST /api/rerun': (q, b) => rerunFailed(findRepo(b.id), Number(b.number)),
   'POST /api/snooze': (q, b) => setSnoozed(b.id, Number(b.number), !!b.on, !!b.wasReady),
   'POST /api/dismiss': (q, b) => setDismissed(b.id, !!b.on),
-  'POST /api/pi': (q, b) => piSend(findRepo(b.id), b.command),
+  'POST /api/pi': (q, b, d) => piSend(findRepo(b.id), b.command, d.orca, d.wait, d.requirements, { pr: b.pr, prs: d.prs }),
   'POST /api/queue': (q, b) => queueFor(b),
   'POST /api/conformity': (q, b) => conformityFor(b),
   'POST /api/repos': (q, b) => addRepo(b.path, b.group),
@@ -99,7 +99,8 @@ function isPanelRunning(port) {
   });
 }
 
-function createServer(port) {
+// `deps` replaces what the pi route talks to ({ orca, wait, requirements, prs }); tests inject fakes, the real server passes none.
+function createServer(port, deps = {}) {
   const hostOk = new Set([`127.0.0.1:${port}`, `localhost:${port}`]);
   return http.createServer(async (req, res) => {
     try {
@@ -120,7 +121,7 @@ function createServer(port) {
       if (!handler) throw new HttpError(404, 'Not found');
       if (req.headers['x-token'] !== TOKEN) throw new HttpError(401, 'Invalid token');
       const body = req.method === 'POST' ? await readBody(req) : {};
-      return send(res, 200, await handler(query(req.url), body));
+      return send(res, 200, await handler(query(req.url), body, deps));
     } catch (e) {
       return send(res, e.status || 500, { error: e.message || 'Internal error' });
     }

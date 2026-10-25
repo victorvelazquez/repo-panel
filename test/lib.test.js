@@ -501,13 +501,28 @@ test('workQueue starts a unit only for a clean repo without PRs', () => {
 
 test('workQueue gives one repo several actions, merges first', () => {
   const q = lib.workQueue([repo('a', { dirty: true, stale: true, ready: [{ number: 2, title: 'x' }, { number: 1, title: 'y' }] })]);
-  assert.deepEqual(q.map((a) => [a.kind, a.pr]), [['merge', 2], ['merge', 1], ['branch', undefined], ['deliver', undefined]]);
+  assert.deepEqual(q.map((a) => [a.kind, a.pr]), [['merge', 2], ['merge', 1], ['branch', undefined]]);
+});
+
+test('workQueue: a stale repo with local changes gets only branch, never deliver', () => {
+  assert.deepEqual(lib.workQueue([repo('a', { dirty: true, stale: true })]), [{ repoId: 'id-a', name: 'a', kind: 'branch' }]);
+  assert.deepEqual(kinds(lib.workQueue([repo('a', { dirty: true, unpushed: true, stale: true, next: NEXT })])), ['a:branch']);
+});
+
+test('workQueue: every other stale, dirty and unpushed combination keeps its actions', () => {
+  const of = (o) => kinds(lib.workQueue([repo('a', o)]));
+  assert.deepEqual(of({ stale: true }), ['a:branch']);
+  assert.deepEqual(of({ stale: true, unpushed: true }), ['a:branch', 'a:deliver']);
+  assert.deepEqual(of({ dirty: true }), ['a:deliver']);
+  assert.deepEqual(of({ unpushed: true }), ['a:deliver']);
+  assert.deepEqual(of({ dirty: true, unpushed: true }), ['a:deliver']);
+  assert.deepEqual(of({}), []);
 });
 
 test('workQueue puts priority repos first, case-insensitively, ignoring unknown names and duplicates', () => {
   const items = [repo('a', { ready: [{ number: 1, title: 'x' }] }), repo('B', { dirty: true }), repo('c', { stale: true, dirty: true })];
-  assert.deepEqual(kinds(lib.workQueue(items, ['b', 'ghost', 'B', ' C '])), ['B:deliver', 'c:branch', 'c:deliver', 'a:merge']);
-  assert.deepEqual(kinds(lib.workQueue(items, ['c'])), ['c:branch', 'c:deliver', 'a:merge', 'B:deliver']);
+  assert.deepEqual(kinds(lib.workQueue(items, ['b', 'ghost', 'B', ' C '])), ['B:deliver', 'c:branch', 'a:merge']);
+  assert.deepEqual(kinds(lib.workQueue(items, ['c'])), ['c:branch', 'a:merge', 'B:deliver']);
 });
 
 test('workQueue ignores a priority that is not a list of strings', () => {
@@ -647,7 +662,7 @@ test('piPromptState is idle only for an empty prompt and fails closed otherwise'
 });
 
 test('PI_COMMANDS only offers the flow commands', () => {
-  assert.deepEqual(lib.PI_COMMANDS, { 'flow-commit': '/flow-commit', 'flow-pr': '/flow-pr', 'flow-branch': '/flow-branch' });
+  assert.deepEqual(lib.PI_COMMANDS, { 'flow-commit': '/flow-commit', 'flow-pr': '/flow-pr', 'flow-branch': '/flow-branch', 'flow-branch-stash': '/flow-branch --stash' });
 });
 
 // ---------- RP12c: manual and waiting actions ----------

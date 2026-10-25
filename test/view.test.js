@@ -6,6 +6,10 @@ const path = require('node:path');
 const vm = require('node:vm');
 const { API_VERSION, isOutdated, conformityView } = require('../public/view.js');
 
+test('API_VERSION is 11: the request vocabulary gained flow-branch-stash', () => {
+  assert.equal(API_VERSION, 11);
+});
+
 test('API_VERSION is a positive integer', () => {
   assert.ok(Number.isInteger(API_VERSION) && API_VERSION > 0);
 });
@@ -239,10 +243,6 @@ const { queueFlags } = require('../public/view.js');
 const NOW = { now: Date.parse('2026-10-24T12:00:00Z') };
 const clean = { files: [], branch: 'task', base: 'main', ahead: 0, behind: 0, head: 'h1' };
 const fresh = (state, extra = {}) => ({ available: true, state, next: 'Answer the question.', detail: null, at: '2026-10-24T11:59:00Z', stale: false, reason: null, ...extra });
-
-test('API_VERSION is 9: the queue request now carries manual and waiting', () => {
-  assert.equal(API_VERSION, 9);
-});
 
 test('index.html has an empty data: icon so the browser does not ask for /favicon.ico', () => {
   const html = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'public', 'index.html'), 'utf8');
