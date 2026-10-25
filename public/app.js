@@ -508,12 +508,20 @@ let raf = 0;
 function draw() { if (!raf) raf = requestAnimationFrame(() => { raf = 0; render(); }); }
 
 const COLUMNS = [
+  { key: 'attention', title: 'Needs attention', hint: 'A manual action or a failed /flow-commit: a person has to step in' },
   { key: 'clean', title: 'Clean', hint: 'Nothing to do' },
   { key: 'changes', title: 'Changes', hint: 'Uncommitted files' },
   { key: 'committed', title: 'Committed', hint: 'Commits not pushed yet' },
   { key: 'progress', title: 'Open PRs', hint: 'Checks running, waiting for review or needing a fix (red = needs attention)' },
   { key: 'ready', title: 'Ready to merge', hint: 'All checks passed' },
+  { key: 'merged', title: 'Merged', hint: 'Merged: run /flow-base' },
 ];
+const COLUMN_BY_KEY = Object.fromEntries(COLUMNS.map((c) => [c.key, c]));
+const BOARD_KEYS = ['changes', 'committed', 'progress', 'ready', 'merged'];
+
+// Which columns the board shows, left to right: Needs attention only while it has cards, Clean only when asked for.
+const boardKeys = (attentionCount) => (V ? V.boardColumns(!!S.prefs.cleanAsColumn, attentionCount)
+  : [...(S.prefs.cleanAsColumn ? ['clean'] : attentionCount > 0 ? ['attention'] : []), ...BOARD_KEYS]);
 
 // A PR that cannot merge because of something the user must fix.
 const isProblem = (pr) => (V ? V.isProblem(pr) : !pr.ready && (pr.checks.state === 'failed' || ['DIRTY', 'BEHIND'].includes(pr.mergeStateStatus)));
@@ -523,12 +531,14 @@ const prColumn = (pr) => (V ? V.prColumn(pr) : pr.ready ? 'ready' : 'progress');
 // Where the repo's local card goes (view.js decides it from Git state alone); without view.js, by changes, commits
 // and the stale mark only.
 function placement(l, p, prCount, verdict) {
-  if (V) return V.localPlacement(l, p, prCount, verdict && verdict.state);
+  if (V) return V.boardPlacement(l, p, prCount, verdict && verdict.state, !!S.prefs.cleanAsColumn);
   const stale = !!p.stale;
   if (l.error) return { column: 'changes', attn: true, row: false };
   if ((l.files || []).length > 0) return { column: 'changes', attn: stale, row: false };
   if ((l.ahead || 0) > 0) return { column: 'committed', attn: stale, row: false };
-  return stale ? { column: 'clean', attn: true, row: false } : { column: prCount ? null : 'clean', attn: false, row: !prCount };
+  if (stale) return { column: 'merged', attn: true, row: false };
+  if (prCount) return { column: null, attn: false, row: false };
+  return { column: S.prefs.cleanAsColumn ? 'clean' : 'idle', attn: false, row: true };
 }
 
 // The verdict of the last command sent from this page, or null. It lives in the page only: an ok verdict (or none,
@@ -547,9 +557,11 @@ function verdictOf(r) {
 function buildCards() {
   const cols = Object.fromEntries(COLUMNS.map((c) => [c.key, []]));
   const parked = Object.fromEntries(COLUMNS.map((c) => [c.key, []]));
+  const idle = []; // the compact rows of repos with nothing to do, for the Idle bar
   let problems = 0;
   // Problem cards go first in their column; with the problems filter on, only they are shown.
   const add = (key, html, attn) => {
+    if (key === 'idle') { if (!S.onlyProblems) idle.push(html); return; }
     if (attn) { problems++; cols[key].unshift(html); } else if (!S.onlyProblems) cols[key].push(html);
   };
   for (const r of visibleRepos()) {
@@ -565,7 +577,7 @@ function buildCards() {
       else add(key, prCard(r, pr, p.repo, verdict && verdict.state === 'running' ? verdict : null), isProblem(pr));
     }
   }
-  return { cols, parked, problems };
+  return { cols, parked, idle, problems };
 }
 
 function snoozedRow(r, pr) {
@@ -592,16 +604,37 @@ function render() {
     $('#app').innerHTML = '<div class="empty">No repositories yet.<br><br><button class="primary" data-act="add-dialog">+ Add your first repo</button></div>';
     return;
   }
-  const { cols, parked, problems } = buildCards();
+  const { cols, parked, idle, problems } = buildCards();
   const alerts = $('#alerts');
   alerts.hidden = !problems && !S.onlyProblems;
   alerts.textContent = `⚠ ${problems}`;
   alerts.classList.toggle('active', S.onlyProblems);
-  $('#app').innerHTML = `<div class="board">${COLUMNS.map((c) => `
+  $('#app').innerHTML = `<div class="board">${boardKeys(cols.attention.length).map((k) => COLUMN_BY_KEY[k]).map((c) => `
     <section class="col col-${c.key}">
       <div class="col-head" title="${esc(c.hint)}"><h2>${c.title}</h2><span class="n">${cols[c.key].length}</span></div>
       <div class="col-body">${cols[c.key].join('') || (parked[c.key].length ? '' : '<div class="col-empty">—</div>')}${snoozedBlock(c.key, parked[c.key])}</div>
-    </section>`).join('')}</div>`;
+    </section>`).join('')}</div>${idleBar(idle)}`;
+}
+
+// The Idle bar under the board: the compact rows of repos with nothing to do, closed by default (a preference, so it
+// stays as the person left it). The rows are the same cleanRow markup the Clean column holds, in a container that
+// can host actions later. Nothing is drawn without rows, and not at all while Clean is a column.
+function idleBar(rows) {
+  if (S.prefs.cleanAsColumn || !rows.length) return '';
+  const open = !!S.prefs.idleOpen;
+  return `<section class="idle" aria-label="Idle repos">
+    <div class="idle-head">
+      <button type="button" class="idle-toggle" data-act="toggle-idle" aria-expanded="${open}" aria-controls="idleList"><span class="idle-caret" aria-hidden="true">${open ? '▾' : '▸'}</span> Idle · ${rows.length} repo${rows.length === 1 ? '' : 's'}</button>
+      <button type="button" class="idle-column" data-act="clean-as-column" title="Put the Clean column back on the board">Show as column</button>
+    </div>
+    ${open ? `<div class="idle-list" id="idleList">${rows.join('')}</div>` : ''}
+  </section>`;
+}
+
+function setPref(key, value) {
+  S.prefs[key] = value;
+  localStorage.setItem('prefs', JSON.stringify(S.prefs));
+  draw();
 }
 
 // Well-separated hues, assigned to groups by their position in config.json (wraps after 6 groups).
@@ -965,6 +998,8 @@ const ACTIONS = {
   'toggle-problems': () => { S.onlyProblems = !S.onlyProblems; draw(); },
   'snooze': (el) => setSnooze(el.dataset.id, Number(el.dataset.n), true),
   'unsnooze': (el) => setSnooze(el.dataset.id, Number(el.dataset.n), false),
+  'toggle-idle': () => setPref('idleOpen', !S.prefs.idleOpen),
+  'clean-as-column': () => { $('#cleanAsColumn').checked = true; setPref('cleanAsColumn', true); },
   'toggle-snoozed': (el) => { S.snoozedOpen[el.dataset.col] = !S.snoozedOpen[el.dataset.col]; draw(); },
   'toggle-roadmap': (el) => { S.rmOpen[el.dataset.id] = !S.rmOpen[el.dataset.id]; draw(); },
   'rerun': (el) => doRerun(el.dataset.id, Number(el.dataset.n)),
@@ -1019,9 +1054,7 @@ document.addEventListener('toggle', (e) => {
 document.addEventListener('change', (e) => {
   const key = e.target.dataset.pref;
   if (!key) return;
-  S.prefs[key] = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
-  localStorage.setItem('prefs', JSON.stringify(S.prefs));
-  draw();
+  setPref(key, e.target.type === 'checkbox' ? e.target.checked : e.target.value);
 });
 
 $('#search').addEventListener('input', (e) => { S.q = e.target.value; draw(); });
@@ -1042,6 +1075,7 @@ document.addEventListener('visibilitychange', () => {
   try { await loadConfig(); } catch (e) { toast(e.message, 'bad'); }
   $('#method').value = S.prefs.method;
   $('#delBranch').checked = S.prefs.del;
+  $('#cleanAsColumn').checked = !!S.prefs.cleanAsColumn;
   draw();
   if (location.hash === '#conformity') openConformity(); // deep link
   refreshAll();

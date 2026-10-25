@@ -89,13 +89,23 @@ dialog .row.end { justify-content: flex-end; }
 
 /* ---------- kanban board ---------- */
 main { max-width: none; padding: 8px; }
-.board { display: grid; grid-template-columns: repeat(5, minmax(200px, 1fr)); gap: 8px; align-items: start; overflow-x: auto; padding-bottom: 12px; }
+.board { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(200px, 1fr); gap: 8px; align-items: start; overflow-x: auto; padding-bottom: 12px; }
 .col { background: var(--panel); border: 1px solid var(--line); border-top: 3px solid var(--gray); border-radius: 8px; min-width: 0; }
+.col-attention { border-top-color: var(--red); }
 .col-clean { border-top-color: var(--gray); }
 .col-changes { border-top-color: var(--yellow); }
 .col-committed { border-top-color: var(--blue); }
 .col-progress { border-top-color: var(--green); }
 .col-ready { border-top-color: #238636; }
+.col-merged { border-top-color: var(--purple); }
+/* Idle bar: the collapsible home of the clean repos' compact rows. */
+.idle { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; margin-top: 4px; }
+.idle-head { display: flex; align-items: center; gap: 8px; padding: 4px 8px; }
+.idle-toggle { flex: 1; text-align: left; border-color: transparent; background: transparent; font-weight: 600; }
+.idle-toggle:focus-visible, .idle-column:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+.idle-caret { display: inline-block; width: 12px; color: var(--muted); }
+.idle-column { font-size: 12px; padding: 0 8px; color: var(--muted); }
+.idle-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 2px 8px; padding: 0 8px 8px; }
 .col-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; }
 .col-head h2 { margin: 0; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; }
 .col-head .n { background: var(--line); border-radius: 10px; padding: 0 8px; font-size: 12px; }

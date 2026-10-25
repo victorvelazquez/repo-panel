@@ -58,9 +58,9 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 | RP20 | S19 | worker acotado; animación CSS de los estados en curso y del chip de CI pendiente; `piScreenAsk` y el estado `asking` con su aviso; hecho y verificado en Edge real | PR #40 (11337ab) |
 | RP21 | S20 | worker acotado con reglas de seguridad absolutas (nunca correr instaladores sin `-DryRun`); guarda de carpeta temporal, guardián de tareas en `npm test` y hallazgos de RP19; hecho y verificado | PR #41 (3758ef3) |
 | RP22 | S20 | en línea (un solo tema); guardián con todas las acciones de la tarea y `safeToRunCopy`; RED primero; hecho y verificado | pendiente de commit |
-| RP23 | S22 | worker acotado con reglas de seguridad; refresco local/caliente/completo, caché corta del PR fusionado, colores por acción y bordes de columna; verificado en Edge real con gh falso | pendiente de commit |
+| RP23 | S22 | worker acotado con reglas de seguridad; refresco local/caliente/completo, caché corta del PR fusionado, colores por acción y bordes de columna; verificado en Edge real con gh falso | PR #45 (1b48300) |
 | RP24 | S21 | worker acotado con reglas de seguridad; `working` sin invalidar por actividad, sesión busy/asking deshabilita /flow-commit, período de calma | PR #43 (5e616b2) |
-| RP25 | S23 | pendiente; columna Merged y barra plegable «Idle» para Clean, reversible | pendiente |
+| RP25 | S23 | worker acotado con reglas de seguridad; columna Merged, barra Idle plegable, columna Needs attention y preferencia reversible; verificado en Edge real | pendiente de commit |
 | RP26 | S24 | en línea (unidad chica); RED primero; icono de Refresh gira, sin flechita en tarjetas; verificado en Edge real | PR #44 (b6a46b1) |
 
 Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a → RP11b → RP12a → RP12b → RP12 → RP13 → RP14. RP12 puede ir antes de RP11 si la persona lo prefiere.
