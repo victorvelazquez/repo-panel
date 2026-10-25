@@ -10,7 +10,7 @@ const local = (o = {}) => ({ branch: 'task', detached: false, upstream: 'origin/
 const openPr = (checks, o = {}) => ({ number: 7, head: 'task', base: 'main', ready: false, mergeStateStatus: 'BLOCKED', checks: { failedRuns: [], ...checks }, ...o });
 const pending = openPr({ state: 'pending' });
 const failed = openPr({ state: 'failed', failedRuns: ['123'] });
-const merged = { via: 'merged', pr: 7, reason: 'Merged: run /flow-branch' };
+const merged = { via: 'merged', pr: 7, reason: 'Merged: run /flow-base' };
 
 // Each step: what /api/local and /api/prs say, then the expected column of the local card (null: no local card),
 // its flow buttons, and the column of the PR card.
@@ -21,9 +21,9 @@ const STEPS = [
   { name: '4. checks failed', l: local(), p: { prs: [failed], stale: null }, column: null, buttons: [], pr: { column: 'progress', problem: true, fix: true } },
   { name: '5. the agent fixed it: dirty again, open PR', l: local({ files: [file] }), p: { prs: [failed], stale: null }, column: 'changes', buttons: ['/flow-commit'] },
   { name: '6. after /flow-commit: ahead 1, open PR of this branch', l: local({ ahead: 1 }), p: { prs: [failed], stale: null }, column: 'committed', buttons: ['/flow-pr (update PR)'] },
-  { name: '7. PR merged and branch gone: stale and clean', l: local({ currentGone: true }), p: { prs: [], stale: merged }, column: 'clean', attn: true, buttons: ['/flow-branch'] },
-  { name: '7b. merged branch but files changed: carry them with --stash', l: local({ files: [file], currentGone: true }), p: { prs: [], stale: merged }, column: 'changes', attn: true, buttons: ['/flow-branch --stash'] },
-  { name: '8. after /flow-branch: on the base branch, nothing ahead', l: local({ branch: 'main', upstream: 'origin/main' }), p: { prs: [], stale: null }, column: 'clean', row: true, buttons: [] },
+  { name: '7. PR merged and branch gone: stale and clean', l: local({ currentGone: true }), p: { prs: [], stale: merged }, column: 'clean', attn: true, buttons: ['/flow-base'] },
+  { name: '7b. merged branch but files changed: carry them with --stash', l: local({ files: [file], currentGone: true }), p: { prs: [], stale: merged }, column: 'changes', attn: true, buttons: ['/flow-base --stash'] },
+  { name: '8. after /flow-base: on the base branch, nothing ahead', l: local({ branch: 'main', upstream: 'origin/main' }), p: { prs: [], stale: null }, column: 'clean', row: true, buttons: [] },
 ];
 
 test('the whole flow: column and flow buttons at every step', () => {
@@ -54,14 +54,14 @@ test('the whole flow: no flow button when the repo needs manual action', () => {
   assert.equal(localPlacement(detached, p, 0, null).column, 'committed');
 });
 
-test('the whole flow: a stale repo with changes shows /flow-branch --stash and no /flow-commit', () => {
+test('the whole flow: a stale repo with changes shows /flow-base --stash and no /flow-commit', () => {
   const l = local({ files: [file], currentGone: true });
   const p = { prs: [], stale: merged };
-  assert.deepEqual(flowButtons(l, p, null, {}).map((b) => b.label), ['/flow-branch --stash']);
+  assert.deepEqual(flowButtons(l, p, null, {}).map((b) => b.label), ['/flow-base --stash']);
   assert.deepEqual(localPlacement(l, p, 0, null), { column: 'changes', attn: true, row: false });
 });
 
-test('the whole flow: a running /flow-commit hides /flow-pr and /flow-branch', () => {
+test('the whole flow: a running /flow-commit hides /flow-pr and /flow-base', () => {
   const ctx = { verdict: 'running' };
   assert.deepEqual(flowButtons(local({ ahead: 1 }), { prs: [], stale: null }, null, ctx), []);
   assert.deepEqual(flowButtons(local(), { prs: [], stale: merged }, null, ctx), []);

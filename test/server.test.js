@@ -828,7 +828,7 @@ test('put-in-conditions: keeps the session safeguards (busy prompt, several sess
 });
 
 test('piSend still types each fixed command as before', async () => {
-  for (const [key, text] of [['flow-commit', '/flow-commit'], ['flow-pr', '/flow-pr'], ['flow-branch', '/flow-branch']]) {
+  for (const [key, text] of [['flow-commit', '/flow-commit'], ['flow-pr', '/flow-pr'], ['flow-base', '/flow-base'], ['flow-base-stash', '/flow-base --stash']]) {
     const f = fakeOrca();
     await piSend(REPO, key, f.orca, noWait, async () => { throw new Error('requirements must not be read'); });
     assert.deepEqual(f.sends(), [['send', '--terminal', 'h1', '--text', text, '--enter']]);

@@ -63,7 +63,7 @@ function parseBaseBranch(out) {
   return m ? m[1] : 'main';
 }
 
-const STALE_REASON = 'Merged: run /flow-branch';
+const STALE_REASON = 'Merged: run /flow-base';
 
 // A working branch whose work already landed: its remote is gone, or a merged PR came from it.
 // The branch name may have been reused by a new open PR, which is live work and not stale.
@@ -401,7 +401,7 @@ const QUEUE_RANK = { merge: 0, branch: 1, manual: 1, waiting: 2, deliver: 3, sta
 const WAITING_STATES = ['needs-input', 'blocked'];
 
 // The ordered "go work on" actions for repos given in board order. Per repo: one `merge` per ready PR,
-// `branch` when stale, `deliver` when it has local changes (not when it is also stale: /flow-branch --stash carries them), `start` when clean with a next unit. A repo flagged
+// `branch` when stale, `deliver` when it has local changes (not when it is also stale: /flow-base --stash carries them), `start` when clean with a next unit. A repo flagged
 // `manual` (a reason string) gets a `manual` action and a repo with `waiting` ({ state, next }) a `waiting` one:
 // neither is told to deliver or start. Both fields are optional and ignored when absent or malformed.
 // Repos named in `priority` (case-insensitive, in that order) come first; ties keep board order.
@@ -460,7 +460,7 @@ function conformityReport(entries) {
 
 // ---------- pi sessions in Orca terminals ----------
 // The only texts the browser can ask the panel to type into a pi session (it sends the key, never the text).
-const PI_COMMANDS = { 'flow-commit': '/flow-commit', 'flow-pr': '/flow-pr', 'flow-branch': '/flow-branch', 'flow-branch-stash': '/flow-branch --stash' };
+const PI_COMMANDS = { 'flow-commit': '/flow-commit', 'flow-pr': '/flow-pr', 'flow-base': '/flow-base', 'flow-base-stash': '/flow-base --stash' };
 
 // Orca reports the same folder as C:/x or C:\\x; compare them without caring about separators or case.
 const normPath = (p) => String(p || '').replace(/[\\/]+/g, '/').replace(/\/$/, '').toLowerCase();

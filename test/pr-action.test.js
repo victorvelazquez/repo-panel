@@ -80,7 +80,7 @@ test('prAction: hidden, with a short reason, when anything is not clean', () => 
   // a merge conflict leaves files changed too: the manual-action reason wins
   assert.match(no(local({ inProgress: 'merge', files: [file()] }), prs(), null), /merge is in progress/);
   assert.match(no(local({ behind: 1 }), prs(), null), /Diverged/);
-  assert.match(no(local(), prs({ stale: { reason: 'Merged: run /flow-branch', via: 'merged' } }), null), /merged/i);
+  assert.match(no(local(), prs({ stale: { reason: 'Merged: run /flow-base', via: 'merged' } }), null), /merged/i);
   assert.match(no(local(), prs(), 'attention'), /attention/i);
   assert.match(no(local(), prs(), 'running'), /committing/i);
 });
@@ -134,6 +134,9 @@ test('commitOverrideItem: offered only while a declared state hides the button a
   assert.equal(commitOverrideItem(st('ready-to-commit'), { now: NOW }), null);
   assert.equal(commitOverrideItem(undefined, { now: NOW }), null);
   assert.equal(commitOverrideItem(st('working', { at: ago(31 * MIN) }), { now: NOW }), null);
+  // a stale repo offers /flow-base --stash instead of /flow-commit: the item would do nothing
+  assert.equal(commitOverrideItem(st('needs-input'), { now: NOW, stale: true }), null);
+  assert.deepEqual(commitOverrideItem(st('needs-input'), { now: NOW, stale: false }), { act: 'show-commit', label: 'Show /flow-commit anyway' });
 });
 
 // ---------- commitVerdict ----------

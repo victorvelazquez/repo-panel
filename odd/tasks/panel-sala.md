@@ -26,7 +26,7 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 
 - **S18. Flujo completo y botones.** «quisiera que hagamos el escenario de todo el flujo y ajustar algunas cosas si falta, por ejemplo como y que momento se mustran los comandos /flow-commit, flow-pr, flow-branch»; «tambien no vi el comando /flow-branch despues de hacer merge»; y para un problema sencillo de un PR: «con ese comando activemos la orden de revisar y corregir y que vuelva a la columna correspondiente ya sea en changes si hay cambios sin commitear o en committed si solo falta hacer PR». *(RP17: botón `/flow-branch`, orden `fix-pr` y escenario completo como prueba.)*
 
-- **S19. Fallos de `/flow-commit`.** «muestra committing ... y el boton /flow-commit sigue habilitado»; y cuando el commit falla, con la sesión diciendo «Después volvé a correr /flow-commit»: «podriamos avisar en el panel eso? que se reintente cuando la sesion indico para reintentar?». *(RP18.)*
+- **S19. Fallos de `/flow-commit`.** «muestra committing ... y el boton /flow-commit sigue habilitado»; y cuando el commit falla, con la sesión diciendo «Después volvé a correr /flow-commit»: «podriamos avisar en el panel eso? que se reintente cuando la sesion indico para reintentar?». Y para `/flow-pr`: «mientras se estaba ejecutando la orden, seguia mostrando en el panel asi ... creo que deberia mostrar tambien el estado actual de haciendo pr y desahabilitar el boton /flow-pr porque probe volver a ejecutar y volvio a ejecutar». *(RP18.)*
 
 ## Tasks
 
@@ -47,6 +47,7 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 | RP15 | S6 | worker acotado; `tray.ps1`, `install-tray.ps1`, `uninstall-tray.ps1` y `test/tray.test.js`; hecho y verificado salvo lo que depende del escritorio | `f1ca93f` (PR #34) |
 | RP16 | S6 | `min-width: 0` en `.clean-row .roadmap`; defecto de la columna CLEAN visto en el panel real; medido antes y después en Edge | `cf76fb0` (PR #35) |
 | RP17 | S18 | worker acotado; `flowButtons`, botón `/flow-branch`, orden `fix-pr` («Fix with pi») y `test/flow-scenario.test.js`; verificado en Edge real con `gh` simulado; ajustado con `/flow-branch --stash` para una rama fusionada y sucia y con una orden `fix-pr` más amplia | pendiente de commit |
+| RP17b | S18, S19 | worker acotado; claves `flow-base` y `flow-base-stash`, `staleChipTitle`, `commitOverrideItem` con `stale` y `API_VERSION` 12; hecho y verificado | pendiente de commit |
 | RP18 | S19 | botón deshabilitado con el veredicto `running`; archivos en staging detectados con Git; causa y reintento visibles en la barra de atención; órdenes a sesiones piden índice vacío | — |
 
 Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a → RP11b → RP12a → RP12b → RP12 → RP13 → RP14. RP12 puede ir antes de RP11 si la persona lo prefiere.
@@ -210,3 +211,16 @@ Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a →
 > dice para reintentar el /flow-commit, podriamos avisar en el panel eso? que se reintente cuando la sesion indico para reintentar?
 
 *Hallazgo propio: la causa del fallo fue mi orden a la sesión de `flow-skills`, que movió archivos con `git mv` y dejó el índice con cambios en staging; Flow Commit se niega a empezar así. Se agregó a la propuesta `flow-base` y queda como regla de las órdenes (RP18).*
+
+**L22.** Mensaje de la persona, con una captura de la tarjeta `flow-skills` en COMMITTED mostrando `/flow-pr` habilitado mientras la orden corría:
+
+> - cuando le di al boton de /flow-pr en el panel, se envio la orde a la sesion, pero mistras se estaba ejecutando la orden, seguia mostrando en el panel asi:
+> creo que deberia mostrar tambien el estado actual de haciendo pr y desahabilitar el boton /flow-pr porque probe volver a ejecutar y volvio a ejecutar.
+
+*Comprobado: el PR #68 de `flow-skills` se creó una sola vez (el segundo `/flow-pr` actualiza, no duplica). El panel solo guarda un estado «en curso» para `/flow-commit`; falta para `/flow-pr` y el resto (RP18).*
+
+**L23.** Mensaje de la persona tras fusionar el renombre en `flow-skills`:
+
+> ya use flow-base en el repo de flow-skills y funciono muy bien, y tambien ya reinicie gentle shell aca, que quiere decir que ya tenemos disponible aca tambien.
+
+*Aplicado: el panel adopta `/flow-base` (RP17b) sobre la misma rama de RP17, para que el PR no introduzca un botón que manda un comando inexistente.*

@@ -8,7 +8,7 @@
 }(typeof self !== 'undefined' ? self : this, () => {
   // Bump it when the client starts needing a new or changed server route. /health reports the value
   // the running server loaded at start; the page compares it with the file it just downloaded.
-  const API_VERSION = 11;
+  const API_VERSION = 12;
 
   // `health` is the parsed /health answer, or null when the request itself failed (no answer, so
   // there is nothing to warn about). Any answer without the current integer `api` is out of date:
@@ -162,8 +162,9 @@
   }
 
   // The "⋯" menu item that lifts the state gating, only while the gating hides the button and it is not lifted yet.
-  function commitOverrideItem(data, { now = Date.now(), override = false } = {}) {
-    return !override && !commitAllowed(data, { now }) ? { act: 'show-commit', label: 'Show /flow-commit anyway' } : null;
+  // Never on a stale repo with changes: that card offers /flow-base --stash, so /flow-commit would not appear anyway.
+  function commitOverrideItem(data, { now = Date.now(), override = false, stale = false } = {}) {
+    return !override && !stale && !commitAllowed(data, { now }) ? { act: 'show-commit', label: 'Show /flow-commit anyway' } : null;
   }
 
   // The card's "what to do now" line: { kind: 'current', dot, text, title } for a usable state, { kind: 'outdated',
@@ -214,31 +215,39 @@
     if (manual) return no(manual);
     if (local.files.length > 0) return no('Uncommitted changes: run /flow-commit first');
     if (!(local.ahead > 0)) return no('No commits to deliver');
-    if (prInfo && prInfo.stale) return no('Branch already merged: run /flow-branch');
+    if (prInfo && prInfo.stale) return no('Branch already merged: run /flow-base');
     if (verdict === 'attention') return no('Needs attention after /flow-commit');
     if (verdict === 'running') return no('Committing…');
     const open = prInfo && Array.isArray(prInfo.prs) ? prInfo.prs : [];
     return { show: true, update: open.some((p) => p && p.head === local.branch), reason: null };
   }
 
-  const FLOW_BRANCH_HINT = 'Start from a fresh, updated base branch: this branch was already merged';
-  const FLOW_STASH_HINT = 'This branch was already merged but has uncommitted changes. /flow-branch --stash carries them to the fresh base branch (stash, switch, update, restore). It refuses and changes nothing when the work of this branch is not yet merged or its remote branch not yet deleted.';
+  const FLOW_BASE_HINT = 'Start from a fresh, updated base branch: this branch was already merged';
+  const FLOW_STASH_HINT = 'This branch was already merged but has uncommitted changes. /flow-base --stash carries them to the fresh base branch (stash, switch, update, restore). It refuses and changes nothing when the work of this branch is not yet merged or its remote branch not yet deleted.';
 
   // The flow buttons of a repo's LOCAL card, in order: [{ cmd, label, reason? }] with cmd flow-commit | flow-pr |
-  // flow-branch, or []. The one source of truth for the page and the tests. `ctx` is { override (the person lifted the
+  // flow-base, or []. The one source of truth for the page and the tests. `ctx` is { override (the person lifted the
   // declared-state gating of /flow-commit), verdict ('running' | 'ok' | 'attention' | null, the last /flow-commit), now }.
-  // A stale repo with changed or untracked files offers /flow-branch --stash instead of /flow-commit (the skill carries
+  // A stale repo with changed or untracked files offers /flow-base --stash instead of /flow-commit (the skill carries
   // the changes aside, updates the base branch and brings them back). Neither branch button shows while a
   // /flow-commit is still running or when the repo needs manual action.
   function flowButtons(local, prInfo, stateData, ctx = {}) {
     if (!hasLocal(local) || manualAction(local, local.base)) return [];
     const { override = false, verdict = null, now = Date.now() } = ctx;
-    if (local.files.length > 0 && prInfo && prInfo.stale) return verdict === 'running' ? [] : [{ cmd: 'flow-branch-stash', label: '/flow-branch --stash', reason: FLOW_STASH_HINT }];
+    if (local.files.length > 0 && prInfo && prInfo.stale) return verdict === 'running' ? [] : [{ cmd: 'flow-base-stash', label: '/flow-base --stash', reason: FLOW_STASH_HINT }];
     if (local.files.length > 0) return commitAllowed(stateData, { now, override }) ? [{ cmd: 'flow-commit', label: '/flow-commit' }] : [];
     const pa = local.ahead > 0 ? prAction(local, prInfo, verdict) : null;
     if (pa && pa.show) return [{ cmd: 'flow-pr', label: pa.update ? '/flow-pr (update PR)' : '/flow-pr' }];
-    if (prInfo && prInfo.stale && verdict !== 'running') return [{ cmd: 'flow-branch', label: '/flow-branch', reason: FLOW_BRANCH_HINT }];
+    if (prInfo && prInfo.stale && verdict !== 'running') return [{ cmd: 'flow-base', label: '/flow-base', reason: FLOW_BASE_HINT }];
     return [];
+  }
+
+  // Tooltip of the red stale chip: names the button the card really offers. `stale` is { via, pr }; `dirty` is whether the
+  // repo has changed or untracked files (then the button is /flow-base --stash, which carries them).
+  function staleChipTitle(stale, dirty) {
+    const why = stale && stale.via === 'merged' ? `PR #${stale.pr} from this branch was merged.` : 'The remote branch was deleted, so its work was merged.';
+    if (dirty) return `${why} Press the /flow-base --stash button: it carries your uncommitted changes to a fresh, updated base branch.`;
+    return `${why} Press the /flow-base button to start from a fresh, updated base branch.`;
   }
 
   // Whether a PR card offers "Fix with pi": only when its checks failed (even with no GitHub Actions run to re-run).
@@ -297,5 +306,5 @@
     return attention(changed ? 'HEAD changed but no commits are left to deliver' : 'No change 15 minutes after /flow-commit and the pi session state is unknown');
   }
 
-  return { API_VERSION, commitAllowed, commitOverrideItem, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, isProblem, prColumn, commitVerdict, queueFlags, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, presenceLabel, presenceDot };
+  return { API_VERSION, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, isProblem, prColumn, commitVerdict, queueFlags, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, presenceLabel, presenceDot };
 }));
