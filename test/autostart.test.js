@@ -88,11 +88,30 @@ const SCRIPTS = path.join(ROOT, 'scripts');
 const GUARDED = ['install-autostart.ps1', 'uninstall-autostart.ps1', 'install-tray.ps1', 'uninstall-tray.ps1'];
 const REFUSAL = /refused: this copy lives inside the OS temp folder \(.+\); install from the real repository folder\.$/m;
 
+// Throws unless a copy of the script may be executed: it declares -DryRun, the dry-run branch leaves, and no cmdlet that changes
+// a scheduled task comes before that branch (comment lines do not count). This is what keeps a RED phase from touching a real task.
+function safeToRunCopy(text, name) {
+  if (!/\[switch\]\$DryRun/.test(text)) throw new Error(`${name} must declare -DryRun before a copy of it is run`);
+  const code = text.split(/\r?\n/).filter((l) => !l.trimStart().startsWith('#')).join('\n');
+  const dry = code.indexOf('if ($DryRun)');
+  if (dry < 0) throw new Error(`${name} must have a dry-run branch`);
+  const changes = code.search(/\b(?:Register|Unregister|Set|Start|Stop|Enable|Disable)-ScheduledTask\b/);
+  if (changes >= 0 && changes < dry) throw new Error(`${name} changes a scheduled task before the dry-run branch`);
+  const open = code.indexOf('{', dry);
+  let depth = 0;
+  let end = open;
+  for (; end < code.length; end++) {
+    if (code[end] === '{') depth++;
+    else if (code[end] === '}' && --depth === 0) break;
+  }
+  // It leaves with return or exit, or the cmdlets that change a task sit in an elseif/else of the same if.
+  const leaves = /\b(?:return|exit)\b/.test(code.slice(open, end)) || /^\s*(?:elseif|else)\b/.test(code.slice(end + 1));
+  if (open < 0 || !leaves) throw new Error(`${name}: the dry-run branch does not leave`);
+}
+
 function runCopyInTemp(name) {
   const text = fs.readFileSync(path.join(SCRIPTS, name), 'utf8');
-  // Never execute a script that could do the real thing: it has to declare -DryRun, and the dry-run exit has to come first.
-  assert.match(text, /\[switch\]\$DryRun/, `${name} must declare -DryRun before a copy of it is run`);
-  assert.ok(text.indexOf('if ($DryRun)') >= 0, `${name} must have a dry-run branch`);
+  safeToRunCopy(text, name);
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'repo-panel-guard-'));
   dirs.push(dir);
   fs.mkdirSync(path.join(dir, 'scripts'));
@@ -210,4 +229,39 @@ test('install-autostart.ps1 parses without errors in Windows PowerShell 5.1 and 
       assert.equal(r.status, 0, `${shell} ${path.basename(file)}: ${r.stdout}${r.stderr}`);
     }
   }
+});
+
+// ---------- safeToRunCopy: the check that decides whether a COPY of a script may be executed at all ----------
+const dryParam = 'param([switch]$DryRun)\n';
+
+test('safeToRunCopy: accepts a script whose dry-run branch leaves before any cmdlet that changes a task', () => {
+  assert.doesNotThrow(() => safeToRunCopy(`${dryParam}if ($DryRun) { Write-Host x; return }\nUnregister-ScheduledTask -TaskName a`, 's'));
+  assert.doesNotThrow(() => safeToRunCopy(`${dryParam}if ($DryRun) { exit 0 }\nRegister-ScheduledTask -TaskName a`, 's'));
+});
+
+test('safeToRunCopy: rejects any task-changing cmdlet that comes before the dry-run branch', () => {
+  for (const verb of ['Register', 'Unregister', 'Set', 'Start', 'Stop', 'Enable', 'Disable']) {
+    assert.throws(() => safeToRunCopy(`${dryParam}${verb}-ScheduledTask -TaskName a\nif ($DryRun) { return }`, 's'), /before the dry-run/, verb);
+  }
+});
+
+test('safeToRunCopy: a dry-run branch that does not leave is rejected, and so is a missing -DryRun', () => {
+  assert.throws(() => safeToRunCopy(`${dryParam}if ($DryRun) { Write-Host x }\nUnregister-ScheduledTask -TaskName a`, 's'), /leave/);
+  assert.throws(() => safeToRunCopy('Unregister-ScheduledTask -TaskName a', 's'), /DryRun/);
+  assert.throws(() => safeToRunCopy(`${dryParam}Write-Host nothing here`, 's'), /dry-run branch/);
+});
+
+test('safeToRunCopy: a dry-run branch followed by an elseif or else is structured exit enough, a plain if followed by more code is not', () => {
+  assert.doesNotThrow(() => safeToRunCopy(`${dryParam}if ($DryRun) { Write-Host x } elseif (Get-ScheduledTask -TaskName a) { Unregister-ScheduledTask -TaskName a }`, 's'));
+  assert.doesNotThrow(() => safeToRunCopy(`${dryParam}if ($DryRun) { Write-Host x }\nelse { Unregister-ScheduledTask -TaskName a }`, 's'));
+  assert.throws(() => safeToRunCopy(`${dryParam}if ($DryRun) { Write-Host x }\nUnregister-ScheduledTask -TaskName a`, 's'), /leave/);
+});
+
+test('safeToRunCopy: a cmdlet named only in a comment does not count', () => {
+  assert.doesNotThrow(() => safeToRunCopy(`${dryParam}# Register-ScheduledTask comes later\nif ($DryRun) { return }\nSet-ScheduledTask -TaskName a`, 's'));
+});
+
+test('safeToRunCopy: reads Get-ScheduledTask and the likes as harmless, and accepts the four real scripts', () => {
+  assert.doesNotThrow(() => safeToRunCopy(`${dryParam}Get-ScheduledTask -TaskName a\nif ($DryRun) { return }`, 's'));
+  for (const name of GUARDED) assert.doesNotThrow(() => safeToRunCopy(fs.readFileSync(path.join(SCRIPTS, name), 'utf8'), name), name);
 });

@@ -161,3 +161,36 @@ test('scripts/run-tests.js forwards its arguments to node --test and prints the 
   if (WIN) assert.match(r.stdout, /^task guard: (repo-panel and repo-panel-tray unchanged|.*unavailable.*)$/m);
   else t.diagnostic('not Windows: the guard prints nothing');
 });
+
+// ---------- every action of a task is watched, not only the first ----------
+const extra = (execute) => ({ execute, arguments: '/c calc', workingDirectory: 'C:\\Users\\x\\AppData\\Local\\Temp\\copy' });
+
+test('diffSnapshots: an action added after the first one is a change', () => {
+  const after = same();
+  after['repo-panel'] = present({ moreActions: [extra('cmd.exe')] });
+  const { changes } = diffSnapshots(same(), after);
+  assert.equal(changes.length, 1);
+  assert.equal(changes[0].task, 'repo-panel');
+  assert.equal(changes[0].field, 'moreActions');
+});
+
+test('diffSnapshots: a second action that was edited, or removed, is a change; the same second action is not', () => {
+  const withExtra = (e) => snap(present({ moreActions: [e] }), same()['repo-panel-tray']);
+  assert.equal(diffSnapshots(withExtra(extra('a.exe')), withExtra(extra('b.exe'))).changes.length, 1);
+  assert.equal(diffSnapshots(withExtra(extra('a.exe')), same()).changes.length, 1);
+  assert.deepEqual(diffSnapshots(withExtra(extra('a.exe')), withExtra(extra('a.exe'))), { changes: [], notes: [] });
+});
+
+test('readSnapshot: asks PowerShell for every action and always returns moreActions as a list', () => {
+  const calls = [];
+  const spawn = (cmd, args) => {
+    calls.push(Buffer.from(args[args.indexOf('-EncodedCommand') + 1], 'base64').toString('utf16le'));
+    const task = (more) => ({ status: 'present', execute: 'conhost.exe', arguments: 'a', workingDirectory: 'C:\r', triggers: 'MSFT_TaskLogonTrigger', restartCount: 1, ...more });
+    // PowerShell's ConvertTo-Json writes a one-element list as a bare object
+    return { status: 0, stdout: JSON.stringify({ 'repo-panel': task({ moreActions: extra('cmd.exe') }), 'repo-panel-tray': task({}) }) };
+  };
+  const snapshot = require('../scripts/run-tests').readSnapshot(spawn);
+  assert.match(calls[0], /moreActions/, 'the PowerShell reader looks past the first action');
+  assert.deepEqual(snapshot['repo-panel'].moreActions, [extra('cmd.exe')]);
+  assert.deepEqual(snapshot['repo-panel-tray'].moreActions, []);
+});
