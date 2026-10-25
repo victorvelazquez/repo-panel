@@ -48,7 +48,7 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 | RP16 | S6 | `min-width: 0` en `.clean-row .roadmap`; defecto de la columna CLEAN visto en el panel real; medido antes y después en Edge | `cf76fb0` (PR #35) |
 | RP17 | S18 | worker acotado; `flowButtons`, botón `/flow-branch`, orden `fix-pr` («Fix with pi») y `test/flow-scenario.test.js`; verificado en Edge real con `gh` simulado; ajustado con `/flow-branch --stash` para una rama fusionada y sucia y con una orden `fix-pr` más amplia | pendiente de commit |
 | RP17b | S18, S19 | worker acotado; claves `flow-base` y `flow-base-stash`, `staleChipTitle`, `commitOverrideItem` con `stale` y `API_VERSION` 12; hecho y verificado | pendiente de commit |
-| RP18 | S19 | botón deshabilitado con el veredicto `running`; archivos en staging detectados con Git; causa y reintento visibles en la barra de atención; órdenes a sesiones piden índice vacío | — |
+| RP18 | S19 | botón deshabilitado con el veredicto `running`; archivos en staging detectados con Git; causa y reintento visibles en la barra de atención; órdenes a sesiones piden índice vacío | pendiente de commit |
 
 Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a → RP11b → RP12a → RP12b → RP12 → RP13 → RP14. RP12 puede ir antes de RP11 si la persona lo prefiere.
 
@@ -224,3 +224,11 @@ Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a →
 > ya use flow-base en el repo de flow-skills y funciono muy bien, y tambien ya reinicie gentle shell aca, que quiere decir que ya tenemos disponible aca tambien.
 
 *Aplicado: el panel adopta `/flow-base` (RP17b) sobre la misma rama de RP17, para que el PR no introduzca un botón que manda un comando inexistente.*
+
+**L24.** Mensajes de la persona antes de entregar RP17 y de encargar RP18:
+
+> y lo de la correccion omejor para /flow-commit que tenia problemas ya esta hecho tambien?
+
+> podes mandar, y debo hacer ya commit y pr de aca?
+
+*Aplicado: se confirmó que ni `--unstage` ni los avisos del panel existían todavía; se mandó la propuesta a la sesión de `flow-skills` (ya fusionada allá, `d8c3cd3`) y se hizo RP18 en el panel una vez fusionado RP17.*

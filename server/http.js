@@ -13,7 +13,7 @@ const { localState, diffText } = require('./local.js');
 const { prState, mergePr, rerunFailed } = require('./github.js');
 const { roadmapState } = require('./roadmap.js');
 const { addRepo, removeRepo, setSnoozed, setDismissed, scanFolder } = require('./repos.js');
-const { piSend, piStatus } = require('./pi.js');
+const { piSend, piStatus, sendGuard } = require('./pi.js');
 const { readState } = require('./state.js');
 const { requirementsFor, prerequisites } = require('./requirements.js');
 const { roomsState, createRoom, removeRoom, assignRoom } = require('./rooms.js');
@@ -43,7 +43,7 @@ const routes = {
   'GET /api/roadmap': (q) => roadmapState(findRepo(q.id)),
   'GET /api/requirements': (q) => requirementsFor(findRepo(q.id)),
   'GET /api/state': (q) => readState(findRepo(q.id)),
-  'GET /api/pi-status': (q) => piStatus(findRepo(q.id)),
+  'GET /api/pi-status': (q, b, d) => piStatus(findRepo(q.id), d.orca, { tail: q.tail === '1' }),
   'GET /api/rooms': () => roomsState(),
   'GET /api/prerequisites': () => prerequisites(),
   'GET /api/diff': (q) => diffText(findRepo(q.id)),
@@ -57,7 +57,7 @@ const routes = {
   'POST /api/rerun': (q, b) => rerunFailed(findRepo(b.id), Number(b.number)),
   'POST /api/snooze': (q, b) => setSnoozed(b.id, Number(b.number), !!b.on, !!b.wasReady),
   'POST /api/dismiss': (q, b) => setDismissed(b.id, !!b.on),
-  'POST /api/pi': (q, b, d) => piSend(findRepo(b.id), b.command, d.orca, d.wait, d.requirements, { pr: b.pr, prs: d.prs }),
+  'POST /api/pi': (q, b, d) => piSend(findRepo(b.id), b.command, d.orca, d.wait, d.requirements, { pr: b.pr, prs: d.prs, guard: d.guard }),
   'POST /api/queue': (q, b) => queueFor(b),
   'POST /api/conformity': (q, b) => conformityFor(b),
   'POST /api/repos': (q, b) => addRepo(b.path, b.group),
@@ -99,8 +99,10 @@ function isPanelRunning(port) {
   });
 }
 
-// `deps` replaces what the pi route talks to ({ orca, wait, requirements, prs }); tests inject fakes, the real server passes none.
+// `deps` replaces what the pi routes talk to ({ orca, wait, requirements, prs, guard }); tests inject fakes, the real server passes none.
 function createServer(port, deps = {}) {
+  // One duplicate-send guard per server (tests inject theirs with a fake clock).
+  deps = { guard: sendGuard(), ...deps };
   const hostOk = new Set([`127.0.0.1:${port}`, `localhost:${port}`]);
   return http.createServer(async (req, res) => {
     try {

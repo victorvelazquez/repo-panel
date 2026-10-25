@@ -130,6 +130,53 @@ test('localState: the existing fields keep their shape (branch, files, ahead, be
   assert.equal(l.detached, false);
   assert.equal(l.noUpstream, true);
   assert.deepEqual(l.files.map((f) => [f.path, f.untracked, f.added]), [['new.txt', true, 2]]);
-  assert.deepEqual(Object.keys(l).sort(), ['added', 'ahead', 'base', 'behind', 'branch', 'currentGone', 'deleted', 'detached', 'files', 'goneBranches', 'head', 'inProgress', 'noUpstream', 'upstream'].sort());
+  assert.deepEqual(Object.keys(l).sort(), ['added', 'ahead', 'base', 'behind', 'branch', 'currentGone', 'deleted', 'detached', 'files', 'goneBranches', 'head', 'inProgress', 'noUpstream', 'stagedCount', 'stagedPaths', 'upstream'].sort());
   assert.deepEqual(await localState({ path: path.join(dir, 'missing') }), { error: 'Folder not found' });
+});
+
+// ---------- RP18: files staged in the index ----------
+test('localState: staged renames and edits count once each; untracked and unstaged edits do not', async () => {
+  const dir = repo();
+  commit(dir, 'a.txt', 'a\n'.repeat(5));
+  commit(dir, 'b.txt', 'b\n');
+  commit(dir, 'c.txt', 'c\n');
+  const clean = await at(dir);
+  assert.deepEqual([clean.stagedCount, clean.stagedPaths], [0, []]);
+  sh(dir, 'mv', 'a.txt', 'z.txt'); // a rename in the index
+  fs.writeFileSync(path.join(dir, 'b.txt'), 'b2\n'); // edited, not staged
+  fs.writeFileSync(path.join(dir, 'new.txt'), 'n\n'); // untracked
+  const l = await at(dir);
+  assert.equal(l.stagedCount, 1);
+  assert.deepEqual(l.stagedPaths, ['z.txt']);
+  assert.equal(l.files.length, 3);
+  fs.writeFileSync(path.join(dir, 'c.txt'), 'c2\n');
+  sh(dir, 'add', 'c.txt');
+  fs.writeFileSync(path.join(dir, 'c.txt'), 'c3\n'); // staged and then edited again: still one path
+  const both = await at(dir);
+  assert.equal(both.stagedCount, 2);
+  assert.deepEqual(both.stagedPaths, ['c.txt', 'z.txt']);
+});
+
+test('localState: stagedPaths is sorted and capped at 20 while stagedCount counts them all', async () => {
+  const dir = repo();
+  commit(dir, 'seed.txt', 's\n');
+  for (let i = 25; i >= 1; i--) fs.writeFileSync(path.join(dir, `f${String(i).padStart(2, '0')}.txt`), `${i}\n`);
+  sh(dir, 'add', '-A');
+  const l = await at(dir);
+  assert.equal(l.stagedCount, 25);
+  assert.equal(l.stagedPaths.length, 20);
+  assert.deepEqual(l.stagedPaths, [...l.stagedPaths].sort());
+  assert.equal(l.stagedPaths[0], 'f01.txt');
+});
+
+test('localState: a git status failure still answers the same error, and a failing diff never hides the staged facts', async () => {
+  const dir = repo();
+  commit(dir, 'a.txt', 'a\n');
+  const { git } = require('../server/exec.js');
+  const noStatus = async (cwd, args) => (args[0] === 'status' ? { code: 128, stdout: '', stderr: 'fatal: nope\n' } : git(cwd, args));
+  assert.deepEqual(await localState({ path: dir }, { git: noStatus }), { error: 'fatal: nope' });
+  sh(dir, 'mv', 'a.txt', 'b.txt');
+  const noDiff = async (cwd, args) => (args[0] === 'diff' ? { code: 129, stdout: '', stderr: 'boom' } : git(cwd, args));
+  const l = await localState({ path: dir }, { git: noDiff });
+  assert.deepEqual([l.stagedCount, l.stagedPaths], [1, ['b.txt']]);
 });

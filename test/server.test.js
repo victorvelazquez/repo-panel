@@ -626,6 +626,22 @@ test('GET /api/local carries head, inProgress and base next to the unchanged fie
   });
 });
 
+test('GET /api/local reports the staged files next to the unchanged fields, and nothing else moves', async () => {
+  const repo = originAndClone({ 'a.txt': 'a\n' });
+  await withRepoPanel(repo, async ({ getApi, id }) => {
+    const clean = (await getApi(`/api/local?id=${id}`)).json;
+    assert.deepEqual([clean.stagedCount, clean.stagedPaths], [0, []]);
+    execFileSync('git', ['mv', 'a.txt', 'b.txt'], { cwd: repo.work });
+    fs.writeFileSync(path.join(repo.work, 'untracked.txt'), 'u\n');
+    const l = (await getApi(`/api/local?id=${id}`)).json;
+    assert.deepEqual([l.stagedCount, l.stagedPaths], [1, ['b.txt']]);
+    const { stagedCount, stagedPaths, files, added, deleted, ...rest } = l;
+    const { stagedCount: c2, stagedPaths: p2, files: f2, added: a2, deleted: d2, ...cleanRest } = clean;
+    assert.deepEqual(rest, cleanRest);
+    assert.equal(files.length, 2);
+  });
+});
+
 // ---------- /api/requirements and /api/prerequisites ----------
 const REG_BLOCK = '# Rules\n<!-- orquestacion:registro v1.0 -->\nrules\n<!-- /orquestacion:registro -->\n';
 const HEADER = '**Dónde está:** a\n**Qué sigue:** b\n**Qué lo bloquea:** c\n\n';
@@ -795,7 +811,7 @@ test('put-in-conditions: the order is one line, not a slash command, with the qu
   assert.equal(text.startsWith('/'), false);
   assert.ok(text.includes(`"${INSTALL}"`), text);
   assert.match(text, /user authorizes reading that one file outside this repo/);
-  assert.match(text, /ids: agents-file, roadmap-header, registro-block, ciclo-block\.$/);
+  assert.match(text, /ids: agents-file, roadmap-header, registro-block, ciclo-block\. Never use git mv or git add; keep the git index empty \(\/flow-commit refuses to start with staged files\)\.$/);
   for (const id of ['base-branch', 'adoption-record']) assert.equal(text.includes(id), false, id);
 });
 

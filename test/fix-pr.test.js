@@ -15,7 +15,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const lib = require('../lib.js');
 const { createServer } = require('../server/http.js');
-const { piSend, fixPrOrder } = require('../server/pi.js');
+const { piSend, fixPrOrder, sendGuard } = require('../server/pi.js');
 
 test.after(() => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5 }));
 
@@ -45,7 +45,7 @@ const NEVER = async () => { throw new Error('the PRs must not be read'); };
 // ---------- the builder ----------
 test('fix-pr order: one line, not a slash command, with the PR, its failing checks and its branch', () => {
   const text = fixPrOrder(prOf());
-  assert.equal(text, 'Pull request #7 "Fix the thing" of this repo has failing checks (test, lint). Find out why with gh (gh pr checks 7, gh run view --log-failed) and make sure you are on its branch "task" (switch to it only if the tree is clean; if not, stop and ask). Fix whatever is needed, in production code, test code or configuration, as long as it serves the original objective of this pull request (its title, description and commits). If the failure is unrelated to that objective or looks transient (infrastructure, a flaky run, a runner problem), do not edit any code: say so and recommend the "Re-run failed" button. If the right fix would change the scope of the pull request or needs a product decision, stop and ask. Run this repo\'s tests, and do not commit, push or open pull requests: the user will run /flow-commit and then /flow-pr, which updates this PR. When done, write one line with what you fixed and the next step.');
+  assert.equal(text, 'Pull request #7 "Fix the thing" of this repo has failing checks (test, lint). Find out why with gh (gh pr checks 7, gh run view --log-failed) and be on its branch "task" (switch only if the tree is clean; if not, stop and ask). Fix whatever is needed, in production code, test code or configuration, as long as it serves the original objective of this pull request (its title, description and commits). If the failure is unrelated to that objective or looks transient (infrastructure, a flaky run, a runner problem), do not edit any code: say so and recommend the "Re-run failed" button. If the right fix would change the scope of the pull request or needs a product decision, stop and ask. Run this repo\'s tests; do not commit, push or open pull requests: the user will run /flow-commit and /flow-pr. Never use git mv or git add; keep the git index empty (/flow-commit refuses to start with staged files). Finish with one line: what you fixed and the next step.');
   assert.equal(/[\x00-\x1f\x7f]/.test(text), false);
   assert.equal(text.startsWith('/'), false);
 });
@@ -172,7 +172,8 @@ test('POST /api/pi with fix-pr sends the order through the real server, and refu
   const fresh = () => { f = fakeOrca(); return f; };
   const failing = prOf();
   const passing = prOf({ number: 8, checks: { state: 'success', items: [] } });
-  await withServer({ orca: (args) => f.orca(args), wait: noWait, requirements: NEVER, prs: provider(failing, passing) }, async ({ post }) => {
+  let clock = 1_000_000;
+  await withServer({ orca: (args) => f.orca(args), wait: noWait, requirements: NEVER, prs: provider(failing, passing), guard: sendGuard(() => clock) }, async ({ post }) => {
     const ok = await post('/api/pi', { id, command: 'fix-pr', pr: 7 });
     assert.deepEqual([ok.status, ok.json], [200, { sent: true, confirmed: true }]);
     assert.deepEqual(f.sends(), [['send', '--terminal', 'h1', '--text', fixPrOrder(failing), '--enter']]);
@@ -183,7 +184,8 @@ test('POST /api/pi with fix-pr sends the order through the real server, and refu
     assert.equal((await post('/api/pi', { id: 'nope', command: 'fix-pr', pr: 7 })).status, 404);
     assert.equal((await post('/api/pi', { id, command: 'fix-pr', pr: 7 }, false)).status, 401);
     assert.equal(f.calls.length, 0);
-    // the browser cannot supply text: an extra text field is ignored
+    // the browser cannot supply text: an extra text field is ignored (a minute later, so the duplicate guard is not involved)
+    clock += 60_000;
     await post('/api/pi', { id, command: 'fix-pr', pr: 7, text: 'rm -rf /' });
     assert.deepEqual(f.sends().map((c) => c[4]), [fixPrOrder(failing)]);
     // the fixed keys keep working through the same route

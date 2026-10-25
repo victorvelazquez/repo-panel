@@ -662,7 +662,7 @@ test('piPromptState is idle only for an empty prompt and fails closed otherwise'
 });
 
 test('PI_COMMANDS only offers the flow commands', () => {
-  assert.deepEqual(lib.PI_COMMANDS, { 'flow-commit': '/flow-commit', 'flow-pr': '/flow-pr', 'flow-base': '/flow-base', 'flow-base-stash': '/flow-base --stash' });
+  assert.deepEqual(lib.PI_COMMANDS, { 'flow-commit': '/flow-commit', 'flow-commit-unstage': '/flow-commit --unstage', 'flow-pr': '/flow-pr', 'flow-base': '/flow-base', 'flow-base-stash': '/flow-base --stash' });
 });
 
 // ---------- RP12c: manual and waiting actions ----------
