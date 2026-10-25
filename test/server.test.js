@@ -1097,7 +1097,7 @@ test('sh: a failing git command throws an error with the command, the exit statu
     assert.match(caught.message, /git .*rev-parse --verify nope/);
     assert.match(caught.message, /status 128/);
     assert.match(caught.message, /signal/);
-    assert.match(caught.message, /fatal: Needed a single revision/);
+    assert.match(caught.message, /^stderr: \S/m, 'git\'s own stderr is included, whatever its language');
     assert.ok(caught.cause instanceof Error, 'the original error is kept as cause');
     assert.equal(caught.cause.status, 128);
     assert.ok(!/after 1 retry/.test(caught.message), 'a command that was not retried does not claim a retry');
@@ -1162,4 +1162,25 @@ test('runGit: a push that fails once on win32 and then succeeds returns the seco
 test('runGit: secrets in a URL argument never reach the error message', () => {
   const { exec } = fakeGit(gitFail(1, 'denied'));
   assert.throws(() => runGit('/w', ['clone', 'https://user:s3cret@example.com/r.git'], { exec, platform: 'linux' }), (e) => e.message.includes('example.com') && !/s3cret/.test(e.message));
+});
+
+test('runGit: GitHub tokens and Authorization header values never reach the error message, wherever they appear', () => {
+  const classic = 'ghp_' + 'A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8';
+  const fine = 'github_pat_' + '11ABCDEFG0abcdefghij_KLMNOPQRSTUVWXYZ0123456789abcdefghijklmnop';
+  const oauth = 'gho_' + 'Z9y8X7w6V5u4T3s2R1q0P9o8N7m6L5k4J3i2';
+  const { exec } = fakeGit(gitFail(1, `remote: bad credentials ${classic}\nAuthorization: Bearer abc123SECRET`, `echo ${fine} and ${oauth}`));
+  assert.throws(() => runGit('/w', ['-c', 'http.extraheader=AUTHORIZATION: basic dXNlcjpwYXNz', 'fetch', 'origin'], { exec, platform: 'linux' }), (e) => {
+    for (const secret of [classic, fine, oauth, 'abc123SECRET', 'dXNlcjpwYXNz']) assert.ok(!e.message.includes(secret), `${secret} is hidden`);
+    assert.match(e.message, /remote: bad credentials \*\*\*/);
+    assert.match(e.message, /Authorization: Bearer \*\*\*/);
+    assert.match(e.message, /AUTHORIZATION: basic \*\*\*/);
+    assert.match(e.message, /stdout: echo \*\*\* and \*\*\*/);
+    return true;
+  });
+});
+
+test('runGit: text that only looks like a token or a header is left as it was', () => {
+  const text = 'ghp_short, ghost_town, github_pat_x, an authorization was requested, see ghp_ docs';
+  const { exec } = fakeGit(gitFail(1, text));
+  assert.throws(() => runGit('/w', ['fetch'], { exec, platform: 'linux' }), (e) => e.message.includes(`stderr: ${text}`));
 });

@@ -5,6 +5,17 @@ $ErrorActionPreference = 'Stop'
 
 $taskName = 'repo-panel'
 $root = Split-Path -Parent $PSScriptRoot
+# True when $Path is the OS temp folder or inside it. A copy of these scripts there must never touch the user's real tasks.
+function Test-UnderTemp([string]$Path, [string]$Temp = [System.IO.Path]::GetTempPath()) {
+  $sep = [string][System.IO.Path]::DirectorySeparatorChar
+  $full = [System.IO.Path]::GetFullPath($Path).TrimEnd('\', '/') + $sep
+  $base = [System.IO.Path]::GetFullPath($Temp).TrimEnd('\', '/') + $sep
+  return $full.StartsWith($base, [System.StringComparison]::OrdinalIgnoreCase)
+}
+if (Test-UnderTemp $root) {
+  [Console]::Error.WriteLine("install-autostart.ps1 refused: this copy lives inside the OS temp folder ($root); install from the real repository folder.")
+  exit 2
+}
 # The task runs node through conhost, which cannot start a node.cmd or node.ps1 shim (npm, volta, fnm): it needs a real .exe.
 function Get-NodeExe {
   $exe = @(Get-Command node -All -CommandType Application -ErrorAction SilentlyContinue | Where-Object { $_.Source -like '*.exe' })
@@ -25,7 +36,7 @@ if ($DryRun) {
 
 # conhost --headless runs the console app without opening a window.
 $action = New-ScheduledTaskAction -Execute 'conhost.exe' `
-  -Argument "--headless `"$node`" server.js" -WorkingDirectory $root
+  -Argument $argument -WorkingDirectory $root
 $trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
 # Retry if the process exits with an error (e.g. another program briefly held the port at boot).
 $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `

@@ -6,7 +6,13 @@ const RETRYABLE = new Set(['push', 'clone', 'fetch']);
 const RETRY_DELAY_MS = 300;
 
 const blockingSleep = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
-const hideSecrets = (text) => String(text).replace(/(:\/\/)[^/\s@]+@/g, '$1***@');
+// Credentials in a URL, GitHub token shapes (ghp_, gho_, ghu_, ghs_, ghr_, github_pat_) and Authorization header values.
+const SECRETS = [
+  [/(:\/\/)[^/\s@]+@/g, '$1***@'],
+  [/\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})/g, '***'],
+  [/(authorization:\s*(?:(?:basic|bearer|token)\s+)?)\S+/gi, '$1***'],
+];
+const hideSecrets = (text) => SECRETS.reduce((s, [re, to]) => s.replace(re, to), String(text));
 const subcommand = (args) => args.find((a) => !String(a).startsWith('-'));
 
 // Runs `git <args>` and returns the trimmed stdout. `exec`, `platform` and `sleep` are injectable for tests.

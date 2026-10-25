@@ -27,6 +27,7 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 - **S18. Flujo completo y botones.** «quisiera que hagamos el escenario de todo el flujo y ajustar algunas cosas si falta, por ejemplo como y que momento se mustran los comandos /flow-commit, flow-pr, flow-branch»; «tambien no vi el comando /flow-branch despues de hacer merge»; y para un problema sencillo de un PR: «con ese comando activemos la orden de revisar y corregir y que vuelva a la columna correspondiente ya sea en changes si hay cambios sin commitear o en committed si solo falta hacer PR». *(RP17: botón `/flow-branch`, orden `fix-pr` y escenario completo como prueba.)*
 
 - **S19. Fallos de `/flow-commit`.** «muestra committing ... y el boton /flow-commit sigue habilitado»; y cuando el commit falla, con la sesión diciendo «Después volvé a correr /flow-commit»: «podriamos avisar en el panel eso? que se reintente cuando la sesion indico para reintentar?». Y para `/flow-pr`: «mientras se estaba ejecutando la orden, seguia mostrando en el panel asi ... creo que deberia mostrar tambien el estado actual de haciendo pr y desahabilitar el boton /flow-pr porque probe volver a ejecutar y volvio a ejecutar». *(RP18.)*
+- **S20. Que las pruebas no pisen las tareas reales.** Incidente del 2026-10-25: la tarea real `repo-panel` quedó apuntando a la carpeta temporal de un escritor. La persona aceptó el endurecimiento propuesto: «si, podes hacer».
 
 ## Tasks
 
@@ -50,7 +51,8 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 | RP17b | S18, S19 | worker acotado; claves `flow-base` y `flow-base-stash`, `staleChipTitle`, `commitOverrideItem` con `stale` y `API_VERSION` 12; hecho y verificado | pendiente de commit |
 | RP18 | S19 | botón deshabilitado con el veredicto `running`; archivos en staging detectados con Git; causa y reintento visibles en la barra de atención; órdenes a sesiones piden índice vacío; fusionado en PR #38 | `f47e5c2` |
 | RP19 | S6 | worker acotado; `install-autostart.ps1` con `Get-NodeExe` y `-DryRun`, `test/git-helper.js` con `runGit` y su reintento en Windows; fusionado en PR #39 | `ec60d85` |
-| RP20 | S19 | worker acotado; animación CSS de los estados en curso y del chip de CI pendiente; `piScreenAsk` y el estado `asking` con su aviso; hecho y verificado en Edge real | pendiente de commit |
+| RP20 | S19 | worker acotado; animación CSS de los estados en curso y del chip de CI pendiente; `piScreenAsk` y el estado `asking` con su aviso; hecho y verificado en Edge real | PR #40 (11337ab) |
+| RP21 | S20 | worker acotado con reglas de seguridad absolutas (nunca correr instaladores sin `-DryRun`); guarda de carpeta temporal, guardián de tareas en `npm test` y hallazgos de RP19; hecho y verificado | pendiente de commit |
 
 Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a → RP11b → RP12a → RP12b → RP12 → RP13 → RP14. RP12 puede ir antes de RP11 si la persona lo prefiere.
 
@@ -249,3 +251,9 @@ Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a →
 > - cuando después de ejecutar /flow-commit, pasa a la columna de committed y queda en estado de espera porque el estado sigue en committing… y el botón de /flow-pr deshabilitado, que esta bien porque sigue en proceso. pero el problema surge cuando el commit espera una confirmación mas como esta: [captura], que se puede solucionar al seleccionar la tercera opción la primera vez y después la sesión ya hace para todo el transcurso de esa sesión activa, no se si compensa agregar un aviso de cuando suceda eso u otra clase de situación que requiera una acciona o dejamos así nomas, ya que es algo que se debe elegir una sola vez por sesión?
 
 *Aplicado: RP20. Se comprobó que el panel no podía distinguir ese diálogo: con la barra «working…» debajo lo leía como `busy` (por eso seguía en «committing…») y solo, como sesión cerrada. Se agregó el aviso mínimo y genérico; el panel nunca responde por la persona. El consentimiento de revisión es una decisión suya dentro de la sesión.*
+
+**L27.** Respuesta de la persona a la propuesta de endurecer `install-autostart.ps1` tras el incidente de la tarea sobrescrita:
+
+> si, podes hacer
+
+*Aplicado: RP21.*
