@@ -130,7 +130,7 @@ test('localState: the existing fields keep their shape (branch, files, ahead, be
   assert.equal(l.detached, false);
   assert.equal(l.noUpstream, true);
   assert.deepEqual(l.files.map((f) => [f.path, f.untracked, f.added]), [['new.txt', true, 2]]);
-  assert.deepEqual(Object.keys(l).sort(), ['added', 'ahead', 'base', 'behind', 'branch', 'currentGone', 'deleted', 'detached', 'files', 'goneBranches', 'head', 'inProgress', 'noUpstream', 'stagedCount', 'stagedPaths', 'upstream'].sort());
+  assert.deepEqual(Object.keys(l).sort(), ['added', 'ahead', 'base', 'behind', 'branch', 'currentGone', 'deleted', 'detached', 'files', 'goneBranches', 'head', 'inProgress', 'lastChangeMs', 'noUpstream', 'stagedCount', 'stagedPaths', 'upstream'].sort());
   assert.deepEqual(await localState({ path: path.join(dir, 'missing') }), { error: 'Folder not found' });
 });
 

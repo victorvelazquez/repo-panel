@@ -9,7 +9,7 @@ Después de CADA acción que escriba archivos, corrija o implemente algo, o cuan
 3. Nunca commitees `.panel/`. Si Git no la ignora, agregá `.panel/` a `.git/info/exclude` (creá el archivo si falta). No la agregues a `.gitignore`.
 
 Valores de `state`:
-- `working`: seguís trabajando.
+- `working`: seguís trabajando, también mientras dejás un trabajo corriendo en segundo plano (no pases a `ready-to-commit` hasta tener su resultado).
 - `needs-input`: esperás una decisión de la persona.
 - `ready-to-commit`: el trabajo está terminado y verificado; se pueden commitear los archivos.
 - `ready-to-pr`: ya está commiteado y listo para un pull request.

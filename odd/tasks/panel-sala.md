@@ -28,6 +28,9 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 
 - **S19. Fallos de `/flow-commit`.** «muestra committing ... y el boton /flow-commit sigue habilitado»; y cuando el commit falla, con la sesión diciendo «Después volvé a correr /flow-commit»: «podriamos avisar en el panel eso? que se reintente cuando la sesion indico para reintentar?». Y para `/flow-pr`: «mientras se estaba ejecutando la orden, seguia mostrando en el panel asi ... creo que deberia mostrar tambien el estado actual de haciendo pr y desahabilitar el boton /flow-pr porque probe volver a ejecutar y volvio a ejecutar». *(RP18.)*
 - **S20. Que las pruebas no pisen las tareas reales.** Incidente del 2026-10-25: la tarea real `repo-panel` quedó apuntando a la carpeta temporal de un escritor. La persona aceptó el endurecimiento propuesto: «si, podes hacer».
+- **S21. El botón de commit no debe poder pulsarse a mitad del trabajo.** «cuando hay un nuevo cambio detectado en el repo y la sesión esta en ejecución de algo todavia, o sea que este todavía trabajando y no están listos los cambios porque se estarán haciendo mas cambios y la tarjeta ya esta en la columna changes con el botón de /flow-commit habilitado, creo que eso seria un problema por si accidentalmente clickeo el botón». Los trabajos en segundo plano: «solo si será fácil el trato de estas situaciones».
+- **S22. Refresco y colores.** «creo que cada 20 segundos se vuelve a verificar todo, y creo que ya es mucho la espera para ver los cambios [...] lo mínimo posible para que refleje mas rápido los cambios pero sin forzar recursos»; «tarda mucho en mostrar el estado de: Merged: run /flow-base»; «mostrar con colores los mensajes animados de estado»; «que queden en sintonia o armonia» con GitHub, también las columnas.
+- **S23. Columna Merged y Clean.** «no es mejor mostrar una columna aparte de los en estado "Merged: run /flow-base"?»; «la columna de Clean es necesario o util? creo a veces no se muy bien su utlidad real»; aprobado: «me cierra separar RP25 y que Clean pase a ser una barra plegable cerrada por defecto [...] si no me gusta volvemos a mostrar en el tablero como columna».
 
 ## Tasks
 
@@ -54,6 +57,9 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 | RP20 | S19 | worker acotado; animación CSS de los estados en curso y del chip de CI pendiente; `piScreenAsk` y el estado `asking` con su aviso; hecho y verificado en Edge real | PR #40 (11337ab) |
 | RP21 | S20 | worker acotado con reglas de seguridad absolutas (nunca correr instaladores sin `-DryRun`); guarda de carpeta temporal, guardián de tareas en `npm test` y hallazgos de RP19; hecho y verificado | PR #41 (3758ef3) |
 | RP22 | S20 | en línea (un solo tema); guardián con todas las acciones de la tarea y `safeToRunCopy`; RED primero; hecho y verificado | pendiente de commit |
+| RP23 | S22 | pendiente; refresco local/remoto separado, repos calientes, caché corta del PR fusionado, paleta acorde a GitHub | pendiente |
+| RP24 | S21 | worker acotado con reglas de seguridad; `working` sin invalidar por actividad, sesión busy/asking deshabilita /flow-commit, período de calma | pendiente de commit |
+| RP25 | S23 | pendiente; columna Merged y barra plegable «Idle» para Clean, reversible | pendiente |
 
 Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a → RP11b → RP12a → RP12b → RP12 → RP13 → RP14. RP12 puede ir antes de RP11 si la persona lo prefiere.
 
@@ -273,3 +279,44 @@ Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a →
 > podes ajecutar lo recomendado del punto 3
 
 *Aplicado: RP22.*
+
+**L30.** Observaciones de la persona tras fusionar RP22:
+
+> tengo algunas observaciones:
+> - podríamos mostrar con colores los mensajes animados de estado de: committing…, creating pull request…, … 2 running · 2/4, updating base branch…
+> - también cuando hay un nuevo cambio detectado en el repo y la sesión esta en ejecución de algo todavia, o sea que este todavía trabajando y no están listos los cambios porque se estarán haciendo mas cambios y la tarjeta ya esta en la columna changes con el botón de /flow-commit habilitado, creo que eso seria un problema por si accidentalmente clickeo el botón. en momentos anteriores ya habíamos planteado ese problema y no se si dimos con alguna propuesta de como manejar esta situación. o te parece si vemos como podemos tratar esta situación? creo que la idea era que agreguemos en cada agents.md una regla de que cuando termine una etapa del ciclo que responda en una linea el estado habilitado como siguiente paso y de ahí íbamos a tomar si esta habilitado para commit, pr, merge o volver a base? que me decís sobre eso. puedes analizar esa situación y plantearme algo? creo que seria bueno es opción también para todos los estados de leer la ultima linea del chat de la sesión para habilitar los botones de comandos en cada columna según su estado?
+> también para ese problemas debemos considerar que hay tipos de ejecuciones que corren en segundo plano como estos:
+> * Falta solo el resultado de la suite completa con el wrapper (corre en segundo plano). Cuando termine, registro RP21 en la hoja de ruta y en el plan con los números reales, no con los que me contó el escritor.
+> * La suite completa corre en segundo plano. Cuando termine, cierro con el resultado.
+> con eso no quiero que nos preocupemos tambien con todo esto si es que va a ser muy complicado de manejar. solo si será fácil el trato de estas situaciones.
+> - otro detalle, creo que cada 20 segundos se vuelve a verificar todo, y creo que ya es mucho la espera para ver los cambios. hasta cuantos segundos es recomendado bajar.? lo mínimo posible para que refleje mas rápido los cambios pero sin forzar recursos.
+> - también tarda mucho en mostrar el estado de: Merged: run /flow-base, suele estar un buen tiempo como clean y después recién muestra /flow-base.
+
+*Aplicado: análisis y propuesta (RP23 y RP24).*
+
+**L31.**
+
+> los colores podrian ser los que mas convinan con cada accion? github no tiene colores para esos estados?
+
+*Aplicado: se propuso una correspondencia con los colores de GitHub.*
+
+**L32.**
+
+> - me gustan los colores que propones igual o parecidos a los de github. que mas podriamos ajustar de todos los colores que manejamos en el panel para que quedo todo acorde a github o que queden en sintonia o armonia. tambien analiza los colores de cada columnas si pueden ser tambien acordes.
+> - y arracamos con lo que te parezca mejor
+
+*Aplicado: se empieza por RP24 (el botón).*
+
+**L33.**
+
+> - prfecto, me gustan los colores que propones.
+> - una consulta. no es mejor mostrar una columna aparte de los en estado "Merged: run /flow-base"?
+> - y la columna de Clean es necesario o util? creo a veces no se muy bien su utlidad real. y no se si me aporta algo para entender los estados de los trabajos actuales.
+
+*Aplicado: se propuso la columna Merged y una barra plegable para Clean (RP25).*
+
+**L34.**
+
+> me cierra separar RP25 y que Clean pase a ser una barra plegable cerrada por defecto, pero mas adelante podemos querer iniciar alguna accion desde los repos en clean. cuando haya posibilidad de integrar el chat y poder iniciar sesion y demas ideas. pero por el momento podemos ahorrar ese espacio. si no me gusta volvemos a mostrar en el tablero como columna.
+
+*Aplicado: RP25 queda registrada como pendiente, con esas dos condiciones.*

@@ -8,7 +8,7 @@
 }(typeof self !== 'undefined' ? self : this, () => {
   // Bump it when the client starts needing a new or changed server route. /health reports the value
   // the running server loaded at start; the page compares it with the file it just downloaded.
-  const API_VERSION = 14;
+  const API_VERSION = 15;
 
   // `health` is the parsed /health answer, or null when the request itself failed (no answer, so
   // there is nothing to warn about). Any answer without the current integer `api` is out of date:
@@ -147,10 +147,39 @@
     return data.state === 'working' && Number.isFinite(at) && now - at > WORKING_EXPIRY_MS;
   }
 
+  // A declared `working` is not invalidated by repo activity (`stale`): the agent is meant to be changing files
+  // while it works, so only its own expiry ends it. Every other state is ignored once the repo changed after it.
   function usableState(data, now = Date.now()) {
-    if (!data || data.available !== true || data.stale === true) return null;
+    if (!data || data.available !== true || (data.stale === true && data.state !== 'working')) return null;
     if (!Object.hasOwn(STATE_DOT, data.state)) return null;
     return expiredWorking(data, now) ? null : data;
+  }
+
+  // Why the commit buttons are disabled while the work is still going on, or null. `session` is the state of
+  // GET /api/pi-status for a repo with changes: only busy and asking hold; idle, closed, ambiguous, unknown and a
+  // failed request never do (fail open, a flaky Orca must not hold a repo hostage).
+  const SESSION_BUSY = 'the pi session is still working';
+  const SESSION_ASKING = 'waiting for your answer in the session';
+  const QUIET_MS = 20 * 1000; // files changed more recently than this: more changes are probably coming
+  const QUIET_SKEW_MS = 5 * 1000; // a time further in the future than this is a clock problem, not activity
+  const QUIET_REASON = 'files changed a few seconds ago';
+
+  function sessionHold(session) {
+    return session === 'busy' ? SESSION_BUSY : session === 'asking' ? SESSION_ASKING : null;
+  }
+
+  // Whether the newest changed file is younger than QUIET_MS. A missing or non-finite value never blocks.
+  function quietPeriod(lastChangeMs, now = Date.now()) {
+    if (typeof lastChangeMs !== 'number' || !Number.isFinite(lastChangeMs)) return false;
+    const age = now - lastChangeMs;
+    return age >= -QUIET_SKEW_MS && age < QUIET_MS;
+  }
+
+  // The repos whose live session state the page polls: loaded, with uncommitted changes, and no command of the panel
+  // in flight (loadPiStatus already polls those). Nothing while the tab is hidden.
+  function piPollTargets({ ids = [], local = {}, sent = {}, hidden = false } = {}) {
+    if (hidden) return [];
+    return ids.filter((id) => hasLocal(local[id]) && local[id].files.length > 0 && !sent[id]);
   }
 
   // The commit button stays unless a usable state says the work is not ready to commit. No state never blocks.
@@ -163,8 +192,9 @@
 
   // The "⋯" menu item that lifts the state gating, only while the gating hides the button and it is not lifted yet.
   // Never on a stale repo with changes: that card offers /flow-base --stash, so /flow-commit would not appear anyway.
-  function commitOverrideItem(data, { now = Date.now(), override = false, stale = false } = {}) {
-    return !override && !stale && !commitAllowed(data, { now }) ? { act: 'show-commit', label: 'Show /flow-commit anyway' } : null;
+  // `session` is the live pi session state: a busy or asking one also gates the button, and the item lifts that too.
+  function commitOverrideItem(data, { now = Date.now(), override = false, stale = false, session } = {}) {
+    return !override && !stale && (!commitAllowed(data, { now }) || sessionHold(session)) ? { act: 'show-commit', label: 'Show /flow-commit anyway' } : null;
   }
 
   // The card's "what to do now" line: { kind: 'current', dot, text, title } for a usable state, { kind: 'outdated',
@@ -241,7 +271,9 @@
   // flow-commit-unstage | flow-pr | flow-base | flow-base-stash, or []. The one source of truth for the page and the
   // tests. `ctx` is { override (the person lifted the declared-state gating of /flow-commit), verdict ('running' |
   // 'ok' | 'attention' | null, the last /flow-commit), running ({ cmd, label } of a command sent from this page that is
-  // still running: the same buttons come back disabled with a reason), retry (label the commit button "Retry …"), now }.
+  // still running: the same buttons come back disabled with a reason), retry (label the commit button "Retry …"), session
+  // (live pi session state of a repo with changes: busy or asking disables the commit pair with a reason; so does a
+  // `local.lastChangeMs` younger than QUIET_MS; `override` lifts both), now }.
   // A stale repo with changed or untracked files offers /flow-base --stash instead of /flow-commit (the skill carries
   // the changes aside, updates the base branch and brings them back). A dirty repo with staged files offers
   // /flow-commit --unstage instead of /flow-commit (the index must be empty). Neither branch button shows while a
@@ -258,8 +290,9 @@
     if (local.files.length > 0) {
       if (!commitAllowed(stateData, { now, override })) return [];
       const again = retry ? 'Retry ' : '';
-      if (local.stagedCount > 0) return [{ cmd: 'flow-commit-unstage', label: `${again}/flow-commit --unstage`, reason: UNSTAGE_HINT }];
-      return [{ cmd: 'flow-commit', label: `${again}/flow-commit` }];
+      const hold = override ? null : sessionHold(ctx.session) || (quietPeriod(local.lastChangeMs, now) ? QUIET_REASON : null);
+      if (local.stagedCount > 0) return [{ cmd: 'flow-commit-unstage', label: `${again}/flow-commit --unstage`, reason: hold || UNSTAGE_HINT, ...(hold ? { disabled: true } : {}) }];
+      return [{ cmd: 'flow-commit', label: `${again}/flow-commit`, ...(hold ? { disabled: true, reason: hold } : {}) }];
     }
     const pa = local.ahead > 0 ? prAction(local, prInfo, verdict) : null;
     if (pa && pa.show) return [{ cmd: 'flow-pr', label: pa.update ? '/flow-pr (update PR)' : '/flow-pr' }];
@@ -397,5 +430,5 @@
     return attention(`No change 15 minutes after ${text} and the pi session state is unknown`);
   }
 
-  return { API_VERSION, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, isProblem, prColumn, commitVerdict, queueFlags, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, presenceLabel, presenceDot };
+  return { API_VERSION, QUIET_MS, quietPeriod, piPollTargets, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, isProblem, prColumn, commitVerdict, queueFlags, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, presenceLabel, presenceDot };
 }));

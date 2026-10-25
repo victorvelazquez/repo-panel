@@ -6,8 +6,8 @@ const path = require('node:path');
 const vm = require('node:vm');
 const { API_VERSION, isOutdated, conformityView } = require('../public/view.js');
 
-test('API_VERSION is 14: the page needs flow-commit-unstage, the staged fields, pi-status tail and the asking state', () => {
-  assert.equal(API_VERSION, 14);
+test('API_VERSION is 15: the page needs flow-commit-unstage, the staged fields, pi-status tail and the asking state', () => {
+  assert.equal(API_VERSION, 15);
 });
 
 test('API_VERSION is a positive integer', () => {
