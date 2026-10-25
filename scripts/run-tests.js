@@ -5,7 +5,7 @@
 const { spawnSync } = require('node:child_process');
 
 const TASKS = ['repo-panel', 'repo-panel-tray'];
-const FIELDS = ['execute', 'arguments', 'workingDirectory', 'triggers', 'restartCount'];
+const FIELDS = ['execute', 'arguments', 'workingDirectory', 'moreActions', 'triggers', 'restartCount'];
 
 // Read-only: Get-ScheduledTask only. A task that is not there is `absent`; any other failure is `unavailable`.
 const READ_SCRIPT = [
@@ -15,7 +15,8 @@ const READ_SCRIPT = [
   '  try {',
   '    $t = Get-ScheduledTask -TaskName $n',
   '    $a = @($t.Actions)[0]',
-  "    $r[$n] = @{ status = 'present'; execute = $a.Execute; arguments = $a.Arguments; workingDirectory = $a.WorkingDirectory;",
+  '    $more = @(@($t.Actions) | Select-Object -Skip 1 | ForEach-Object { @{ execute = $_.Execute; arguments = $_.Arguments; workingDirectory = $_.WorkingDirectory } })',
+  "    $r[$n] = @{ status = 'present'; execute = $a.Execute; arguments = $a.Arguments; workingDirectory = $a.WorkingDirectory; moreActions = $more;",
   '      triggers = @($t.Triggers | ForEach-Object { $_.CimClass.CimClassName }); restartCount = $t.Settings.RestartCount }',
   '  } catch {',
   "    if ($_.CategoryInfo.Category -eq 'ObjectNotFound' -or $_.FullyQualifiedErrorId -like '*NotFound*') { $r[$n] = @{ status = 'absent' } }",
@@ -37,7 +38,7 @@ function readSnapshot(spawn = spawnSync) {
     for (const t of TASKS) {
       const e = parsed[t];
       if (!e || typeof e !== 'object') out[t] = { status: 'unavailable', reason: 'no data' };
-      else if (e.status === 'present') out[t] = { ...e, triggers: [].concat(e.triggers ?? []) };
+      else if (e.status === 'present') out[t] = { ...e, moreActions: [].concat(e.moreActions ?? []), triggers: [].concat(e.triggers ?? []) };
       else out[t] = e;
     }
     return out;

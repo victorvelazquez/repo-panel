@@ -52,7 +52,8 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 | RP18 | S19 | botón deshabilitado con el veredicto `running`; archivos en staging detectados con Git; causa y reintento visibles en la barra de atención; órdenes a sesiones piden índice vacío; fusionado en PR #38 | `f47e5c2` |
 | RP19 | S6 | worker acotado; `install-autostart.ps1` con `Get-NodeExe` y `-DryRun`, `test/git-helper.js` con `runGit` y su reintento en Windows; fusionado en PR #39 | `ec60d85` |
 | RP20 | S19 | worker acotado; animación CSS de los estados en curso y del chip de CI pendiente; `piScreenAsk` y el estado `asking` con su aviso; hecho y verificado en Edge real | PR #40 (11337ab) |
-| RP21 | S20 | worker acotado con reglas de seguridad absolutas (nunca correr instaladores sin `-DryRun`); guarda de carpeta temporal, guardián de tareas en `npm test` y hallazgos de RP19; hecho y verificado | pendiente de commit |
+| RP21 | S20 | worker acotado con reglas de seguridad absolutas (nunca correr instaladores sin `-DryRun`); guarda de carpeta temporal, guardián de tareas en `npm test` y hallazgos de RP19; hecho y verificado | PR #41 (3758ef3) |
+| RP22 | S20 | en línea (un solo tema); guardián con todas las acciones de la tarea y `safeToRunCopy`; RED primero; hecho y verificado | pendiente de commit |
 
 Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a → RP11b → RP12a → RP12b → RP12 → RP13 → RP14. RP12 puede ir antes de RP11 si la persona lo prefiere.
 
@@ -257,3 +258,18 @@ Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a →
 > si, podes hacer
 
 *Aplicado: RP21.*
+
+**L28.** Respuesta de la persona al estado tras fusionar RP21 (punto 1: orden a la sesión de `flow-skills`; punto 2: ramas locales; punto 3: los hallazgos de la revisión; punto 4: el panel):
+
+> 1. le di orden que implemente la mejora.
+> 2.  podes borrar todas.
+> 3. no se que es? me pedis para ejecutar?
+> 4. te avisare.
+
+*Aplicado: se borraron las 5 ramas locales; se explicó el punto 3.*
+
+**L29.**
+
+> podes ajecutar lo recomendado del punto 3
+
+*Aplicado: RP22.*

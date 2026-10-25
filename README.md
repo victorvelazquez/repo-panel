@@ -55,7 +55,7 @@ npm run open       # same as start, and opens the browser (Windows only)
 npm test           # run the test suite (node --test through scripts/run-tests.js)
 ```
 
-`npm test` forwards every extra argument to `node --test` (`npm test -- --test-name-pattern foo`). On Windows it also reads the definition of the real `repo-panel` and `repo-panel-tray` scheduled tasks (read-only) before and after the run and fails with a loud message if either changed, even when every test passed. When all is fine it adds one line: `task guard: repo-panel and repo-panel-tray unchanged`. If PowerShell cannot read the tasks the line says so and the run is not failed.
+`npm test` forwards every extra argument to `node --test` (`npm test -- --test-name-pattern foo`). On Windows it also reads the definition of the real `repo-panel` and `repo-panel-tray` scheduled tasks (read-only: every action, the triggers and the restart count) before and after the run and fails with a loud message if either changed, even when every test passed. When all is fine it adds one line: `task guard: repo-panel and repo-panel-tray unchanged`. If PowerShell cannot read the tasks the line says so and the run is not failed.
 
 ## Start automatically at logon (Windows)
 
