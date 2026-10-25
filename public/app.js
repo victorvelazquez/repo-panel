@@ -12,7 +12,7 @@ const S = {
   dismissed: new Set(), menu: null, reqPassOpen: {},
   group: '', q: '', queue: [], queueKey: '', queueSeq: 0,
   conf: { items: [], ok: 0, loaded: false, failed: false, key: '', seq: 0 }, confOpen: false,
-  req: {}, reqSeq: {}, state: {}, stateSeq: {}, sent: {}, pistatus: {}, pistatusSeq: {}, pitail: {}, piask: {}, tailFor: {}, finishing: {}, showCommit: new Set(), prereq: { state: 'loading', items: [], seq: 0 },
+  req: {}, reqSeq: {}, state: {}, stateSeq: {}, sent: {}, pistatus: {}, pistatusSeq: {}, live: {}, liveBusy: {}, pitail: {}, piask: {}, tailFor: {}, finishing: {}, showCommit: new Set(), prereq: { state: 'loading', items: [], seq: 0 },
   rooms: [], roomIssues: [], roomData: { state: 'loading', data: null }, roomSeq: 0,
   prefs: store('prefs', { method: 'squash', del: true }),
   lastRefresh: 0, scan: [],
@@ -121,6 +121,35 @@ function loadPiStatus(id) {
   ));
 }
 
+// The session state of a repo with uncommitted changes and no command of this page in flight (S.live), so the commit
+// button is disabled while the agent is still working. Silent: it redraws only when the answer changes, one request per
+// repo at a time. A failed request clears it: an unknown session never blocks.
+function loadLive(id) {
+  if (S.liveBusy[id]) return Promise.resolve();
+  S.liveBusy[id] = true;
+  const set = (state) => {
+    if (S.sent[id] || S.live[id] === state) return;
+    if (state === undefined) delete S.live[id]; else S.live[id] = state;
+    draw();
+  };
+  return pooled(() => api(`/api/pi-status?id=${id}`)).then((d) => set(d.state), () => set(undefined)).finally(() => { delete S.liveBusy[id]; });
+}
+
+// Every few seconds, while the tab is visible: polls the repos the view says need it and forgets the rest. It also
+// redraws when a repo is inside the quiet period, so the button enables itself once that ends.
+let quietNow = {}; // which polled repos were inside the quiet period at the last tick
+function pollLive() {
+  const ids = V ? V.piPollTargets({ ids: allRepos().map((r) => r.id), local: S.local, sent: S.sent, hidden: document.hidden }) : [];
+  for (const id of Object.keys(S.live)) if (!ids.includes(id)) delete S.live[id];
+  ids.forEach(loadLive);
+  // Redraw while a repo is inside the quiet period and once more on the tick that finds it over, or the disabled button stays.
+  const quiet = {};
+  for (const id of ids) quiet[id] = V.quietPeriod(S.local[id].lastChangeMs);
+  const redraw = ids.some((id) => quiet[id] || quietNow[id]);
+  quietNow = quiet;
+  if (redraw) draw();
+}
+
 // Applies a polled session state. A session that stops being busy has just finished its command: the repo's data is
 // refreshed first (so the card moves column at once and never judges the result on stale data), and only then is the
 // new state applied. The screen tail is asked for once per sent command, and only when the verdict needs attention.
@@ -153,6 +182,7 @@ function loadTail(id) {
 // Starts (or restarts) the in-progress record of a command the session just received.
 function startSent(id, record) {
   clearSent(id);
+  delete S.live[id];
   S.sent[id] = record;
   draw();
   loadPiStatus(id);
@@ -200,6 +230,7 @@ async function refreshAll() {
   if (S.conf.failed) S.conf.key = ''; // ask again once per refresh, never on every redraw
   S.lastRefresh = Date.now();
   await Promise.all([loadPrerequisites(), loadRooms(), ...allRepos().map((r) => refreshRepo(r.id))]);
+  pollLive();
 }
 
 async function fetchRepo(id) {
@@ -678,8 +709,8 @@ function repoCard(r, attn = false, verdict = null) {
   const commitVerdict = verdict && COMMIT_CMDS.includes(verdict.cmd) ? verdict.state : null;
   const running = verdict && verdict.state === 'running' ? { cmd: verdict.cmd, label: verdict.label } : null;
   const retry = commitVerdict === 'attention';
-  const flow = V ? V.flowButtons(l, p, S.state[r.id], { override, verdict: commitVerdict, running, retry }) : dirty ? [{ cmd: 'flow-commit', label: '/flow-commit' }] : [];
-  const overrideItem = !manual && dirty && V ? V.commitOverrideItem(S.state[r.id], { override, stale: !!p.stale }) : null;
+  const flow = V ? V.flowButtons(l, p, S.state[r.id], { override, verdict: commitVerdict, running, retry, session: S.sent[r.id] ? undefined : S.live[r.id] }) : dirty ? [{ cmd: 'flow-commit', label: '/flow-commit' }] : [];
+  const overrideItem = !manual && dirty && V ? V.commitOverrideItem(S.state[r.id], { override, stale: !!p.stale, session: S.sent[r.id] ? undefined : S.live[r.id] }) : null;
   const chips = [];
   if (dirty) chips.push(`<button class="chip yellow chip-btn" data-act="diff" data-id="${r.id}" title="View diff">● ${l.files.length} file${l.files.length === 1 ? '' : 's'} <span class="add">+${l.added}</span> <span class="del">−${l.deleted}</span></button>`);
   if (unpushed) chips.push(`<span class="chip blue">↑ ${l.ahead} unpushed${l.noUpstream ? ' · no upstream' : ''}</span>`);
@@ -971,6 +1002,7 @@ $('#groupFilter').addEventListener('change', (e) => { S.group = e.target.value; 
 setInterval(() => {
   if (!document.hidden && !Object.keys(S.busy).length) refreshAll();
 }, 60000);
+setInterval(pollLive, 10000);
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden && Date.now() - S.lastRefresh > 30000) refreshAll();
 });

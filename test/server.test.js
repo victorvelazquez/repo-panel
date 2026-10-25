@@ -635,8 +635,9 @@ test('GET /api/local reports the staged files next to the unchanged fields, and 
     fs.writeFileSync(path.join(repo.work, 'untracked.txt'), 'u\n');
     const l = (await getApi(`/api/local?id=${id}`)).json;
     assert.deepEqual([l.stagedCount, l.stagedPaths], [1, ['b.txt']]);
-    const { stagedCount, stagedPaths, files, added, deleted, ...rest } = l;
-    const { stagedCount: c2, stagedPaths: p2, files: f2, added: a2, deleted: d2, ...cleanRest } = clean;
+    const { stagedCount, stagedPaths, files, added, deleted, lastChangeMs, ...rest } = l;
+    const { stagedCount: c2, stagedPaths: p2, files: f2, added: a2, deleted: d2, lastChangeMs: m2, ...cleanRest } = clean;
+    assert.ok(Number.isFinite(lastChangeMs) && m2 === null);
     assert.deepEqual(rest, cleanRest);
     assert.equal(files.length, 2);
   });

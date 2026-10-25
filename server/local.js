@@ -1,6 +1,7 @@
 'use strict';
 // Local Git state of a repo: status, line counts, diff and the base branch.
 const fs = require('node:fs');
+const fsp = require('node:fs/promises');
 const path = require('node:path');
 const lib = require('../lib.js');
 const { git, firstLine } = require('./exec.js');
@@ -41,6 +42,15 @@ async function inProgressOf(repo, run) {
 }
 
 const STAGED_CAP = 20;
+const MAX_MTIME_FILES = 200;
+
+// Newest mtime (epoch ms) of the changed or untracked files, from the status already parsed: one lstat per file, no
+// git call. A file that vanished is skipped; null when none could be read.
+async function newestMtime(repo, files) {
+  const stats = await Promise.all(files.slice(0, MAX_MTIME_FILES).map((f) => fsp.lstat(path.join(repo.path, f.path)).catch(() => null)));
+  const times = stats.filter((s) => s && Number.isFinite(s.mtimeMs)).map((s) => Math.floor(s.mtimeMs));
+  return times.length ? Math.max(...times) : null;
+}
 
 // The runner is injectable so tests can force failures; the facts above never throw.
 async function localState(repo, { git: run = git } = {}) {
@@ -74,7 +84,7 @@ async function localState(repo, { git: run = git } = {}) {
   const fr = await run(repo.path, ['for-each-ref', '--format=%(refname:short)%09%(upstream:track)', 'refs/heads']);
   const gone = fr.code === 0 ? lib.parseGoneBranches(fr.stdout) : [];
 
-  const [head, inProgress, base] = await Promise.all([headOf(repo, run), inProgressOf(repo, run), baseBranchOf(repo, run).catch(() => null)]);
+  const [head, inProgress, base, lastChangeMs] = await Promise.all([headOf(repo, run), inProgressOf(repo, run), baseBranchOf(repo, run).catch(() => null), newestMtime(repo, s.files)]);
 
   // Paths with a change in the index (renames included), from the same status parse; untracked files are never staged.
   const staged = s.files.filter((f) => f.xy !== '??' && f.xy[0] !== '.').map((f) => f.path).sort();
@@ -85,7 +95,7 @@ async function localState(repo, { git: run = git } = {}) {
     added: files.reduce((a, f) => a + f.added, 0),
     deleted: files.reduce((a, f) => a + f.deleted, 0),
     goneBranches: gone, currentGone: !!s.branch && gone.includes(s.branch),
-    head, inProgress, base,
+    head, inProgress, base, lastChangeMs,
     stagedCount: staged.length, stagedPaths: staged.slice(0, STAGED_CAP),
   };
 }
