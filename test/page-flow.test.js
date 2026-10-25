@@ -68,21 +68,31 @@ test('page: the /flow-pr button on a Committed card keeps its markup, and its up
   assert.ok(update.includes(`<div class="actions">${button('flow-pr', '/flow-pr (update PR)')}</div>`), update);
 });
 
-test('page: a stale clean card offers /flow-branch with a tooltip, and the red chip points at the button', () => {
-  const html = card(loadPage(), local({ currentGone: true }), { stale: { via: 'merged', pr: 7, reason: 'Merged: run /flow-branch' } });
-  const m = /<button data-act="pi" data-id="abc" data-cmd="flow-branch" title="([^"]+)">\/flow-branch<\/button>/.exec(html);
+test('page: a stale clean card offers /flow-base with a tooltip, and the red chip points at the button', () => {
+  const html = card(loadPage(), local({ currentGone: true }), { stale: { via: 'merged', pr: 7, reason: 'Merged: run /flow-base' } });
+  const m = /<button data-act="pi" data-id="abc" data-cmd="flow-base" title="([^"]+)">\/flow-base<\/button>/.exec(html);
   assert.ok(m, html);
   assert.match(m[1], /fresh, updated base branch/);
-  assert.match(html, /<span class="chip red" title="[^"]*\/flow-branch button[^"]*">Merged: run \/flow-branch<\/span>/);
+  assert.match(html, /<span class="chip red" title="[^"]*Press the \/flow-base button to start[^"]*">Merged: run \/flow-base<\/span>/);
+  assert.equal(/class="chip red" title="[^"]*--stash/.test(html), false);
 });
 
-test('page: a stale card with changes offers /flow-branch --stash with a tooltip and no /flow-commit', () => {
-  const html = card(loadPage(), local({ files: [file] }), { stale: { via: 'merged', pr: 7, reason: 'Merged: run /flow-branch' } });
-  const m = /<button data-act="pi" data-id="abc" data-cmd="flow-branch-stash" title="([^"]+)">\/flow-branch --stash<\/button>/.exec(html);
+test('page: a stale card with changes offers /flow-base --stash with a tooltip and no /flow-commit', () => {
+  const html = card(loadPage(), local({ files: [file] }), { stale: { via: 'merged', pr: 7, reason: 'Merged: run /flow-base' } });
+  const m = /<button data-act="pi" data-id="abc" data-cmd="flow-base-stash" title="([^"]+)">\/flow-base --stash<\/button>/.exec(html);
   assert.ok(m, html);
   assert.match(m[1], /refuses and changes nothing/);
   assert.equal(html.includes('data-cmd="flow-commit"'), false);
-  assert.equal(html.includes('data-cmd="flow-branch"'), false);
+  assert.equal(html.includes('data-cmd="flow-base"'), false);
+  assert.match(html, /<span class="chip red" title="[^"]*Press the \/flow-base --stash button[^"]*uncommitted changes[^"]*">/);
+});
+
+test('page: the "Show /flow-commit anyway" menu item is offered on a dirty card, but not on a stale dirty one', () => {
+  const page = loadPage();
+  const open = (l, p) => { page.get('S').menu = 'abc|repo'; return card(page, l, p); };
+  page.get('S').state[R.id] = { available: true, state: 'needs-input', next: 'x', at: new Date().toISOString(), head: 'h1' };
+  assert.ok(open(local({ files: [file] }), {}).includes('data-act="show-commit"'));
+  assert.equal(open(local({ files: [file] }), { stale: { via: 'merged', pr: 7, reason: 'Merged: run /flow-base' } }).includes('show-commit'), false);
 });
 
 test('page: a failed PR shows "Fix with pi" (also with no run to re-run) and "Re-run failed" only when there are runs', () => {
@@ -113,7 +123,7 @@ test('page: the pi buttons post the command, and only the fix-pr one carries its
 test('page: the stash button posts only its key and reads no commit baseline', async () => {
   const page = loadPage();
   page.answers['/api/pi'] = { sent: true, confirmed: true };
-  await page.get('ACTIONS').pi({ dataset: { id: 'abc', cmd: 'flow-branch-stash' }, disabled: false });
-  assert.deepEqual(page.calls.filter((c) => c.url === '/api/pi' || c.url.startsWith('/api/local')).map((c) => [c.url, c.body]), [['/api/pi', { id: 'abc', command: 'flow-branch-stash' }]]);
+  await page.get('ACTIONS').pi({ dataset: { id: 'abc', cmd: 'flow-base-stash' }, disabled: false });
+  assert.deepEqual(page.calls.filter((c) => c.url === '/api/pi' || c.url.startsWith('/api/local')).map((c) => [c.url, c.body]), [['/api/pi', { id: 'abc', command: 'flow-base-stash' }]]);
   assert.deepEqual(Object.keys(page.get('S').sent), []);
 });

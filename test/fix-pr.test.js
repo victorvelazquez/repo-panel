@@ -136,11 +136,11 @@ test('piSend still refuses an unknown key before reading anything, and the fixed
   const f = fakeOrca();
   for (const c of ['rm -rf', '/fix-pr', 'fix_pr', 'constructor', undefined]) await refuses(piSend(REPO, c, f.orca, noWait, NEVER, { pr: 7, prs: NEVER }), 400, /Unknown command/);
   assert.equal(f.calls.length, 0);
-  await piSend(REPO, 'flow-branch', f.orca, noWait, NEVER, { pr: 7, prs: NEVER });
-  assert.deepEqual(f.sends(), [['send', '--terminal', 'h1', '--text', '/flow-branch', '--enter']]);
+  await piSend(REPO, 'flow-base', f.orca, noWait, NEVER, { pr: 7, prs: NEVER });
+  assert.deepEqual(f.sends(), [['send', '--terminal', 'h1', '--text', '/flow-base', '--enter']]);
   const g = fakeOrca();
-  await piSend(REPO, 'flow-branch-stash', g.orca, noWait, NEVER, { pr: 7, prs: NEVER });
-  assert.deepEqual(g.sends(), [['send', '--terminal', 'h1', '--text', '/flow-branch --stash', '--enter']]);
+  await piSend(REPO, 'flow-base-stash', g.orca, noWait, NEVER, { pr: 7, prs: NEVER });
+  assert.deepEqual(g.sends(), [['send', '--terminal', 'h1', '--text', '/flow-base --stash', '--enter']]);
 });
 
 // ---------- the real server ----------
@@ -188,18 +188,24 @@ test('POST /api/pi with fix-pr sends the order through the real server, and refu
     assert.deepEqual(f.sends().map((c) => c[4]), [fixPrOrder(failing)]);
     // the fixed keys keep working through the same route
     fresh();
-    await post('/api/pi', { id, command: 'flow-branch' });
-    assert.deepEqual(f.sends(), [['send', '--terminal', 'h1', '--text', '/flow-branch', '--enter']]);
-    // the carry-over key types exactly /flow-branch --stash through the same safeguards
+    await post('/api/pi', { id, command: 'flow-base' });
+    assert.deepEqual(f.sends(), [['send', '--terminal', 'h1', '--text', '/flow-base', '--enter']]);
+    // the carry-over key types exactly /flow-base --stash through the same safeguards
     fresh();
-    const stash = await post('/api/pi', { id, command: 'flow-branch-stash' });
+    const stash = await post('/api/pi', { id, command: 'flow-base-stash' });
     assert.deepEqual([stash.status, stash.json], [200, { sent: true, confirmed: true }]);
-    assert.deepEqual(f.sends(), [['send', '--terminal', 'h1', '--text', '/flow-branch --stash', '--enter']]);
-    assert.equal((await post('/api/pi', { id, command: 'flow-branch-stash' }, false)).status, 401);
-    assert.equal((await post('/api/pi', { id: 'nope', command: 'flow-branch-stash' })).status, 404);
+    assert.deepEqual(f.sends(), [['send', '--terminal', 'h1', '--text', '/flow-base --stash', '--enter']]);
+    assert.equal((await post('/api/pi', { id, command: 'flow-base-stash' }, false)).status, 401);
+    assert.equal((await post('/api/pi', { id: 'nope', command: 'flow-base-stash' })).status, 404);
     // near-miss keys and free text are still unknown
     fresh();
-    for (const command of ['flow-branch --stash', 'flow-branch-stash ', 'FLOW-BRANCH-STASH', '/flow-branch --stash', 'flow-branch-stash2']) assert.equal((await post('/api/pi', { id, command })).status, 400, command);
+    for (const command of ['flow-base --stash', 'flow-base-stash ', 'FLOW-BASE-STASH', '/flow-base --stash', 'flow-base-stash2']) assert.equal((await post('/api/pi', { id, command })).status, 400, command);
+    assert.equal(f.calls.length, 0);
+    // no alias: the keys of the renamed skill are gone
+    for (const command of ['flow-branch', 'flow-branch-stash']) {
+      const old = await post('/api/pi', { id, command });
+      assert.deepEqual([old.status, old.json.error], [400, 'Unknown command'], command);
+    }
     assert.equal(f.calls.length, 0);
   });
 });

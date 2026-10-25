@@ -248,7 +248,7 @@ const QUEUE_CLIP = 80;
 const clip = (s, n) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 const QUEUE_TEXT = {
   merge: (a) => `Merge #${a.pr} ${a.title}`,
-  branch: () => '/flow-branch',
+  branch: () => '/flow-base',
   deliver: () => 'Deliver changes',
   start: (a) => `Start ${a.unit.id} ${a.unit.entrega}`,
   manual: (a) => `Manual action: ${clip(a.reason, QUEUE_CLIP)}`,
@@ -614,12 +614,12 @@ function repoCard(r, attn = false, verdict = null) {
   const override = S.showCommit.has(r.id);
   // The flow buttons come from view.js; without it only /flow-commit is offered, as before.
   const flow = V ? V.flowButtons(l, p, S.state[r.id], { override, verdict: verdict && verdict.state }) : dirty ? [{ cmd: 'flow-commit', label: '/flow-commit' }] : [];
-  const overrideItem = !manual && dirty && V ? V.commitOverrideItem(S.state[r.id], { override }) : null;
+  const overrideItem = !manual && dirty && V ? V.commitOverrideItem(S.state[r.id], { override, stale: !!p.stale }) : null;
   const chips = [];
   if (dirty) chips.push(`<button class="chip yellow chip-btn" data-act="diff" data-id="${r.id}" title="View diff">● ${l.files.length} file${l.files.length === 1 ? '' : 's'} <span class="add">+${l.added}</span> <span class="del">−${l.deleted}</span></button>`);
   if (unpushed) chips.push(`<span class="chip blue">↑ ${l.ahead} unpushed${l.noUpstream ? ' · no upstream' : ''}</span>`);
   if (l.behind) chips.push(`<span class="chip gray">↓ ${l.behind} behind</span>`);
-  if (p.stale) chips.push(`<span class="chip red" title="${esc(p.stale.via === 'merged' ? `PR #${p.stale.pr} from this branch was merged. Press the /flow-branch button to start from a fresh, updated base branch.` : 'The remote branch was deleted, so its work was merged. Press the /flow-branch button to start from a fresh, updated base branch.')}">${esc(p.stale.reason)}</span>`);
+  if (p.stale) chips.push(`<span class="chip red" title="${esc(V ? V.staleChipTitle(p.stale, dirty) : p.stale.reason)}">${esc(p.stale.reason)}</span>`);
   else if (l.currentGone) chips.push('<span class="chip gray" title="The remote branch was deleted (merged PR?)">remote branch deleted</span>');
   if (p.noRemote) chips.push('<span class="chip gray">no GitHub remote</span>');
   return `<div class="card ${attn ? 'attn' : ''}">
@@ -782,7 +782,7 @@ const ACTIONS = {
         draw();
         loadPiStatus(id);
       }
-      const what = cmd === 'fix-pr' ? `the fix order for #${pr}` : cmd === 'flow-branch-stash' ? '/flow-branch --stash' : `/${cmd}`;
+      const what = cmd === 'fix-pr' ? `the fix order for #${pr}` : cmd === 'flow-base-stash' ? '/flow-base --stash' : `/${cmd}`;
       toast(d.confirmed ? `Sent ${what} to pi` : `Sent ${what}, not confirmed: check the pi session`, d.confirmed ? 'ok' : '');
     } catch (e) { toast(e.message, 'bad'); }
     el.disabled = false;

@@ -6,8 +6,8 @@ const path = require('node:path');
 const vm = require('node:vm');
 const { API_VERSION, isOutdated, conformityView } = require('../public/view.js');
 
-test('API_VERSION is 11: the request vocabulary gained flow-branch-stash', () => {
-  assert.equal(API_VERSION, 11);
+test('API_VERSION is 12: the request vocabulary renamed flow-branch to flow-base', () => {
+  assert.equal(API_VERSION, 12);
 });
 
 test('API_VERSION is a positive integer', () => {

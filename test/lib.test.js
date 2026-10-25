@@ -88,9 +88,9 @@ test('parseBaseBranch reads origin/HEAD and falls back to main', () => {
 test('staleBranch flags a working branch whose work was already merged', () => {
   const merged = { number: 12, url: 'u' };
   const gone = lib.staleBranch({ branch: 'docs/x', base: 'main', gone: true });
-  assert.deepEqual(gone, { reason: 'Merged: run /flow-branch', via: 'gone', pr: null });
+  assert.deepEqual(gone, { reason: 'Merged: run /flow-base', via: 'gone', pr: null });
   const viaPr = lib.staleBranch({ branch: 'docs/x', base: 'main', mergedPr: merged });
-  assert.deepEqual(viaPr, { reason: 'Merged: run /flow-branch', via: 'merged', pr: 12 });
+  assert.deepEqual(viaPr, { reason: 'Merged: run /flow-base', via: 'merged', pr: 12 });
 });
 
 test('staleBranch stays quiet when there is nothing to start over from', () => {
@@ -662,7 +662,7 @@ test('piPromptState is idle only for an empty prompt and fails closed otherwise'
 });
 
 test('PI_COMMANDS only offers the flow commands', () => {
-  assert.deepEqual(lib.PI_COMMANDS, { 'flow-commit': '/flow-commit', 'flow-pr': '/flow-pr', 'flow-branch': '/flow-branch', 'flow-branch-stash': '/flow-branch --stash' });
+  assert.deepEqual(lib.PI_COMMANDS, { 'flow-commit': '/flow-commit', 'flow-pr': '/flow-pr', 'flow-base': '/flow-base', 'flow-base-stash': '/flow-base --stash' });
 });
 
 // ---------- RP12c: manual and waiting actions ----------
