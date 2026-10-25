@@ -64,6 +64,8 @@ powershell -ExecutionPolicy Bypass -File scripts/uninstall-autostart.ps1  # remo
 
 This registers a per-user scheduled task (no admin needed) that runs the panel hidden at every logon and retries every minute if it fails. The port never changes, so the URL stays stable and you can pin it as a browser app. Launching the panel while it is already running just exits quietly. If another program owns the port, the launch fails with a clear message instead of picking a different port.
 
+`install-autostart.ps1 -DryRun` shows what it would register without registering it. It needs a real `node.exe` on PATH (not an npm, volta or fnm `.cmd`/`.ps1` shim).
+
 ### Restart after an update
 
 The page files are read from disk on every request, but the server code is loaded only when the process starts. After `git pull` (or any update of the panel) the server must be restarted, or the page will talk to old code and show the red out-of-date banner.
