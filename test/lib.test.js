@@ -604,14 +604,38 @@ test('normPath ignores separator style, trailing slash and case', () => {
   assert.equal(lib.normPath('C:/dev/repo'), 'c:/dev/repo');
 });
 
-test('piTerminalsFor keeps only live, writable pi terminals of exactly that repo', () => {
+test('terminalsOfWorktree keeps the live, writable terminals of exactly that worktree, whatever their title', () => {
   const list = [
     term(), term({ handle: 'h2', worktreePath: 'C:\\DEV\\repo\\' }), term({ handle: 'other', worktreePath: 'C:/dev/repo2' }),
-    term({ handle: 'plain', title: 'Terminal 1' }), term({ handle: 'dead', connected: false }),
+    term({ handle: 'plain', title: 'Terminal 1' }), term({ handle: 'untitled', title: undefined }), term({ handle: 'dead', connected: false }),
     term({ handle: 'ro', writable: false }), term({ handle: 'orphan', orphaned: true }), null, { title: 'π' },
   ];
-  assert.deepEqual(lib.piTerminalsFor(list, 'c:\\dev\\repo').map((t) => t.handle), ['h1', 'h2']);
-  assert.deepEqual(lib.piTerminalsFor('x', 'C:/dev/repo'), []);
+  assert.deepEqual(lib.terminalsOfWorktree(list, 'c:\\dev\\repo').map((t) => t.handle), ['h1', 'h2', 'plain', 'untitled']);
+  assert.deepEqual(lib.terminalsOfWorktree('x', 'C:/dev/repo'), []);
+  assert.equal(lib.piTerminalsFor, undefined);
+});
+
+const BUSY = '$ sleep 20 (timeout 30s)\nElapsed 7.2s\n▎ ❁ working…\n▎   type, or / for commands\n▎\nfooter';
+
+test('piScreenState reads a Gentle Shell pi screen: idle, busy with either glyph, or typed', () => {
+  assert.equal(lib.piScreenState(IDLE), 'idle');
+  assert.equal(lib.piScreenState(BUSY), 'busy');
+  assert.equal(lib.piScreenState(BUSY.replace('❁', '✿')), 'busy');
+  assert.equal(lib.piScreenState(IDLE.replace('✿', '★')), 'idle');
+  assert.equal(lib.piScreenState(IDLE.replace('type, or / for commands', 'half a sentence')), 'typed');
+  assert.equal(lib.piScreenState('▎ ✿ waiting for input\n'), 'typed');
+});
+
+test('piScreenState is null for anything that is not a pi screen', () => {
+  assert.equal(lib.piScreenState('PS C:\\Users\\victor> git status\nnothing to commit'), null);
+  assert.equal(lib.piScreenState('waiting for input'), null);
+  for (const v of ['', '\n\n', 'garbage ▎', null, undefined, 7, {}]) assert.equal(lib.piScreenState(v), null);
+});
+
+test('piScreenState still sees the prompt below long output and ignores one scrolled far above', () => {
+  const long = Array.from({ length: 200 }, (_, i) => `output ${i}`).join('\n');
+  assert.equal(lib.piScreenState(`${long}\n${IDLE}`), 'idle');
+  assert.equal(lib.piScreenState(`${IDLE}\n${long}`), null);
 });
 
 test('piPromptState is idle only for an empty prompt and fails closed otherwise', () => {

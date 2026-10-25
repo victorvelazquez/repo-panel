@@ -429,16 +429,28 @@ test('a top-level priority survives a config save; without it none is written', 
 
 // ---------- pi sessions ----------
 const { piSend } = require('../server.js');
+const { piSessions } = require('../server/pi.js');
 const IDLE_PI = '▎ ✿ waiting for input\n▎   type, or / for commands\n▎\n';
-const piTerm = (o = {}) => ({ handle: 'h1', title: 'π - repo', worktreePath: 'C:/dev/repo', connected: true, writable: true, ...o });
+const BUSY_PI = '$ sleep 20 (timeout 30s)\nElapsed 7.2s\n▎ ❁ working…\n▎   type, or / for commands\n▎\n';
+const PLAIN_PS = 'PS C:\\dev\\repo> git status\nnothing to commit, working tree clean\nPS C:\\dev\\repo> ';
+// The title of the same live session changes (`pi`, `Terminal 1`, `π - x`...): the panel must not care.
+const piTerm = (o = {}) => ({ handle: 'h1', title: 'Terminal 1', worktreePath: 'C:/dev/repo', connected: true, writable: true, ...o });
 
 // A fake Orca: `terminals` is what `list` returns, `previews` the successive `show` previews (the last one repeats).
-function fakeOrca({ terminals = [piTerm()], previews = [IDLE_PI, IDLE_PI, 'working'] } = {}) {
+// `screens` answers a `show` by handle instead (a string, or a list whose last entry repeats); a handle in
+// `failShow` makes its `show` throw.
+function fakeOrca({ terminals = [piTerm()], previews = [IDLE_PI, IDLE_PI, 'working'], screens = null, failShow = [] } = {}) {
   const calls = [];
   let n = 0;
+  const seen = {};
   const orca = async (args) => {
     calls.push(args);
     if (args[0] === 'list') return { terminals };
+    if (args[0] === 'show' && failShow.includes(args[2])) throw new Error('Orca could not show that terminal');
+    if (args[0] === 'show' && screens) {
+      const s = [].concat(screens[args[2]] ?? '');
+      return { terminal: { preview: s[Math.min(seen[args[2]] = (seen[args[2]] ?? -1) + 1, s.length - 1)] } };
+    }
     if (args[0] === 'show') return { terminal: { preview: previews[Math.min(n++, previews.length - 1)] } };
     return { send: { accepted: true } };
   };
@@ -452,6 +464,34 @@ test('piSend types the fixed command and Enter into the one idle pi session and 
   const f = fakeOrca();
   assert.deepEqual(await piSend(REPO, 'flow-commit', f.orca, noWait), { sent: true, confirmed: true });
   assert.deepEqual(f.sends(), [['send', '--terminal', 'h1', '--text', '/flow-commit', '--enter']]);
+});
+
+test('piSend finds the session by its screen: a title of Terminal 1 works, a π title over a plain PowerShell does not', async () => {
+  for (const title of ['Terminal 1', 'pi', 'Windows PowerShell', 'π - panel-e2e', undefined]) {
+    const f = fakeOrca({ terminals: [piTerm({ title })] });
+    assert.deepEqual(await piSend(REPO, 'flow-commit', f.orca, noWait), { sent: true, confirmed: true });
+    assert.equal(f.sends().length, 1);
+  }
+  const f = fakeOrca({ terminals: [piTerm({ title: 'π - x' })], screens: { h1: PLAIN_PS } });
+  await refuses(piSend(REPO, 'flow-commit', f.orca, noWait), 409, /No open pi session found for this repo in Orca/);
+  assert.equal(f.sends().length, 0);
+});
+
+test('piSend uses the one pi screen among several terminals and ignores a terminal whose show fails', async () => {
+  const terminals = [piTerm({ handle: 'ps' }), piTerm({ handle: 'broken' }), piTerm({ handle: 'pi' })];
+  const f = fakeOrca({ terminals, screens: { ps: PLAIN_PS, pi: [IDLE_PI, 'working'] }, failShow: ['broken'] });
+  assert.deepEqual(await piSend(REPO, 'flow-commit', f.orca, noWait), { sent: true, confirmed: true });
+  assert.deepEqual(f.sends(), [['send', '--terminal', 'pi', '--text', '/flow-commit', '--enter']]);
+  const none = fakeOrca({ terminals: [piTerm({ handle: 'broken' })], failShow: ['broken'] });
+  await refuses(piSend(REPO, 'flow-commit', none.orca, noWait), 409, /No open pi session/);
+  assert.equal(none.sends().length, 0);
+});
+
+test('piSessions lists only the terminals of the worktree whose screen is a pi screen, with their state', async () => {
+  const terminals = [piTerm({ handle: 'a' }), piTerm({ handle: 'b' }), piTerm({ handle: 'c' }), piTerm({ handle: 'd' }), piTerm({ handle: 'e', worktreePath: 'C:/dev/else' })];
+  const f = fakeOrca({ terminals, screens: { a: IDLE_PI, b: BUSY_PI, c: PLAIN_PS, d: IDLE_PI.replace('type, or / for commands', 'half typed'), e: IDLE_PI } });
+  assert.deepEqual(await piSessions(REPO, f.orca), [{ handle: 'a', state: 'idle' }, { handle: 'b', state: 'busy' }, { handle: 'd', state: 'typed' }]);
+  assert.deepEqual(f.calls.map((c) => c.join(' ')).sort(), ['list', 'show --terminal a', 'show --terminal b', 'show --terminal c', 'show --terminal d']);
 });
 
 test('piSend says not confirmed when the session never leaves the idle prompt', async () => {
@@ -471,7 +511,8 @@ test('piSend refuses, and sends nothing, with no session, several sessions, a bu
     [{ terminals: [] }, /No open pi session/],
     [{ terminals: [piTerm({ worktreePath: 'C:/dev/elsewhere' })] }, /No open pi session/],
     [{ terminals: [piTerm(), piTerm({ handle: 'h2' })] }, /Several pi sessions/],
-    [{ previews: ['thinking…'] }, /busy or has text/],
+    [{ terminals: [piTerm(), piTerm({ handle: 'h2' })], screens: { h1: BUSY_PI, h2: IDLE_PI } }, /Several pi sessions/],
+    [{ previews: [BUSY_PI] }, /busy or has text/],
     [{ previews: [IDLE_PI.replace('type, or / for commands', 'half typed')] }, /busy or has text/],
   ];
   for (const [opts, re] of cases) {
@@ -528,16 +569,29 @@ test('piStatus: idle, busy (a fresh show of the one session) and ambiguous with 
   const idle = fakeOrca({ previews: [IDLE_PI] });
   assert.deepEqual(await piStatus(REPO, idle.orca), { state: 'idle' });
   assert.deepEqual(idle.calls, [['list'], ['show', '--terminal', 'h1']]);
-  assert.deepEqual(await piStatus(REPO, fakeOrca({ previews: ['thinking…'] }).orca), { state: 'busy' });
+  assert.deepEqual(await piStatus(REPO, fakeOrca({ previews: [BUSY_PI] }).orca), { state: 'busy' });
   assert.deepEqual(await piStatus(REPO, fakeOrca({ previews: [IDLE_PI.replace('type, or / for commands', 'half typed')] }).orca), { state: 'idle' });
   const two = fakeOrca({ terminals: [piTerm(), piTerm({ handle: 'h2' })] });
   assert.deepEqual(await piStatus(REPO, two.orca), { state: 'ambiguous' });
-  assert.deepEqual(two.calls, [['list']]);
+  assert.deepEqual(two.calls.map((c) => c.join(' ')).sort(), ['list', 'show --terminal h1', 'show --terminal h2']);
+});
+
+test('piStatus reads the screen, not the title: Terminal 1 is a session, a π title over PowerShell is closed', async () => {
+  assert.deepEqual(await piStatus(REPO, fakeOrca({ terminals: [piTerm({ title: 'Terminal 1' })], previews: [IDLE_PI] }).orca), { state: 'idle' });
+  assert.deepEqual(await piStatus(REPO, fakeOrca({ terminals: [piTerm({ title: 'π - x' })], previews: [PLAIN_PS] }).orca), { state: 'closed' });
+  const mixed = fakeOrca({ terminals: [piTerm({ handle: 'ps' }), piTerm({ handle: 'pi' })], screens: { ps: PLAIN_PS, pi: BUSY_PI } });
+  assert.deepEqual(await piStatus(REPO, mixed.orca), { state: 'busy' });
+  const partial = fakeOrca({ terminals: [piTerm({ handle: 'bad' }), piTerm({ handle: 'pi' })], screens: { pi: IDLE_PI }, failShow: ['bad'] });
+  assert.deepEqual(await piStatus(REPO, partial.orca), { state: 'idle' });
+  const twoPi = fakeOrca({ terminals: [piTerm({ handle: 'a' }), piTerm({ handle: 'b' })], screens: { a: IDLE_PI, b: BUSY_PI } });
+  assert.deepEqual(await piStatus(REPO, twoPi.orca), { state: 'ambiguous' });
 });
 
 test('piStatus: an Orca failure is unknown, never closed, and nothing is ever sent', async () => {
   const boom = async () => { throw new Error('Orca CLI is unavailable'); };
   assert.deepEqual(await piStatus(REPO, boom), { state: 'unknown' });
+  const oneFailsNoPi = fakeOrca({ terminals: [piTerm({ handle: 'bad' }), piTerm({ handle: 'ps' })], screens: { ps: PLAIN_PS }, failShow: ['bad'] });
+  assert.deepEqual(await piStatus(REPO, oneFailsNoPi.orca), { state: 'unknown' }); // a failed show could hide the session
   const showFails = async (args) => { if (args[0] === 'show') throw new Error('nope'); return { terminals: [piTerm()] }; };
   assert.deepEqual(await piStatus(REPO, showFails), { state: 'unknown' });
   assert.deepEqual(await piStatus(REPO, async () => ({})), { state: 'unknown' });
@@ -766,7 +820,7 @@ test('put-in-conditions: refuses with 409, touching nothing, when everything pas
 });
 
 test('put-in-conditions: keeps the session safeguards (busy prompt, several sessions) and sends nothing', async () => {
-  for (const [opts, re] of [[{ previews: ['thinking…'] }, /busy or has text/], [{ terminals: [piTerm(), piTerm({ handle: 'h2' })] }, /Several pi sessions/]]) {
+  for (const [opts, re] of [[{ previews: [BUSY_PI] }, /busy or has text/], [{ terminals: [piTerm(), piTerm({ handle: 'h2' })] }, /Several pi sessions/]]) {
     const f = fakeOrca(opts);
     await refuses(piSend(REPO, 'put-in-conditions', f.orca, noWait, reqsOf(res('a', 'fail'))), 409, re);
     assert.equal(f.sends().length, 0);
