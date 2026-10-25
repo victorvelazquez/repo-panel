@@ -488,6 +488,17 @@ function piScreenState(preview) {
   return isHint(lines[at + 1]) ? 'idle' : 'typed';
 }
 
+// Whether the screen is a selection dialog waiting for the user's answer: within the last 14 non-empty lines there
+// is a footer line holding BOTH `Enter confirm` and `Esc cancel`. Returns { text } (the last up to 12 non-empty lines,
+// control characters replaced by a space, 200 characters per line, 900 in all) or null. Anything else fails closed.
+// Informational only: the panel shows a notice and never answers the dialog.
+function piScreenAsk(preview) {
+  if (typeof preview !== 'string') return null;
+  const lines = preview.split('\n').map((l) => l.replace(/[\x00-\x1f\x7f-\x9f\u2028\u2029]/g, ' ').trim()).filter(Boolean);
+  if (!lines.slice(-14).some((l) => l.includes('Enter confirm') && l.includes('Esc cancel'))) return null;
+  return { text: lines.slice(-12).map((l) => l.slice(0, 200)).join('\n').slice(0, 900) };
+}
+
 // Reads the end of a terminal preview: 'idle' (waiting with an empty prompt), 'typed' (waiting but the prompt
 // holds text) or 'busy' (anything else, including a screen this does not recognise: it fails closed).
 function piPromptState(preview) {
@@ -498,7 +509,7 @@ function piPromptState(preview) {
 }
 
 module.exports = {
-  PI_COMMANDS, normPath, terminalsOfWorktree, piScreenState, piPromptState,
+  PI_COMMANDS, normPath, terminalsOfWorktree, piScreenState, piScreenAsk, piPromptState,
   repoId, parseStatus, parseNumstat, parseGoneBranches, parseBaseBranch, staleBranch, statusLetter,
   summarizeChecks, blockedReason, enrichPr, encodeRef, parseRoadmap, safeRelPath, roadmapSummary,
   matchesUnitId, deriveUnitStates, nextUnit, workQueue, conformityReport,

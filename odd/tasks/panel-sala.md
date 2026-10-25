@@ -49,7 +49,8 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 | RP17 | S18 | worker acotado; `flowButtons`, botón `/flow-branch`, orden `fix-pr` («Fix with pi») y `test/flow-scenario.test.js`; verificado en Edge real con `gh` simulado; ajustado con `/flow-branch --stash` para una rama fusionada y sucia y con una orden `fix-pr` más amplia | pendiente de commit |
 | RP17b | S18, S19 | worker acotado; claves `flow-base` y `flow-base-stash`, `staleChipTitle`, `commitOverrideItem` con `stale` y `API_VERSION` 12; hecho y verificado | pendiente de commit |
 | RP18 | S19 | botón deshabilitado con el veredicto `running`; archivos en staging detectados con Git; causa y reintento visibles en la barra de atención; órdenes a sesiones piden índice vacío; fusionado en PR #38 | `f47e5c2` |
-| RP19 | S6 | worker acotado; `install-autostart.ps1` con `Get-NodeExe` y `-DryRun`, `test/git-helper.js` con `runGit` y su reintento en Windows; hecho y verificado | pendiente de commit |
+| RP19 | S6 | worker acotado; `install-autostart.ps1` con `Get-NodeExe` y `-DryRun`, `test/git-helper.js` con `runGit` y su reintento en Windows; fusionado en PR #39 | `ec60d85` |
+| RP20 | S19 | worker acotado; animación CSS de los estados en curso y del chip de CI pendiente; `piScreenAsk` y el estado `asking` con su aviso; hecho y verificado en Edge real | pendiente de commit |
 
 Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a → RP11b → RP12a → RP12b → RP12 → RP13 → RP14. RP12 puede ir antes de RP11 si la persona lo prefiere.
 
@@ -241,3 +242,10 @@ Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a →
 > podes hacer la Opción recomendada: dos endurecimientos. mientras leo todo
 
 *Aplicado: RP19 (endurecer el inicio automático y el ayudante de Git de las pruebas), sin tocar lo que la persona está observando en la pantalla. Quedan pendientes sus observaciones del ciclo, RP14 y la idea de la sala orquestadora (S17).*
+
+**L26.** Mensaje de la persona sobre los estados en curso y una confirmación pendiente (con una captura del diálogo «Review consent» con las opciones «Review this change», «Skip this time» y «Review and allow this session»):
+
+> - podríamos mostrar animado los mensajes de estado de: committing…, creating pull request…, … 2 running · 2/4(cuando esta corriendo CI, creo que debería mostrar también el mensaje de su estado como verifando... o algo?), updating base branch…
+> - cuando después de ejecutar /flow-commit, pasa a la columna de committed y queda en estado de espera porque el estado sigue en committing… y el botón de /flow-pr deshabilitado, que esta bien porque sigue en proceso. pero el problema surge cuando el commit espera una confirmación mas como esta: [captura], que se puede solucionar al seleccionar la tercera opción la primera vez y después la sesión ya hace para todo el transcurso de esa sesión activa, no se si compensa agregar un aviso de cuando suceda eso u otra clase de situación que requiera una acciona o dejamos así nomas, ya que es algo que se debe elegir una sola vez por sesión?
+
+*Aplicado: RP20. Se comprobó que el panel no podía distinguir ese diálogo: con la barra «working…» debajo lo leía como `busy` (por eso seguía en «committing…») y solo, como sesión cerrada. Se agregó el aviso mínimo y genérico; el panel nunca responde por la persona. El consentimiento de revisión es una decisión suya dentro de la sesión.*

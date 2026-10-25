@@ -96,21 +96,25 @@ async function orderText(repo, key, requirements, extra) {
 
 // Looks at every terminal of the folder's worktree with a fresh `show` (the `list` preview is truncated), in
 // parallel. `sessions` are the ones whose screen is a pi screen; `failed` counts the terminals whose `show`
-// failed: those are unknown, not sessions. `listed` is an already fetched `list` result (rooms list once).
-async function scanSessions(folder, orca, listed, withPreview = false) {
+// failed: those are unknown, not sessions. `listed` is an already fetched `list` result (rooms list once). A
+// terminal showing a selection dialog (lib.piScreenAsk) IS a session and that wins over idle/busy/typed: it is
+// reported as 'asking' (with its `ask` text) only when `askAware`; other callers (rooms) keep seeing 'busy'.
+async function scanSessions(folder, orca, listed, withPreview = false, askAware = false) {
   const terminals = lib.terminalsOfWorktree(listed === undefined ? (await orca(['list'])).terminals : listed, folder);
   const seen = await Promise.all(terminals.map(async ({ handle }) => {
     try {
       const preview = ((await orca(['show', '--terminal', handle])).terminal || {}).preview;
+      const ask = lib.piScreenAsk(preview);
+      if (ask) return askAware ? { handle, state: 'asking', ask: ask.text, preview } : { handle, state: 'busy', preview };
       return { handle, state: lib.piScreenState(preview), preview };
     } catch { return { handle, state: null, failed: true }; }
   }));
-  const sessions = seen.filter((t) => t.state).map(({ handle, state, preview }) => (withPreview ? { handle, state, preview } : { handle, state }));
+  const sessions = seen.filter((t) => t.state).map(({ handle, state, ask, preview }) => ({ handle, state, ...(ask ? { ask } : {}), ...(withPreview ? { preview } : {}) }));
   return { sessions, failed: seen.filter((t) => t.failed).length };
 }
 
-// The pi sessions of the repo: [{ handle, state }] with state idle | typed | busy.
-const piSessions = async (repo, orca = orcaTerminal) => (await scanSessions(repo.path, orca)).sessions;
+// The pi sessions of the repo: [{ handle, state }] with state idle | typed | busy | asking.
+const piSessions = async (repo, orca = orcaTerminal) => (await scanSessions(repo.path, orca, undefined, false, true)).sessions;
 
 // `extra` is { pr, prs, guard }: the PR number of fix-pr, the provider of the repo's open PRs (injectable for tests) and
 // the duplicate-send guard of sendGuard (the HTTP server always passes one; without it nothing is refused as a repeat).
@@ -124,6 +128,7 @@ async function piSend(repo, key, orca = orcaTerminal, wait = sleep, requirements
     const mine = await piSessions(repo, orca);
     if (!mine.length) throw new HttpError(409, 'No open pi session found for this repo in Orca');
     if (mine.length > 1) throw new HttpError(409, 'Several pi sessions are open for this repo; close the extra ones');
+    if (mine[0].state === 'asking') throw new HttpError(409, 'The pi session is waiting for your answer to a question');
     const { handle } = mine[0];
     const state = async () => lib.piPromptState(((await orca(['show', '--terminal', handle])).terminal || {}).preview);
     if (mine[0].state !== 'idle') throw new HttpError(409, 'The pi session is busy or has text typed in its prompt');
@@ -163,15 +168,17 @@ function screenTail(preview) {
 // (`list` and a fresh `show` per terminal, never `send`), as the room presence does. An Orca failure is unknown,
 // never closed; a prompt with text typed in it is still a session waiting for input, so it counts as idle. If a
 // `show` failed and no pi screen was seen, the failed terminal could be the session, so that is unknown too.
-// With `tail` the answer also carries the end of the screen above the prompt (screenTail), '' when unreadable.
+// With `tail` the answer also carries the end of the screen above the prompt (screenTail), '' when unreadable. A
+// session showing a selection dialog is 'asking' and the answer carries `ask`, its sanitized text (only then).
 async function piStatus(repo, orca = orcaTerminal, { tail = false } = {}) {
-  const out = (state, screen = '') => (tail ? { state, tail: screen } : { state });
+  const out = (state, screen = '', ask) => ({ state, ...(tail ? { tail: screen } : {}), ...(ask ? { ask } : {}) });
   try {
     const listed = (await orca(['list'])).terminals;
     if (!Array.isArray(listed)) return out('unknown');
-    const { sessions, failed } = await scanSessions(repo.path, orca, listed, tail);
+    const { sessions, failed } = await scanSessions(repo.path, orca, listed, tail, true);
     if (!sessions.length) return out(failed ? 'unknown' : 'closed');
     if (sessions.length > 1) return out('ambiguous');
+    if (sessions[0].state === 'asking') return out('asking', screenTail(sessions[0].preview), sessions[0].ask);
     return out(sessions[0].state === 'busy' ? 'busy' : 'idle', screenTail(sessions[0].preview));
   } catch { return out('unknown'); }
 }
