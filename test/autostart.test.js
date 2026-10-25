@@ -109,7 +109,8 @@ for (const name of GUARDED) {
     const r = runCopyInTemp(name);
     assert.equal(r.code, 2, `${r.out}\n${r.err}`);
     assert.match(r.err, REFUSAL);
-    assert.ok(r.err.includes(r.dir), 'names the folder of the copy');
+    // Compare the unique folder name, not the full path: on Windows runners os.tmpdir() can come back in 8.3 short form (RUNNER~1) while PowerShell prints the long one.
+    assert.ok(r.err.includes(path.basename(r.dir)), 'names the folder of the copy');
     assert.ok(!/dry run/i.test(r.out), 'the dry-run text is not printed');
     assert.equal(r.out, '');
   });
