@@ -31,6 +31,7 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 - **S21. El botón de commit no debe poder pulsarse a mitad del trabajo.** «cuando hay un nuevo cambio detectado en el repo y la sesión esta en ejecución de algo todavia, o sea que este todavía trabajando y no están listos los cambios porque se estarán haciendo mas cambios y la tarjeta ya esta en la columna changes con el botón de /flow-commit habilitado, creo que eso seria un problema por si accidentalmente clickeo el botón». Los trabajos en segundo plano: «solo si será fácil el trato de estas situaciones».
 - **S22. Refresco y colores.** «creo que cada 20 segundos se vuelve a verificar todo, y creo que ya es mucho la espera para ver los cambios [...] lo mínimo posible para que refleje mas rápido los cambios pero sin forzar recursos»; «tarda mucho en mostrar el estado de: Merged: run /flow-base»; «mostrar con colores los mensajes animados de estado»; «que queden en sintonia o armonia» con GitHub, también las columnas.
 - **S23. Columna Merged y Clean.** «no es mejor mostrar una columna aparte de los en estado "Merged: run /flow-base"?»; «la columna de Clean es necesario o util? creo a veces no se muy bien su utlidad real»; aprobado: «me cierra separar RP25 y que Clean pase a ser una barra plegable cerrada por defecto [...] si no me gusta volvemos a mostrar en el tablero como columna».
+- **S24. Una sola señal de actualización.** «la animacion de actualizando que es la flechita que gira en cada tarjeta esta demas. podriamos limpiar y solo mostrar la de la barra de arriba. sin dejar de actualizar todas».
 
 ## Tasks
 
@@ -58,8 +59,9 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 | RP21 | S20 | worker acotado con reglas de seguridad absolutas (nunca correr instaladores sin `-DryRun`); guarda de carpeta temporal, guardián de tareas en `npm test` y hallazgos de RP19; hecho y verificado | PR #41 (3758ef3) |
 | RP22 | S20 | en línea (un solo tema); guardián con todas las acciones de la tarea y `safeToRunCopy`; RED primero; hecho y verificado | pendiente de commit |
 | RP23 | S22 | pendiente; refresco local/remoto separado, repos calientes, caché corta del PR fusionado, paleta acorde a GitHub | pendiente |
-| RP24 | S21 | worker acotado con reglas de seguridad; `working` sin invalidar por actividad, sesión busy/asking deshabilita /flow-commit, período de calma | pendiente de commit |
+| RP24 | S21 | worker acotado con reglas de seguridad; `working` sin invalidar por actividad, sesión busy/asking deshabilita /flow-commit, período de calma | PR #43 (5e616b2) |
 | RP25 | S23 | pendiente; columna Merged y barra plegable «Idle» para Clean, reversible | pendiente |
+| RP26 | S24 | en línea (unidad chica); RED primero; icono de Refresh gira, sin flechita en tarjetas; verificado en Edge real | pendiente de commit |
 
 Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a → RP11b → RP12a → RP12b → RP12 → RP13 → RP14. RP12 puede ir antes de RP11 si la persona lo prefiere.
 
@@ -320,3 +322,15 @@ Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a →
 > me cierra separar RP25 y que Clean pase a ser una barra plegable cerrada por defecto, pero mas adelante podemos querer iniciar alguna accion desde los repos en clean. cuando haya posibilidad de integrar el chat y poder iniciar sesion y demas ideas. pero por el momento podemos ahorrar ese espacio. si no me gusta volvemos a mostrar en el tablero como columna.
 
 *Aplicado: RP25 queda registrada como pendiente, con esas dos condiciones.*
+
+**L35.**
+
+> la animacion de actualizando que es la flechita que gira en cada tarjeta esta demas. podriamos limpiar y solo mostrar la de la barra de arriba. sin dejar de actualizar todas
+
+*Aplicado: se encontró que la barra de arriba no tenía animación; se propuso hacer girar el icono de Refresh (RP26).*
+
+**L36.**
+
+> me cierra lo del icono
+
+*Aplicado: RP26.*

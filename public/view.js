@@ -175,6 +175,9 @@
     return age >= -QUIET_SKEW_MS && age < QUIET_MS;
   }
 
+  // True while any repo has a request in flight: the one place the page shows that it is refreshing (the top button).
+  const isRefreshing = (loading) => Object.values(loading || {}).some((n) => n > 0);
+
   // The repos whose live session state the page polls: loaded, with uncommitted changes, and no command of the panel
   // in flight (loadPiStatus already polls those). Nothing while the tab is hidden.
   function piPollTargets({ ids = [], local = {}, sent = {}, hidden = false } = {}) {
@@ -430,5 +433,5 @@
     return attention(`No change 15 minutes after ${text} and the pi session state is unknown`);
   }
 
-  return { API_VERSION, QUIET_MS, quietPeriod, piPollTargets, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, isProblem, prColumn, commitVerdict, queueFlags, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, presenceLabel, presenceDot };
+  return { API_VERSION, isRefreshing, QUIET_MS, quietPeriod, piPollTargets, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, isProblem, prColumn, commitVerdict, queueFlags, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, presenceLabel, presenceDot };
 }));
