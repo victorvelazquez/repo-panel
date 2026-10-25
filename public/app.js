@@ -12,7 +12,7 @@ const S = {
   dismissed: new Set(), menu: null, reqPassOpen: {},
   group: '', q: '', queue: [], queueKey: '', queueSeq: 0,
   conf: { items: [], ok: 0, loaded: false, failed: false, key: '', seq: 0 }, confOpen: false,
-  req: {}, reqSeq: {}, state: {}, stateSeq: {}, sent: {}, pistatus: {}, pistatusSeq: {}, pitail: {}, tailFor: {}, finishing: {}, showCommit: new Set(), prereq: { state: 'loading', items: [], seq: 0 },
+  req: {}, reqSeq: {}, state: {}, stateSeq: {}, sent: {}, pistatus: {}, pistatusSeq: {}, pitail: {}, piask: {}, tailFor: {}, finishing: {}, showCommit: new Set(), prereq: { state: 'loading', items: [], seq: 0 },
   rooms: [], roomIssues: [], roomData: { state: 'loading', data: null }, roomSeq: 0,
   prefs: store('prefs', { method: 'squash', del: true }),
   lastRefresh: 0, scan: [],
@@ -110,13 +110,13 @@ function loadState(id) {
   ));
 }
 
-// The pi session state (closed | idle | busy | ambiguous | unknown), only for a repo that has a command sent from
+// The pi session state (closed | idle | busy | asking | ambiguous | unknown), only for a repo that has a command sent from
 // this page (S.sent). A failed request is an unknown session, never a closed one.
 function loadPiStatus(id) {
   if (!S.sent[id]) return Promise.resolve();
   const seq = S.pistatusSeq[id] = (S.pistatusSeq[id] || 0) + 1;
   return track(id, pooled(() => api(`/api/pi-status?id=${id}`)).then(
-    (d) => (seq === S.pistatusSeq[id] ? applyPiState(id, d.state) : null),
+    (d) => (seq === S.pistatusSeq[id] ? applyPiState(id, d.state, d.ask) : null),
     () => (seq === S.pistatusSeq[id] ? applyPiState(id, 'unknown') : null),
   ));
 }
@@ -124,16 +124,17 @@ function loadPiStatus(id) {
 // Applies a polled session state. A session that stops being busy has just finished its command: the repo's data is
 // refreshed first (so the card moves column at once and never judges the result on stale data), and only then is the
 // new state applied. The screen tail is asked for once per sent command, and only when the verdict needs attention.
-async function applyPiState(id, state) {
+async function applyPiState(id, state, ask) {
   const sent = S.sent[id];
   if (!sent) return;
-  if (state === 'busy') sent.busySeen = true;
+  if (state === 'busy' || state === 'asking') sent.busySeen = true; // a dialog means the session is working on it
   if (S.pistatus[id] === 'busy' && state !== 'busy' && !S.finishing[id]) {
     S.finishing[id] = true;
     try { await refreshRepo(id, { poll: false }); } finally { delete S.finishing[id]; }
   }
   if (S.sent[id] !== sent) return; // dismissed or sent again meanwhile
   S.pistatus[id] = state;
+  if (state === 'asking' && typeof ask === 'string') S.piask[id] = ask; else delete S.piask[id];
   const v = verdictOf({ id });
   draw();
   if (v && v.state === 'attention') await loadTail(id);
@@ -158,7 +159,7 @@ function startSent(id, record) {
 }
 
 function clearSent(id) {
-  delete S.sent[id]; delete S.pistatus[id]; delete S.pitail[id]; delete S.tailFor[id]; delete S.finishing[id];
+  delete S.sent[id]; delete S.pistatus[id]; delete S.pitail[id]; delete S.piask[id]; delete S.tailFor[id]; delete S.finishing[id];
 }
 
 function loadPrerequisites() {
@@ -642,11 +643,19 @@ function cleanRow(r) {
   </div>`;
 }
 
+// The inline style that keeps a CSS animation continuous although #app is re-rendered on every draw (see view.js).
+const animStyle = () => `style="animation-delay:${V ? V.animDelay() : 0}ms"`;
+
 // "committing…", "creating pull request…"… while the last command sent runs; a red bar with the reason, what the session
 // last said (informational, escaped) and a way to dismiss it when it went wrong.
 function verdictRow(r, verdict) {
   if (!verdict) return '';
-  if (verdict.state === 'running') return `<div class="verdict-line" title="${esc(verdict.reason)}">${esc(verdict.label || 'committing…')}</div>`;
+  if (verdict.asking) return `<div class="ask-line" role="status" aria-live="polite" title="${esc(S.piask[r.id] || verdict.reason)}">${esc(verdict.label)}</div>`;
+  if (verdict.state === 'running') {
+    const label = verdict.label || 'committing…';
+    const dots = label.endsWith('…') ? `${esc(label.slice(0, -1))}<span class="ell" ${animStyle()}>…</span>` : esc(label);
+    return `<div class="verdict-line" role="status" aria-live="polite" title="${esc(verdict.reason)}"><span class="pulse-dot" aria-hidden="true" ${animStyle()}></span>${dots}</div>`;
+  }
   if (verdict.state !== 'attention') return '';
   const tail = S.pitail[r.id];
   return `<div class="attn-bar"><span>⚠ Needs attention: ${esc(verdict.reason)}</span>${tail ? `<div class="attn-tail" title="${esc(tail)}">${esc(tail)}</div>` : ''}<button data-act="dismiss-sent" data-id="${r.id}" title="Dismiss">✕</button></div>`;
@@ -699,7 +708,7 @@ function checksChip(c) {
   const tip = esc(c.items.map((i) => `${i.state === 'success' ? '✔' : i.state === 'failed' ? '✘' : '…'} ${i.name}`).join('\n'));
   if (c.state === 'success') return `<span class="chip green" title="${tip}">✔ ${c.passed}/${c.total} checks</span>`;
   if (c.state === 'failed') return `<span class="chip red" title="${tip}">✘ ${c.failed} failed · ${c.passed}/${c.total}</span>`;
-  return `<span class="chip yellow" title="${tip}">… ${c.pending} running · ${c.passed}/${c.total}</span>`;
+  return `<span class="chip yellow chip-verify" title="${tip}"><span class="pulse-dot" aria-hidden="true" ${animStyle()}></span>verifying checks · ${c.pending} running · ${c.passed}/${c.total}</span>`;
 }
 
 const FIX_PR_HINT = 'Ask the open pi session to find out why the checks failed and fix it (it will not commit or push)';

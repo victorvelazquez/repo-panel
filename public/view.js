@@ -8,7 +8,7 @@
 }(typeof self !== 'undefined' ? self : this, () => {
   // Bump it when the client starts needing a new or changed server route. /health reports the value
   // the running server loaded at start; the page compares it with the file it just downloaded.
-  const API_VERSION = 13;
+  const API_VERSION = 14;
 
   // `health` is the parsed /health answer, or null when the request itself failed (no answer, so
   // there is nothing to warn about). Any answer without the current integer `api` is out of date:
@@ -203,6 +203,7 @@
     if (manual) out.manual = manual;
     const s = override ? null : usableState(stateData, now);
     if (s && (s.state === 'needs-input' || s.state === 'blocked')) out.waiting = { state: s.state, next: typeof s.next === 'string' ? s.next : '' };
+    if (verdict && verdict.asking === true) out.waiting = { state: 'needs-input', next: 'Answer the question in the pi session' };
     return out;
   }
 
@@ -338,6 +339,13 @@
   };
   const CMD_TEXT = { 'flow-commit': '/flow-commit', 'flow-commit-unstage': '/flow-commit --unstage', 'flow-pr': '/flow-pr', 'flow-base': '/flow-base', 'flow-base-stash': '/flow-base --stash' };
   const SESSION_CLOSED = 'The pi session closed while the command was running';
+  const ASKING = 'waiting for your answer in the session';
+
+  // The CSS animations of the progress lines (pulsing dot, ellipsis) all last this long. The page re-renders #app on
+  // every draw, which restarts a CSS animation; an inline negative animation-delay of `now mod ANIM_MS` puts a
+  // freshly drawn element back at the phase it would have had, so the animation looks continuous across redraws.
+  const ANIM_MS = 1200;
+  const animDelay = (now = Date.now()) => 0 - (now % ANIM_MS);
 
   // Verdict of any command sent from the page: { state: 'running' | 'ok' | 'attention', reason, label }, or null when
   // there is no record or the command has no verdict (fix-pr and put-in-conditions are dropped once the session is
@@ -347,6 +355,8 @@
   // /flow-commit --unstage are judged by commitVerdict (the latter must also leave an empty index).
   function flowVerdict(sent, local, session, prInfo, now = Date.now()) {
     if (!sent) return null;
+    // A session showing a selection dialog is waiting for the person, who is the blocker: stay running, never expire.
+    if (session === 'asking') return { state: 'running', reason: ASKING, label: ASKING, cmd: sent.cmd, asking: true };
     const label = RUNNING_LABEL[sent.cmd] || '';
     const done = (v) => (v ? { ...v, label, cmd: sent.cmd } : null);
     if (sent.cmd === 'flow-commit' || sent.cmd === 'flow-commit-unstage') {
@@ -387,5 +397,5 @@
     return attention(`No change 15 minutes after ${text} and the pi session state is unknown`);
   }
 
-  return { API_VERSION, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, isProblem, prColumn, commitVerdict, queueFlags, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, presenceLabel, presenceDot };
+  return { API_VERSION, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, isProblem, prColumn, commitVerdict, queueFlags, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, presenceLabel, presenceDot };
 }));
