@@ -178,6 +178,35 @@
   // True while any repo has a request in flight: the one place the page shows that it is refreshing (the top button).
   const isRefreshing = (loading) => Object.values(loading || {}).some((n) => n > 0);
 
+  // Refresh rhythm (S22). Git data (no network) is re-read every LOCAL_REFRESH_MS; GitHub data of every repo every
+  // FULL_REFRESH_MS; a "hot" repo also re-reads its PRs every HOT_REFRESH_MS, so a merge shows up fast without every repo
+  // spending the API budget of 5000 requests per hour.
+  const LOCAL_REFRESH_MS = 10000;
+  const HOT_REFRESH_MS = 20000;
+  const FULL_REFRESH_MS = 60000;
+
+  // Hot: the current branch has an open PR (the PR is the thing about to change), or a command of the panel is in flight.
+  function isHotRepo({ local, prs, sent } = {}) {
+    if (sent) return true;
+    const branch = local && !local.error && !local.detached ? local.branch : null;
+    return !!branch && Array.isArray(prs && prs.prs) && prs.prs.some((p) => p.head === branch);
+  }
+
+  // What the periodic tick refreshes now: [{ id, kind }], kind 'hot' (local + PRs) or 'local' (git only). `last[id]` is
+  // { local, prs }: when each kind of data was last asked for (a full refresh sets both). Nothing while the tab is hidden
+  // or a merge is in progress, and a repo with a request still in flight is skipped.
+  function refreshPlan({ now = Date.now(), ids = [], local = {}, prs = {}, sent = {}, last = {}, loading = {}, hidden = false, busy = {} } = {}) {
+    if (hidden || Object.keys(busy).length) return [];
+    const out = [];
+    for (const id of ids) {
+      if (loading[id] > 0) continue;
+      const at = last[id] || {};
+      if (isHotRepo({ local: local[id], prs: prs[id], sent: sent[id] }) && now - (at.prs || 0) >= HOT_REFRESH_MS) out.push({ id, kind: 'hot' });
+      else if (now - (at.local || 0) >= LOCAL_REFRESH_MS) out.push({ id, kind: 'local' });
+    }
+    return out;
+  }
+
   // The repos whose live session state the page polls: loaded, with uncommitted changes, and no command of the panel
   // in flight (loadPiStatus already polls those). Nothing while the tab is hidden.
   function piPollTargets({ ids = [], local = {}, sent = {}, hidden = false } = {}) {
@@ -373,6 +402,9 @@
     'flow-base': 'updating base branch…', 'flow-base-stash': 'updating base branch…',
     'fix-pr': 'fixing pull request…', 'put-in-conditions': 'putting repo in conditions…',
   };
+  // The GitHub-like color of the progress line of each command (the pending CI chip is always yellow).
+  const RUN_COLOR = { 'flow-commit': 'blue', 'flow-commit-unstage': 'blue', 'flow-pr': 'green', 'flow-base': 'purple', 'flow-base-stash': 'purple', 'fix-pr': 'orange' };
+  const runColor = (cmd) => RUN_COLOR[cmd] || 'gray';
   const CMD_TEXT = { 'flow-commit': '/flow-commit', 'flow-commit-unstage': '/flow-commit --unstage', 'flow-pr': '/flow-pr', 'flow-base': '/flow-base', 'flow-base-stash': '/flow-base --stash' };
   const SESSION_CLOSED = 'The pi session closed while the command was running';
   const ASKING = 'waiting for your answer in the session';
@@ -433,5 +465,5 @@
     return attention(`No change 15 minutes after ${text} and the pi session state is unknown`);
   }
 
-  return { API_VERSION, isRefreshing, QUIET_MS, quietPeriod, piPollTargets, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, isProblem, prColumn, commitVerdict, queueFlags, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, presenceLabel, presenceDot };
+  return { API_VERSION, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, piPollTargets, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, isProblem, prColumn, commitVerdict, queueFlags, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, presenceLabel, presenceDot };
 }));
