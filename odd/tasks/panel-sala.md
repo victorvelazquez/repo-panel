@@ -24,6 +24,10 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 - **S16. Nombre.** Se mantiene `repo-panel` por ahora; revisar cuando la sala esté integrada, con un identificador interno estable.
 - **S17. Idea futura de la persona.** Una sola sesión de pi como sala que orquesta los repos integrados, pudiendo abrir una sesión en un repo sin actividad según su estado (limpio o no), y la persona solo presiona: commitear, hacer PR, confirmar el PR en GitHub, volver a la base actualizada y limpia, nuevo ciclo. La persona ampliará la idea más adelante; no implementar sin su detalle.
 
+- **S18. Flujo completo y botones.** «quisiera que hagamos el escenario de todo el flujo y ajustar algunas cosas si falta, por ejemplo como y que momento se mustran los comandos /flow-commit, flow-pr, flow-branch»; «tambien no vi el comando /flow-branch despues de hacer merge»; y para un problema sencillo de un PR: «con ese comando activemos la orden de revisar y corregir y que vuelva a la columna correspondiente ya sea en changes si hay cambios sin commitear o en committed si solo falta hacer PR». *(RP17: botón `/flow-branch`, orden `fix-pr` y escenario completo como prueba.)*
+
+- **S19. Fallos de `/flow-commit`.** «muestra committing ... y el boton /flow-commit sigue habilitado»; y cuando el commit falla, con la sesión diciendo «Después volvé a correr /flow-commit»: «podriamos avisar en el panel eso? que se reintente cuando la sesion indico para reintentar?». *(RP18.)*
+
 ## Tasks
 
 | ID | Specs | Ruta | Commit |
@@ -42,6 +46,8 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 | RP14 | S14, S17 | opcional: botón hacia la terminal de la sala; chat solo si la persona lo decide | pendiente por decisión de la persona: solo el botón hacia la sala, sin chat, cuando ya use una sala | — |
 | RP15 | S6 | worker acotado; `tray.ps1`, `install-tray.ps1`, `uninstall-tray.ps1` y `test/tray.test.js`; hecho y verificado salvo lo que depende del escritorio | `f1ca93f` (PR #34) |
 | RP16 | S6 | `min-width: 0` en `.clean-row .roadmap`; defecto de la columna CLEAN visto en el panel real; medido antes y después en Edge | `cf76fb0` (PR #35) |
+| RP17 | S18 | worker acotado; `flowButtons`, botón `/flow-branch`, orden `fix-pr` («Fix with pi») y `test/flow-scenario.test.js`; verificado en Edge real con `gh` simulado; ajustado con `/flow-branch --stash` para una rama fusionada y sucia y con una orden `fix-pr` más amplia | pendiente de commit |
+| RP18 | S19 | botón deshabilitado con el veredicto `running`; archivos en staging detectados con Git; causa y reintento visibles en la barra de atención; órdenes a sesiones piden índice vacío | — |
 
 Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a → RP11b → RP12a → RP12b → RP12 → RP13 → RP14. RP12 puede ir antes de RP11 si la persona lo prefiere.
 
@@ -179,3 +185,28 @@ Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a →
 > prefiero tu recomendacion?
 
 *Aplicado: RP14 será solo el botón hacia la terminal de la sala (`orca terminal switch`), sin mostrar el chat dentro del panel, y se hará cuando la persona ya tenga una sala creada y la haya usado un tiempo. La idea futura de una sola sesión de pi como sala que orquesta los repositorios (S17) sigue anotada, sin implementar, a la espera del detalle de la persona.*
+
+**L19.** Mensaje de la persona tras cerrar la serie:
+
+> - podes borrar todas las ramas, ya no lo usaremos.
+> - el punto 1. va a ser nuestra prueba de todo el flujo cuando estemos listo. pero antes quisiera que hagamos el escenario de todo el flujo y ajustar algunas cosas si falta, por ejemplo como y que momento se mustran los comandos /flow-commit, flow-pr, flow-branch y cuando hay un problema sencillo con el pedido de PR como sucedio ahora que dio error y con una simple revision y correccion como podemos poner un comando tambien en el panel que cuando haya esa clase de error que con ese comando activemos la orden de revisar y corregir y que vuelva a la columna correspondiente ya sea en changes si hay cambios sin commitear o en committed si solo falta hacer PR. tambien no vi el comando /flow-branch despues de hacer merge.
+> - despues vemos boton y la idea del chat en la sala del panel.
+
+*Aplicado: se borraron las 13 ramas locales de las unidades fusionadas (todas con su PR fusionado); RP17 agrega el botón `/flow-branch`, la orden «Fix with pi» y el escenario completo como prueba; el botón hacia la sala y el chat (RP14) quedan para después.*
+
+**L20.** Mensaje de la persona sobre RP17:
+
+> - con el Botón "Fix with pi" tambien correjira cuando el caso sea un error en los codigos de test u otro error en el codigo hecho mismo? seria bueno que pueda hacer todo tipo de correccion posible siempre y cuando sea parte del objetivo de la tarea inicial.
+> - el /flow-branch en que columna aparecera? y otro detalle de paso, creo que el nombre de /flow-branch ya no representa muy bien a lo que hace ese comando skill, creo que deberiamos pensar eso y si no, pensar en un nombre nuevo que si le representa a su funcion principal que es de volverse a la rama base actualizada, limpia y sujerir ese cambio al repositorio de flow-skills y despues adoptar ese cambio.?
+> - yo sobre tu pregunta de sobre una rama ya fusionada pero con cambios sin commitear; yo creo que debe ser la opcion B de mostrar /flow-branch, pero creo que flow-branch queda bloqueado porque no puede hacer ese cambio por encontrar algo sucio, debemos analizar esa skill y que cuando haya caso asi que haga algo para poder avanzar como por ejemplo copiar los archivos sucios a una carpeta temporal y hacer todo el de volver a la rama base, actualizar con remoto, poder limpio todo y volver a traer esos archivos del temporal. que te parece esa opcion?
+
+*Aplicado: la orden «Fix with pi» se amplió al objetivo del PR (código, tests o configuración); la rama fusionada y sucia ofrece `/flow-branch --stash`, que ya existe en la skill y hace lo que la persona describió con `git stash` en lugar de una carpeta temporal (guarda también lo no seguido, restaura con el índice y deja el stash si hay conflicto). El cambio de nombre de `/flow-branch` queda como propuesta a `flow-skills`, sin editar ese repositorio.*
+
+**L21.** Mensaje de la persona con tres capturas (la tarjeta de `flow-skills` con «committing…», la barra «Needs attention: 6 files still uncommitted after /flow-commit» y el aviso de Flow Commit con `index-not-empty`):
+
+> detalle para agregar a la lista de correcciones.
+> - muestra committing ... y el boton /flow-commit sigue habilitado:
+> - y cuando el commit fallo por alguna razon como esta:
+> dice para reintentar el /flow-commit, podriamos avisar en el panel eso? que se reintente cuando la sesion indico para reintentar?
+
+*Hallazgo propio: la causa del fallo fue mi orden a la sesión de `flow-skills`, que movió archivos con `git mv` y dejó el índice con cambios en staging; Flow Commit se niega a empezar así. Se agregó a la propuesta `flow-base` y queda como regla de las órdenes (RP18).*

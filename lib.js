@@ -401,7 +401,7 @@ const QUEUE_RANK = { merge: 0, branch: 1, manual: 1, waiting: 2, deliver: 3, sta
 const WAITING_STATES = ['needs-input', 'blocked'];
 
 // The ordered "go work on" actions for repos given in board order. Per repo: one `merge` per ready PR,
-// `branch` when stale, `deliver` when it has local changes, `start` when clean with a next unit. A repo flagged
+// `branch` when stale, `deliver` when it has local changes (not when it is also stale: /flow-branch --stash carries them), `start` when clean with a next unit. A repo flagged
 // `manual` (a reason string) gets a `manual` action and a repo with `waiting` ({ state, next }) a `waiting` one:
 // neither is told to deliver or start. Both fields are optional and ignored when absent or malformed.
 // Repos named in `priority` (case-insensitive, in that order) come first; ties keep board order.
@@ -428,7 +428,7 @@ function workQueue(items, priority) {
       ? { state: w.state, next: typeof w.next === 'string' ? w.next.trim().slice(0, 200) : '' } : null;
     if (manual) add({ ...base, kind: 'manual', reason: manual });
     else if (waiting) add({ ...base, kind: 'waiting', ...waiting });
-    else if (it.dirty || it.unpushed) add({ ...base, kind: 'deliver' });
+    else if (!(it.stale && it.dirty) && (it.dirty || it.unpushed)) add({ ...base, kind: 'deliver' });
     const n = it.next;
     if (!manual && !waiting && !it.dirty && !it.unpushed && !it.stale && !it.hasPrs && n && typeof n.id === 'string') {
       add({ ...base, kind: 'start', unit: { id: n.id, entrega: String(n.entrega ?? '') } });
@@ -460,7 +460,7 @@ function conformityReport(entries) {
 
 // ---------- pi sessions in Orca terminals ----------
 // The only texts the browser can ask the panel to type into a pi session (it sends the key, never the text).
-const PI_COMMANDS = { 'flow-commit': '/flow-commit', 'flow-pr': '/flow-pr', 'flow-branch': '/flow-branch' };
+const PI_COMMANDS = { 'flow-commit': '/flow-commit', 'flow-pr': '/flow-pr', 'flow-branch': '/flow-branch', 'flow-branch-stash': '/flow-branch --stash' };
 
 // Orca reports the same folder as C:/x or C:\\x; compare them without caring about separators or case.
 const normPath = (p) => String(p || '').replace(/[\\/]+/g, '/').replace(/\/$/, '').toLowerCase();

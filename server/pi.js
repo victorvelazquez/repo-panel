@@ -8,9 +8,11 @@ const lib = require('../lib.js');
 const { HttpError } = require('./errors.js');
 const { run } = require('./exec.js');
 const { requirementsFor } = require('./requirements.js');
+const { prState } = require('./github.js');
 
 const INSTALL_PATH = path.join(__dirname, '..', 'requirements', 'INSTALL.md');
 const PUT_IN_CONDITIONS = 'put-in-conditions';
+const FIX_PR = 'fix-pr';
 
 const piBusy = new Set();
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -33,7 +35,36 @@ function conditionsOrder(results, installPath = INSTALL_PATH) {
   return `Put this repo in conditions for repo-panel: read "${installPath}" (the user authorizes reading that one file outside this repo) and apply these requirement ids: ${ids.join(', ')}.`;
 }
 
-async function orderText(repo, key, requirements) {
+// Text that comes from GitHub (titles, branch and check names) goes into the order only after this: control
+// characters become a space, double quotes are dropped, spaces collapse and the length is capped.
+function clean(value, max) {
+  return String(value ?? '').replace(/[\x00-\x1f\x7f-\x9f\u2028\u2029]/g, ' ').replace(/"/g, '').replace(/\s+/g, ' ').trim().slice(0, max).trim();
+}
+
+const MAX_CHECK_NAMES = 5;
+
+// The one-line order that sends the agent to fix a pull request with failing checks. Built here from the PR's own
+// data (as listed by prState); the browser never supplies text. It never starts with "/" and holds no control character.
+function fixPrOrder(pr) {
+  const names = ((pr.checks && pr.checks.items) || []).filter((i) => i && i.state === 'failed').map((i) => clean(i.name, 60)).filter(Boolean);
+  const more = names.length - MAX_CHECK_NAMES;
+  const list = names.slice(0, MAX_CHECK_NAMES).join(', ') + (more > 0 ? ` and ${more} more` : '') || 'unnamed checks';
+  const n = Number(pr.number);
+  return `Pull request #${n} "${clean(pr.title, 120)}" of this repo has failing checks (${list}). Find out why with gh (gh pr checks ${n}, gh run view --log-failed) and make sure you are on its branch "${clean(pr.head, 120)}" (switch to it only if the tree is clean; if not, stop and ask). Fix whatever is needed, in production code, test code or configuration, as long as it serves the original objective of this pull request (its title, description and commits). If the failure is unrelated to that objective or looks transient (infrastructure, a flaky run, a runner problem), do not edit any code: say so and recommend the "Re-run failed" button. If the right fix would change the scope of the pull request or needs a product decision, stop and ask. Run this repo's tests, and do not commit, push or open pull requests: the user will run /flow-commit and then /flow-pr, which updates this PR. When done, write one line with what you fixed and the next step.`;
+}
+
+// Looks the PR up in the repo's open PRs and refuses unless it exists and its checks failed.
+async function fixPrOrderFor(repo, number, prs) {
+  const listed = await prs(repo);
+  if (!listed || listed.error || listed.noRemote || !Array.isArray(listed.prs)) throw new HttpError(409, 'The pull requests of this repo could not be read');
+  const pr = listed.prs.find((p) => p && p.number === number);
+  if (!pr) throw new HttpError(409, `Pull request #${number} does not exist or is not open`);
+  if (!pr.checks || pr.checks.state !== 'failed') throw new HttpError(409, `Pull request #${number} has no failing checks: nothing to fix`);
+  return fixPrOrder(pr);
+}
+
+async function orderText(repo, key, requirements, extra) {
+  if (key === FIX_PR) return fixPrOrderFor(repo, extra.pr, extra.prs);
   if (key === PUT_IN_CONDITIONS) {
     const req = await requirements(repo);
     if (!req.available) throw new HttpError(409, 'The requirements could not be evaluated (is the base branch available?)');
@@ -57,12 +88,14 @@ async function scanSessions(folder, orca, listed) {
 // The pi sessions of the repo: [{ handle, state }] with state idle | typed | busy.
 const piSessions = async (repo, orca = orcaTerminal) => (await scanSessions(repo.path, orca)).sessions;
 
-async function piSend(repo, key, orca = orcaTerminal, wait = sleep, requirements = requirementsFor) {
-  if (key !== PUT_IN_CONDITIONS && !Object.hasOwn(lib.PI_COMMANDS, key)) throw new HttpError(400, 'Unknown command');
+// `extra` is { pr, prs }: the PR number of fix-pr and the provider of the repo's open PRs (injectable for tests).
+async function piSend(repo, key, orca = orcaTerminal, wait = sleep, requirements = requirementsFor, { pr, prs = prState } = {}) {
+  if (key !== PUT_IN_CONDITIONS && key !== FIX_PR && !Object.hasOwn(lib.PI_COMMANDS, key)) throw new HttpError(400, 'Unknown command');
+  if (key === FIX_PR && !(Number.isInteger(pr) && pr > 0)) throw new HttpError(400, 'fix-pr needs the pr number of an open pull request (a positive integer)');
   if (piBusy.has(repo.path)) throw new HttpError(409, 'A command is already being sent to this repo');
   piBusy.add(repo.path);
   try {
-    const text = await orderText(repo, key, requirements);
+    const text = await orderText(repo, key, requirements, { pr, prs });
     const mine = await piSessions(repo, orca);
     if (!mine.length) throw new HttpError(409, 'No open pi session found for this repo in Orca');
     if (mine.length > 1) throw new HttpError(409, 'Several pi sessions are open for this repo; close the extra ones');
@@ -95,4 +128,4 @@ async function piStatus(repo, orca = orcaTerminal) {
   } catch { return { state: 'unknown' }; }
 }
 
-module.exports = { piSend, piStatus, piSessions, scanSessions, conditionsOrder, orcaTerminal };
+module.exports = { piSend, piStatus, piSessions, scanSessions, conditionsOrder, fixPrOrder, orcaTerminal };

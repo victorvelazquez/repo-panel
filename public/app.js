@@ -419,9 +419,20 @@ const COLUMNS = [
 ];
 
 // A PR that cannot merge because of something the user must fix.
-const isProblem = (pr) => !pr.ready && (pr.checks.state === 'failed' || ['DIRTY', 'BEHIND'].includes(pr.mergeStateStatus));
+const isProblem = (pr) => (V ? V.isProblem(pr) : !pr.ready && (pr.checks.state === 'failed' || ['DIRTY', 'BEHIND'].includes(pr.mergeStateStatus)));
 
-const prColumn = (pr) => (pr.ready ? 'ready' : 'progress');
+const prColumn = (pr) => (V ? V.prColumn(pr) : pr.ready ? 'ready' : 'progress');
+
+// Where the repo's local card goes (view.js decides it from Git state alone); without view.js, by changes, commits
+// and the stale mark only.
+function placement(l, p, prCount, verdict) {
+  if (V) return V.localPlacement(l, p, prCount, verdict && verdict.state);
+  const stale = !!p.stale;
+  if (l.error) return { column: 'changes', attn: true, row: false };
+  if ((l.files || []).length > 0) return { column: 'changes', attn: stale, row: false };
+  if ((l.ahead || 0) > 0) return { column: 'committed', attn: stale, row: false };
+  return stale ? { column: 'clean', attn: true, row: false } : { column: prCount ? null : 'clean', attn: false, row: !prCount };
+}
 
 // The verdict of the last /flow-commit sent from this page, or null. It lives in the page only: an ok verdict
 // clears the record and the card simply lives in COMMITTED. Judged from Git and the session state, never from
@@ -445,15 +456,11 @@ function buildCards() {
   };
   for (const r of visibleRepos()) {
     if (!S.local[r.id] || !S.prs[r.id]) continue; // first load still running
-    const { l, p, prs, dirty, unpushed } = info(r);
+    const { l, p, prs } = info(r);
     // A stale branch, something that needs manual action and a failed /flow-commit all need a person.
     const verdict = verdictOf(r);
-    const attn = !!p.stale || !!(V && V.manualAction(l, l.base)) || !!(verdict && verdict.state === 'attention');
-    if (l.error) add('changes', repoCard(r, true), true);
-    else if (dirty) add('changes', repoCard(r, attn, verdict), attn);
-    else if (unpushed) add('committed', repoCard(r, attn, verdict), attn);
-    else if (attn) add('clean', repoCard(r, true, verdict), true);
-    else if (!prs.length) add('clean', cleanRow(r), false);
+    const place = placement(l, p, prs.length, verdict);
+    if (place.column) add(place.column, place.row ? cleanRow(r) : l.error ? repoCard(r, true) : repoCard(r, place.attn, verdict), place.attn);
     for (const pr of prs) {
       const key = prColumn(pr);
       if (S.snoozed.has(snoozeKey(r.id, pr.number))) { if (!S.onlyProblems) parked[key].push(snoozedRow(r, pr)); }
@@ -516,7 +523,7 @@ const repoName = (r, url) => (url
 const removeBtn = (r) => `<button class="x" data-act="remove" data-id="${r.id}" title="Remove from panel (deletes nothing)">✕</button>`;
 
 // Types the command into the repo's open pi session (through Orca); the server refuses when that is not safe.
-const piBtn = (r, cmd, label = `/${cmd}`) => `<button data-act="pi" data-id="${r.id}" data-cmd="${cmd}" title="Send /${cmd} to the open pi session of this repo">${esc(label)}</button>`;
+const piBtn = (r, cmd, label = `/${cmd}`, { title = `Send /${cmd} to the open pi session of this repo`, pr } = {}) => `<button data-act="pi" data-id="${r.id}" data-cmd="${cmd}"${pr ? ` data-pr="${pr}"` : ''} title="${esc(title)}">${esc(label)}</button>`;
 
 // "⋯" menu of a card. Its open state lives in S (the page redraws on every refresh); `slot` tells apart
 // the several cards of one repo. Empty while the requirements are not loaded or nothing is left to do.
@@ -605,14 +612,14 @@ function repoCard(r, attn = false, verdict = null) {
   const { l, p, dirty, unpushed } = info(r);
   const manual = V ? V.manualAction(l, l.base) : null;
   const override = S.showCommit.has(r.id);
-  const commitOk = !manual && dirty && (!V || V.commitAllowed(S.state[r.id], { override }));
-  const pa = !manual && !dirty && unpushed && V ? V.prAction(l, p, verdict && verdict.state) : null;
+  // The flow buttons come from view.js; without it only /flow-commit is offered, as before.
+  const flow = V ? V.flowButtons(l, p, S.state[r.id], { override, verdict: verdict && verdict.state }) : dirty ? [{ cmd: 'flow-commit', label: '/flow-commit' }] : [];
   const overrideItem = !manual && dirty && V ? V.commitOverrideItem(S.state[r.id], { override }) : null;
   const chips = [];
   if (dirty) chips.push(`<button class="chip yellow chip-btn" data-act="diff" data-id="${r.id}" title="View diff">● ${l.files.length} file${l.files.length === 1 ? '' : 's'} <span class="add">+${l.added}</span> <span class="del">−${l.deleted}</span></button>`);
   if (unpushed) chips.push(`<span class="chip blue">↑ ${l.ahead} unpushed${l.noUpstream ? ' · no upstream' : ''}</span>`);
   if (l.behind) chips.push(`<span class="chip gray">↓ ${l.behind} behind</span>`);
-  if (p.stale) chips.push(`<span class="chip red" title="${esc(p.stale.via === 'merged' ? `PR #${p.stale.pr} from this branch was merged. Run /flow-branch to start from a fresh branch.` : 'The remote branch was deleted, so its work was merged. Run /flow-branch to start from a fresh branch.')}">${esc(p.stale.reason)}</span>`);
+  if (p.stale) chips.push(`<span class="chip red" title="${esc(p.stale.via === 'merged' ? `PR #${p.stale.pr} from this branch was merged. Press the /flow-branch button to start from a fresh, updated base branch.` : 'The remote branch was deleted, so its work was merged. Press the /flow-branch button to start from a fresh, updated base branch.')}">${esc(p.stale.reason)}</span>`);
   else if (l.currentGone) chips.push('<span class="chip gray" title="The remote branch was deleted (merged PR?)">remote branch deleted</span>');
   if (p.noRemote) chips.push('<span class="chip gray">no GitHub remote</span>');
   return `<div class="card ${attn ? 'attn' : ''}">
@@ -626,8 +633,7 @@ function repoCard(r, attn = false, verdict = null) {
     ${chips.length ? `<div class="chips">${chips.join('')}</div>` : ''}
     ${l.error ? `<div class="err">${esc(l.error)}</div>` : ''}
     ${p.error ? `<div class="err">GitHub: ${esc(p.error)}</div>` : ''}
-    ${commitOk ? `<div class="actions">${piBtn(r, 'flow-commit')}</div>` : ''}
-    ${pa && pa.show ? `<div class="actions">${piBtn(r, 'flow-pr', pa.update ? '/flow-pr (update PR)' : '/flow-pr')}</div>` : ''}
+    ${flow.map((b) => `<div class="actions">${piBtn(r, b.cmd, b.label, b.reason ? { title: b.reason } : {})}</div>`).join('')}
   </div>`;
 }
 
@@ -638,6 +644,8 @@ function checksChip(c) {
   if (c.state === 'failed') return `<span class="chip red" title="${tip}">✘ ${c.failed} failed · ${c.passed}/${c.total}</span>`;
   return `<span class="chip yellow" title="${tip}">… ${c.pending} running · ${c.passed}/${c.total}</span>`;
 }
+
+const FIX_PR_HINT = 'Ask the open pi session to find out why the checks failed and fix it (it will not commit or push)';
 
 function prCard(r, pr, meta) {
   const busy = S.busy[`${r.id}:${pr.number}`];
@@ -661,6 +669,7 @@ function prCard(r, pr, meta) {
       <button data-act="snooze" ${n} title="Park this PR at the bottom of the column until it is ready to merge (stays parked if it is already ready)">💤</button>
     </div>
     ${pr.checks.failedRuns.length ? `<button data-act="rerun" ${n} ${busy ? 'disabled' : ''}>Re-run failed</button>` : ''}
+    ${V && V.fixPrAction(pr).show ? piBtn(r, 'fix-pr', 'Fix with pi', { pr: pr.number, title: FIX_PR_HINT }) : ''}
   </div>`;
 }
 
@@ -760,12 +769,12 @@ const ACTIONS = {
   'close-drawer': () => { S.confOpen = false; $('#drawer').hidden = true; },
   'conformity': () => openConformity(),
   'pi': async (el) => {
-    const { id, cmd } = el.dataset;
+    const { id, cmd, pr } = el.dataset;
     el.disabled = true;
     try {
       // The baseline of the verdict is read fresh, right before sending, so a stale card cannot fake "HEAD changed".
       const before = cmd === 'flow-commit' ? await api(`/api/local?id=${id}`).catch(() => null) : null;
-      const d = await api('/api/pi', { id, command: cmd });
+      const d = await api('/api/pi', pr ? { id, command: cmd, pr: Number(pr) } : { id, command: cmd });
       if (before && !before.error && d.sent) {
         S.local[id] = before;
         S.sent[id] = { at: Date.now(), head: before.head ?? null, files: before.files.length };
@@ -773,7 +782,8 @@ const ACTIONS = {
         draw();
         loadPiStatus(id);
       }
-      toast(d.confirmed ? `Sent /${el.dataset.cmd} to pi` : `Sent /${el.dataset.cmd}, not confirmed: check the pi session`, d.confirmed ? 'ok' : '');
+      const what = cmd === 'fix-pr' ? `the fix order for #${pr}` : cmd === 'flow-branch-stash' ? '/flow-branch --stash' : `/${cmd}`;
+      toast(d.confirmed ? `Sent ${what} to pi` : `Sent ${what}, not confirmed: check the pi session`, d.confirmed ? 'ok' : '');
     } catch (e) { toast(e.message, 'bad'); }
     el.disabled = false;
   },
