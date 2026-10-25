@@ -41,6 +41,7 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 | RP13 | S11 | hecho en `implementation-guides` (perfil renombrado, afirmaciones falsas corregidas, párrafo opcional del panel; 58 pruebas bien); su commit y PR los hace la persona en ese repositorio | pendiente de commit en `implementation-guides` |
 | RP14 | S14, S17 | opcional: botón hacia la terminal de la sala; chat solo si la persona lo decide | — |
 | RP15 | S6 | worker acotado; `tray.ps1`, `install-tray.ps1`, `uninstall-tray.ps1` y `test/tray.test.js`; hecho y verificado salvo lo que depende del escritorio | pendiente de commit |
+| RP16 | S6 | `min-width: 0` en `.clean-row .roadmap`; defecto de la columna CLEAN visto en el panel real; medido antes y después en Edge | pendiente de commit |
 
 Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a → RP11b → RP12a → RP12b → RP12 → RP13 → RP14. RP12 puede ir antes de RP11 si la persona lo prefiere.
 

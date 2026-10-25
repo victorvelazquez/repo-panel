@@ -187,7 +187,12 @@ test('tray -SelfTestRestart: refuses to run when the config is outside the temp 
   } finally { fs.rmSync(outside, { force: true }); }
 });
 
+// Counts the tasks named repo-panel-tray. The count is compared before and after the dry run, because a machine where
+// the tray was really installed already has one: the dry run must change nothing, whatever the starting state.
+const trayTaskCount = () => spawnSync('powershell.exe', [...PS, '-Command', "@(Get-ScheduledTask -TaskName 'repo-panel-tray' -ErrorAction SilentlyContinue).Count"], { encoding: 'utf8' }).stdout.trim();
+
 test('install-tray.ps1 -DryRun prints the task and action and registers nothing', opts, () => {
+  const before = trayTaskCount();
   const r = ps(INSTALL, ['-DryRun'], {});
   assert.equal(r.code, 0, r.err);
   assert.match(r.out, /repo-panel-tray/);
@@ -195,8 +200,7 @@ test('install-tray.ps1 -DryRun prints the task and action and registers nothing'
   assert.match(r.out, /-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File/);
   assert.ok(r.out.includes(TRAY), 'names the full path of tray.ps1');
   assert.match(r.out, /dry run/i);
-  const q = spawnSync('powershell.exe', [...PS, '-Command', "@(Get-ScheduledTask -TaskName 'repo-panel-tray' -ErrorAction SilentlyContinue).Count"], { encoding: 'utf8' });
-  assert.equal(q.stdout.trim(), '0');
+  assert.equal(trayTaskCount(), before, 'a dry run leaves the scheduled tasks as they were');
 });
 
 test('uninstall-tray.ps1 -DryRun registers or removes nothing', opts, () => {

@@ -727,3 +727,9 @@ test('workQueue without manual or waiting is unchanged: deliver, stale branch, s
     { repoId: 'id-c', name: 'c', kind: 'start', unit: { id: 'RP9', entrega: 'Next thing' } },
   ]);
 });
+
+test("this repository's own docs/ROADMAP.md parses without errors, so the panel can read its own plan", () => {
+  const text = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'docs', 'ROADMAP.md'), 'utf8');
+  const errors = lib.parseRoadmap(text).problems.filter((p) => p.severity === 'error');
+  assert.deepEqual(errors.map((p) => `line ${p.line}: ${p.message}`), []);
+});
