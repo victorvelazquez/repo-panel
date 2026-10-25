@@ -10,4 +10,5 @@ You are in the pi session of ONE repo, and the user typed an order that points y
 6. If `AGENTS.md` already has a rule that conflicts with a block (for example a different roadmap path, state names, or a rule about commits or branches), STOP. Quote both rules, ask the user which one wins, and wait. Do not decide alone.
 7. `docs/ROADMAP.md` follows the format of the `registro` block: the three header lines (`**Dónde está:**`, `**Qué sigue:**`, `**Qué lo bloquea:**`) and the units table. Do not invent units: if the project has no plan yet, ask the user for it.
 8. Work on a task branch, not on the base branch. Do not commit, push or open PRs yourself: the user runs `/flow-commit` and `/flow-pr`.
-9. Finish by writing ONE line that says what you did and the next step for the user (normally: run `/flow-commit`).
+9. Never use `git mv` or `git add`: leave the git index empty (use plain file operations to move or rename files), because `/flow-commit` refuses to start when files are staged.
+10. Finish by writing ONE line that says what you did and the next step for the user (normally: run `/flow-commit`).

@@ -68,3 +68,51 @@ test('the whole flow: a running /flow-commit hides /flow-pr and /flow-base', () 
   // a failed /flow-commit puts the card in attention without moving it
   assert.deepEqual(localPlacement(local({ ahead: 1 }), { prs: [], stale: null }, 0, 'attention'), { column: 'committed', attn: true, row: false });
 });
+
+// ---------- RP18: sending a command shows it running, and the card moves when the session finishes ----------
+const { flowVerdict } = require('../public/view.js');
+
+test('the whole flow: /flow-pr is sent, runs (disabled), finishes, and the card moves to the PR column after the refresh', () => {
+  const NOW = 50_000_000;
+  const none = { prs: [], stale: null };
+  const sent = { cmd: 'flow-pr', at: NOW - 60_000, head: 'h1', branch: 'task', files: 0, ahead: 1 };
+  const committed = local({ ahead: 1, noUpstream: true, upstream: null });
+  // 1. COMMITTED card with /flow-pr enabled
+  assert.deepEqual(flowButtons(committed, none, null, {}).map((b) => [b.label, b.disabled]), [['/flow-pr', undefined]]);
+  // 2. sent, the session works: running, same card and column, the button disabled (the second click is impossible)
+  const running = flowVerdict(sent, committed, 'busy', none, NOW);
+  assert.deepEqual([running.state, running.label], ['running', 'creating pull request…']);
+  assert.deepEqual(flowButtons(committed, none, null, { running }).map((b) => [b.label, b.disabled]), [['/flow-pr', true]]);
+  assert.equal(localPlacement(committed, none, 0, running.state).column, 'committed');
+  // 3. the session finished and the refresh brought the pushed branch with its open PR: ok, and the card is the PR's
+  const refreshed = { l: local(), p: { prs: [pending], stale: null } };
+  const done = flowVerdict(sent, refreshed.l, 'idle', refreshed.p, NOW);
+  assert.equal(done.state, 'ok');
+  assert.equal(localPlacement(refreshed.l, refreshed.p, 1, null).column, null);
+  assert.equal(prColumn(pending), 'progress');
+  // a /flow-pr that finished without creating the PR needs attention instead
+  assert.equal(flowVerdict(sent, committed, 'idle', none, NOW).reason, 'No open pull request for task after /flow-pr');
+});
+
+test('the whole flow: staged renames -> /flow-commit --unstage -> unstaged dirty tree -> /flow-commit -> /flow-pr', () => {
+  const NOW = 60_000_000;
+  const none = { prs: [], stale: null };
+  const renamed = local({ files: [file, file], stagedCount: 2, stagedPaths: ['new.txt', 'old.txt'], noUpstream: true, upstream: null });
+  // 1. the index is not empty: only the unstage button, with its explanation
+  assert.deepEqual(flowButtons(renamed, none, null, {}).map((b) => b.label), ['/flow-commit --unstage']);
+  // 2. sent: running, disabled
+  const unstage = { cmd: 'flow-commit-unstage', at: NOW - 60_000, head: 'h1', branch: 'task', files: 2, ahead: 0 };
+  const running = flowVerdict(unstage, renamed, 'busy', none, NOW);
+  assert.equal(running.state, 'running');
+  assert.deepEqual(flowButtons(renamed, none, null, { running }).map((b) => [b.label, b.disabled]), [['/flow-commit --unstage', true]]);
+  // 3. the index is empty but the tree is still dirty and nothing was committed: attention, plain retry label
+  const unstaged = local({ files: [file, file], noUpstream: true, upstream: null });
+  const stuck = flowVerdict(unstage, unstaged, 'idle', none, NOW);
+  assert.equal(stuck.state, 'attention');
+  assert.deepEqual(flowButtons(unstaged, none, null, { verdict: stuck.state, retry: true }).map((b) => b.label), ['Retry /flow-commit']);
+  // 4. /flow-commit commits: ok, and the COMMITTED card offers /flow-pr
+  const commit = { cmd: 'flow-commit', at: NOW - 60_000, head: 'h1', branch: 'task', files: 2, ahead: 0 };
+  const committed = local({ ahead: 1, head: 'h2', noUpstream: true, upstream: null });
+  assert.equal(flowVerdict(commit, committed, 'idle', none, NOW).state, 'ok');
+  assert.deepEqual(flowButtons(committed, none, null, {}).map((b) => b.label), ['/flow-pr']);
+});

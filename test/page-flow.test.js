@@ -120,10 +120,11 @@ test('page: the pi buttons post the command, and only the fix-pr one carries its
   assert.deepEqual(posts, [{ id: 'abc', command: 'flow-commit' }, { id: 'abc', command: 'fix-pr', pr: 7 }]);
 });
 
-test('page: the stash button posts only its key and reads no commit baseline', async () => {
+test('page: the stash button posts only its key, after reading the baseline of its verdict', async () => {
   const page = loadPage();
   page.answers['/api/pi'] = { sent: true, confirmed: true };
+  page.answers['/api/local?id=abc'] = local({ files: [file] });
   await page.get('ACTIONS').pi({ dataset: { id: 'abc', cmd: 'flow-base-stash' }, disabled: false });
-  assert.deepEqual(page.calls.filter((c) => c.url === '/api/pi' || c.url.startsWith('/api/local')).map((c) => [c.url, c.body]), [['/api/pi', { id: 'abc', command: 'flow-base-stash' }]]);
-  assert.deepEqual(Object.keys(page.get('S').sent), []);
+  assert.deepEqual(page.calls.filter((c) => c.url === '/api/pi' || c.url.startsWith('/api/local')).map((c) => [c.url, c.body]), [['/api/local?id=abc', null], ['/api/pi', { id: 'abc', command: 'flow-base-stash' }]]);
+  assert.equal(page.get('S').sent.abc.cmd, 'flow-base-stash');
 });

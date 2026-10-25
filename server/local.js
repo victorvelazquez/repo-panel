@@ -40,6 +40,8 @@ async function inProgressOf(repo, run) {
   return null;
 }
 
+const STAGED_CAP = 20;
+
 // The runner is injectable so tests can force failures; the facts above never throw.
 async function localState(repo, { git: run = git } = {}) {
   if (!fs.existsSync(repo.path)) return { error: 'Folder not found' };
@@ -74,6 +76,9 @@ async function localState(repo, { git: run = git } = {}) {
 
   const [head, inProgress, base] = await Promise.all([headOf(repo, run), inProgressOf(repo, run), baseBranchOf(repo, run).catch(() => null)]);
 
+  // Paths with a change in the index (renames included), from the same status parse; untracked files are never staged.
+  const staged = s.files.filter((f) => f.xy !== '??' && f.xy[0] !== '.').map((f) => f.path).sort();
+
   return {
     branch: s.branch, detached: s.detached, upstream: s.upstream, noUpstream,
     ahead, behind: s.behind, files,
@@ -81,6 +86,7 @@ async function localState(repo, { git: run = git } = {}) {
     deleted: files.reduce((a, f) => a + f.deleted, 0),
     goneBranches: gone, currentGone: !!s.branch && gone.includes(s.branch),
     head, inProgress, base,
+    stagedCount: staged.length, stagedPaths: staged.slice(0, STAGED_CAP),
   };
 }
 

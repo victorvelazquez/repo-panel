@@ -8,7 +8,7 @@
 }(typeof self !== 'undefined' ? self : this, () => {
   // Bump it when the client starts needing a new or changed server route. /health reports the value
   // the running server loaded at start; the page compares it with the file it just downloaded.
-  const API_VERSION = 12;
+  const API_VERSION = 13;
 
   // `health` is the parsed /health answer, or null when the request itself failed (no answer, so
   // there is nothing to warn about). Any answer without the current integer `api` is out of date:
@@ -225,17 +225,41 @@
   const FLOW_BASE_HINT = 'Start from a fresh, updated base branch: this branch was already merged';
   const FLOW_STASH_HINT = 'This branch was already merged but has uncommitted changes. /flow-base --stash carries them to the fresh base branch (stash, switch, update, restore). It refuses and changes nothing when the work of this branch is not yet merged or its remote branch not yet deleted.';
 
-  // The flow buttons of a repo's LOCAL card, in order: [{ cmd, label, reason? }] with cmd flow-commit | flow-pr |
-  // flow-base, or []. The one source of truth for the page and the tests. `ctx` is { override (the person lifted the
-  // declared-state gating of /flow-commit), verdict ('running' | 'ok' | 'attention' | null, the last /flow-commit), now }.
+  const UNSTAGE_HINT = '/flow-commit needs an empty index. This clears the index (git reset: your changes stay in the working tree) and continues with the normal commit.';
+
+  // What a running command is called in a tooltip.
+  const RUNNING_NAME = { 'fix-pr': 'the fix order', 'put-in-conditions': 'the put-in-conditions order' };
+
+  // The tooltip of a button that is disabled while `running` ({ cmd, label }) runs.
+  function runningReason(running) {
+    const name = RUNNING_NAME[running.cmd] || CMD_TEXT[running.cmd] || `/${running.cmd}`;
+    return `Running ${name} (${running.label}): wait for it to finish`;
+  }
+
+  // The flow buttons of a repo's LOCAL card, in order: [{ cmd, label, reason?, disabled? }] with cmd flow-commit |
+  // flow-commit-unstage | flow-pr | flow-base | flow-base-stash, or []. The one source of truth for the page and the
+  // tests. `ctx` is { override (the person lifted the declared-state gating of /flow-commit), verdict ('running' |
+  // 'ok' | 'attention' | null, the last /flow-commit), running ({ cmd, label } of a command sent from this page that is
+  // still running: the same buttons come back disabled with a reason), retry (label the commit button "Retry …"), now }.
   // A stale repo with changed or untracked files offers /flow-base --stash instead of /flow-commit (the skill carries
-  // the changes aside, updates the base branch and brings them back). Neither branch button shows while a
-  // /flow-commit is still running or when the repo needs manual action.
+  // the changes aside, updates the base branch and brings them back). A dirty repo with staged files offers
+  // /flow-commit --unstage instead of /flow-commit (the index must be empty). Neither branch button shows while a
+  // bare `verdict: 'running'` is passed or when the repo needs manual action.
   function flowButtons(local, prInfo, stateData, ctx = {}) {
+    if (ctx.running) {
+      const { running, ...rest } = ctx;
+      const reason = runningReason(running);
+      return flowButtons(local, prInfo, stateData, { ...rest, verdict: null }).map((b) => ({ ...b, disabled: true, reason }));
+    }
     if (!hasLocal(local) || manualAction(local, local.base)) return [];
-    const { override = false, verdict = null, now = Date.now() } = ctx;
+    const { override = false, verdict = null, retry = false, now = Date.now() } = ctx;
     if (local.files.length > 0 && prInfo && prInfo.stale) return verdict === 'running' ? [] : [{ cmd: 'flow-base-stash', label: '/flow-base --stash', reason: FLOW_STASH_HINT }];
-    if (local.files.length > 0) return commitAllowed(stateData, { now, override }) ? [{ cmd: 'flow-commit', label: '/flow-commit' }] : [];
+    if (local.files.length > 0) {
+      if (!commitAllowed(stateData, { now, override })) return [];
+      const again = retry ? 'Retry ' : '';
+      if (local.stagedCount > 0) return [{ cmd: 'flow-commit-unstage', label: `${again}/flow-commit --unstage`, reason: UNSTAGE_HINT }];
+      return [{ cmd: 'flow-commit', label: `${again}/flow-commit` }];
+    }
     const pa = local.ahead > 0 ? prAction(local, prInfo, verdict) : null;
     if (pa && pa.show) return [{ cmd: 'flow-pr', label: pa.update ? '/flow-pr (update PR)' : '/flow-pr' }];
     if (prInfo && prInfo.stale && verdict !== 'running') return [{ cmd: 'flow-base', label: '/flow-base', reason: FLOW_BASE_HINT }];
@@ -306,5 +330,62 @@
     return attention(changed ? 'HEAD changed but no commits are left to deliver' : 'No change 15 minutes after /flow-commit and the pi session state is unknown');
   }
 
-  return { API_VERSION, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, isProblem, prColumn, commitVerdict, queueFlags, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, presenceLabel, presenceDot };
+  // What the status line says while each command a button can send is running.
+  const RUNNING_LABEL = {
+    'flow-commit': 'committing…', 'flow-commit-unstage': 'committing…', 'flow-pr': 'creating pull request…',
+    'flow-base': 'updating base branch…', 'flow-base-stash': 'updating base branch…',
+    'fix-pr': 'fixing pull request…', 'put-in-conditions': 'putting repo in conditions…',
+  };
+  const CMD_TEXT = { 'flow-commit': '/flow-commit', 'flow-commit-unstage': '/flow-commit --unstage', 'flow-pr': '/flow-pr', 'flow-base': '/flow-base', 'flow-base-stash': '/flow-base --stash' };
+  const SESSION_CLOSED = 'The pi session closed while the command was running';
+
+  // Verdict of any command sent from the page: { state: 'running' | 'ok' | 'attention', reason, label }, or null when
+  // there is no record or the command has no verdict (fix-pr and put-in-conditions are dropped once the session is
+  // idle: a failure answer from the session is a legitimate outcome). `sent` is { cmd, at, head, branch, files, ahead,
+  // busySeen? } recorded when the command was confirmed; `session` is the state of GET /api/pi-status; `prInfo` is the
+  // answer of /api/prs. Judged from Git and the session state, never from terminal text. /flow-commit and
+  // /flow-commit --unstage are judged by commitVerdict (the latter must also leave an empty index).
+  function flowVerdict(sent, local, session, prInfo, now = Date.now()) {
+    if (!sent) return null;
+    const label = RUNNING_LABEL[sent.cmd] || '';
+    const done = (v) => (v ? { ...v, label, cmd: sent.cmd } : null);
+    if (sent.cmd === 'flow-commit' || sent.cmd === 'flow-commit-unstage') {
+      const v = commitVerdict(sent, local, session, now);
+      if (v && v.state === 'ok' && sent.cmd === 'flow-commit-unstage' && local.stagedCount > 0) {
+        return done({ state: 'attention', reason: `${local.stagedCount} file${local.stagedCount === 1 ? ' is' : 's are'} still staged after /flow-commit --unstage` });
+      }
+      return done(v);
+    }
+    const running = (reason) => done({ state: 'running', reason });
+    const attention = (reason) => done({ state: 'attention', reason });
+    const noCommit = sent.cmd === 'fix-pr' || sent.cmd === 'put-in-conditions';
+    if (!hasLocal(local)) return running('Waiting for the repo state');
+    if (session === 'busy') return running('The pi session is working');
+    const text = CMD_TEXT[sent.cmd] || `/${sent.cmd}`;
+    const branch = local.branch || '(detached)';
+    const base = local.base || 'the base branch';
+    let ok = false;
+    let notOk = '';
+    if (sent.cmd === 'flow-pr') {
+      const open = prInfo && Array.isArray(prInfo.prs) ? prInfo.prs : [];
+      ok = local.files.length === 0 && !local.noUpstream && local.ahead === 0 && open.some((p) => p && p.head === local.branch);
+      notOk = `No open pull request for ${branch} after ${text}`;
+    } else if (!noCommit) {
+      const up = local.branch === local.base && local.behind === 0 && local.ahead === 0;
+      ok = up && (sent.cmd === 'flow-base-stash' || local.files.length === 0);
+      notOk = local.branch === sent.branch ? `Still on ${branch} after ${text}` : `Not on a ${sent.cmd === 'flow-base' ? 'clean, ' : ''}up-to-date ${base} after ${text}`;
+    }
+    if (ok) return done({ state: 'ok', reason: `${text} done` });
+    const elapsed = now - sent.at;
+    const settling = elapsed < SETTLE_MS && !sent.busySeen;
+    if (session === 'closed') return noCommit || settling ? attention(SESSION_CLOSED) : attention(notOk);
+    if (session === 'idle') {
+      if (settling) return running('Waiting for the pi session to start');
+      return noCommit ? null : attention(notOk);
+    }
+    if (elapsed < UNKNOWN_MS) return running('Waiting for the pi session');
+    return attention(`No change 15 minutes after ${text} and the pi session state is unknown`);
+  }
+
+  return { API_VERSION, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, isProblem, prColumn, commitVerdict, queueFlags, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, presenceLabel, presenceDot };
 }));

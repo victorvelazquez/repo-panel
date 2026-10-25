@@ -15,6 +15,27 @@ const PUT_IN_CONDITIONS = 'put-in-conditions';
 const FIX_PR = 'fix-pr';
 
 const piBusy = new Set();
+
+// The same command key is not accepted twice for one repo within this window after a confirmed send: a pi screen
+// that reads idle while a subagent still works would otherwise let a second /flow-pr through.
+const DUPLICATE_MS = 45 * 1000;
+
+// In-memory record of the last confirmed send per repo path and command key. The clock is injectable for tests.
+function sendGuard(now = Date.now) {
+  const last = new Map();
+  const id = (repo, key) => `${repo.path}|${key}`;
+  return {
+    check(repo, key) {
+      const ago = now() - (last.get(id(repo, key)) ?? -Infinity);
+      if (ago < DUPLICATE_MS) throw new HttpError(409, `That command was already sent ${Math.max(0, Math.round(ago / 1000))} s ago; wait for it to finish`);
+    },
+    record(repo, key) { last.set(id(repo, key), now()); },
+  };
+}
+
+// Appended to the orders that make a session edit files: /flow-commit refuses to start when the index is not empty.
+const INDEX_RULE = 'Never use git mv or git add; keep the git index empty (/flow-commit refuses to start with staged files).';
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function orcaTerminal(args) {
@@ -32,7 +53,7 @@ function conditionsOrder(results, installPath = INSTALL_PATH) {
   const open = results.filter((r) => r.status !== 'pass');
   if (!open.length) throw new HttpError(409, 'Every requirement already passes: nothing to do');
   const ids = [...open.filter((r) => r.level === 'required'), ...open.filter((r) => r.level !== 'required')].map((r) => r.id);
-  return `Put this repo in conditions for repo-panel: read "${installPath}" (the user authorizes reading that one file outside this repo) and apply these requirement ids: ${ids.join(', ')}.`;
+  return `Put this repo in conditions for repo-panel: read "${installPath}" (the user authorizes reading that one file outside this repo) and apply these requirement ids: ${ids.join(', ')}. ${INDEX_RULE}`;
 }
 
 // Text that comes from GitHub (titles, branch and check names) goes into the order only after this: control
@@ -50,7 +71,7 @@ function fixPrOrder(pr) {
   const more = names.length - MAX_CHECK_NAMES;
   const list = names.slice(0, MAX_CHECK_NAMES).join(', ') + (more > 0 ? ` and ${more} more` : '') || 'unnamed checks';
   const n = Number(pr.number);
-  return `Pull request #${n} "${clean(pr.title, 120)}" of this repo has failing checks (${list}). Find out why with gh (gh pr checks ${n}, gh run view --log-failed) and make sure you are on its branch "${clean(pr.head, 120)}" (switch to it only if the tree is clean; if not, stop and ask). Fix whatever is needed, in production code, test code or configuration, as long as it serves the original objective of this pull request (its title, description and commits). If the failure is unrelated to that objective or looks transient (infrastructure, a flaky run, a runner problem), do not edit any code: say so and recommend the "Re-run failed" button. If the right fix would change the scope of the pull request or needs a product decision, stop and ask. Run this repo's tests, and do not commit, push or open pull requests: the user will run /flow-commit and then /flow-pr, which updates this PR. When done, write one line with what you fixed and the next step.`;
+  return `Pull request #${n} "${clean(pr.title, 120)}" of this repo has failing checks (${list}). Find out why with gh (gh pr checks ${n}, gh run view --log-failed) and be on its branch "${clean(pr.head, 120)}" (switch only if the tree is clean; if not, stop and ask). Fix whatever is needed, in production code, test code or configuration, as long as it serves the original objective of this pull request (its title, description and commits). If the failure is unrelated to that objective or looks transient (infrastructure, a flaky run, a runner problem), do not edit any code: say so and recommend the "Re-run failed" button. If the right fix would change the scope of the pull request or needs a product decision, stop and ask. Run this repo's tests; do not commit, push or open pull requests: the user will run /flow-commit and /flow-pr. ${INDEX_RULE} Finish with one line: what you fixed and the next step.`;
 }
 
 // Looks the PR up in the repo's open PRs and refuses unless it exists and its checks failed.
@@ -76,20 +97,24 @@ async function orderText(repo, key, requirements, extra) {
 // Looks at every terminal of the folder's worktree with a fresh `show` (the `list` preview is truncated), in
 // parallel. `sessions` are the ones whose screen is a pi screen; `failed` counts the terminals whose `show`
 // failed: those are unknown, not sessions. `listed` is an already fetched `list` result (rooms list once).
-async function scanSessions(folder, orca, listed) {
+async function scanSessions(folder, orca, listed, withPreview = false) {
   const terminals = lib.terminalsOfWorktree(listed === undefined ? (await orca(['list'])).terminals : listed, folder);
   const seen = await Promise.all(terminals.map(async ({ handle }) => {
-    try { return { handle, state: lib.piScreenState(((await orca(['show', '--terminal', handle])).terminal || {}).preview) }; }
-    catch { return { handle, state: null, failed: true }; }
+    try {
+      const preview = ((await orca(['show', '--terminal', handle])).terminal || {}).preview;
+      return { handle, state: lib.piScreenState(preview), preview };
+    } catch { return { handle, state: null, failed: true }; }
   }));
-  return { sessions: seen.filter((t) => t.state).map(({ handle, state }) => ({ handle, state })), failed: seen.filter((t) => t.failed).length };
+  const sessions = seen.filter((t) => t.state).map(({ handle, state, preview }) => (withPreview ? { handle, state, preview } : { handle, state }));
+  return { sessions, failed: seen.filter((t) => t.failed).length };
 }
 
 // The pi sessions of the repo: [{ handle, state }] with state idle | typed | busy.
 const piSessions = async (repo, orca = orcaTerminal) => (await scanSessions(repo.path, orca)).sessions;
 
-// `extra` is { pr, prs }: the PR number of fix-pr and the provider of the repo's open PRs (injectable for tests).
-async function piSend(repo, key, orca = orcaTerminal, wait = sleep, requirements = requirementsFor, { pr, prs = prState } = {}) {
+// `extra` is { pr, prs, guard }: the PR number of fix-pr, the provider of the repo's open PRs (injectable for tests) and
+// the duplicate-send guard of sendGuard (the HTTP server always passes one; without it nothing is refused as a repeat).
+async function piSend(repo, key, orca = orcaTerminal, wait = sleep, requirements = requirementsFor, { pr, prs = prState, guard = null } = {}) {
   if (key !== PUT_IN_CONDITIONS && key !== FIX_PR && !Object.hasOwn(lib.PI_COMMANDS, key)) throw new HttpError(400, 'Unknown command');
   if (key === FIX_PR && !(Number.isInteger(pr) && pr > 0)) throw new HttpError(400, 'fix-pr needs the pr number of an open pull request (a positive integer)');
   if (piBusy.has(repo.path)) throw new HttpError(409, 'A command is already being sent to this repo');
@@ -102,30 +127,53 @@ async function piSend(repo, key, orca = orcaTerminal, wait = sleep, requirements
     const { handle } = mine[0];
     const state = async () => lib.piPromptState(((await orca(['show', '--terminal', handle])).terminal || {}).preview);
     if (mine[0].state !== 'idle') throw new HttpError(409, 'The pi session is busy or has text typed in its prompt');
+    if (guard) guard.check(repo, key);
     await orca(['send', '--terminal', handle, '--text', text, '--enter']);
     // Orca cannot report delivery, so look for the session to leave the idle prompt. `confirmed` only means the
     // prompt left the idle state (the agent started something); it does not prove the order was read or applied.
     for (let i = 0; i < 6; i++) {
       await wait(700);
-      if (await state() !== 'idle') return { sent: true, confirmed: true };
+      if (await state() !== 'idle') { if (guard) guard.record(repo, key); return { sent: true, confirmed: true }; }
     }
     return { sent: true, confirmed: false };
   } finally { piBusy.delete(repo.path); }
+}
+
+const TAIL_LINES = 6;
+const TAIL_LINE_MAX = 200;
+const TAIL_MAX = 800;
+
+// The last non-empty lines of a pi screen ABOVE its prompt bars (the `▎` lines and the footer below them), made
+// safe to show: control characters become a space and the lengths are capped. '' when the screen has no prompt bar.
+// Informational only: nothing is ever decided from it.
+function screenTail(preview) {
+  if (typeof preview !== 'string') return '';
+  const lines = preview.split(/\r?\n/);
+  const at = lines.reduce((last, l, i) => (/^▎\s*\S+\s+(waiting for input|working…)/.test(l.trim()) ? i : last), -1);
+  if (at < 0) return '';
+  let start = at;
+  while (start > 0 && lines[start - 1].trim().startsWith('▎')) start--;
+  const above = lines.slice(0, start)
+    .map((l) => l.replace(/[\x00-\x1f\x7f-\x9f\u2028\u2029]/g, ' ').trim().slice(0, TAIL_LINE_MAX))
+    .filter(Boolean);
+  return above.slice(-TAIL_LINES).join('\n').slice(0, TAIL_MAX);
 }
 
 // The state of the repo's pi session for the commit verdict: closed | idle | busy | ambiguous | unknown. Read-only
 // (`list` and a fresh `show` per terminal, never `send`), as the room presence does. An Orca failure is unknown,
 // never closed; a prompt with text typed in it is still a session waiting for input, so it counts as idle. If a
 // `show` failed and no pi screen was seen, the failed terminal could be the session, so that is unknown too.
-async function piStatus(repo, orca = orcaTerminal) {
+// With `tail` the answer also carries the end of the screen above the prompt (screenTail), '' when unreadable.
+async function piStatus(repo, orca = orcaTerminal, { tail = false } = {}) {
+  const out = (state, screen = '') => (tail ? { state, tail: screen } : { state });
   try {
     const listed = (await orca(['list'])).terminals;
-    if (!Array.isArray(listed)) return { state: 'unknown' };
-    const { sessions, failed } = await scanSessions(repo.path, orca, listed);
-    if (!sessions.length) return { state: failed ? 'unknown' : 'closed' };
-    if (sessions.length > 1) return { state: 'ambiguous' };
-    return { state: sessions[0].state === 'busy' ? 'busy' : 'idle' };
-  } catch { return { state: 'unknown' }; }
+    if (!Array.isArray(listed)) return out('unknown');
+    const { sessions, failed } = await scanSessions(repo.path, orca, listed, tail);
+    if (!sessions.length) return out(failed ? 'unknown' : 'closed');
+    if (sessions.length > 1) return out('ambiguous');
+    return out(sessions[0].state === 'busy' ? 'busy' : 'idle', screenTail(sessions[0].preview));
+  } catch { return out('unknown'); }
 }
 
-module.exports = { piSend, piStatus, piSessions, scanSessions, conditionsOrder, fixPrOrder, orcaTerminal };
+module.exports = { piSend, piStatus, piSessions, scanSessions, conditionsOrder, fixPrOrder, orcaTerminal, sendGuard };

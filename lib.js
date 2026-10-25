@@ -460,7 +460,7 @@ function conformityReport(entries) {
 
 // ---------- pi sessions in Orca terminals ----------
 // The only texts the browser can ask the panel to type into a pi session (it sends the key, never the text).
-const PI_COMMANDS = { 'flow-commit': '/flow-commit', 'flow-pr': '/flow-pr', 'flow-base': '/flow-base', 'flow-base-stash': '/flow-base --stash' };
+const PI_COMMANDS = { 'flow-commit': '/flow-commit', 'flow-commit-unstage': '/flow-commit --unstage', 'flow-pr': '/flow-pr', 'flow-base': '/flow-base', 'flow-base-stash': '/flow-base --stash' };
 
 // Orca reports the same folder as C:/x or C:\\x; compare them without caring about separators or case.
 const normPath = (p) => String(p || '').replace(/[\\/]+/g, '/').replace(/\/$/, '').toLowerCase();
