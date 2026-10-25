@@ -43,8 +43,10 @@ function tempConfig(content) {
   return file;
 }
 
+// `agent: false` opens a fresh connection every time. The default agent keeps sockets alive (Node 19+), and a
+// socket to the server that a restart just ended would be reused while spawnSync still blocks the event loop.
 const health = (port) => new Promise((resolve) => {
-  const req = http.get({ host: '127.0.0.1', port, path: '/health', timeout: 1500 }, (res) => {
+  const req = http.get({ host: '127.0.0.1', port, path: '/health', timeout: 1500, agent: false }, (res) => {
     let d = ''; res.on('data', (c) => { d += c; }); res.on('end', () => { try { resolve(JSON.parse(d).app === 'repo-panel'); } catch { resolve(false); } });
   });
   req.on('timeout', () => req.destroy());
@@ -140,6 +142,23 @@ test('tray -SelfTestRestart: ends and relaunches only the owned throwaway server
   children.push({ pid: j.newPid });
   assert.ok(await health(port), 'the relaunched server answers /health');
   assert.ok(await until(() => { try { process.kill(panel.pid, 0); return false; } catch { return true; } }, 5000), 'the old process is gone');
+});
+
+test('tray -SelfTestRestart: a node.cmd shim earlier on PATH does not break the relaunch', opts, async () => {
+  const port = await freePort();
+  const config = tempConfig({ port });
+  const panel = await startPanel(config);
+  const shimDir = fs.mkdtempSync(path.join(os.tmpdir(), 'repo-panel-shim-'));
+  dirs.push(shimDir);
+  fs.writeFileSync(path.join(shimDir, 'node.cmd'), ['@echo off', 'exit /b 1', ''].join(String.fromCharCode(13, 10)));
+  const pathKey = Object.keys(process.env).find((k) => k.toLowerCase() === 'path') || 'PATH';
+  const r = ps(TRAY, ['-SelfTest', '-ConfigPath', config, '-SelfTestRestart'], { REPO_PANEL_CONFIG: config, [pathKey]: shimDir + path.delimiter + process.env[pathKey] });
+  assert.equal(r.code, 0, r.err);
+  const j = jsonLine(r.out);
+  assert.equal(j.restarted, true, 'the relaunch must use node.exe, not the shim');
+  assert.equal(j.oldPid, panel.pid);
+  children.push({ pid: j.newPid });
+  assert.ok(await health(port), 'the relaunched server answers /health');
 });
 
 test('tray -SelfTestRestart: never touches an unrelated program on the port', opts, async () => {

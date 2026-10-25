@@ -61,8 +61,15 @@ function Test-PanelTask {
 }
 
 # Same command the scheduled task runs: conhost --headless node server.js, in the repo folder.
+# The first `node` on PATH can be a .cmd or .ps1 shim (npm, volta, fnm), which conhost cannot run: take a real .exe.
+function Get-NodeExe {
+  $exe = @(Get-Command node -All -CommandType Application -ErrorAction SilentlyContinue | Where-Object { $_.Source -like '*.exe' })
+  if (-not $exe.Count) { throw 'node.exe was not found on PATH.' }
+  return $exe[0].Source
+}
+
 function Start-PanelProcess {
-  $node = (Get-Command node -ErrorAction Stop).Source
+  $node = Get-NodeExe
   Start-Process -FilePath 'conhost.exe' -ArgumentList "--headless `"$node`" server.js" `
     -WorkingDirectory $script:root -WindowStyle Hidden | Out-Null
 }
