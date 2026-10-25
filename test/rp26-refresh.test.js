@@ -9,7 +9,10 @@ const vm = require('node:vm');
 const view = require('../public/view.js');
 
 const PUBLIC = path.join(__dirname, '..', 'public');
-const read = (f) => fs.readFileSync(path.join(PUBLIC, f), 'utf8');
+// Windows runners check the repo out with CRLF line endings: read everything as LF so the regexes below do not depend on it.
+const lf = (text) => text.replace(/\r\n/g, '\n');
+const read = (f) => lf(fs.readFileSync(path.join(PUBLIC, f), 'utf8'));
+const renderBody = (src) => /function render\(\) \{[\s\S]*?\n\}\n/.exec(lf(src));
 
 const stub = () => new Proxy(function stubElement() {}, {
   get: (t, k) => (k === 'content' ? 'token' : k === 'dataset' ? {} : k === 'classList' ? { add() {}, remove() {}, toggle() {} } : k === Symbol.toPrimitive ? () => '' : stub),
@@ -87,7 +90,7 @@ test('page: the top Refresh icon is switched on while any repo is refreshing and
 
 test('page: render keeps the top icon in step with the loading count', () => {
   const src = read('app.js');
-  const render = /function render\(\) \{[\s\S]*?\n\}\n/.exec(src);
+  const render = renderBody(src);
   assert.ok(render && /syncRefreshIcon\(\)/.test(render[0]), 'render() calls syncRefreshIcon()');
   assert.ok(!/class="spin"/.test(src), 'no spinner markup is left in app.js');
 });
@@ -105,4 +108,11 @@ test('the spin respects prefers-reduced-motion', () => {
   assert.ok(block, 'there is a reduced-motion block');
   assert.match(block[1], /\.ico/);
   assert.match(block[1], /animation:\s*none/);
+});
+
+test('the checks that read the page source also work on a CRLF checkout (Windows runners)', () => {
+  const crlf = read('app.js').replace(/\n/g, '\r\n');
+  const body = renderBody(crlf);
+  assert.ok(body && /syncRefreshIcon\(\)/.test(body[0]), 'render() is found and calls syncRefreshIcon() with CRLF line endings');
+  assert.ok(!/class="spin"/.test(lf(crlf)));
 });
