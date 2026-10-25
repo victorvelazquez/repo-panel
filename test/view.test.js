@@ -279,3 +279,11 @@ test('queueFlags: an expired working state is not waiting, and a missing local s
   assert.deepEqual(queueFlags(undefined, null, null, NOW), {});
   assert.deepEqual(queueFlags({ error: 'x' }, null, null, NOW), {});
 });
+
+test('style.css: the roadmap block of a clean row can shrink, so a long Next line is cut with an ellipsis instead of widening the column', () => {
+  const css = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'public', 'style.css'), 'utf8');
+  const start = css.indexOf('.clean-row .roadmap {');
+  assert.ok(start >= 0, 'the .clean-row .roadmap rule exists');
+  const rule = css.slice(start, css.indexOf('}', start));
+  assert.ok(rule.includes('min-width: 0'), `expected min-width: 0 in: ${rule}`);
+});

@@ -147,7 +147,7 @@ a.repo-name:hover { text-decoration: none; color: var(--blue); }
 
 .roadmap { cursor: pointer; font-size: 12px; color: var(--muted); }
 .clean-row { flex-wrap: wrap; }
-.clean-row .roadmap { flex: 1 0 100%; }
+.clean-row .roadmap { flex: 1 0 100%; min-width: 0; }
 .rm-line { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .rm-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rm-count { flex: none; }
