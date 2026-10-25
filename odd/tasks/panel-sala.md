@@ -38,10 +38,10 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 | RP12b | S2, S3, S5 | worker acotado; `/flow-pr` con variante de actualizar, acción manual, veredicto desde Git y la sesión, `pi-status`, caducidad de `working` y arreglos de RP12a; fusionado en PR #31 | `9936f86` |
 | RP12c | S3, S4 | worker acotado; la franja «Go work on» con tipos `manual` y `waiting`, `API_VERSION` 9 y icono; fusionado en PR #32 | `e4d4d66` |
 | RP12d | S1, S13 | worker acotado; `piScreenState`, `terminalsOfWorktree`, `scanSessions` y presencia por pantalla; fusionado en PR #33 | `9088a00` |
-| RP13 | S11 | hecho en `implementation-guides` (perfil renombrado, afirmaciones falsas corregidas, párrafo opcional del panel; 58 pruebas bien); su commit y PR los hace la persona en ese repositorio | pendiente de commit en `implementation-guides` |
-| RP14 | S14, S17 | opcional: botón hacia la terminal de la sala; chat solo si la persona lo decide | — |
-| RP15 | S6 | worker acotado; `tray.ps1`, `install-tray.ps1`, `uninstall-tray.ps1` y `test/tray.test.js`; hecho y verificado salvo lo que depende del escritorio | pendiente de commit |
-| RP16 | S6 | `min-width: 0` en `.clean-row .roadmap`; defecto de la columna CLEAN visto en el panel real; medido antes y después en Edge | pendiente de commit |
+| RP13 | S11 | hecho en `implementation-guides` (perfil renombrado, afirmaciones falsas corregidas, párrafo opcional del panel; 58 pruebas bien); su commit y PR los hace la persona en ese repositorio | `2418264` (PR #8 de `implementation-guides`) |
+| RP14 | S14, S17 | opcional: botón hacia la terminal de la sala; chat solo si la persona lo decide | pendiente por decisión de la persona: solo el botón hacia la sala, sin chat, cuando ya use una sala | — |
+| RP15 | S6 | worker acotado; `tray.ps1`, `install-tray.ps1`, `uninstall-tray.ps1` y `test/tray.test.js`; hecho y verificado salvo lo que depende del escritorio | `f1ca93f` (PR #34) |
+| RP16 | S6 | `min-width: 0` en `.clean-row .roadmap`; defecto de la columna CLEAN visto en el panel real; medido antes y después en Edge | `cf76fb0` (PR #35) |
 
 Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a → RP11b → RP12a → RP12b → RP12 → RP13 → RP14. RP12 puede ir antes de RP11 si la persona lo prefiere.
 
@@ -164,3 +164,18 @@ Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a →
 - Defecto hallado y corregido (RP12d): el título de la terminal no es estable; la detección pasa a la pantalla.
 - No probado a propósito: `/flow-pr` (empujaría una rama al GitHub real); el camino de «attention» (fallo del commit); dos sesiones en un mismo worktree; un `pi` sin Gentle Shell (no se detecta por diseño).
 - Efecto colateral inofensivo: el agente agregó `.panel/` al `.git/info/exclude` del repositorio principal de `repo-panel` (compartido entre worktrees).
+
+**L17.** Mensaje de la persona tras fusionar RP16 y cerrar RP13:
+
+> 1. podes anotar.
+> 2. ya vi el icono y se ve bien y funciona bien.
+> 3. lo pondre enseguida.
+> 4. que es RP14?
+
+*Aplicado: se anotó el PR #8 de `implementation-guides` en RP13; el ícono de bandeja quedó verificado a ojo por la persona (RP15); poner los repositorios en condiciones con «Put in conditions» queda en manos de la persona.*
+
+**L18.** Respuesta de la persona sobre RP14 (entre hacer solo el botón hacia la sala o ver el chat dentro del panel):
+
+> prefiero tu recomendacion?
+
+*Aplicado: RP14 será solo el botón hacia la terminal de la sala (`orca terminal switch`), sin mostrar el chat dentro del panel, y se hará cuando la persona ya tenga una sala creada y la haya usado un tiempo. La idea futura de una sola sesión de pi como sala que orquesta los repositorios (S17) sigue anotada, sin implementar, a la espera del detalle de la persona.*
