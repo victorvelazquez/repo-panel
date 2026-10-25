@@ -2,9 +2,10 @@
 
 A local, single-window dashboard for the repos you work on. It answers one question: **what is left for me to do?**
 
-- A kanban board with one card per pending thing, in six columns: **Clean · Changes · Committed · PR in progress · Ready to merge · Needs attention**. A repo with local changes and a ready PR shows up in both columns.
+- A kanban board with one card per pending thing, in columns: **Changes · Committed · Open PRs · Ready to merge · Merged**. A repo with local changes and a ready PR shows up in both columns.
+- **Merged, Idle and Needs attention.** Repos whose branch already merged (`Merged: run /flow-base`, clean tree, nothing ahead) have their own purple **Merged** column. Repos with nothing to do no longer take a column: they are compact rows in a collapsible **Idle · N repos** bar under the board, closed by default (its state is remembered; it is not drawn when no repo is idle). A card that needs a person but is not a merged branch (a manual action, a failed `/flow-commit` with a clean tree) never hides in that bar: it goes to a red **Needs attention** column, leftmost, that exists only while it has cards. To get the **Clean column** back, tick **Clean column** in the header (or press **Show as column** in the Idle bar): the column returns first, holding the rows and those cards, and the bar and the Needs attention column go away. Untick it to go back; Merged stays in both layouts.
 - Per repo: uncommitted files, `+/−` lines, unpushed commits, and a full diff viewer.
-- Per open PR: CI status and a **Merge** button that only enables when every check is green and GitHub reports the PR as mergeable. PRs with failed checks, conflicts or an outdated branch go to *Needs attention*.
+- Per open PR: CI status and a **Merge** button that only enables when every check is green and GitHub reports the PR as mergeable. PRs with failed checks, conflicts or an outdated branch stay in **Open PRs**, marked red as needing attention (the separate **Needs attention** column is for repos, not PRs).
 - Repos organised in groups (personal, work, commercial…), shown as a colored tag on each card, with a group filter and a name search.
 - A roadmap block on each repo card (in progress or next unit, progress bar, a problems badge and, on click, the roadmap header). It reads `docs/ROADMAP.md` from the remote base branch, not the working tree; repos without that file look unchanged.
 - The states `Lista`, `En revisión` and `En curso` (derived) are computed from Git and GitHub, never written in the file. A unit is linked to a branch or an open PR by its ID inside the branch name or the PR title; those units are skipped when picking the next one (`siguiente`).
@@ -178,7 +179,7 @@ One rule set (`flowButtons` in `public/view.js`) decides the buttons of a repo's
 | A `/flow-commit` or `/flow-commit --unstage` failed (attention) | Changes or Committed | `Retry /flow-commit` (or `Retry /flow-commit --unstage` while files are staged), with the reason and what the session said |
 | Clean, commits ahead, no open PR for the branch | Committed | `/flow-pr` |
 | Clean, commits ahead, an open PR from this branch | Committed | `/flow-pr (update PR)` |
-| Branch already merged (or its remote branch deleted), clean tree | Clean (red mark) | `/flow-base`: starts from a fresh, updated base branch |
+| Branch already merged (or its remote branch deleted), clean tree | Merged (red mark) | `/flow-base`: starts from a fresh, updated base branch |
 | Branch already merged, but files changed | Changes (red mark) | `/flow-base --stash` and no `/flow-commit`: the skill carries the uncommitted changes aside (stash, including untracked files), switches to the fresh base branch, updates it and restores them. It refuses and changes nothing when the work of the branch is not yet merged or its remote branch not yet deleted |
 | Needs manual action (detached HEAD, commits on the base branch, merge or rebase in progress, diverged) | Wherever Git puts it | none |
 | A `/flow-commit` is running | Changes or Committed | no `/flow-pr` and no `/flow-base` until it settles |

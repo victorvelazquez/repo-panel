@@ -144,9 +144,10 @@ test('css: top border of the five columns follows GitHub', () => {
   assert.match(rule('button.merge'), /background:\s*#238636/);
 });
 
-test('css: no Merged column was added (that is RP25)', () => {
-  assert.equal(rule('.col-merged'), null);
-  assert.ok(!/key: 'merged'/.test(read('app.js')));
+// RP23 left the Merged column out on purpose; RP25 adds it, purple, so this pin now says the opposite.
+test('css: the Merged column (added by RP25) is purple and the existing borders above did not change', () => {
+  assert.match(rule('.col-merged'), /border-top-color:\s*var\(--purple\)/);
+  assert.ok(/key: 'merged'/.test(read('app.js')));
 });
 
 test('css: the reduced-motion block and the ask line are untouched', () => {
