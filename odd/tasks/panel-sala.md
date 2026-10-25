@@ -37,10 +37,10 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 | RP12a | S4, S6, S7 | worker acotado; bloque `panel:estado`, requisitos, `server/state.js`, `GET /api/state`, línea `next` y acceso a `/flow-commit`; fusionado en PR #30 | `0021290` |
 | RP12b | S2, S3, S5 | worker acotado; `/flow-pr` con variante de actualizar, acción manual, veredicto desde Git y la sesión, `pi-status`, caducidad de `working` y arreglos de RP12a; fusionado en PR #31 | `9936f86` |
 | RP12c | S3, S4 | worker acotado; la franja «Go work on» con tipos `manual` y `waiting`, `API_VERSION` 9 y icono; fusionado en PR #32 | `e4d4d66` |
-| RP12d | S1, S13 | worker acotado; `piScreenState`, `terminalsOfWorktree`, `scanSessions` y presencia por pantalla; hecho y verificado con una sesión real | pendiente de commit |
-| RP13 | S11 | cierre de la dependencia de `implementation-guides` (otro proyecto, con autorización) | — |
+| RP12d | S1, S13 | worker acotado; `piScreenState`, `terminalsOfWorktree`, `scanSessions` y presencia por pantalla; fusionado en PR #33 | `9088a00` |
+| RP13 | S11 | hecho en `implementation-guides` (perfil renombrado, afirmaciones falsas corregidas, párrafo opcional del panel; 58 pruebas bien); su commit y PR los hace la persona en ese repositorio | pendiente de commit en `implementation-guides` |
 | RP14 | S14, S17 | opcional: botón hacia la terminal de la sala; chat solo si la persona lo decide | — |
-| RP15 | S6 | ícono de bandeja de Windows (PowerShell oculto con `NotifyIcon`) para abrir, reiniciar y salir del panel, sobre la tarea de inicio automático existente | — |
+| RP15 | S6 | worker acotado; `tray.ps1`, `install-tray.ps1`, `uninstall-tray.ps1` y `test/tray.test.js`; hecho y verificado salvo lo que depende del escritorio | pendiente de commit |
 
 Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a → RP11b → RP12a → RP12b → RP12 → RP13 → RP14. RP12 puede ir antes de RP11 si la persona lo prefiere.
 

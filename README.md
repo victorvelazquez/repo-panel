@@ -76,6 +76,25 @@ Get-NetTCPConnection -LocalPort 4310 -State Listen | ForEach-Object { Stop-Proce
 
 Use the `port` from `config.json` if you changed it. To check: open `/health`, it must show the current `api`, and the red banner must disappear after reloading the page.
 
+#### Tray icon (Windows)
+
+To avoid doing that by hand, `scripts/tray.ps1` puts an icon in the notification area (next to Docker and the like). It is a hidden PowerShell script (Windows PowerShell 5.1 or PowerShell 7, no dependencies).
+
+```powershell
+.\scripts\install-tray.ps1      # registers the per-user task repo-panel-tray at logon (no admin)
+Start-ScheduledTask -TaskName repo-panel-tray   # start it now, without logging out
+.\scripts\uninstall-tray.ps1    # removes the task (close a running tray with its "Quit tray" item)
+```
+
+`install-tray.ps1 -DryRun` (and `uninstall-tray.ps1 -DryRun`) only print what they would do. You can also run `powershell -File scripts\tray.ps1` by hand; a second launch exits quietly (one tray at a time). The port is read from `config.json` (or `REPO_PANEL_CONFIG`, or `-ConfigPath`), default 4310; an unreadable config uses the default.
+
+- The icon is green when `http://127.0.0.1:<port>/health` answers `repo-panel`, gray when it does not (checked every 5 seconds); the tooltip says `repo-panel: running (port N)` or `repo-panel: stopped`.
+- Right-click menu: **Open panel** (also the double-click), **Restart panel**, **Start panel** (enabled only when stopped) and **Quit tray** (the panel keeps running).
+- **Restart panel** ends only the processes listening on the port whose command line runs this repo's `server.js` (a path inside this folder, or the `node server.js` form of the autostart task that also answers `/health` as `repo-panel`). If something else holds the port it ends nothing and says so. Then it runs the `repo-panel` task, or, if that task does not exist, `conhost.exe --headless node server.js` in this folder, waits up to 15 seconds for `/health` and reports the result in a balloon tip.
+- It only talks to `127.0.0.1`. Errors show as a balloon tip; the tray keeps running.
+- `scripts\tray.ps1 -SelfTest` prints the facts the menu uses (port, health, listeners, owned listeners, task) as one JSON line and opens no window; `-SelfTestRestart` runs the end-and-relaunch logic and refuses unless `REPO_PANEL_CONFIG` is inside the temp folder. The tests use these two modes.
+- Windows only. Not verified by the tests (they cannot see the desktop): that the icon is visible, its colors, the right-click menu, the balloon tips, and clicking **Open panel** / **Restart panel** in the real menu. If the tray process is killed (not quit), Windows may keep a ghost icon until the mouse passes over it.
+
 ## Configuration
 
 On first run there is nothing to configure: click **+ Repo** to add a single folder, or to scan a parent folder for every repo inside it. The panel saves your choices to `config.json`, which is git-ignored so your local paths are never committed.
