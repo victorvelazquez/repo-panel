@@ -465,12 +465,27 @@ const PI_COMMANDS = { 'flow-commit': '/flow-commit', 'flow-pr': '/flow-pr', 'flo
 // Orca reports the same folder as C:/x or C:\\x; compare them without caring about separators or case.
 const normPath = (p) => String(p || '').replace(/[\\/]+/g, '/').replace(/\/$/, '').toLowerCase();
 
-// Live, writable pi terminals whose worktree is exactly this repo.
-function piTerminalsFor(terminals, repoPath) {
+// Live, writable terminals whose worktree is exactly this folder. The title says nothing: Orca renames the
+// same pi session (`pi`, `Windows PowerShell`, `Terminal 1`...), so a pi session is told apart by its screen.
+function terminalsOfWorktree(terminals, repoPath) {
   const want = normPath(repoPath);
   return (Array.isArray(terminals) ? terminals : []).filter((t) => t && typeof t.handle === 'string'
-    && typeof t.title === 'string' && t.title.startsWith('π') && t.connected === true && t.writable === true
-    && t.orphaned !== true && normPath(t.worktreePath) === want);
+    && t.connected === true && t.writable === true && t.orphaned !== true && normPath(t.worktreePath) === want);
+}
+
+// What a Gentle Shell pi screen says, read from the end of a terminal preview: null when it is not a pi screen
+// (no prompt bar `▎ <glyph> waiting for input` / `▎ <glyph> working…` and no `▎   type, or / for commands` line
+// in the last 8 non-empty lines), 'idle' (waiting with an empty prompt), 'typed' (waiting but the prompt holds
+// text) or 'busy' (working, or a pi screen that is not waiting). The glyph alternates, so any one will do.
+function piScreenState(preview) {
+  if (typeof preview !== 'string') return null;
+  const lines = preview.split('\n').map((l) => l.trim()).filter(Boolean).slice(-8);
+  const bar = lines.map((l) => (/^▎\s*\S+\s+(waiting for input|working…)/.exec(l) || [])[1]);
+  const at = bar.reduce((last, b, i) => (b ? i : last), -1);
+  const isHint = (l) => /^▎\s+type, or \/ for commands/.test(l || '');
+  if (at < 0) return lines.some(isHint) ? 'busy' : null;
+  if (bar[at] !== 'waiting for input') return 'busy';
+  return isHint(lines[at + 1]) ? 'idle' : 'typed';
 }
 
 // Reads the end of a terminal preview: 'idle' (waiting with an empty prompt), 'typed' (waiting but the prompt
@@ -483,7 +498,7 @@ function piPromptState(preview) {
 }
 
 module.exports = {
-  PI_COMMANDS, normPath, piTerminalsFor, piPromptState,
+  PI_COMMANDS, normPath, terminalsOfWorktree, piScreenState, piPromptState,
   repoId, parseStatus, parseNumstat, parseGoneBranches, parseBaseBranch, staleBranch, statusLetter,
   summarizeChecks, blockedReason, enrichPr, encodeRef, parseRoadmap, safeRelPath, roadmapSummary,
   matchesUnitId, deriveUnitStates, nextUnit, workQueue, conformityReport,

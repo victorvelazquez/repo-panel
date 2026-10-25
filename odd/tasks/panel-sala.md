@@ -36,9 +36,11 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 | RP11b | S13 | worker acotado; diálogo «+ Room», menú «Assign to room», rutas de gestión, `roomIssues` y entradas inválidas conservadas; fusionado en PR #29 | `502b819` |
 | RP12a | S4, S6, S7 | worker acotado; bloque `panel:estado`, requisitos, `server/state.js`, `GET /api/state`, línea `next` y acceso a `/flow-commit`; fusionado en PR #30 | `0021290` |
 | RP12b | S2, S3, S5 | worker acotado; `/flow-pr` con variante de actualizar, acción manual, veredicto desde Git y la sesión, `pi-status`, caducidad de `working` y arreglos de RP12a; fusionado en PR #31 | `9936f86` |
-| RP12c | S3, S4 | worker acotado; la franja «Go work on» con tipos `manual` y `waiting`, `API_VERSION` 9 y icono; arreglo de un defecto visto en navegador real; hecho y verificado | pendiente de commit |
+| RP12c | S3, S4 | worker acotado; la franja «Go work on» con tipos `manual` y `waiting`, `API_VERSION` 9 y icono; fusionado en PR #32 | `e4d4d66` |
+| RP12d | S1, S13 | worker acotado; `piScreenState`, `terminalsOfWorktree`, `scanSessions` y presencia por pantalla; hecho y verificado con una sesión real | pendiente de commit |
 | RP13 | S11 | cierre de la dependencia de `implementation-guides` (otro proyecto, con autorización) | — |
 | RP14 | S14, S17 | opcional: botón hacia la terminal de la sala; chat solo si la persona lo decide | — |
+| RP15 | S6 | ícono de bandeja de Windows (PowerShell oculto con `NotifyIcon`) para abrir, reiniciar y salir del panel, sobre la tarea de inicio automático existente | — |
 
 Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a → RP11b → RP12a → RP12b → RP12 → RP13 → RP14. RP12 puede ir antes de RP11 si la persona lo prefiere.
 
@@ -145,3 +147,19 @@ Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a →
 > 3. ¿Cómo entregamos RP12? — Dos PR: RP12a y RP12b (Recomendado)
 
 *Aplicado: `/flow-pr` se muestra como «actualizar PR» cuando ya hay uno abierto; `.panel/` se ignora con `.git/info/exclude` (local, sin commit; el panel lo detecta con `git check-ignore`); RP12 se parte en RP12a (protocolo de estado) y RP12b (`/flow-pr`, acción manual y veredicto). La línea de «qué hacer ahora» va en español porque la lee la persona. El estado declarado solo puede ocultar el botón de commit; su ausencia nunca bloquea nada.*
+
+**L16.** Decisiones de la persona tras fusionar RP12c (respuestas a tres preguntas):
+
+> 1. ¿Cómo hacemos la prueba real con una sesión de pi (veredicto, presencia y la orden 'Put in conditions')? — Yo creo una sesión descartable
+> 2. RP13: ¿autorizás editar el proyecto implementation-guides para que quede solo como referencia de instalar el panel? — Sí, por su propio ciclo
+> 3. ¿Qué hacemos con reiniciar el panel sin buscar procesos? — Ícono de bandeja (Recomendado)
+
+*Aplicado: se hizo la prueba real con un worktree hijo descartable de `repo-panel` creado con `orca worktree create` (Orca no tiene `repo rm`, por eso no se registró una carpeta temporal) y una sesión de Gentle Shell (`gs`); se limpió todo al terminar. RP13 queda autorizado. RP15 es el ícono de bandeja.*
+
+**Resultados de la prueba real (2026-10-24, sesión de Gentle Shell en un worktree descartable):**
+- La orden «Put in conditions» llegó (`confirmed: true`); el agente leyó `requirements/INSTALL.md` desde fuera de su repo sin que nada se lo impidiera, aplicó `ciclo-block`, `estado-block` y `panel-ignored`, no encontró conflicto, no commiteó ni empujó, usó `git rev-parse --git-path info/exclude` (válido en worktrees) y cerró con «Lo siguiente es que corras /flow-commit».
+- Ante una tarea chica, el agente cumplió el bloque `estado`: escribió `.panel/state.json` con `ready-to-commit` y un `next` útil y cerró con una línea «Siguiente: …».
+- Desde la página real (Edge, clic): `/flow-commit` mostró «committing…», el agente hizo 2 commits y la tarjeta pasó sola a COMMITTED con `/flow-pr`; el agente actualizó el estado a `ready-to-pr`.
+- Defecto hallado y corregido (RP12d): el título de la terminal no es estable; la detección pasa a la pantalla.
+- No probado a propósito: `/flow-pr` (empujaría una rama al GitHub real); el camino de «attention» (fallo del commit); dos sesiones en un mismo worktree; un `pi` sin Gentle Shell (no se detecta por diseño).
+- Efecto colateral inofensivo: el agente agregó `.panel/` al `.git/info/exclude` del repositorio principal de `repo-panel` (compartido entre worktrees).

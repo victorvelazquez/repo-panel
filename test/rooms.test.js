@@ -5,8 +5,10 @@ const { roomsState } = require('../server/rooms.js');
 
 const IDLE_PI = '▎ ✿ waiting for input\n▎   type, or / for commands\n▎\n';
 const TYPED_PI = '▎ ✿ waiting for input\n▎ half a sentence\n▎\n';
+const PLAIN_PS = 'PS C:\\dev\\ceo> git status\nnothing to commit\nPS C:\\dev\\ceo> ';
+const BUSY_PI = '▎ ❁ working…\n▎   type, or / for commands\n▎\n';
 const ROOM = { name: 'UPEN', path: 'C:\\dev\\ceo', repos: ['a', 'b'] };
-const piTerm = (o = {}) => ({ handle: 'h1', title: 'π - ceo', worktreePath: 'C:/dev/ceo', connected: true, writable: true, ...o });
+const piTerm = (o = {}) => ({ handle: 'h1', title: 'Terminal 1', worktreePath: 'C:/dev/ceo', connected: true, writable: true, ...o });
 const REQ = { available: true, base: 'main', results: [{ id: 'room-base-branch', status: 'pass' }], summary: { ready: true } };
 const requirements = async () => REQ;
 const gitAt = (stdout = '2026-10-24T10:00:00-05:00\n', code = 0) => {
@@ -15,14 +17,16 @@ const gitAt = (stdout = '2026-10-24T10:00:00-05:00\n', code = 0) => {
   return Object.assign(run, { calls });
 };
 
-// A fake Orca: `terminals` is what `list` returns, `preview` what every `show` returns; `fail` makes a verb throw.
-function fakeOrca({ terminals = [], preview = IDLE_PI, fail = null } = {}) {
+// A fake Orca: `terminals` is what `list` returns, `preview` what every `show` returns (or `screens[handle]`);
+// `fail` makes a verb throw and `failShow` makes the `show` of those handles throw.
+function fakeOrca({ terminals = [], preview = IDLE_PI, fail = null, screens = null, failShow = [] } = {}) {
   const calls = [];
   const orca = async (args) => {
     calls.push(args);
     if (fail === args[0] || fail === 'all') throw new Error('Orca CLI is unavailable');
     if (args[0] === 'list') return typeof terminals === 'function' ? terminals() : { terminals };
-    if (args[0] === 'show') return { terminal: { preview } };
+    if (args[0] === 'show' && failShow.includes(args[2])) throw new Error('Orca could not show that terminal');
+    if (args[0] === 'show') return { terminal: { preview: screens ? screens[args[2]] : preview } };
     throw new Error(`unexpected orca verb ${args[0]}`);
   };
   return { orca, calls };
@@ -49,10 +53,21 @@ test('roomsState: a room reports its config, requirements, presence and last com
   assert.deepEqual(room.presence, { state: 'idle', sessions: 1 });
 });
 
-test('presence: closed when Orca answers and no pi terminal is open in the room folder', async () => {
-  for (const terminals of [[], [piTerm({ worktreePath: 'C:/dev/other' })], [piTerm({ title: 'zsh' })], [piTerm({ connected: false })]]) {
+test('presence: closed when Orca answers and no pi screen is open in the room folder', async () => {
+  for (const terminals of [[], [piTerm({ worktreePath: 'C:/dev/other' })], [piTerm({ connected: false })]]) {
     assert.deepEqual((await state({ terminals })).room.presence, { state: 'closed', sessions: 0 });
   }
+  // the screen decides, not the title: a π title over a plain PowerShell is no session
+  assert.deepEqual((await state({ terminals: [piTerm({ title: 'π - ceo' })], preview: PLAIN_PS })).room.presence, { state: 'closed', sessions: 0 });
+});
+
+test('presence: a session titled Terminal 1 is seen, idle or busy, and a failing terminal is ignored when another is a session', async () => {
+  for (const title of ['Terminal 1', 'Windows PowerShell', 'pi']) {
+    assert.equal((await state({ terminals: [piTerm({ title })] })).room.presence.state, 'idle');
+  }
+  assert.deepEqual((await state({ terminals: [piTerm()], preview: BUSY_PI })).room.presence, { state: 'busy', sessions: 1 });
+  const mixed = await state({ terminals: [piTerm({ handle: 'bad' }), piTerm({ handle: 'ps' }), piTerm({ handle: 'pi' })], screens: { ps: PLAIN_PS, pi: IDLE_PI }, failShow: ['bad'] });
+  assert.deepEqual(mixed.room.presence, { state: 'idle', sessions: 1 });
 });
 
 test('presence: idle and busy come from a fresh `show` of the one session; typed text still counts as idle', async () => {
@@ -60,13 +75,13 @@ test('presence: idle and busy come from a fresh `show` of the one session; typed
   assert.equal(idle.room.presence.state, 'idle');
   assert.deepEqual(idle.calls, [['list'], ['show', '--terminal', 'h1']]);
   assert.equal((await state({ terminals: [piTerm()], preview: TYPED_PI })).room.presence.state, 'idle');
-  assert.equal((await state({ terminals: [piTerm()], preview: 'the agent is working…' })).room.presence.state, 'busy');
+  assert.equal((await state({ terminals: [piTerm()], preview: BUSY_PI })).room.presence.state, 'busy');
 });
 
-test('presence: two or more pi terminals are ambiguous and are not shown', async () => {
+test('presence: two or more pi screens are ambiguous', async () => {
   const { room, calls } = await state({ terminals: [piTerm(), piTerm({ handle: 'h2' })] });
   assert.deepEqual(room.presence, { state: 'ambiguous', sessions: 2 });
-  assert.deepEqual(calls, [['list']]);
+  assert.deepEqual(calls.map((c) => c.join(' ')).sort(), ['list', 'show --terminal h1', 'show --terminal h2']);
 });
 
 test('presence: when Orca fails it is unknown, never closed', async () => {

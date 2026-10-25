@@ -5,24 +5,24 @@
 // assign a room); a room folder is only looked at, never written.
 const fs = require('node:fs');
 const path = require('node:path');
-const lib = require('../lib.js');
 const { HttpError } = require('./errors.js');
 const { git } = require('./exec.js');
 const { loadConfig, saveConfig, findRepo, roomIssues, nameProblem, pathProblem, ROOMS_NOT_LIST } = require('./config.js');
-const { orcaTerminal } = require('./pi.js');
+const { orcaTerminal, scanSessions } = require('./pi.js');
 const { roomRequirementsFor } = require('./requirements.js');
 
 // closed | idle | busy | ambiguous | unknown. `terminals` is null when Orca could not be listed: that is
-// unknown, never closed. The state is read from a fresh `show` (the `list` preview is truncated); a prompt
-// with text typed in it is still a session waiting for input, so it counts as idle.
+// unknown, never closed. A pi session is found by its screen (a fresh `show` per terminal of the room folder;
+// the title is not trusted and the `list` preview is truncated). If a `show` failed and no pi screen was seen,
+// that terminal could be the session: unknown. A prompt with text typed in it is still a session waiting for
+// input, so it counts as idle.
 async function presenceOf(room, terminals, orca) {
   if (!terminals) return { state: 'unknown', sessions: null };
-  const mine = lib.piTerminalsFor(terminals, room.path);
-  if (!mine.length) return { state: 'closed', sessions: 0 };
-  if (mine.length > 1) return { state: 'ambiguous', sessions: mine.length };
   try {
-    const shown = await orca(['show', '--terminal', mine[0].handle]);
-    return { state: lib.piPromptState((shown.terminal || {}).preview) === 'busy' ? 'busy' : 'idle', sessions: 1 };
+    const { sessions, failed } = await scanSessions(room.path, orca, terminals);
+    if (!sessions.length) return failed ? { state: 'unknown', sessions: null } : { state: 'closed', sessions: 0 };
+    if (sessions.length > 1) return { state: 'ambiguous', sessions: sessions.length };
+    return { state: sessions[0].state === 'busy' ? 'busy' : 'idle', sessions: 1 };
   } catch { return { state: 'unknown', sessions: null }; }
 }
 
