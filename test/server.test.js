@@ -10,6 +10,7 @@ const net = require('node:net');
 const { spawn, spawnSync, execFileSync } = require('node:child_process');
 
 const vm = require('node:vm');
+const { sh, runGit } = require('./git-helper');
 
 const SERVER = path.join(__dirname, '..', 'server.js');
 const PUBLIC = path.join(__dirname, '..', 'public');
@@ -135,7 +136,6 @@ test('per-repo settings survive a config save; plain repos stay plain', async ()
 });
 
 // ---------- /api/roadmap, against a real origin + clone ----------
-const sh = (cwd, ...args) => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { cwd, encoding: 'utf8', stdio: 'pipe' }).trim();
 const rows = (...ids) => `# Plan\n\n| ID | Entrega | Resultado visible | Depende de | Estado | Notas | Ficha |\n| --- | --- | --- | --- | --- | --- | --- |\n${ids.map(([id, st]) => `| ${id} | e | r | — | ${st} | | — |`).join('\n')}\n`;
 
 // Returns { tmp, work, push(file, text) }: a bare origin and a clone whose main already has `files`.
@@ -1076,4 +1076,90 @@ test('POST /api/queue keeps the exact answer for an old-shape body', async () =>
       { repoId: 'c', name: 'c', kind: 'start', unit: { id: 'RP9', entrega: 'E' } },
     ] });
   });
+});
+
+// ---------- test/git-helper.js: failures name the command, and only Windows retries the setup commands ----------
+const gitFail = (status, stderr = '', stdout = '') => Object.assign(new Error('Command failed'), { status, signal: null, stderr, stdout });
+// An injectable runner: each call takes the next outcome (an Error to throw, anything else to return).
+function fakeGit(...outcomes) {
+  const calls = [];
+  const exec = (cmd, argv) => { calls.push([cmd, ...argv]); const o = outcomes[Math.min(calls.length, outcomes.length) - 1]; if (o instanceof Error) throw o; return o; };
+  return { calls, exec };
+}
+
+test('sh: a failing git command throws an error with the command, the exit status and git\'s own output', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'repo-panel-sh-'));
+  try {
+    sh(tmp, 'init', '-q', '-b', 'main');
+    let caught;
+    try { sh(tmp, 'rev-parse', '--verify', 'nope'); } catch (e) { caught = e; }
+    assert.ok(caught instanceof Error, 'it throws');
+    assert.match(caught.message, /git .*rev-parse --verify nope/);
+    assert.match(caught.message, /status 128/);
+    assert.match(caught.message, /signal/);
+    assert.match(caught.message, /fatal: Needed a single revision/);
+    assert.ok(caught.cause instanceof Error, 'the original error is kept as cause');
+    assert.equal(caught.cause.status, 128);
+    assert.ok(!/after 1 retry/.test(caught.message), 'a command that was not retried does not claim a retry');
+  } finally { fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5 }); }
+});
+
+test('sh: a successful command still returns the trimmed stdout', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'repo-panel-sh-'));
+  try {
+    sh(tmp, 'init', '-q', '-b', 'main');
+    assert.equal(sh(tmp, 'symbolic-ref', '--short', 'HEAD'), 'main');
+  } finally { fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5 }); }
+});
+
+test('runGit: on win32 a failing push is retried once after 300 ms and then reported with the retry', () => {
+  const { calls, exec } = fakeGit(gitFail(1, 'first err', 'first out'), gitFail(1, 'file is locked', 'some out'));
+  const waits = [];
+  assert.throws(() => runGit('/w', ['push', '-q', 'origin', 'main'], { exec, platform: 'win32', sleep: (ms) => waits.push(ms) }), (e) => {
+    assert.match(e.message, /push -q origin main/);
+    assert.match(e.message, /status 1/);
+    assert.match(e.message, /after 1 retry/);
+    assert.match(e.message, /file is locked/);
+    assert.match(e.message, /some out/);
+    assert.equal(e.cause.stderr, 'file is locked');
+    return true;
+  });
+  assert.equal(calls.length, 2);
+  assert.deepEqual(waits, [300]);
+});
+
+test('runGit: on win32 clone and fetch are retried too, commit and other commands are not', () => {
+  for (const cmd of ['clone', 'fetch']) {
+    const { calls, exec } = fakeGit(gitFail(1));
+    assert.throws(() => runGit('/w', [cmd, 'x'], { exec, platform: 'win32', sleep() {} }), /after 1 retry/);
+    assert.equal(calls.length, 2, cmd);
+  }
+  for (const cmd of ['commit', 'checkout', 'rev-parse']) {
+    const { calls, exec } = fakeGit(gitFail(1));
+    const waits = [];
+    assert.throws(() => runGit('/w', [cmd, 'x'], { exec, platform: 'win32', sleep: (ms) => waits.push(ms) }), (e) => !/after 1 retry/.test(e.message));
+    assert.equal(calls.length, 1, cmd);
+    assert.deepEqual(waits, []);
+  }
+});
+
+test('runGit: outside win32 a failing push is not retried', () => {
+  for (const platform of ['linux', 'darwin']) {
+    const { calls, exec } = fakeGit(gitFail(1, 'rejected'));
+    const waits = [];
+    assert.throws(() => runGit('/w', ['push', 'origin', 'main'], { exec, platform, sleep: (ms) => waits.push(ms) }), (e) => /rejected/.test(e.message) && !/after 1 retry/.test(e.message));
+    assert.equal(calls.length, 1, platform);
+    assert.deepEqual(waits, []);
+  }
+});
+
+test('runGit: a push that fails once on win32 and then succeeds returns the second result', () => {
+  const { calls, exec } = fakeGit(gitFail(1, 'locked'), `  pushed  ${String.fromCharCode(10)}`);
+  assert.equal(runGit('/w', ['push', 'origin', 'main'], { exec, platform: 'win32', sleep() {} }), 'pushed');
+  assert.equal(calls.length, 2);
+});
+
+test('runGit: secrets in a URL argument never reach the error message', () => {
+  const { exec } = fakeGit(gitFail(1, 'denied'));
+  assert.throws(() => runGit('/w', ['clone', 'https://user:s3cret@example.com/r.git'], { exec, platform: 'linux' }), (e) => e.message.includes('example.com') && !/s3cret/.test(e.message));
 });
