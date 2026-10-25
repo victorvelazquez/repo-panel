@@ -52,8 +52,10 @@ Other commands:
 
 ```bash
 npm run open       # same as start, and opens the browser (Windows only)
-npm test           # run the test suite
+npm test           # run the test suite (node --test through scripts/run-tests.js)
 ```
+
+`npm test` forwards every extra argument to `node --test` (`npm test -- --test-name-pattern foo`). On Windows it also reads the definition of the real `repo-panel` and `repo-panel-tray` scheduled tasks (read-only) before and after the run and fails with a loud message if either changed, even when every test passed. When all is fine it adds one line: `task guard: repo-panel and repo-panel-tray unchanged`. If PowerShell cannot read the tasks the line says so and the run is not failed.
 
 ## Start automatically at logon (Windows)
 
@@ -64,7 +66,9 @@ powershell -ExecutionPolicy Bypass -File scripts/uninstall-autostart.ps1  # remo
 
 This registers a per-user scheduled task (no admin needed) that runs the panel hidden at every logon and retries every minute if it fails. The port never changes, so the URL stays stable and you can pin it as a browser app. Launching the panel while it is already running just exits quietly. If another program owns the port, the launch fails with a clear message instead of picking a different port.
 
-`install-autostart.ps1 -DryRun` shows what it would register without registering it. It needs a real `node.exe` on PATH (not an npm, volta or fnm `.cmd`/`.ps1` shim).
+`install-autostart.ps1 -DryRun` shows what it would register without registering it, and `uninstall-autostart.ps1 -DryRun` says what it would remove without removing it. The installer needs a real `node.exe` on PATH (not an npm, volta or fnm `.cmd`/`.ps1` shim).
+
+All four scripts that register or remove a task (`install-autostart`, `uninstall-autostart`, `install-tray`, `uninstall-tray`) refuse to run, even with `-DryRun`, from a copy that lives inside the OS temp folder: they print `... refused: this copy lives inside the OS temp folder (<folder>); install from the real repository folder.` to stderr and exit with code 2. The tasks are per-user and global to the machine, so a throwaway copy (a test, a worker) that registered one would silently overwrite the real task with paths into a folder that is about to disappear.
 
 ### Restart after an update
 

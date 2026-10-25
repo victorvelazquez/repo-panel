@@ -5,6 +5,17 @@ $ErrorActionPreference = 'Stop'
 
 $taskName = 'repo-panel-tray'
 $root = Split-Path -Parent $PSScriptRoot
+# True when $Path is the OS temp folder or inside it. A copy of these scripts there must never touch the user's real tasks.
+function Test-UnderTemp([string]$Path, [string]$Temp = [System.IO.Path]::GetTempPath()) {
+  $sep = [string][System.IO.Path]::DirectorySeparatorChar
+  $full = [System.IO.Path]::GetFullPath($Path).TrimEnd('\', '/') + $sep
+  $base = [System.IO.Path]::GetFullPath($Temp).TrimEnd('\', '/') + $sep
+  return $full.StartsWith($base, [System.StringComparison]::OrdinalIgnoreCase)
+}
+if (Test-UnderTemp $root) {
+  [Console]::Error.WriteLine("install-tray.ps1 refused: this copy lives inside the OS temp folder ($root); install from the real repository folder.")
+  exit 2
+}
 $script = Join-Path $root 'scripts\tray.ps1'
 $argument = "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$script`""
 
