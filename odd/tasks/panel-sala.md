@@ -40,6 +40,7 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 - **S30. «Put in conditions» sin doble clic.** Tras el informe de RP32 sobre ese botón: «podes arreglear tambien».
 - **S31. `/flow-base` no falla por trabajo nuevo.** Con una captura: tarjeta con `main`, 4 archivos y «Needs attention: Not on a clean, up-to-date main after /flow-base», trabajando sobre una implementación iniciada desde una base limpia y actualizada.
 - **S32. Un solo formato de tabla en la hoja de ruta.** Tras la advertencia de `flow-skills`: «quiero la opcion A, nuestro formato debe ser consistente».
+- **S33. Los cambios de un bloque suben su versión.** Sobre la propuesta de pruebas y actualización de «Put in conditions»: «podemos haceer lo recomendado» y «podemos vanazar con todos» (las tres partes: RP36 versiones de bloques, RP37 casos de prueba, RP38 vista de repos desactualizados, una unidad por vez).
 
 ## Tasks
 
@@ -78,7 +79,8 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 | RP32 | S29 | worker acotado con reglas de seguridad; reproducido en el panel real; hueco de la primera consulta, familia de pies en piScreenAsk y estado «enviando» desde el clic; verificado en Edge real con orca falso | PR #51 (1d9a060) |
 | RP33 | S30 | en línea (unidad chica, calcada de RP32); RED primero (4 de 8); el manejador put-in-conditions usa S.sending | PR #52 (73b5990) |
 | RP34 | S31 | en línea (cambio de una condición en flowVerdict); reproducido con la función real, RED 2 de 6 | PR #53 (531c5d6) |
-| RP35 | S32 | en línea (instrucciones y un export); RED primero (6 de 7); los textos salen de lib.RM_REQUIRED | pendiente de commit |
+| RP35 | S32 | en línea (instrucciones y un export); RED primero (6 de 7); los textos salen de lib.RM_REQUIRED | PR #54 (e7ce56b) |
+| RP36 | S33 | en línea (tests y documentación); RED primero (2 de 9); experimento de 5 escenarios en copia temporal | pendiente de commit |
 
 Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a → RP11b → RP12a → RP12b → RP12 → RP13 → RP14. RP12 puede ir antes de RP11 si la persona lo prefiere.
 
@@ -452,3 +454,15 @@ Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a →
 > quiero la opcion A, nuestro formato debe ser consistente. y creo que era solo ese error cuanto hable de 'unos errores u observaciones'. cuando corrijamos entas reglas en el instal del panel, no podriamos tener un actualizador de repos? que se ejecute devuelta 'Put in conditions' y se corrija lo que falta corregir? asi cuando tengamos caso de modificaciones de las reglas y condiciones podamos actualizar cualquier repo con esas nuevas condiciones.
 
 *Aplicado: RP35 (opción A). La idea del actualizador de repos queda como propuesta, sin construir.*
+
+**L50.**
+
+> si
+>
+> o sea no entendi bien la propuesta que queres armar?
+>
+> podemos haceer lo recomendado
+>
+> podemos vanazar con todos
+
+*Aplicado: documento `.panel/PROPUESTA-put-in-conditions-pruebas-y-actualizacion.md` y RP36 (parte 2). RP37 y RP38 siguen, una unidad por vez.*
