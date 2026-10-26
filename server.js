@@ -4,14 +4,20 @@
 const { spawn } = require('node:child_process');
 const { loadConfig } = require('./server/config.js');
 const { createServer, isPanelRunning } = require('./server/http.js');
-const { piSend, setCaseRecorder } = require('./server/pi.js');
+const { piSend, setCaseRecorder, orcaTerminal } = require('./server/pi.js');
 const { createRecorder, casesFile } = require('./server/casos.js');
+const { createWatcher, watchInterval } = require('./server/vigia.js');
 
 if (require.main === module) {
   const { port } = loadConfig();
   // The passive recorder of question-like pi screens is installed ONLY here, never by a module import (see README).
   const cases = casesFile(process.env, __dirname);
-  if (cases) setCaseRecorder(createRecorder({ file: cases }).record);
+  if (cases) {
+    setCaseRecorder(createRecorder({ file: cases }).record);
+    // The watcher scans the sessions by itself (read-only) so the recorder works with the page closed; it exists only with a recorder.
+    const every = watchInterval(process.env);
+    if (every) createWatcher({ orca: orcaTerminal, intervalMs: every }).start();
+  }
   const server = createServer(port);
   server.on('error', async (e) => {
     if (e.code !== 'EADDRINUSE') { console.error(e.message); process.exit(1); }
