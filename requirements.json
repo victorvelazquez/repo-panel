@@ -32,7 +32,7 @@
       "category": "verificable",
       "level": "required",
       "check": { "type": "file-exists", "file": "roadmap" },
-      "remedy": "Create docs/ROADMAP.md (or the roadmap path configured for this repo) with the three header lines and a units table whose header has exactly these column names: `ID`, `Entrega`, `Depende de` and `Estado` (optional: `Resultado visible`, `Notas`, `Ficha`)."
+      "remedy": "If the repo already has a roadmap somewhere else or in another format, do not move or restructure it: stop and ask the user (requirements/INSTALL.md step 7). Otherwise create docs/ROADMAP.md (or the roadmap path configured for this repo) with the three header lines and a units table whose header has exactly these column names: `ID`, `Entrega`, `Depende de` and `Estado` (optional: `Resultado visible`, `Notas`, `Ficha`)."
     },
     {
       "id": "roadmap-header",
@@ -48,7 +48,7 @@
       "category": "verificable",
       "level": "required",
       "check": { "type": "roadmap-table", "file": "roadmap" },
-      "remedy": "Fix the units table in the roadmap so it has no errors (required columns, one-word states, unique IDs): rename any header that does not match so the table has exactly `ID`, `Entrega`, `Depende de` and `Estado` (a column called `Unidad` or `Dependencias` is not recognised); the panel's Conformity drawer lists the problems."
+      "remedy": "Fix the units table in the roadmap so it has no errors (required columns, one-word states, unique IDs): rename any header that does not match so the table has exactly `ID`, `Entrega`, `Depende de` and `Estado` (a column called `Unidad` or `Dependencias` is not recognised); the panel's Conformity drawer lists the problems. If the repo already has a roadmap in another path or format, do not restructure it: stop and ask the user (requirements/INSTALL.md step 7)."
     },
     {
       "id": "ciclo-block",
@@ -74,7 +74,7 @@
       "category": "verificable",
       "level": "recommended",
       "check": { "type": "file-exists", "file": "adoption" },
-      "remedy": "Create docs/ORQUESTACION.md recording how this repo adopted the Orquestación profile and which blocks it uses."
+      "remedy": "Create docs/ORQUESTACION.md recording how this repo adopted the Orquestación profile: the date of adoption, the profile, the version of each block installed (say when the `ciclo` block was installed without its SALA regions) and every rule not adopted or changed (write none when there is none)."
     },
     {
       "id": "estado-block",

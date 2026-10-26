@@ -43,6 +43,7 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 - **S33. Los cambios de un bloque suben su versión.** Sobre la propuesta de pruebas y actualización de «Put in conditions»: «podemos haceer lo recomendado» y «podemos vanazar con todos» (las tres partes: RP36 versiones de bloques, RP37 casos de prueba, RP38 vista de repos desactualizados, una unidad por vez).
 - **S34. Casos de prueba de «Put in conditions».** Parte 1 de lo aprobado con «podemos vanazar con todos»: lo que decide el panel se prueba con repos de mentira, lo que hace el agente queda en una lista para la persona.
 - **S35. Un clic por repo desde la lista de pendientes.** Parte 3 de lo aprobado con «podemos vanazar con todos»: la lista de repos desactualizados con un clic por repo y sin botón masivo. Se redujo a un botón en el cajón de conformidad, que ya era la lista.
+- **S36. Frenar y preguntar ante un roadmap existente.** De las pruebas reales sobre `implementation-guides` y `pi-usage-audit`: «no me pregunto nada» y «mejor arrancamos ya con rp39».
 
 ## Tasks
 
@@ -84,7 +85,8 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 | RP35 | S32 | en línea (instrucciones y un export); RED primero (6 de 7); los textos salen de lib.RM_REQUIRED | PR #54 (e7ce56b) |
 | RP36 | S33 | en línea (tests y documentación); RED primero (2 de 9); experimento de 5 escenarios en copia temporal | PR #55 (0027337) |
 | RP37 | S34 | en línea (tests y documentación); sin RED natural, 5 mutaciones en copia temporal; repos de mentira con Git real | PR #56 (2df925e) |
-| RP38 | S35 | en línea (un botón y una regla de estilo); RED primero (5 de 7); reutiliza la acción de la tarjeta | pendiente de commit |
+| RP38 | S35 | en línea (un botón y una regla de estilo); RED primero (5 de 7); reutiliza la acción de la tarjeta | PR #57 (3b5e114) |
+| RP39 | S36 | en línea (texto de instrucciones y pruebas); RED primero (7 de 9); decisión A y A tomada sobre mi recomendación | pendiente de commit |
 
 Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a → RP11b → RP12a → RP12b → RP12 → RP13 → RP14. RP12 puede ir antes de RP11 si la persona lo prefiere.
 
@@ -480,3 +482,21 @@ Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a →
 **L52.**
 
 *Sin mensaje nuevo de la persona: es la parte 3 de lo aprobado en L50. Tras `/flow-base` de RP37 se exploró y se vio que el cajón «Roadmap conformity» ya era la lista; se hizo solo el botón por repo (RP38).*
+
+**L53.**
+
+> voy a probar primero con el repositorio de implementation-guides
+>
+> termino la instalacion, no se si quedo bien, podes revisar.
+>
+> si, haremos mas pruebas, la siguiente sera pi-usague-audit
+>
+> revisá pi-usage-audit
+>
+> - no me pregunto nada.
+> - que hacemos ahora?
+>
+> - el repo pi-usage-audit ya esta listo y puedo commitear nomas ya?
+> - podemos acumular mas aprendizaje con otras pruebas o mejor arrancamos ya con rp39?
+
+*Aplicado: se revisaron `implementation-guides` y `pi-usage-audit` en solo lectura y se hizo RP39 con la recomendación A y A (frenar y preguntar ante un roadmap existente; `U0` como convención). La persona no contestó expresamente ese «sí»: se tomó su pregunta «mejor arrancamos ya con rp39?» como la señal.*
