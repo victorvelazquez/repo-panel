@@ -496,7 +496,9 @@
       notOk = `No open pull request for ${branch} after ${text}`;
     } else if (!noCommit) {
       const up = local.branch === local.base && local.behind === 0 && local.ahead === 0;
-      ok = up && (sent.cmd === 'flow-base-stash' || local.files.length === 0);
+      // The plain /flow-base asks for a clean tree only when it was clean when sent: files that appeared afterwards are
+      // the person already working on the fresh base branch, not a failed command. A record without the count stays strict.
+      ok = up && (sent.cmd === 'flow-base-stash' || local.files.length === 0 || sent.files === 0);
       notOk = local.branch === sent.branch ? `Still on ${branch} after ${text}` : `Not on a ${sent.cmd === 'flow-base' ? 'clean, ' : ''}up-to-date ${base} after ${text}`;
     }
     if (ok) return done({ state: 'ok', reason: `${text} done` });

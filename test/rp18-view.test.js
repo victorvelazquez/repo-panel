@@ -97,7 +97,7 @@ test('flowVerdict /flow-base: running while busy; ok on a clean, up-to-date base
   const onBase = local({ branch: 'main', upstream: 'origin/main' });
   assert.deepEqual([verdict(s, local(), 'busy').state, verdict(s, local(), 'busy').label], ['running', 'updating base branch…']);
   assert.equal(verdict(s, onBase, 'idle').state, 'ok');
-  assert.equal(verdict(s, local({ ...onBase, files: [file] }), 'idle').state, 'attention'); // plain variant needs a clean tree
+  assert.equal(verdict(sent('flow-base', { branch: 'task', files: 2 }), local({ ...onBase, files: [file] }), 'idle').state, 'attention'); // plain variant needs a clean tree when it was dirty when sent (RP34: new work after a clean send is fine)
   assert.equal(verdict(s, local({ ...onBase, behind: 2 }), 'idle').state, 'attention');
   assert.equal(verdict(s, local({ ...onBase, ahead: 1 }), 'idle').state, 'attention');
 });
