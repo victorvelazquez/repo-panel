@@ -473,7 +473,10 @@ function reqBlock(r) {
   const e = S.req[r.id];
   const name = `<button class="repo-name" data-act="queue-pick" data-close="1" data-name="${esc(r.name)}" title="Filter the board to this repo">${esc(r.name)}</button>`;
   if (!e || e.state !== 'loaded') return `<div class="conf-item">${name}<div class="conf-line">${e ? 'Could not read the requirements' : 'Checking the requirements…'}</div></div>`;
-  return `<div class="conf-item">${name}${reqResults(r.id, e.data)}</div>`;
+  // The same action as the card's ⋯ menu (and its protection against a second click): offered while any requirement is open.
+  const offered = V && V.cardMenu(e, false).some((i) => i.act === 'put-in-conditions');
+  const put = offered ? `<button class="conf-put" data-act="put-in-conditions" data-id="${esc(r.id)}"${S.sending[r.id] ? ' disabled' : ''} title="Asks the pi session of this repo to apply the requirements that are not passing">Put in conditions</button>` : '';
+  return `<div class="conf-item">${name}${put}${reqResults(r.id, e.data)}</div>`;
 }
 
 // A room: its folder, whether a pi session is open there, its own requirements and the repos assigned to it.
