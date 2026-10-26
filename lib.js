@@ -532,5 +532,5 @@ module.exports = {
   PI_COMMANDS, normPath, terminalsOfWorktree, piScreenState, piScreenAsk, piScreenQuestionish, piPromptState,
   repoId, parseStatus, parseNumstat, parseGoneBranches, parseBaseBranch, staleBranch, statusLetter,
   summarizeChecks, blockedReason, enrichPr, encodeRef, parseRoadmap, safeRelPath, roadmapSummary,
-  matchesUnitId, deriveUnitStates, nextUnit, workQueue, conformityReport,
+  matchesUnitId, deriveUnitStates, nextUnit, workQueue, conformityReport, RM_REQUIRED,
 };
