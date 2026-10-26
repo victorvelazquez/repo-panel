@@ -197,7 +197,7 @@ test('install-tray.ps1 -DryRun prints the task and action and registers nothing'
   assert.equal(r.code, 0, r.err);
   assert.match(r.out, /repo-panel-tray/);
   assert.match(r.out, /powershell\.exe/);
-  assert.match(r.out, /-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File/);
+  assert.match(r.out, /-NoProfile -ExecutionPolicy Bypass -File/);
   assert.ok(r.out.includes(TRAY), 'names the full path of tray.ps1');
   assert.match(r.out, /dry run/i);
   assert.equal(trayTaskCount(), before, 'a dry run leaves the scheduled tasks as they were');
@@ -221,4 +221,39 @@ test('the three tray scripts parse without errors in Windows PowerShell 5.1 and 
       assert.equal(r.status, 0, `${shell} ${path.basename(file)}: ${r.stdout}${r.stderr}`);
     }
   }
+});
+
+// ---------- RP27: the tray task runs without any console window ----------
+// Closing the console window of a hidden powershell.exe killed the icon (task result 0xC000013A). Like the panel task, the
+// tray task goes through conhost.exe --headless, which runs the program with no window to close.
+const INSTALL_TEXT = fs.readFileSync(INSTALL, 'utf8').replace(/\r\n/g, '\n');
+const installCode = INSTALL_TEXT.split('\n').filter((l) => !l.trimStart().startsWith('#')).join('\n');
+
+test('install-tray.ps1 registers conhost.exe --headless with the full path of powershell.exe (script text only, never run)', () => {
+  assert.match(installCode, /New-ScheduledTaskAction -Execute 'conhost\.exe'/);
+  assert.match(installCode, /--headless/);
+  assert.ok(/WindowsPowerShell\\v1\.0\\powershell\.exe/.test(installCode), 'names the full path of Windows PowerShell');
+  assert.ok(!/-WindowStyle Hidden/.test(installCode), 'no hidden-window flag: there is no window at all');
+  assert.ok(!/-Execute 'powershell\.exe'/.test(installCode), 'powershell.exe is no longer the task action itself');
+});
+
+test('install-tray.ps1 builds the argument once and registers the very text the dry run prints', () => {
+  assert.match(installCode, /-Argument \$argument/);
+  assert.equal(installCode.split('--headless').length - 1, 1, 'the argument is built once');
+  // The refusal message says install-tray.ps1, which contains tray.ps1: count the script the task starts by its folder.
+  assert.equal(installCode.split('scripts\\tray.ps1').length - 1, 1, 'and so is the script it starts');
+  const dry = installCode.indexOf('if ($DryRun)');
+  assert.ok(dry >= 0 && dry < installCode.indexOf('Register-ScheduledTask'), 'the dry-run exit comes before the registration');
+});
+
+test('install-tray.ps1 -DryRun describes the headless action and still registers nothing', opts, () => {
+  const before = trayTaskCount();
+  const r = ps(INSTALL, ['-DryRun'], {});
+  assert.equal(r.code, 0, r.err);
+  assert.match(r.out, /Action:\s+conhost\.exe --headless /);
+  assert.match(r.out, /WindowsPowerShell\\v1\.0\\powershell\.exe/);
+  assert.match(r.out, /-NoProfile -ExecutionPolicy Bypass -File/);
+  assert.ok(!/-WindowStyle Hidden/.test(r.out));
+  assert.ok(r.out.includes(TRAY), 'names the full path of tray.ps1');
+  assert.equal(trayTaskCount(), before);
 });

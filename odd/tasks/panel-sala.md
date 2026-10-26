@@ -32,6 +32,7 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 - **S22. Refresco y colores.** «creo que cada 20 segundos se vuelve a verificar todo, y creo que ya es mucho la espera para ver los cambios [...] lo mínimo posible para que refleje mas rápido los cambios pero sin forzar recursos»; «tarda mucho en mostrar el estado de: Merged: run /flow-base»; «mostrar con colores los mensajes animados de estado»; «que queden en sintonia o armonia» con GitHub, también las columnas.
 - **S23. Columna Merged y Clean.** «no es mejor mostrar una columna aparte de los en estado "Merged: run /flow-base"?»; «la columna de Clean es necesario o util? creo a veces no se muy bien su utlidad real»; aprobado: «me cierra separar RP25 y que Clean pase a ser una barra plegable cerrada por defecto [...] si no me gusta volvemos a mostrar en el tablero como columna».
 - **S24. Una sola señal de actualización.** «la animacion de actualizando que es la flechita que gira en cada tarjeta esta demas. podriamos limpiar y solo mostrar la de la barra de arriba. sin dejar de actualizar todas».
+- **S25. El ícono de bandeja no debe morir al cerrar una terminal.** «hay una terminal visible corriendo, seguro desaparece el icono al cerrar la terminal»; confirmado: «cerra la terminal y cerrro el icono, desaparecio el icono».
 
 ## Tasks
 
@@ -60,8 +61,9 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 | RP22 | S20 | en línea (un solo tema); guardián con todas las acciones de la tarea y `safeToRunCopy`; RED primero; hecho y verificado | pendiente de commit |
 | RP23 | S22 | worker acotado con reglas de seguridad; refresco local/caliente/completo, caché corta del PR fusionado, colores por acción y bordes de columna; verificado en Edge real con gh falso | PR #45 (1b48300) |
 | RP24 | S21 | worker acotado con reglas de seguridad; `working` sin invalidar por actividad, sesión busy/asking deshabilita /flow-commit, período de calma | PR #43 (5e616b2) |
-| RP25 | S23 | worker acotado con reglas de seguridad; columna Merged, barra Idle plegable, columna Needs attention y preferencia reversible; verificado en Edge real | pendiente de commit |
+| RP25 | S23 | worker acotado con reglas de seguridad; columna Merged, barra Idle plegable, columna Needs attention y preferencia reversible; verificado en Edge real | PR #46 (2931a19) |
 | RP26 | S24 | en línea (unidad chica); RED primero; icono de Refresh gira, sin flechita en tarjetas; verificado en Edge real | PR #44 (b6a46b1) |
+| RP27 | S25 | en línea (unidad chica); RED primero; la tarea de la bandeja usa conhost --headless; mecanismo probado con un ícono mínimo; reinstalar la tarea real queda para la persona | pendiente de commit |
 
 Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a → RP11b → RP12a → RP12b → RP12 → RP13 → RP14. RP12 puede ir antes de RP11 si la persona lo prefiere.
 
@@ -342,3 +344,17 @@ Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a →
 > 3. avancemos tambien con lo que falta
 
 *Aplicado: se borraron las ramas locales de RP24 y RP26; la tarea del ícono se volvió a arrancar y sigue viva; se hizo RP23 y queda RP25.*
+
+**L38.**
+
+> si ya veo el icono, pero tambien hay una terminal visible corriendo, seguro desaparece el icono al cerrar la terminal. puedo probar cerrar la terminal
+
+*Aplicado: se midió quién lanza el ícono y se aclaró qué terminal cerrar y cuál no; sin tocar nada.*
+
+**L39.**
+
+> 1. ya reinicie y ya se ven.
+> 2. podes borrar.
+> 3. cerra la terminal y cerrro el icono, desaparecio el icono.
+
+*Aplicado: se borraron las ramas locales de RP23 y RP25, se volvió a arrancar el ícono y se hizo RP27.*
