@@ -156,16 +156,31 @@
   }
 
   // Why the commit buttons are disabled while the work is still going on, or null. `session` is the state of
-  // GET /api/pi-status for a repo with changes: only busy and asking hold; idle, closed, ambiguous, unknown and a
-  // failed request never do (fail open, a flaky Orca must not hold a repo hostage).
+  // GET /api/pi-status for a repo with changes: busy, asking and 'checking' (see liveSession) hold; idle, closed,
+  // ambiguous, unknown and a failed request never do (fail open, a flaky Orca must not hold a repo hostage).
   const SESSION_BUSY = 'the pi session is still working';
   const SESSION_ASKING = 'waiting for your answer in the session';
+  const SESSION_CHECKING = 'checking the pi session…';
+  // How long a dirty repo, seen by the page for the first time, keeps its commit buttons disabled while the first
+  // answer of the live session state is still on its way.
+  const LIVE_CHECK_MS = 20 * 1000;
   const QUIET_MS = 20 * 1000; // files changed more recently than this: more changes are probably coming
   const QUIET_SKEW_MS = 5 * 1000; // a time further in the future than this is a clock problem, not activity
   const QUIET_REASON = 'files changed a few seconds ago';
 
   function sessionHold(session) {
-    return session === 'busy' ? SESSION_BUSY : session === 'asking' ? SESSION_ASKING : null;
+    return session === 'busy' ? SESSION_BUSY : session === 'asking' ? SESSION_ASKING : session === 'checking' ? SESSION_CHECKING : null;
+  }
+
+  // The `session` of a repo with changes as the buttons see it. A command of this page in flight has its own verdict
+  // (undefined). Once the live state was asked for, its answer rules: a state, or undefined after a failed request.
+  // Before the first answer the repo is 'checking' until LIVE_CHECK_MS after it was first seen dirty (`dirtyAt`), then
+  // the normal rules apply (fail open).
+  function liveSession({ sent, live, answered = false, dirtyAt, now = Date.now() } = {}) {
+    if (sent) return undefined;
+    if (answered) return live;
+    const age = now - dirtyAt;
+    return typeof dirtyAt === 'number' && age >= 0 && age < LIVE_CHECK_MS ? 'checking' : undefined;
   }
 
   // Whether the newest changed file is younger than QUIET_MS. A missing or non-finite value never blocks.
@@ -434,6 +449,9 @@
   const RUN_COLOR = { 'flow-commit': 'blue', 'flow-commit-unstage': 'blue', 'flow-pr': 'green', 'flow-base': 'purple', 'flow-base-stash': 'purple', 'fix-pr': 'orange' };
   const runColor = (cmd) => RUN_COLOR[cmd] || 'gray';
   const CMD_TEXT = { 'flow-commit': '/flow-commit', 'flow-commit-unstage': '/flow-commit --unstage', 'flow-pr': '/flow-pr', 'flow-base': '/flow-base', 'flow-base-stash': '/flow-base --stash' };
+  // The pseudo-verdict of a command whose order is still being sent to the session: it behaves as a running one, with
+  // the label the real running verdict shows for that command.
+  const sendingVerdict = (cmd) => ({ state: 'running', cmd, label: RUNNING_LABEL[cmd] || '', reason: 'Sending the order to the pi session' });
   const SESSION_CLOSED = 'The pi session closed while the command was running';
   const ASKING = 'waiting for your answer in the session';
 
@@ -493,5 +511,5 @@
     return attention(`No change 15 minutes after ${text} and the pi session state is unknown`);
   }
 
-  return { API_VERSION, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, piPollTargets, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, presenceLabel, presenceDot };
+  return { API_VERSION, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, piPollTargets, LIVE_CHECK_MS, liveSession, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, presenceLabel, presenceDot };
 }));

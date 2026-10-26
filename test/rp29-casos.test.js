@@ -25,7 +25,7 @@ const DIALOG = [
   '↑↓ choose · Enter confirm · Esc cancel · D details',
   '',
 ].join('\n');
-const screen2 = (timer = '18m55s') => [
+const screen2 = (timer = '18m55s', footer = '↑↓ navigate  enter select  escape/ctrl+c cancel') => [
   '❀ Agents  1 waiting',
   `? gentle-ai-worker  asked: Allow guarded git push?            claude-sonnet-5-5 · medium · 3.8M · ${timer}`,
   '──────────────────────────────────────────────────────────────',
@@ -35,10 +35,14 @@ const screen2 = (timer = '18m55s') => [
   '→ Yes',
   '  No',
   '',
-  '↑↓ navigate  enter select  escape/ctrl+c cancel',
+  footer,
   '',
 ].join('\n');
 const SAMPLE2 = screen2();
+// RP32 made SAMPLE2 recognised by piScreenAsk. The recorder only keeps screens the panel does NOT recognise, so the
+// recorder and wiring tests use this variant: the same dialog with a footer outside the recognised family.
+const UNRECOGNISED_FOOTER = '↑↓ navigate  enter pick  escape/ctrl+c exit  (choose one)';
+const SAMPLE2U = screen2('18m55s', UNRECOGNISED_FOOTER);
 const IDLE = '▎ ✿ waiting for input\n▎   type, or / for commands\n▎\n5h 27% ↻14:10 · 7d 31% ↻jue 11:00\n';
 const WORKING = '$ sleep 20\nElapsed 7.2s\n▎ ❁ working…\n▎   type, or / for commands\n▎\n';
 
@@ -96,8 +100,9 @@ test('piScreenQuestionish: control characters become a space and lines are cappe
   assert.match(q.lines[0], /^ab \[31mcd/);
 });
 
-test('PRESERVE piScreenAsk / piScreenState: sample 2 is still not recognised and the old results hold', () => {
-  assert.equal(lib.piScreenAsk(SAMPLE2), null);
+test('PRESERVE piScreenAsk / piScreenState: sample 2 is now recognised by piScreenAsk (RP32), a footer outside the family is not, and the old results hold', () => {
+  assert.ok(lib.piScreenAsk(SAMPLE2));
+  assert.equal(lib.piScreenAsk(SAMPLE2U), null);
   assert.equal(lib.piScreenState(SAMPLE2), null);
   assert.ok(lib.piScreenAsk(DIALOG));
   assert.equal(lib.piScreenState(IDLE), 'idle');
@@ -118,7 +123,7 @@ test('recorder: one JSON line with at, folder, handle, state, recognized, signal
   try {
     const c = clock();
     const r = casos.createRecorder({ file: s.file, now: c.now });
-    assert.equal(r.record({ folder: 'C:/repo', handle: 'h1', state: null, preview: SAMPLE2 }), undefined);
+    assert.equal(r.record({ folder: 'C:/repo', handle: 'h1', state: null, preview: SAMPLE2U }), undefined);
     await r.flush();
     const [row, ...more] = rows(s.file);
     assert.equal(more.length, 0);
@@ -129,7 +134,7 @@ test('recorder: one JSON line with at, folder, handle, state, recognized, signal
     assert.equal(row.state, null);
     assert.equal(row.recognized, false);
     assert.deepEqual(row.signals, ['footer', 'agents-waiting', 'asked']);
-    assert.deepEqual(row.lines, lib.piScreenQuestionish(SAMPLE2).lines);
+    assert.deepEqual(row.lines, lib.piScreenQuestionish(SAMPLE2U).lines);
   } finally { s.done(); }
 });
 
@@ -334,7 +339,7 @@ test('wiring: only the require.main block of server.js installs the real recorde
 });
 
 test('wiring: scanSessions hands every terminal it looked at to the recorder and its result does not change', async () => {
-  const screens = { a: IDLE, b: SAMPLE2, c: DIALOG, d: new Error('gone') };
+  const screens = { a: IDLE, b: SAMPLE2U, c: DIALOG, d: new Error('gone') };
   const orca = fakeOrca(screens);
   const before = await pi.scanSessions('C:/r', orca, undefined, true, true);
   const seen = [];
@@ -344,7 +349,7 @@ test('wiring: scanSessions hands every terminal it looked at to the recorder and
     assert.deepEqual(after, before);
     const by = Object.fromEntries(seen.map((x) => [x.handle, x]));
     assert.deepEqual(Object.keys(by).sort(), ['a', 'b', 'c']);
-    assert.deepEqual(by.b, { folder: 'C:/r', handle: 'b', state: null, preview: SAMPLE2 });
+    assert.deepEqual(by.b, { folder: 'C:/r', handle: 'b', state: null, preview: SAMPLE2U });
     assert.equal(by.a.state, 'idle');
     assert.equal(by.c.state, 'asking');
   } finally { pi.setCaseRecorder(null); }
@@ -360,7 +365,7 @@ test('wiring: a recorder that throws or returns a rejected promise changes nothi
 });
 
 test('PRESERVE piStatus: same answers with and without a recorder for idle, busy, asking and unknown screens', async () => {
-  const cases = [{ a: IDLE }, { a: WORKING }, { a: DIALOG }, { a: SAMPLE2 }, { a: IDLE, b: IDLE }, { a: new Error('x') }, {}];
+  const cases = [{ a: IDLE }, { a: WORKING }, { a: DIALOG }, { a: SAMPLE2U }, { a: SAMPLE2 }, { a: IDLE, b: IDLE }, { a: new Error('x') }, {}];
   for (const screens of cases) {
     const orca = fakeOrca(screens);
     const plain = [await pi.piStatus({ path: 'C:/r' }, orca), await pi.piStatus({ path: 'C:/r' }, orca, { tail: true })];
@@ -369,7 +374,8 @@ test('PRESERVE piStatus: same answers with and without a recorder for idle, busy
       assert.deepEqual([await pi.piStatus({ path: 'C:/r' }, orca), await pi.piStatus({ path: 'C:/r' }, orca, { tail: true })], plain);
     } finally { pi.setCaseRecorder(null); }
   }
-  assert.deepEqual(await pi.piStatus({ path: 'C:/r' }, fakeOrca({ a: SAMPLE2 })), { state: 'closed' });
+  assert.deepEqual(await pi.piStatus({ path: 'C:/r' }, fakeOrca({ a: SAMPLE2U })), { state: 'closed' });
+  assert.equal((await pi.piStatus({ path: 'C:/r' }, fakeOrca({ a: SAMPLE2 }))).state, 'asking');
 });
 
 test('wiring: end to end through piStatus, the real recorder writes ONE record for repeated polls', async () => {
@@ -378,7 +384,7 @@ test('wiring: end to end through piStatus, the real recorder writes ONE record f
     const r = casos.createRecorder({ file: s.file, now: clock().now });
     pi.setCaseRecorder(r.record);
     try {
-      for (const timer of ['18m55s', '19m01s', '19m11s']) await pi.piStatus({ path: 'C:/r' }, fakeOrca({ a: screen2(timer) }));
+      for (const timer of ['18m55s', '19m01s', '19m11s']) await pi.piStatus({ path: 'C:/r' }, fakeOrca({ a: screen2(timer, UNRECOGNISED_FOOTER) }));
       await r.flush();
     } finally { pi.setCaseRecorder(null); }
     const got = rows(s.file);

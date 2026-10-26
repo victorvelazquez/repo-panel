@@ -36,6 +36,7 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 - **S26. Ajustes del tablero tras el uso real.** «cada vez que presiono el botón verde de merge, el botón se pone inactivo por unos segundos, que esta bien, pero enseguida se pone como activa devuelta por 1 segundo y después la tarjeta se cambia de lugar»; «no podemos unificar en una columna sola los OPEN PRS y READY TO MERGE, diferenciando solo con el estado de la tarjeta? que los que están ready to merge esten arriba primero y los open prs en proceso abajo?»; «las columna clean podemos dejar devuelta visible, quedo feo mostrar minimizado».
 - **S27. Preguntas de la sesión que el panel no ve.** «que podemos hacer cuando esta en estado working con estado changes y aparece esta clase de preguntas en la sesión y no visualizamos en el panel ese pedido y no podemos saber que sucedió y podemos esperar horas sin saber que paso»; decisión: «podes avanzar sin ese cambio e ir acumulando casos y despues analizamos la mejor manera de resolver»; y «como te dire registra la pregunta si el chat desaparece y solo se ve la pregunta de opciones de si o no?». La grabadora responde esto último; el arreglo de fondo queda como RP30.
 - **S28. La grabación no debe depender de la página.** «la grabacion solo se hara sobre el repo de repo-panel o sobre los otros repos tambien?» y, ante la propuesta de que el servidor mire solo: «podes mejorar».
+- **S29. Los botones no deben abrirse antes de tiempo.** «sucede todavía de que el botón /flow-commit se habilita en la tarjeta sin que se haya terminado la implementación»; «también sigue habilitado el botón commit cuando se esta esperando un si o no en el chat de la sesión»; «cuando presiono el botón de los comandos /flow-* normalmente no deshabilita el botón con la acciona y se siente como que no funciono el botón y presiono mas de una vez».
 
 ## Tasks
 
@@ -70,7 +71,8 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 | RP28 | S26 | worker acotado con reglas de seguridad; merge sin parpadeo, columna Pull requests con los listos arriba, Clean visible por defecto; verificado en Edge real y con captura propia | PR #48 (2fc7578) |
 | RP29 | S27 | worker acotado con reglas de seguridad (sin git push); grabadora pasiva `piScreenQuestionish` + `server/casos.js`, instalada solo desde server.js; se saca el widget de consumo; verificado con un orca falso | PR #49 (2ca4c27) |
 | RP30 | S27 | POSTERGADA por la persona hasta acumular casos: reconocer la familia de diálogos, detector de «sin progreso visible», ver las últimas líneas desde la tarjeta, aviso en el título de la pestaña | pendiente |
-| RP31 | S28 | worker acotado con reglas de seguridad (sin git push); vigía del servidor `server/vigia.js`, se arranca solo desde server.js con grabadora; costo medido con orca real; verificado con orca falso y sin llamadas a la API | pendiente de commit |
+| RP31 | S28 | worker acotado con reglas de seguridad (sin git push); vigía del servidor `server/vigia.js`, se arranca solo desde server.js con grabadora; costo medido con orca real; verificado con orca falso y sin llamadas a la API | PR #50 (267adfe) |
+| RP32 | S29 | worker acotado con reglas de seguridad; reproducido en el panel real; hueco de la primera consulta, familia de pies en piScreenAsk y estado «enviando» desde el clic; verificado en Edge real con orca falso | pendiente de commit |
 
 Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a → RP11b → RP12a → RP12b → RP12 → RP13 → RP14. RP12 puede ir antes de RP11 si la persona lo prefiere.
 
@@ -410,3 +412,18 @@ Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a →
 > podes mejorar
 
 *Aplicado: se respondió que graba todos los repos que el panel mira pero solo con la página abierta y visible; se hizo RP31 (el servidor mira por su cuenta).*
+
+**L46.**
+
+> 1. reiniciado.
+> 2. podes borrar.
+> 3. podes cerrar.
+>
+> - sucede todavía de que el botón /flow-commit se habilita en la tarjeta sin que se haya terminado la implementación:
+> C:UsersictorAppDataLocalTemporca-paste-1793013149194-dee8f267-ceae-4c5f-b5cb-d35792a635e9.png
+> C:UsersictorAppDataLocalTemporca-paste-1793013183878-7c424320-da19-4a1f-b2e2-05fdb70b54df.png
+> - también sigue habilitado el botón commit cuando se esta esperando un si o no en el chat de la sesión:
+>  C:UsersictorAppDataLocalTemporca-paste-1793013289035-4e476605-1198-4f01-ad5a-cde2a844f14f.png
+> - también cuando presiono el botón de los comandos /flow-* normalmente no deshabilita el botón con la acciona y se siente como que no funciono el botón y presiono mas de una vez, siendo si se envió ya la orden y en unos segundos recién se deshabilita el botón.
+
+*Aplicado: se borraron las ramas de RP29 y RP31, se cerró el proceso sobrante del puerto 57934 y se hizo RP32.*
