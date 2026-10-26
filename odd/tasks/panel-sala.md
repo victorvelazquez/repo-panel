@@ -41,6 +41,7 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 - **S31. `/flow-base` no falla por trabajo nuevo.** Con una captura: tarjeta con `main`, 4 archivos y «Needs attention: Not on a clean, up-to-date main after /flow-base», trabajando sobre una implementación iniciada desde una base limpia y actualizada.
 - **S32. Un solo formato de tabla en la hoja de ruta.** Tras la advertencia de `flow-skills`: «quiero la opcion A, nuestro formato debe ser consistente».
 - **S33. Los cambios de un bloque suben su versión.** Sobre la propuesta de pruebas y actualización de «Put in conditions»: «podemos haceer lo recomendado» y «podemos vanazar con todos» (las tres partes: RP36 versiones de bloques, RP37 casos de prueba, RP38 vista de repos desactualizados, una unidad por vez).
+- **S34. Casos de prueba de «Put in conditions».** Parte 1 de lo aprobado con «podemos vanazar con todos»: lo que decide el panel se prueba con repos de mentira, lo que hace el agente queda en una lista para la persona.
 
 ## Tasks
 
@@ -80,7 +81,8 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 | RP33 | S30 | en línea (unidad chica, calcada de RP32); RED primero (4 de 8); el manejador put-in-conditions usa S.sending | PR #52 (73b5990) |
 | RP34 | S31 | en línea (cambio de una condición en flowVerdict); reproducido con la función real, RED 2 de 6 | PR #53 (531c5d6) |
 | RP35 | S32 | en línea (instrucciones y un export); RED primero (6 de 7); los textos salen de lib.RM_REQUIRED | PR #54 (e7ce56b) |
-| RP36 | S33 | en línea (tests y documentación); RED primero (2 de 9); experimento de 5 escenarios en copia temporal | pendiente de commit |
+| RP36 | S33 | en línea (tests y documentación); RED primero (2 de 9); experimento de 5 escenarios en copia temporal | PR #55 (0027337) |
+| RP37 | S34 | en línea (tests y documentación); sin RED natural, 5 mutaciones en copia temporal; repos de mentira con Git real | pendiente de commit |
 
 Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a → RP11b → RP12a → RP12b → RP12 → RP13 → RP14. RP12 puede ir antes de RP11 si la persona lo prefiere.
 
@@ -466,3 +468,9 @@ Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a →
 > podemos vanazar con todos
 
 *Aplicado: documento `.panel/PROPUESTA-put-in-conditions-pruebas-y-actualizacion.md` y RP36 (parte 2). RP37 y RP38 siguen, una unidad por vez.*
+
+**L51.**
+
+> que hicimos y como servirsa esto?
+
+*Aplicado: se explicó RP36 con un ejemplo, se siguió con RP37 (parte 1) tras `/flow-base`.*
