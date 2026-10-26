@@ -32,7 +32,7 @@
       "category": "verificable",
       "level": "required",
       "check": { "type": "file-exists", "file": "roadmap" },
-      "remedy": "Create docs/ROADMAP.md (or the roadmap path configured for this repo) with the three header lines and the units table described in requirements/blocks/registro.md."
+      "remedy": "Create docs/ROADMAP.md (or the roadmap path configured for this repo) with the three header lines and a units table whose header has exactly these column names: `ID`, `Entrega`, `Depende de` and `Estado` (optional: `Resultado visible`, `Notas`, `Ficha`)."
     },
     {
       "id": "roadmap-header",
@@ -48,7 +48,7 @@
       "category": "verificable",
       "level": "required",
       "check": { "type": "roadmap-table", "file": "roadmap" },
-      "remedy": "Fix the units table in the roadmap so it has no errors (required columns, one-word states, unique IDs); the panel's Conformity drawer lists the problems."
+      "remedy": "Fix the units table in the roadmap so it has no errors (required columns, one-word states, unique IDs): rename any header that does not match so the table has exactly `ID`, `Entrega`, `Depende de` and `Estado` (a column called `Unidad` or `Dependencias` is not recognised); the panel's Conformity drawer lists the problems."
     },
     {
       "id": "ciclo-block",
