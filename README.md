@@ -85,7 +85,7 @@ Use the `port` from `config.json` if you changed it. To check: open `/health`, i
 
 #### Tray icon (Windows)
 
-To avoid doing that by hand, `scripts/tray.ps1` puts an icon in the notification area (next to Docker and the like). It is a hidden PowerShell script (Windows PowerShell 5.1 or PowerShell 7, no dependencies).
+To avoid doing that by hand, `scripts/tray.ps1` puts an icon in the notification area (next to Docker and the like). It is a hidden PowerShell script (Windows PowerShell 5.1 or PowerShell 7, no dependencies). The task starts it through `conhost.exe --headless`, like the panel task, so there is no console window at all: with a plain hidden `powershell.exe`, closing its console window killed the icon (task result `0xC000013A`). A task installed before this change keeps the old command; run `install-tray.ps1` again from the real repository folder to switch.
 
 ```powershell
 .\scripts\install-tray.ps1      # registers the per-user task repo-panel-tray at logon (no admin)

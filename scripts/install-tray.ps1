@@ -17,17 +17,20 @@ if (Test-UnderTemp $root) {
   exit 2
 }
 $script = Join-Path $root 'scripts\tray.ps1'
-$argument = "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$script`""
+# conhost --headless runs the console app with no window at all, so there is no console window to close by accident:
+# closing the hidden powershell.exe window used to kill the icon (task result 0xC000013A). It needs the full path.
+$powershell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+$argument = "--headless `"$powershell`" -NoProfile -ExecutionPolicy Bypass -File `"$script`""
 
 if ($DryRun) {
   Write-Host "Dry run: nothing was registered."
   Write-Host "Task:      $taskName (at logon of $env:USERNAME, interactive, limited)"
-  Write-Host "Action:    powershell.exe $argument"
+  Write-Host "Action:    conhost.exe $argument"
   Write-Host "Folder:    $root"
   return
 }
 
-$action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument $argument -WorkingDirectory $root
+$action = New-ScheduledTaskAction -Execute 'conhost.exe' -Argument $argument -WorkingDirectory $root
 $trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
 $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
   -ExecutionTimeLimit ([TimeSpan]::Zero)
