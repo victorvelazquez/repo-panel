@@ -33,6 +33,7 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 - **S23. Columna Merged y Clean.** «no es mejor mostrar una columna aparte de los en estado "Merged: run /flow-base"?»; «la columna de Clean es necesario o util? creo a veces no se muy bien su utlidad real»; aprobado: «me cierra separar RP25 y que Clean pase a ser una barra plegable cerrada por defecto [...] si no me gusta volvemos a mostrar en el tablero como columna».
 - **S24. Una sola señal de actualización.** «la animacion de actualizando que es la flechita que gira en cada tarjeta esta demas. podriamos limpiar y solo mostrar la de la barra de arriba. sin dejar de actualizar todas».
 - **S25. El ícono de bandeja no debe morir al cerrar una terminal.** «hay una terminal visible corriendo, seguro desaparece el icono al cerrar la terminal»; confirmado: «cerra la terminal y cerrro el icono, desaparecio el icono».
+- **S26. Ajustes del tablero tras el uso real.** «cada vez que presiono el botón verde de merge, el botón se pone inactivo por unos segundos, que esta bien, pero enseguida se pone como activa devuelta por 1 segundo y después la tarjeta se cambia de lugar»; «no podemos unificar en una columna sola los OPEN PRS y READY TO MERGE, diferenciando solo con el estado de la tarjeta? que los que están ready to merge esten arriba primero y los open prs en proceso abajo?»; «las columna clean podemos dejar devuelta visible, quedo feo mostrar minimizado».
 
 ## Tasks
 
@@ -63,7 +64,8 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 | RP24 | S21 | worker acotado con reglas de seguridad; `working` sin invalidar por actividad, sesión busy/asking deshabilita /flow-commit, período de calma | PR #43 (5e616b2) |
 | RP25 | S23 | worker acotado con reglas de seguridad; columna Merged, barra Idle plegable, columna Needs attention y preferencia reversible; verificado en Edge real | PR #46 (2931a19) |
 | RP26 | S24 | en línea (unidad chica); RED primero; icono de Refresh gira, sin flechita en tarjetas; verificado en Edge real | PR #44 (b6a46b1) |
-| RP27 | S25 | en línea (unidad chica); RED primero; la tarea de la bandeja usa conhost --headless; mecanismo probado con un ícono mínimo; reinstalar la tarea real queda para la persona | pendiente de commit |
+| RP27 | S25 | en línea (unidad chica); RED primero; la tarea de la bandeja usa conhost --headless; mecanismo probado con un ícono mínimo; reinstalar la tarea real queda para la persona | PR #47 (5de00d4) |
+| RP28 | S26 | worker acotado con reglas de seguridad; merge sin parpadeo, columna Pull requests con los listos arriba, Clean visible por defecto; verificado en Edge real y con captura propia | pendiente de commit |
 
 Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a → RP11b → RP12a → RP12b → RP12 → RP13 → RP14. RP12 puede ir antes de RP11 si la persona lo prefiere.
 
@@ -358,3 +360,17 @@ Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a →
 > 3. cerra la terminal y cerrro el icono, desaparecio el icono.
 
 *Aplicado: se borraron las ramas locales de RP23 y RP25, se volvió a arrancar el ícono y se hizo RP27.*
+
+**L40.**
+
+> podes hacer
+
+*Aplicado: se reinstaló la tarea de la bandeja con el comando sin ventana, comparando la definición antes y después; se borró la rama local de RP27.*
+
+**L41.**
+
+> - cada vez que presiono el botón verde de merge, el botón se pone inactivo por unos segundos, que esta bien, pero enseguida se pone como activa devuelta por 1 segundo y después la tarjeta se cambia de lugar. creo que podríamos mejorar ese punto.
+> - no podemos unificar en una columna sola los OPEN PRS y READY TO MERGE, diferenciando solo con el estado de la tarjeta? que los que están ready to merge esten arriba primero y los open prs en proceso abajo? solo pregunto, si tu crees que es mejor dejar separado igual esta bien.
+> - y las columna clean podemos dejar devuelta visible, quedo feo mostrar minimizado.
+
+*Aplicado: RP28; se decidió unificar las dos columnas.*

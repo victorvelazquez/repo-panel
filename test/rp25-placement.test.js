@@ -74,12 +74,12 @@ test('localPlacement itself is unchanged: a stale clean repo is still a clean-co
 });
 
 test('boardColumns: default layout has Needs attention first only when it has cards, Merged last, no Clean', () => {
-  assert.deepEqual(boardColumns(false, 0), ['changes', 'committed', 'progress', 'ready', 'merged']);
-  assert.deepEqual(boardColumns(false, 3), ['attention', 'changes', 'committed', 'progress', 'ready', 'merged']);
-  assert.deepEqual(boardColumns(), ['changes', 'committed', 'progress', 'ready', 'merged']);
+  assert.deepEqual(boardColumns(false, 0), ['changes', 'committed', 'prs', 'merged']);
+  assert.deepEqual(boardColumns(false, 3), ['attention', 'changes', 'committed', 'prs', 'merged']);
+  assert.deepEqual(boardColumns(), ['changes', 'committed', 'prs', 'merged']);
 });
 
 test('boardColumns: cleanAsColumn puts Clean first and never shows Needs attention', () => {
-  assert.deepEqual(boardColumns(true, 0), ['clean', 'changes', 'committed', 'progress', 'ready', 'merged']);
-  assert.deepEqual(boardColumns(true, 5), ['clean', 'changes', 'committed', 'progress', 'ready', 'merged']);
+  assert.deepEqual(boardColumns(true, 0), ['clean', 'changes', 'committed', 'prs', 'merged']);
+  assert.deepEqual(boardColumns(true, 5), ['clean', 'changes', 'committed', 'prs', 'merged']);
 });

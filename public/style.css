@@ -95,8 +95,7 @@ main { max-width: none; padding: 8px; }
 .col-clean { border-top-color: var(--gray); }
 .col-changes { border-top-color: var(--yellow); }
 .col-committed { border-top-color: var(--blue); }
-.col-progress { border-top-color: var(--green); }
-.col-ready { border-top-color: #238636; }
+.col-prs { border-top-color: #238636; }
 .col-merged { border-top-color: var(--purple); }
 /* Idle bar: the collapsible home of the clean repos' compact rows. */
 .idle { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; margin-top: 4px; }
@@ -151,6 +150,7 @@ button.x:hover:not(:disabled) { color: var(--red); border-color: var(--red); }
 .repo-name { color: var(--text); }
 a.repo-name:hover { text-decoration: none; color: var(--blue); }
 .card.attn { border-color: #7a2a27; box-shadow: inset 3px 0 0 var(--red); }
+.card.ready { box-shadow: inset 3px 0 0 #238636; }
 .alerts { color: var(--red); border-color: #5a1f1c; background: #2a1213; font-weight: 600; }
 .alerts.active { background: var(--red); color: #fff; border-color: var(--red); }
 

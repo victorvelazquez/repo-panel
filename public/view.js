@@ -378,13 +378,21 @@
   // when the person asked for it as a column.
   function boardColumns(cleanAsColumn = false, attentionCount = 0) {
     const first = cleanAsColumn ? ['clean'] : attentionCount > 0 ? ['attention'] : [];
-    return [...first, 'changes', 'committed', 'progress', 'ready', 'merged'];
+    return [...first, 'changes', 'committed', 'prs', 'merged'];
   }
 
   // A PR that cannot merge because of something the user must fix.
   const isProblem = (pr) => !pr.ready && (pr.checks.state === 'failed' || ['DIRTY', 'BEHIND'].includes(pr.mergeStateStatus));
 
+  // The rank of a PR (the board shows all of them in the one `prs` column; the work queue relies on this).
   const prColumn = (pr) => (pr.ready ? 'ready' : 'progress');
+
+  // The order inside the Pull requests column: 0 ready to merge, 1 problems (red), 2 the rest (checks running, waiting).
+  const prRank = (pr) => (pr.ready ? 0 : isProblem(pr) ? 1 : 2);
+
+  // The cards of the column in that order, keeping the original order inside each group; `get` reads the PR of an item.
+  const sortPrCards = (items, get = (x) => x) => items.map((item, i) => ({ item, i, rank: prRank(get(item)) }))
+    .sort((a, b) => a.rank - b.rank || a.i - b.i).map((x) => x.item);
 
   // Verdict after /flow-commit: { state: 'running' | 'ok' | 'attention', reason }, or null without a record.
   // `sent` is { at (epoch ms), head, files } recorded when the command was sent; `session` is the state of
@@ -485,5 +493,5 @@
     return attention(`No change 15 minutes after ${text} and the pi session state is unknown`);
   }
 
-  return { API_VERSION, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, piPollTargets, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, commitVerdict, queueFlags, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, presenceLabel, presenceDot };
+  return { API_VERSION, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, piPollTargets, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, presenceLabel, presenceDot };
 }));
