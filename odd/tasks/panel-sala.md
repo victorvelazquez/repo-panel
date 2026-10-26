@@ -35,6 +35,7 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 - **S25. El ícono de bandeja no debe morir al cerrar una terminal.** «hay una terminal visible corriendo, seguro desaparece el icono al cerrar la terminal»; confirmado: «cerra la terminal y cerrro el icono, desaparecio el icono».
 - **S26. Ajustes del tablero tras el uso real.** «cada vez que presiono el botón verde de merge, el botón se pone inactivo por unos segundos, que esta bien, pero enseguida se pone como activa devuelta por 1 segundo y después la tarjeta se cambia de lugar»; «no podemos unificar en una columna sola los OPEN PRS y READY TO MERGE, diferenciando solo con el estado de la tarjeta? que los que están ready to merge esten arriba primero y los open prs en proceso abajo?»; «las columna clean podemos dejar devuelta visible, quedo feo mostrar minimizado».
 - **S27. Preguntas de la sesión que el panel no ve.** «que podemos hacer cuando esta en estado working con estado changes y aparece esta clase de preguntas en la sesión y no visualizamos en el panel ese pedido y no podemos saber que sucedió y podemos esperar horas sin saber que paso»; decisión: «podes avanzar sin ese cambio e ir acumulando casos y despues analizamos la mejor manera de resolver»; y «como te dire registra la pregunta si el chat desaparece y solo se ve la pregunta de opciones de si o no?». La grabadora responde esto último; el arreglo de fondo queda como RP30.
+- **S28. La grabación no debe depender de la página.** «la grabacion solo se hara sobre el repo de repo-panel o sobre los otros repos tambien?» y, ante la propuesta de que el servidor mire solo: «podes mejorar».
 
 ## Tasks
 
@@ -67,8 +68,9 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 | RP26 | S24 | en línea (unidad chica); RED primero; icono de Refresh gira, sin flechita en tarjetas; verificado en Edge real | PR #44 (b6a46b1) |
 | RP27 | S25 | en línea (unidad chica); RED primero; la tarea de la bandeja usa conhost --headless; mecanismo probado con un ícono mínimo; reinstalar la tarea real queda para la persona | PR #47 (5de00d4) |
 | RP28 | S26 | worker acotado con reglas de seguridad; merge sin parpadeo, columna Pull requests con los listos arriba, Clean visible por defecto; verificado en Edge real y con captura propia | PR #48 (2fc7578) |
-| RP29 | S27 | worker acotado con reglas de seguridad (sin git push); grabadora pasiva `piScreenQuestionish` + `server/casos.js`, instalada solo desde server.js; se saca el widget de consumo; verificado con un orca falso | pendiente de commit |
+| RP29 | S27 | worker acotado con reglas de seguridad (sin git push); grabadora pasiva `piScreenQuestionish` + `server/casos.js`, instalada solo desde server.js; se saca el widget de consumo; verificado con un orca falso | PR #49 (2ca4c27) |
 | RP30 | S27 | POSTERGADA por la persona hasta acumular casos: reconocer la familia de diálogos, detector de «sin progreso visible», ver las últimas líneas desde la tarjeta, aviso en el título de la pestaña | pendiente |
+| RP31 | S28 | worker acotado con reglas de seguridad (sin git push); vigía del servidor `server/vigia.js`, se arranca solo desde server.js con grabadora; costo medido con orca real; verificado con orca falso y sin llamadas a la API | pendiente de commit |
 
 Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a → RP11b → RP12a → RP12b → RP12 → RP13 → RP14. RP12 puede ir antes de RP11 si la persona lo prefiere.
 
@@ -400,3 +402,11 @@ Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a →
 > esta parte de la linea no es necesario considerar porque es un widgets que mustra el consumo de claude: 5h 15% ↻lun 01:50 · 7d 37% ↻jue 11:00
 
 *Aplicado: RP29 (la grabadora); el widget de consumo se descarta de lo guardado.*
+
+**L45.**
+
+> la grabacion solo se hara sobre el repo de repo-panel o sobre los otros repos tambien?
+
+> podes mejorar
+
+*Aplicado: se respondió que graba todos los repos que el panel mira pero solo con la página abierta y visible; se hizo RP31 (el servidor mira por su cuenta).*
