@@ -512,33 +512,37 @@ const COLUMNS = [
   { key: 'clean', title: 'Clean', hint: 'Nothing to do' },
   { key: 'changes', title: 'Changes', hint: 'Uncommitted files' },
   { key: 'committed', title: 'Committed', hint: 'Commits not pushed yet' },
-  { key: 'progress', title: 'Open PRs', hint: 'Checks running, waiting for review or needing a fix (red = needs attention)' },
-  { key: 'ready', title: 'Ready to merge', hint: 'All checks passed' },
+  { key: 'prs', title: 'Pull requests', hint: 'Open PRs: ready to merge first, then fixes, then checks still running' },
   { key: 'merged', title: 'Merged', hint: 'Merged: run /flow-base' },
 ];
 const COLUMN_BY_KEY = Object.fromEntries(COLUMNS.map((c) => [c.key, c]));
-const BOARD_KEYS = ['changes', 'committed', 'progress', 'ready', 'merged'];
+const BOARD_KEYS = ['changes', 'committed', 'prs', 'merged'];
 
-// Which columns the board shows, left to right: Needs attention only while it has cards, Clean only when asked for.
-const boardKeys = (attentionCount) => (V ? V.boardColumns(!!S.prefs.cleanAsColumn, attentionCount)
-  : [...(S.prefs.cleanAsColumn ? ['clean'] : attentionCount > 0 ? ['attention'] : []), ...BOARD_KEYS]);
+// Clean is a board column unless the person turned it off (saved as exactly false): the saved preferences object is
+// kept whole, so one saved before the option existed has no key and gets the column.
+const cleanAsColumn = () => S.prefs.cleanAsColumn !== false;
+
+// Which columns the board shows, left to right: Clean first by default, otherwise Needs attention only while it has cards.
+const boardKeys = (attentionCount) => (V ? V.boardColumns(cleanAsColumn(), attentionCount)
+  : [...(cleanAsColumn() ? ['clean'] : attentionCount > 0 ? ['attention'] : []), ...BOARD_KEYS]);
 
 // A PR that cannot merge because of something the user must fix.
 const isProblem = (pr) => (V ? V.isProblem(pr) : !pr.ready && (pr.checks.state === 'failed' || ['DIRTY', 'BEHIND'].includes(pr.mergeStateStatus)));
 
-const prColumn = (pr) => (V ? V.prColumn(pr) : pr.ready ? 'ready' : 'progress');
+// The PR cards of the one Pull requests column: ready to merge first, then problems, then the rest.
+const sortPrCards = (items) => (V ? V.sortPrCards(items, (x) => x.pr) : items);
 
 // Where the repo's local card goes (view.js decides it from Git state alone); without view.js, by changes, commits
 // and the stale mark only.
 function placement(l, p, prCount, verdict) {
-  if (V) return V.boardPlacement(l, p, prCount, verdict && verdict.state, !!S.prefs.cleanAsColumn);
+  if (V) return V.boardPlacement(l, p, prCount, verdict && verdict.state, cleanAsColumn());
   const stale = !!p.stale;
   if (l.error) return { column: 'changes', attn: true, row: false };
   if ((l.files || []).length > 0) return { column: 'changes', attn: stale, row: false };
   if ((l.ahead || 0) > 0) return { column: 'committed', attn: stale, row: false };
   if (stale) return { column: 'merged', attn: true, row: false };
   if (prCount) return { column: null, attn: false, row: false };
-  return { column: S.prefs.cleanAsColumn ? 'clean' : 'idle', attn: false, row: true };
+  return { column: cleanAsColumn() ? 'clean' : 'idle', attn: false, row: true };
 }
 
 // The verdict of the last command sent from this page, or null. It lives in the page only: an ok verdict (or none,
@@ -558,6 +562,7 @@ function buildCards() {
   const cols = Object.fromEntries(COLUMNS.map((c) => [c.key, []]));
   const parked = Object.fromEntries(COLUMNS.map((c) => [c.key, []]));
   const idle = []; // the compact rows of repos with nothing to do, for the Idle bar
+  const prCards = []; // { pr, html } of every open PR, ranked into the Pull requests column after the loop
   let problems = 0;
   // Problem cards go first in their column; with the problems filter on, only they are shown.
   const add = (key, html, attn) => {
@@ -572,11 +577,13 @@ function buildCards() {
     const place = placement(l, p, prs.length, verdict);
     if (place.column) add(place.column, place.row ? cleanRow(r) : l.error ? repoCard(r, true) : repoCard(r, place.attn, verdict), place.attn);
     for (const pr of prs) {
-      const key = prColumn(pr);
-      if (S.snoozed.has(snoozeKey(r.id, pr.number))) { if (!S.onlyProblems) parked[key].push(snoozedRow(r, pr)); }
-      else add(key, prCard(r, pr, p.repo, verdict && verdict.state === 'running' ? verdict : null), isProblem(pr));
+      if (S.snoozed.has(snoozeKey(r.id, pr.number))) { if (!S.onlyProblems) parked.prs.push(snoozedRow(r, pr)); continue; }
+      const attn = isProblem(pr);
+      if (attn) problems++;
+      if (attn || !S.onlyProblems) prCards.push({ pr, html: prCard(r, pr, p.repo, verdict && verdict.state === 'running' ? verdict : null) });
     }
   }
+  cols.prs = sortPrCards(prCards).map((x) => x.html);
   return { cols, parked, idle, problems };
 }
 
@@ -620,7 +627,7 @@ function render() {
 // stays as the person left it). The rows are the same cleanRow markup the Clean column holds, in a container that
 // can host actions later. Nothing is drawn without rows, and not at all while Clean is a column.
 function idleBar(rows) {
-  if (S.prefs.cleanAsColumn || !rows.length) return '';
+  if (cleanAsColumn() || !rows.length) return '';
   const open = !!S.prefs.idleOpen;
   return `<section class="idle" aria-label="Idle repos">
     <div class="idle-head">
@@ -812,7 +819,7 @@ function prCard(r, pr, meta, running = null) {
   const hold = running && V ? V.runningReason({ cmd: running.cmd, label: running.label }) : '';
   const showReason = !pr.ready && pr.blockedReason && pr.checks.state !== 'pending' && pr.checks.state !== 'failed';
   const n = `data-id="${r.id}" data-n="${pr.number}"`;
-  return `<div class="card ${isProblem(pr) ? 'attn' : ''}">
+  return `<div class="card ${isProblem(pr) ? 'attn' : ''} ${pr.ready ? 'ready' : ''}">
     ${cardTop(r, meta?.url, `pr${pr.number}`)}
     ${reqWarn(r)}
     <a class="pr-title" href="${esc(pr.url)}" target="_blank" rel="noopener" title="${esc(pr.title)}">#${pr.number} ${esc(pr.title)}</a>
@@ -826,7 +833,7 @@ function prCard(r, pr, meta, running = null) {
     </div>
     <div class="merge-row">
       <button class="merge" data-act="merge" ${n} ${pr.ready && !busy && !hold ? '' : 'disabled'}
-        title="${esc(hold || (pr.ready ? 'Merge into ' + pr.base : pr.blockedReason))}">${busy ? 'Merging…' : `Merge · ${S.prefs.method}`}</button>
+        title="${esc(hold || (pr.ready ? 'Merge into ' + pr.base : pr.blockedReason))}">${busy === 'done' ? 'Merged ✓' : busy ? 'Merging…' : `Merge · ${S.prefs.method}`}</button>
       <button data-act="snooze" ${n} title="Park this PR at the bottom of the column until it is ready to merge (stays parked if it is already ready)">💤</button>
     </div>
     ${pr.checks.failedRuns.length ? `<button data-act="rerun" ${n} ${busy || hold ? 'disabled' : ''}${hold ? ` title="${esc(hold)}"` : ''}>Re-run failed</button>` : ''}
@@ -871,13 +878,18 @@ async function doMerge(id, n) {
   const pr = (S.prs[id]?.prs || []).find((x) => x.number === n);
   if (!pr || S.busy[`${id}:${n}`]) return;
   const { method, del } = S.prefs;
-  S.busy[`${id}:${n}`] = true; draw();
+  const key = `${id}:${n}`;
+  S.busy[key] = true; draw();
   try {
     const r = await api('/api/merge', { id, number: n, method, deleteBranch: del });
+    // Merged: keep the button disabled ("done") through the refresh, so it never comes back to life before the card moves.
+    S.busy[key] = 'done'; draw();
     toast(`#${n} merged${r.branch === 'deleted' ? ' · branch deleted' : r.branch === 'auto' ? ' · branch auto-deleted' : ''}`, 'ok');
-  } catch (e) { toast(`#${n}: ${e.message}`, 'bad'); }
-  delete S.busy[`${id}:${n}`];
-  await refreshRepo(id);
+  } catch (e) {
+    delete S.busy[key];
+    toast(`#${n}: ${e.message}`, 'bad');
+  }
+  try { await refreshRepo(id); } finally { delete S.busy[key]; draw(); }
 }
 
 async function doRerun(id, n) {
@@ -1075,7 +1087,7 @@ document.addEventListener('visibilitychange', () => {
   try { await loadConfig(); } catch (e) { toast(e.message, 'bad'); }
   $('#method').value = S.prefs.method;
   $('#delBranch').checked = S.prefs.del;
-  $('#cleanAsColumn').checked = !!S.prefs.cleanAsColumn;
+  $('#cleanAsColumn').checked = cleanAsColumn();
   draw();
   if (location.hash === '#conformity') openConformity(); // deep link
   refreshAll();

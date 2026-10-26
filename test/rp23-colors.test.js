@@ -139,8 +139,7 @@ test('css: top border of the five columns follows GitHub', () => {
   assert.match(rule('.col-clean'), /border-top-color:\s*var\(--gray\)/);
   assert.match(rule('.col-changes'), /border-top-color:\s*var\(--yellow\)/);
   assert.match(rule('.col-committed'), /border-top-color:\s*var\(--blue\)/);
-  assert.match(rule('.col-progress'), /border-top-color:\s*var\(--green\)/);
-  assert.match(rule('.col-ready'), /border-top-color:\s*#238636/);
+  assert.match(rule('.col-prs'), /border-top-color:\s*#238636/); // RP28: Open PRs and Ready to merge became one column
   assert.match(rule('button.merge'), /background:\s*#238636/);
 });
 

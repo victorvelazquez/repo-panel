@@ -61,7 +61,8 @@ function setup(page, keys, prefs = {}) {
   const S = page.get('S');
   S.groups = [{ name: 'g', repos: keys.map((k) => REPOS[k]) }];
   for (const k of keys) { S.local[REPOS[k].id] = STATE[k][0]; S.prs[REPOS[k].id] = { ...STATE[k][1], repo: { url: `https://github.com/o/${REPOS[k].name}` } }; }
-  Object.assign(S.prefs, prefs);
+  // RP28: Clean is a column by default; these RP25 tests describe the Idle bar layout, so they ask for it explicitly.
+  Object.assign(S.prefs, { cleanAsColumn: false }, prefs);
   return S;
 }
 
@@ -75,12 +76,12 @@ function sections(html) {
 }
 const byKey = (html, key) => sections(html).find((s) => s.key === key);
 
-test('page: default layout puts the stale-clean repo in Merged with its attention card and keeps the others where they were', async () => {
+test('page: the Idle bar layout puts the stale-clean repo in Merged with its attention card and keeps the others where they were', async () => {
   const page = await loadPage();
   setup(page, ['quiet', 'stale', 'manual', 'dirty']);
   page.get('render')();
   const html = page.app.innerHTML;
-  assert.deepEqual(sections(html).map((s) => s.key), ['attention', 'changes', 'committed', 'progress', 'ready', 'merged']);
+  assert.deepEqual(sections(html).map((s) => s.key), ['attention', 'changes', 'committed', 'prs', 'merged']);
   const R = REPOS;
   const merged = byKey(html, 'merged');
   assert.ok(merged.html.includes('stale-repo'));
@@ -88,7 +89,7 @@ test('page: default layout puts the stale-clean repo in Merged with its attentio
   assert.match(merged.html, /<h2>Merged<\/h2>/);
   assert.match(merged.html, /title="Merged: run \/flow-base"/);
   assert.ok(byKey(html, 'changes').html.includes('dirty-repo'), 'changes is unchanged');
-  assert.ok(!html.includes('col-clean'), 'no Clean column by default');
+  assert.ok(!html.includes('col-clean'), 'no Clean column in the bar layout');
 });
 
 test('page: the Merged column has no other repo and shows the empty marker when there is none', async () => {
@@ -202,7 +203,7 @@ test('page: cleanAsColumn brings back the Clean column first with the rows and t
   setup(page, ['quiet', 'stale', 'manual', 'dirty'], { cleanAsColumn: true });
   page.get('render')();
   const html = page.app.innerHTML;
-  assert.deepEqual(sections(html).map((s) => s.key), ['clean', 'changes', 'committed', 'progress', 'ready', 'merged']);
+  assert.deepEqual(sections(html).map((s) => s.key), ['clean', 'changes', 'committed', 'prs', 'merged']);
   const clean = byKey(html, 'clean');
   assert.match(clean.html, /<h2>Clean<\/h2>/);
   assert.match(clean.html, /title="Nothing to do"/);
@@ -221,7 +222,7 @@ test('page: the clean-as-column action and the header checkbox set the same pref
   assert.equal(JSON.parse(page.saved.prefs).cleanAsColumn, true);
   assert.match(read('public/index.html'), /<input[^>]*type="checkbox"[^>]*data-pref="cleanAsColumn"/, 'the always-visible header toggle');
   assert.match(read('public/index.html'), /id="cleanAsColumn"[^>]*data-pref="cleanAsColumn"|data-pref="cleanAsColumn"[^>]*id="cleanAsColumn"/);
-  assert.match(read('public/app.js'), /\$\('#cleanAsColumn'\)\.checked = !!S\.prefs\.cleanAsColumn/, 'the checkbox reflects the stored preference on load');
+  assert.match(read('public/app.js'), /\$\('#cleanAsColumn'\)\.checked = cleanAsColumn\(\)/, 'the checkbox reflects the stored preference on load');
 });
 
 test('page: the problems filter hides the idle bar and keeps the attention cards', async () => {
@@ -241,8 +242,7 @@ test('css: Merged is purple, Needs attention is red, Clean keeps its gray and th
   assert.match(rule(css, '.col-clean'), /border-top-color:\s*var\(--gray\)/);
   assert.match(rule(css, '.col-changes'), /border-top-color:\s*var\(--yellow\)/);
   assert.match(rule(css, '.col-committed'), /border-top-color:\s*var\(--blue\)/);
-  assert.match(rule(css, '.col-progress'), /border-top-color:\s*var\(--green\)/);
-  assert.match(rule(css, '.col-ready'), /border-top-color:\s*#238636/);
+  assert.match(rule(css, '.col-prs'), /border-top-color:\s*#238636/);
   assert.match(css, /--bg: #0f1216; --panel: #171b21; --panel2: #1e242c; --line: #2a323c; --text: #d7dde5; --muted: #8b96a3;/);
 });
 

@@ -102,6 +102,8 @@ async function mergePr(repo, number, method, deleteBranch) {
     const after = await viewPr(repo, number).catch(() => null);
     if (!after || after.state !== 'MERGED') throw new HttpError(502, ghError(m));
   }
+  // The branch has a merged PR now: forget a cached "none" so the next /api/prs reports it at once.
+  mergedCache.delete(`${repo.id}:${pr.head}`);
 
   // Branch cleanup: skip when the repo already deletes branches, or the head lives in a fork.
   let branch = 'kept';
