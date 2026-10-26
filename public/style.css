@@ -180,6 +180,7 @@ a.repo-name:hover { text-decoration: none; color: var(--blue); }
 .conf-sum { color: var(--muted); margin-bottom: 12px; }
 .conf-item { border: 1px solid var(--line); border-radius: 6px; padding: 8px 12px; margin-bottom: 8px; background: var(--panel); }
 .conf-item .repo-name { background: none; border: 0; padding: 0; cursor: pointer; }
+.conf-item .conf-put { margin-left: 8px; font-size: 11px; padding: 0 6px; }
 .conf-item .repo-name:hover { color: var(--blue); }
 .conf-status { color: var(--yellow); font-size: 13px; margin: 2px 0; }
 .conf-line { font: 12px/1.6 ui-monospace, Consolas, monospace; color: var(--muted); overflow-wrap: anywhere; }
