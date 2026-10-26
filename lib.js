@@ -499,6 +499,23 @@ function piScreenAsk(preview) {
   return { text: lines.slice(-12).map((l) => l.slice(0, 200)).join('\n').slice(0, 900) };
 }
 
+// Whether the end of a screen LOOKS like a question for the user, however the panel classifies it (this is only
+// observed, never acted on: piScreenAsk and piScreenState are unchanged). From the last 14 non-empty lines (control
+// characters replaced by a space, 200 characters per line) it returns { signals, lines } or null. Signals: 'footer' (ONE
+// line holding a key word and an action word), 'agents-waiting' (`Agents 1 waiting`) and 'asked' (a line with `asked:`).
+function piScreenQuestionish(preview) {
+  if (typeof preview !== 'string') return null;
+  // The Claude usage widget under the pi screen (`5h 15% ↻lun 01:50 · 7d 37% ↻jue 11:00`) is not part of the screen: it
+  // says nothing about a question, it holds the user's consumption, and it must not take one of the 14 lines.
+  const usageWidget = /^\d+h\s+\d+%\s+↻[^·]*·\s+\d+d\s+\d+%\s+↻/;
+  const lines = preview.split('\n').map((l) => l.replace(/[\x00-\x1f\x7f-\x9f\u2028\u2029]/g, ' ').trim()).filter((l) => l && !usageWidget.test(l)).slice(-14).map((l) => l.slice(0, 200));
+  const signals = [];
+  if (lines.some((l) => /\b(enter|return|esc|escape)\b|ctrl\+c/i.test(l) && /\b(confirm|select|cancel|submit|navigate|accept)\b/i.test(l))) signals.push('footer');
+  if (lines.some((l) => /\bAgents?\s+\d+\s+waiting\b/i.test(l))) signals.push('agents-waiting');
+  if (lines.some((l) => l.includes('asked:'))) signals.push('asked');
+  return signals.length ? { signals, lines } : null;
+}
+
 // Reads the end of a terminal preview: 'idle' (waiting with an empty prompt), 'typed' (waiting but the prompt
 // holds text) or 'busy' (anything else, including a screen this does not recognise: it fails closed).
 function piPromptState(preview) {
@@ -509,7 +526,7 @@ function piPromptState(preview) {
 }
 
 module.exports = {
-  PI_COMMANDS, normPath, terminalsOfWorktree, piScreenState, piScreenAsk, piPromptState,
+  PI_COMMANDS, normPath, terminalsOfWorktree, piScreenState, piScreenAsk, piScreenQuestionish, piPromptState,
   repoId, parseStatus, parseNumstat, parseGoneBranches, parseBaseBranch, staleBranch, statusLetter,
   summarizeChecks, blockedReason, enrichPr, encodeRef, parseRoadmap, safeRelPath, roadmapSummary,
   matchesUnitId, deriveUnitStates, nextUnit, workQueue, conformityReport,

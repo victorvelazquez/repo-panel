@@ -94,6 +94,16 @@ async function orderText(repo, key, requirements, extra) {
   return Object.hasOwn(lib.PI_COMMANDS, key) ? lib.PI_COMMANDS[key] : null;
 }
 
+// Passive recorder of question-like screens (server/casos.js). A no-op until server.js installs one in its entry block;
+// no module and no test installs it by itself. It only observes: its result is never used and it can never fail a scan.
+const NO_RECORDER = () => {};
+let caseRecorder = NO_RECORDER;
+const setCaseRecorder = (fn) => { caseRecorder = typeof fn === 'function' ? fn : NO_RECORDER; };
+const caseRecorderInstalled = () => caseRecorder !== NO_RECORDER;
+function observe(folder, handle, state, preview) {
+  try { const r = caseRecorder({ folder, handle, state, preview }); if (r && typeof r.catch === 'function') r.catch(() => {}); } catch { /* observing never changes a scan */ }
+}
+
 // Looks at every terminal of the folder's worktree with a fresh `show` (the `list` preview is truncated), in
 // parallel. `sessions` are the ones whose screen is a pi screen; `failed` counts the terminals whose `show`
 // failed: those are unknown, not sessions. `listed` is an already fetched `list` result (rooms list once). A
@@ -105,6 +115,7 @@ async function scanSessions(folder, orca, listed, withPreview = false, askAware 
     try {
       const preview = ((await orca(['show', '--terminal', handle])).terminal || {}).preview;
       const ask = lib.piScreenAsk(preview);
+      observe(folder, handle, ask ? 'asking' : lib.piScreenState(preview), preview);
       if (ask) return askAware ? { handle, state: 'asking', ask: ask.text, preview } : { handle, state: 'busy', preview };
       return { handle, state: lib.piScreenState(preview), preview };
     } catch { return { handle, state: null, failed: true }; }
@@ -183,4 +194,4 @@ async function piStatus(repo, orca = orcaTerminal, { tail = false } = {}) {
   } catch { return out('unknown'); }
 }
 
-module.exports = { piSend, piStatus, piSessions, scanSessions, conditionsOrder, fixPrOrder, orcaTerminal, sendGuard };
+module.exports = { piSend, piStatus, piSessions, scanSessions, conditionsOrder, fixPrOrder, orcaTerminal, sendGuard, setCaseRecorder, caseRecorderInstalled };

@@ -34,6 +34,7 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 - **S24. Una sola señal de actualización.** «la animacion de actualizando que es la flechita que gira en cada tarjeta esta demas. podriamos limpiar y solo mostrar la de la barra de arriba. sin dejar de actualizar todas».
 - **S25. El ícono de bandeja no debe morir al cerrar una terminal.** «hay una terminal visible corriendo, seguro desaparece el icono al cerrar la terminal»; confirmado: «cerra la terminal y cerrro el icono, desaparecio el icono».
 - **S26. Ajustes del tablero tras el uso real.** «cada vez que presiono el botón verde de merge, el botón se pone inactivo por unos segundos, que esta bien, pero enseguida se pone como activa devuelta por 1 segundo y después la tarjeta se cambia de lugar»; «no podemos unificar en una columna sola los OPEN PRS y READY TO MERGE, diferenciando solo con el estado de la tarjeta? que los que están ready to merge esten arriba primero y los open prs en proceso abajo?»; «las columna clean podemos dejar devuelta visible, quedo feo mostrar minimizado».
+- **S27. Preguntas de la sesión que el panel no ve.** «que podemos hacer cuando esta en estado working con estado changes y aparece esta clase de preguntas en la sesión y no visualizamos en el panel ese pedido y no podemos saber que sucedió y podemos esperar horas sin saber que paso»; decisión: «podes avanzar sin ese cambio e ir acumulando casos y despues analizamos la mejor manera de resolver»; y «como te dire registra la pregunta si el chat desaparece y solo se ve la pregunta de opciones de si o no?». La grabadora responde esto último; el arreglo de fondo queda como RP30.
 
 ## Tasks
 
@@ -65,7 +66,9 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 | RP25 | S23 | worker acotado con reglas de seguridad; columna Merged, barra Idle plegable, columna Needs attention y preferencia reversible; verificado en Edge real | PR #46 (2931a19) |
 | RP26 | S24 | en línea (unidad chica); RED primero; icono de Refresh gira, sin flechita en tarjetas; verificado en Edge real | PR #44 (b6a46b1) |
 | RP27 | S25 | en línea (unidad chica); RED primero; la tarea de la bandeja usa conhost --headless; mecanismo probado con un ícono mínimo; reinstalar la tarea real queda para la persona | PR #47 (5de00d4) |
-| RP28 | S26 | worker acotado con reglas de seguridad; merge sin parpadeo, columna Pull requests con los listos arriba, Clean visible por defecto; verificado en Edge real y con captura propia | pendiente de commit |
+| RP28 | S26 | worker acotado con reglas de seguridad; merge sin parpadeo, columna Pull requests con los listos arriba, Clean visible por defecto; verificado en Edge real y con captura propia | PR #48 (2fc7578) |
+| RP29 | S27 | worker acotado con reglas de seguridad (sin git push); grabadora pasiva `piScreenQuestionish` + `server/casos.js`, instalada solo desde server.js; se saca el widget de consumo; verificado con un orca falso | pendiente de commit |
+| RP30 | S27 | POSTERGADA por la persona hasta acumular casos: reconocer la familia de diálogos, detector de «sin progreso visible», ver las últimas líneas desde la tarjeta, aviso en el título de la pestaña | pendiente |
 
 Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a → RP11b → RP12a → RP12b → RP12 → RP13 → RP14. RP12 puede ir antes de RP11 si la persona lo prefiere.
 
@@ -374,3 +377,26 @@ Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a →
 > - y las columna clean podemos dejar devuelta visible, quedo feo mostrar minimizado.
 
 *Aplicado: RP28; se decidió unificar las dos columnas.*
+
+**L42.**
+
+> - que podemos hacer cuando esta en estado working con estado changes y aparece esta clase de preguntas en la sesión y no visualizamos en el panel ese pedido y no podemos saber que sucedió y podemos esperar horas sin saber que paso.
+> C:UsersictorAppDataLocalTemporca-paste-1792975995438-f9b62d04-4e05-4a8b-b589-4a8b59efb796.png
+
+*Aplicado: diagnóstico con las funciones reales del panel sobre el texto de la captura; propuesta de RP30.*
+
+**L43.**
+
+> podes avanzar sin ese cambio e ir acumulando casos y despues analizamos la mejor manera de resolver, cada vez que suce te indico para que registres la ultima pregunta que se hizo. o saco captura devuelta y te paso despues. pero si vos mismo tenes como leer en el registro de esta sesion cuales fueron las ultimas preguntas que se hizo?
+
+*Aplicado: se buscó la pregunta en la transcripción y en el registro de pi (no queda escrita); se creó `.panel/CASOS-preguntas-de-sesion.md` con el caso 1; RP30 postergada.*
+
+**L44.**
+
+> pero como te dire 'registra la pregunta' si el chat desaparece y solo se ve la pregunta de opciones de si o no?
+
+> si, podes hacer, con eso podemos captar mas cosas e ir analizando cada tando para solucionar problemas futuros que aparezcan? y como te aviso que revise la grabacion?
+
+> esta parte de la linea no es necesario considerar porque es un widgets que mustra el consumo de claude: 5h 15% ↻lun 01:50 · 7d 37% ↻jue 11:00
+
+*Aplicado: RP29 (la grabadora); el widget de consumo se descarta de lo guardado.*
