@@ -12,7 +12,7 @@ const S = {
   dismissed: new Set(), menu: null, reqPassOpen: {},
   group: '', q: '', queue: [], queueKey: '', queueSeq: 0,
   conf: { items: [], ok: 0, loaded: false, failed: false, key: '', seq: 0 }, confOpen: false,
-  req: {}, reqSeq: {}, state: {}, stateSeq: {}, sent: {}, pistatus: {}, pistatusSeq: {}, live: {}, liveBusy: {}, pitail: {}, piask: {}, tailFor: {}, finishing: {}, showCommit: new Set(), prereq: { state: 'loading', items: [], seq: 0 },
+  req: {}, reqSeq: {}, state: {}, stateSeq: {}, sent: {}, pistatus: {}, pistatusSeq: {}, live: {}, liveBusy: {}, liveAnswered: {}, dirtyAt: {}, sending: {}, pitail: {}, piask: {}, tailFor: {}, finishing: {}, showCommit: new Set(), prereq: { state: 'loading', items: [], seq: 0 },
   rooms: [], roomIssues: [], roomData: { state: 'loading', data: null }, roomSeq: 0,
   prefs: store('prefs', { method: 'squash', del: true }),
   lastRefresh: 0, lastAt: {}, scan: [],
@@ -79,7 +79,23 @@ function track(id, p) {
 }
 
 // `poll: false` leaves the pi session status alone (the status poll itself refreshes the repo when a session finishes).
-const loadLocal = (id) => track(id, pooled(() => api(`/api/local?id=${id}`)).then((d) => { S.local[id] = d; }, (e) => { S.local[id] = { error: e.message }; }));
+const loadLocal = (id) => track(id, pooled(() => api(`/api/local?id=${id}`)).then((d) => { S.local[id] = d; noteLocal(id); }, (e) => { S.local[id] = { error: e.message }; }));
+
+// A repo seen dirty for the first time starts the checking of its pi session (view.js liveSession) and asks for the live
+// state at once, so the commit button is never enabled while the answer is still due. A repo that turns clean forgets
+// both, so its next dirty spell is checked again. An errored read changes nothing.
+function noteLocal(id) {
+  const l = S.local[id];
+  if (!l || l.error || !Array.isArray(l.files)) return;
+  if (!l.files.length) { delete S.dirtyAt[id]; delete S.liveAnswered[id]; return; }
+  if (S.dirtyAt[id] !== undefined) return;
+  S.dirtyAt[id] = Date.now();
+  if (!S.sent[id]) loadLive(id);
+  setTimeout(draw, (V ? V.LIVE_CHECK_MS : 20000) + 50); // the hold ends by itself: redraw once it has
+}
+
+// The session state the buttons of a repo see (S.sent has its own verdict): the live answer, or 'checking' until it comes.
+const sessionOf = (id) => (V ? V.liveSession({ sent: S.sent[id], live: S.live[id], answered: S.liveAnswered[id], dirtyAt: S.dirtyAt[id] }) : S.sent[id] ? undefined : S.live[id]);
 const loadPrs = (id) => track(id, pooled(() => api(`/api/prs?id=${id}`)).then((d) => { S.prs[id] = d; wakeReady(id, d); }, (e) => { S.prs[id] = { error: e.message }; }));
 
 // When each kind of data of a repo was last asked for: the periodic tick (refreshTick) plans from it.
@@ -139,7 +155,9 @@ function loadLive(id) {
   if (S.liveBusy[id]) return Promise.resolve();
   S.liveBusy[id] = true;
   const set = (state) => {
-    if (S.sent[id] || S.live[id] === state) return;
+    const first = !S.liveAnswered[id];
+    S.liveAnswered[id] = true; // the first answer, success or failure, ends the 'checking' hold
+    if (S.sent[id] || (!first && S.live[id] === state)) return;
     if (state === undefined) delete S.live[id]; else S.live[id] = state;
     draw();
   };
@@ -150,6 +168,7 @@ function loadLive(id) {
 // redraws when a repo is inside the quiet period, so the button enables itself once that ends.
 let quietNow = {}; // which polled repos were inside the quiet period at the last tick
 function pollLive() {
+  if (document.hidden) return; // a hidden tab keeps what it knew: forgetting it would reopen the window with the button enabled
   const ids = V ? V.piPollTargets({ ids: allRepos().map((r) => r.id), local: S.local, sent: S.sent, hidden: document.hidden }) : [];
   for (const id of Object.keys(S.live)) if (!ids.includes(id)) delete S.live[id];
   ids.forEach(loadLive);
@@ -550,6 +569,8 @@ function placement(l, p, prCount, verdict) {
 // puts it. Judged from Git and the session state, never from terminal text; the panel does not judge the quality of
 // the commits.
 function verdictOf(r) {
+  // The order is still on its way to the session: the repo already behaves as if the command were running.
+  if (S.sending[r.id] && V) return V.sendingVerdict(S.sending[r.id]);
   const sent = S.sent[r.id];
   if (!sent || !V) return null;
   const v = V.flowVerdict(sent, S.local[r.id], S.pistatus[r.id], S.prs[r.id]);
@@ -778,8 +799,8 @@ function repoCard(r, attn = false, verdict = null) {
   const commitVerdict = verdict && COMMIT_CMDS.includes(verdict.cmd) ? verdict.state : null;
   const running = verdict && verdict.state === 'running' ? { cmd: verdict.cmd, label: verdict.label } : null;
   const retry = commitVerdict === 'attention';
-  const flow = V ? V.flowButtons(l, p, S.state[r.id], { override, verdict: commitVerdict, running, retry, session: S.sent[r.id] ? undefined : S.live[r.id] }) : dirty ? [{ cmd: 'flow-commit', label: '/flow-commit' }] : [];
-  const overrideItem = !manual && dirty && V ? V.commitOverrideItem(S.state[r.id], { override, stale: !!p.stale, session: S.sent[r.id] ? undefined : S.live[r.id] }) : null;
+  const flow = V ? V.flowButtons(l, p, S.state[r.id], { override, verdict: commitVerdict, running, retry, session: sessionOf(r.id) }) : dirty ? [{ cmd: 'flow-commit', label: '/flow-commit' }] : [];
+  const overrideItem = !manual && dirty && V ? V.commitOverrideItem(S.state[r.id], { override, stale: !!p.stale, session: sessionOf(r.id) }) : null;
   const chips = [];
   if (dirty) chips.push(`<button class="chip yellow chip-btn" data-act="diff" data-id="${r.id}" title="View diff">● ${l.files.length} file${l.files.length === 1 ? '' : 's'} <span class="add">+${l.added}</span> <span class="del">−${l.deleted}</span></button>`);
   if (unpushed) chips.push(`<span class="chip blue">↑ ${l.ahead} unpushed${l.noUpstream ? ' · no upstream' : ''}</span>`);
@@ -946,7 +967,10 @@ const ACTIONS = {
   'conformity': () => openConformity(),
   'pi': async (el) => {
     const { id, cmd, pr } = el.dataset;
+    if (S.sending[id]) return; // a second click while the first order is on its way never sends another
+    S.sending[id] = cmd;
     el.disabled = true;
+    draw();
     try {
       // The baseline of the verdict is read fresh, right before sending, so a stale card cannot fake "HEAD changed".
       const judged = JUDGED_CMDS.includes(cmd);
@@ -958,8 +982,11 @@ const ACTIONS = {
       } else if (!judged && d.sent) startSent(id, { cmd, at: Date.now() });
       const what = cmd === 'fix-pr' ? `the fix order for #${pr}` : cmd === 'flow-base-stash' ? '/flow-base --stash' : `/${cmd}`;
       toast(d.confirmed ? `Sent ${what} to pi` : `Sent ${what}, not confirmed: check the pi session`, d.confirmed ? 'ok' : '');
-    } catch (e) { toast(e.message, 'bad'); }
-    el.disabled = false;
+    } catch (e) { toast(e.message, 'bad'); } finally {
+      delete S.sending[id];
+      el.disabled = false;
+      draw();
+    }
   },
   'room-dialog': () => {
     S.menu = null;
@@ -1080,7 +1107,9 @@ setInterval(() => {
 setInterval(() => refreshTick(), 2000);
 setInterval(pollLive, 10000);
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden && Date.now() - S.lastRefresh > 30000) refreshAll();
+  if (document.hidden) return;
+  pollLive();
+  if (Date.now() - S.lastRefresh > 30000) refreshAll();
 });
 
 (async () => {

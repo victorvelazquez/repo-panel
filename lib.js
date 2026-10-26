@@ -489,13 +489,16 @@ function piScreenState(preview) {
 }
 
 // Whether the screen is a selection dialog waiting for the user's answer: within the last 14 non-empty lines there
-// is a footer line holding BOTH `Enter confirm` and `Esc cancel`. Returns { text } (the last up to 12 non-empty lines,
+// is ONE footer line (at most 140 characters, case-insensitive) holding a key (`enter`, `return`) next to an action
+// (`confirm`, `select`, `submit`, `accept`), an exit key (`esc`, `escape`, `ctrl+c`) and `cancel`, as in
+// `Enter confirm  Esc cancel` or `↑↓ navigate  enter select  escape/ctrl+c cancel`. Returns { text } (the last up to 12 non-empty lines,
 // control characters replaced by a space, 200 characters per line, 900 in all) or null. Anything else fails closed.
 // Informational only: the panel shows a notice and never answers the dialog.
 function piScreenAsk(preview) {
   if (typeof preview !== 'string') return null;
   const lines = preview.split('\n').map((l) => l.replace(/[\x00-\x1f\x7f-\x9f\u2028\u2029]/g, ' ').trim()).filter(Boolean);
-  if (!lines.slice(-14).some((l) => l.includes('Enter confirm') && l.includes('Esc cancel'))) return null;
+  const footer = (l) => l.length <= 140 && /\b(enter|return)\b\W{0,4}(to\s+)?(confirm|select|submit|accept)\b/i.test(l) && /\b(esc|escape)\b|ctrl\+c/i.test(l) && /\bcancel\b/i.test(l);
+  if (!lines.slice(-14).some(footer)) return null;
   return { text: lines.slice(-12).map((l) => l.slice(0, 200)).join('\n').slice(0, 900) };
 }
 
