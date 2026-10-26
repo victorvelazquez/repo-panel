@@ -1021,13 +1021,19 @@ const ACTIONS = {
   'toggle-warning': (el) => { S.menu = null; return setDismissed(el.dataset.id, !S.dismissed.has(el.dataset.id)); },
   // The server builds the order from the repo's requirements; `confirmed` only means the prompt left idle.
   'put-in-conditions': async (el) => {
+    const id = el.dataset.id;
     S.menu = null;
+    if (S.sending[id]) { draw(); return; } // a second click while an order of this repo is on its way never sends another
+    S.sending[id] = 'put-in-conditions'; // the repo behaves as if the command were running from the click until the answer
     draw();
     try {
-      const d = await api('/api/pi', { id: el.dataset.id, command: 'put-in-conditions' });
-      if (d.sent) startSent(el.dataset.id, { cmd: 'put-in-conditions', at: Date.now() });
+      const d = await api('/api/pi', { id, command: 'put-in-conditions' });
+      if (d.sent) startSent(id, { cmd: 'put-in-conditions', at: Date.now() });
       toast(d.confirmed ? 'Sent the put-in-conditions order to pi' : 'Sent the put-in-conditions order, not confirmed: check the pi session', d.confirmed ? 'ok' : '');
-    } catch (e) { toast(e.message, 'bad'); }
+    } catch (e) { toast(e.message, 'bad'); } finally {
+      delete S.sending[id];
+      draw();
+    }
   },
   'merge': (el) => doMerge(el.dataset.id, Number(el.dataset.n)),
   'queue-pick': (el) => {

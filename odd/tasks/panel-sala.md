@@ -37,6 +37,7 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 - **S27. Preguntas de la sesión que el panel no ve.** «que podemos hacer cuando esta en estado working con estado changes y aparece esta clase de preguntas en la sesión y no visualizamos en el panel ese pedido y no podemos saber que sucedió y podemos esperar horas sin saber que paso»; decisión: «podes avanzar sin ese cambio e ir acumulando casos y despues analizamos la mejor manera de resolver»; y «como te dire registra la pregunta si el chat desaparece y solo se ve la pregunta de opciones de si o no?». La grabadora responde esto último; el arreglo de fondo queda como RP30.
 - **S28. La grabación no debe depender de la página.** «la grabacion solo se hara sobre el repo de repo-panel o sobre los otros repos tambien?» y, ante la propuesta de que el servidor mire solo: «podes mejorar».
 - **S29. Los botones no deben abrirse antes de tiempo.** «sucede todavía de que el botón /flow-commit se habilita en la tarjeta sin que se haya terminado la implementación»; «también sigue habilitado el botón commit cuando se esta esperando un si o no en el chat de la sesión»; «cuando presiono el botón de los comandos /flow-* normalmente no deshabilita el botón con la acciona y se siente como que no funciono el botón y presiono mas de una vez».
+- **S30. «Put in conditions» sin doble clic.** Tras el informe de RP32 sobre ese botón: «podes arreglear tambien».
 
 ## Tasks
 
@@ -72,7 +73,8 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 | RP29 | S27 | worker acotado con reglas de seguridad (sin git push); grabadora pasiva `piScreenQuestionish` + `server/casos.js`, instalada solo desde server.js; se saca el widget de consumo; verificado con un orca falso | PR #49 (2ca4c27) |
 | RP30 | S27 | POSTERGADA por la persona hasta acumular casos: reconocer la familia de diálogos, detector de «sin progreso visible», ver las últimas líneas desde la tarjeta, aviso en el título de la pestaña | pendiente |
 | RP31 | S28 | worker acotado con reglas de seguridad (sin git push); vigía del servidor `server/vigia.js`, se arranca solo desde server.js con grabadora; costo medido con orca real; verificado con orca falso y sin llamadas a la API | PR #50 (267adfe) |
-| RP32 | S29 | worker acotado con reglas de seguridad; reproducido en el panel real; hueco de la primera consulta, familia de pies en piScreenAsk y estado «enviando» desde el clic; verificado en Edge real con orca falso | pendiente de commit |
+| RP32 | S29 | worker acotado con reglas de seguridad; reproducido en el panel real; hueco de la primera consulta, familia de pies en piScreenAsk y estado «enviando» desde el clic; verificado en Edge real con orca falso | PR #51 (1d9a060) |
+| RP33 | S30 | en línea (unidad chica, calcada de RP32); RED primero (4 de 8); el manejador put-in-conditions usa S.sending | pendiente de commit |
 
 Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a → RP11b → RP12a → RP12b → RP12 → RP13 → RP14. RP12 puede ir antes de RP11 si la persona lo prefiere.
 
@@ -427,3 +429,10 @@ Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a →
 > - también cuando presiono el botón de los comandos /flow-* normalmente no deshabilita el botón con la acciona y se siente como que no funciono el botón y presiono mas de una vez, siendo si se envió ya la orden y en unos segundos recién se deshabilita el botón.
 
 *Aplicado: se borraron las ramas de RP29 y RP31, se cerró el proceso sobrante del puerto 57934 y se hizo RP32.*
+
+**L47.**
+
+> 1. borrar.
+> 2. podes arreglear tambien.
+
+*Aplicado: se borró la rama local de RP32 y se hizo RP33 (el botón «Put in conditions»).*
