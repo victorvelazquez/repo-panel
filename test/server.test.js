@@ -678,7 +678,7 @@ test('GET /api/requirements: a conforming base branch passes the required ones; 
       'roadmap-header': 'pass', 'roadmap-table': 'pass', 'ciclo-block': 'fail', 'adoption-record': 'pass', 'padron-record': 'pass',
       'estado-block': 'fail', 'panel-ignored': 'fail',
     });
-    assert.deepEqual(r.json.summary, { required: { pass: 9, total: 9 }, recommended: { pass: 1, total: 4 }, ready: true });
+    assert.deepEqual(r.json.summary, { required: { pass: 9, total: 10 }, recommended: { pass: 1, total: 3 }, ready: false });
     assert.ok(r.json.results.every((x) => typeof x.remedy === 'string' && x.remedy));
   });
 });
@@ -712,7 +712,7 @@ test('GET /api/state: missing, then a valid file, then an invalid one; /api/loca
 });
 
 test('GET /api/requirements: estado-block reads the panel block from the base branch, panel-ignored asks the local Git', async () => {
-  const PANEL = '# Rules\n<!-- panel:estado v1.0 -->\nrules\n<!-- /panel:estado -->\n';
+  const PANEL = '# Rules\n<!-- panel:estado v1.0 -->\nrules\n<!-- /panel:estado -->\n<!-- orquestacion:ciclo v1.0 -->\nrules\n<!-- /orquestacion:ciclo -->\n';
   const repo = originAndClone({ 'AGENTS.md': REG_BLOCK + PANEL, 'docs/ROADMAP.md': HEADER + rows(['A1', 'Pendiente']), 'docs/ORQUESTACION.md': ORQ });
   await withRepoPanel(repo, async ({ getApi, id }) => {
     const before = statuses((await getApi(`/api/requirements?id=${id}`)).json);
@@ -1034,12 +1034,12 @@ test('GET /api/requirements: a room member also gets the member-only results and
       assert.equal(s['ciclo-block'], 'fail');
       assert.equal(m.results.find((x) => x.id === 'ciclo-block').level, 'required');
       assert.equal(m.summary.ready, false);
-      // A repo outside every room: same keys, same results (no sala-region, ciclo-block stays recommended), no room field.
+      // A repo outside every room: same keys, same results (no sala-region; ciclo-block is required for everybody since RP44), no room field.
       const o = (await getApi(`/api/requirements?id=${lib.repoId(outside.work)}`)).json;
       assert.deepEqual(Object.keys(o), ['available', 'base', 'results', 'summary']);
       assert.deepEqual(o.results.map((x) => x.id), ['base-branch', 'agents-file', 'registro-block', 'tareas-block', 'entrega-block', 'roadmap-file', 'roadmap-header', 'roadmap-table', 'ciclo-block', 'adoption-record', 'padron-record', 'estado-block', 'panel-ignored']);
-      assert.equal(o.results.find((x) => x.id === 'ciclo-block').level, 'recommended');
-      assert.deepEqual(o.summary, { required: { pass: 9, total: 9 }, recommended: { pass: 2, total: 4 }, ready: true });
+      assert.equal(o.results.find((x) => x.id === 'ciclo-block').level, 'required');
+      assert.deepEqual(o.summary, { required: { pass: 10, total: 10 }, recommended: { pass: 1, total: 3 }, ready: true });
     });
   } finally { for (const r of [member, outside]) fs.rmSync(r.tmp, { recursive: true, force: true }); }
 });

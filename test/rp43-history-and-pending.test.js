@@ -50,7 +50,7 @@ test('the remedy of padron-record no longer carries a fixed version number (it w
 // ---------- the tareas block: verify when the row is taken ----------
 test('the tareas block says that a row marked "sin verificar" is verified BEFORE it is taken, with evidence and the person OK', () => {
   const b = TAREAS();
-  assert.ok(b.includes(`«${MARK}»`), 'the block keys on the marker');
+  assert.ok(b.includes(`«Migrada; ${MARK}»`), 'the block keys on the marker');
   assert.match(b, /verificá si ya está hecha/);
   for (const proof of ['PR fusionados', 'commits', 'pruebas que pasan', 'recibos']) assert.ok(b.includes(proof), proof);
   assert.match(b, /ya está hecha, si falta o si no se puede saber/);

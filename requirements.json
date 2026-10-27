@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "padron": "1.1",
-  "blocks": { "registro": "1.0", "ciclo": "1.0", "estado": "1.0", "tareas": "1.1", "entrega": "1.0" },
+  "padron": "1.2",
+  "blocks": { "registro": "1.0", "ciclo": "1.0", "estado": "1.0", "tareas": "1.2", "entrega": "1.0" },
   "requirements": [
     {
       "id": "base-branch",
@@ -71,8 +71,7 @@
       "id": "ciclo-block",
       "title": "Orquestación 'ciclo' block in AGENTS.md",
       "category": "verificable",
-      "level": "recommended",
-      "levelInRoom": "required",
+      "level": "required",
       "check": { "type": "block", "file": "agents", "name": "ciclo" },
       "remedy": "Add the Orquestación 'ciclo' block (version 1.0) to AGENTS.md exactly as in requirements/blocks/ciclo.md, between <!-- orquestacion:ciclo v1.0 --> and <!-- /orquestacion:ciclo -->; if AGENTS.md has rules that conflict, stop and ask the user."
     },
