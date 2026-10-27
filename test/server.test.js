@@ -644,9 +644,10 @@ test('GET /api/local reports the staged files next to the unchanged fields, and 
 });
 
 // ---------- /api/requirements and /api/prerequisites ----------
-const REG_BLOCK = '# Rules\n<!-- orquestacion:registro v1.0 -->\nrules\n<!-- /orquestacion:registro -->\n<!-- panel:tareas v1.0 -->\nrules\n<!-- /panel:tareas -->\n<!-- panel:entrega v1.0 -->\nrules\n<!-- /panel:entrega -->\n';
+const CURRENT_RULES = require('../requirements.json'); // the versions come from the registry, never written by hand
+const REG_BLOCK = `# Rules\n<!-- orquestacion:registro v${CURRENT_RULES.blocks.registro} -->\nrules\n<!-- /orquestacion:registro -->\n<!-- panel:tareas v${CURRENT_RULES.blocks.tareas} -->\nrules\n<!-- /panel:tareas -->\n<!-- panel:entrega v${CURRENT_RULES.blocks.entrega} -->\nrules\n<!-- /panel:entrega -->\n`;
 // RP41: the adoption record of a repo that meets everything names the padrón of the panel.
-const ORQ = '# Adopción\n\n- **Padrón del panel:** 1.0\n';
+const ORQ = `# Adopción\n\n- **Padrón del panel:** ${CURRENT_RULES.padron}\n`;
 const HEADER = '**Dónde está:** a\n**Qué sigue:** b\n**Qué lo bloquea:** c\n\n';
 const statuses = (json) => Object.fromEntries(json.results.map((r) => [r.id, r.status]));
 
