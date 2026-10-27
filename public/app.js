@@ -6,6 +6,18 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 const V = window.RepoPanelView || null;
 const store = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
 
+// RP47: a region is written only when its HTML changed. The board was replaced on every redraw (about 150 times a minute at
+// rest, because every read of every repo redraws when it starts and when it ends), and a press that spans a replacement
+// loses its target: the `click` never fires. Whatever else writes into one of these elements must go through `paint` too, or
+// the cache would hide the next identical paint.
+const painted = new WeakMap();
+function paint(el, html) {
+  if (painted.get(el) === html) return false;
+  el.innerHTML = html;
+  painted.set(el, html);
+  return true;
+}
+
 const S = {
   groups: [], local: {}, prs: {}, roadmap: {}, rmOpen: {}, loading: {}, busy: {},
   snoozed: new Set(), keepSnoozed: new Set(), snoozedOpen: {}, onlyProblems: false,
@@ -381,11 +393,11 @@ function drawQueue() {
   refreshQueue();
   const el = $('#queue');
   el.hidden = !S.queue.length;
-  el.innerHTML = S.queue.length ? `<strong>Go work on</strong>${S.queue.slice(0, QUEUE_MAX).map((a) => {
+  paint(el, S.queue.length ? `<strong>Go work on</strong>${S.queue.slice(0, QUEUE_MAX).map((a) => {
     const text = `${a.name} · ${QUEUE_TEXT[a.kind](a)}`;
     const title = QUEUE_TITLE[a.kind] ? `${a.name} · ${QUEUE_TITLE[a.kind](a)}` : text;
     return `<button class="chip chip-btn ${QUEUE_COLOR[a.kind]}" data-act="queue-pick" data-name="${esc(a.name)}" title="${esc(title)}">${esc(text)}</button>`;
-  }).join('')}${S.queue.length > QUEUE_MAX ? `<span class="muted">+${S.queue.length - QUEUE_MAX} more</span>` : ''}` : '';
+  }).join('')}${S.queue.length > QUEUE_MAX ? `<span class="muted">+${S.queue.length - QUEUE_MAX} more</span>` : ''}` : '');
 }
 
 // ---------- conformity ----------
@@ -515,7 +527,7 @@ function drawConformity() {
   const sum = v.summary ? `<div class="conf-sum">${esc(v.summary)}</div>` : '';
   const body = v.state === 'issues' ? S.conf.items.map(confBlock).join('') : `<div class="${v.state === 'error' ? 'conf-error' : 'empty'}">${esc(v.message)}</div>`;
   const reqs = V ? `<div class="conf-heading">Requirements</div>${allRepos().map(reqBlock).join('')}${roomsBlock()}` : '';
-  $('#drawerBody').innerHTML = sum + prereqBlock() + body + reqs;
+  paint($('#drawerBody'), sum + prereqBlock() + body + reqs);
 }
 
 function openConformity() {
@@ -528,6 +540,21 @@ function openConformity() {
 // ---------- board ----------
 let raf = 0;
 function draw() { if (!raf) raf = requestAnimationFrame(() => { raf = 0; render(); }); }
+
+// RP47: while a press is held (pointerdown until pointerup), a redraw waits for the release and then runs once, so what is
+// under the pointer is never replaced between the press and the release. A lost release (the pointer let go outside the
+// window, a drag) cannot freeze the page: after PRESS_MAX_MS the redraw runs anyway.
+const PRESS_MAX_MS = 1500;
+let pressedAt = 0;
+let renderWaiting = false;
+const pressHeld = () => !!pressedAt && Date.now() - pressedAt < PRESS_MAX_MS;
+function releasePress() {
+  pressedAt = 0;
+  if (renderWaiting) { renderWaiting = false; draw(); }
+}
+document.addEventListener('pointerdown', () => { pressedAt = Date.now(); }, true);
+document.addEventListener('pointerup', releasePress, true);
+document.addEventListener('pointercancel', releasePress, true);
 
 const COLUMNS = [
   { key: 'attention', title: 'Needs attention', hint: 'A manual action or a failed /flow-commit: a person has to step in' },
@@ -628,11 +655,12 @@ function snoozedBlock(key, rows) {
 }
 
 function render() {
+  if (pressHeld()) { renderWaiting = true; return; } // RP47: wait for the release, then draw once
   syncRefreshIcon();
   drawQueue();
   drawConformity();
   if (!allRepos().length) {
-    $('#app').innerHTML = '<div class="empty">No repositories yet.<br><br><button class="primary" data-act="add-dialog">+ Add your first repo</button></div>';
+    paint($('#app'), '<div class="empty">No repositories yet.<br><br><button class="primary" data-act="add-dialog">+ Add your first repo</button></div>');
     return;
   }
   const { cols, parked, idle, problems } = buildCards();
@@ -640,11 +668,11 @@ function render() {
   alerts.hidden = !problems && !S.onlyProblems;
   alerts.textContent = `⚠ ${problems}`;
   alerts.classList.toggle('active', S.onlyProblems);
-  $('#app').innerHTML = `<div class="board">${boardKeys(cols.attention.length).map((k) => COLUMN_BY_KEY[k]).map((c) => `
+  paint($('#app'), `<div class="board">${boardKeys(cols.attention.length).map((k) => COLUMN_BY_KEY[k]).map((c) => `
     <section class="col col-${c.key}">
       <div class="col-head" title="${esc(c.hint)}"><h2>${c.title}</h2><span class="n">${cols[c.key].length}</span></div>
       <div class="col-body">${cols[c.key].join('') || (parked[c.key].length ? '' : '<div class="col-empty">—</div>')}${snoozedBlock(c.key, parked[c.key])}</div>
-    </section>`).join('')}</div>${idleBar(idle)}`;
+    </section>`).join('')}</div>${idleBar(idle)}`);
 }
 
 // The Idle bar under the board: the compact rows of repos with nothing to do, closed by default (a preference, so it
@@ -887,14 +915,14 @@ async function openDiff(id) {
   S.confOpen = false;
   const l = S.local[id] || {};
   $('#drawerTitle').textContent = `${nameOf(id)} · ${l.branch || ''}`;
-  $('#drawerBody').innerHTML = '<div class="empty">Loading diff…</div>';
+  paint($('#drawerBody'), '<div class="empty">Loading diff…</div>');
   $('#drawer').hidden = false;
   try {
     const d = await api(`/api/diff?id=${id}`);
     const list = (l.files || []).map((f) => `<div><span class="st">${esc(f.status)}</span><span>${esc(f.path)}</span>
       <span class="add">${f.binary ? 'bin' : '+' + f.added}</span><span class="del">${f.binary ? '' : '−' + f.deleted}</span></div>`).join('');
-    $('#drawerBody').innerHTML = `<div class="filelist">${list}</div>${d.truncated ? '<div class="err">Diff truncated (too large).</div>' : ''}${renderDiff(d.diff)}`;
-  } catch (e) { $('#drawerBody').innerHTML = `<div class="err">${esc(e.message)}</div>`; }
+    paint($('#drawerBody'), `<div class="filelist">${list}</div>${d.truncated ? '<div class="err">Diff truncated (too large).</div>' : ''}${renderDiff(d.diff)}`);
+  } catch (e) { paint($('#drawerBody'), `<div class="err">${esc(e.message)}</div>`); }
 }
 
 // ---------- actions ----------
