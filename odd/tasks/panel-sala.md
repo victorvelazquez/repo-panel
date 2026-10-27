@@ -48,6 +48,7 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 - **S38. El estándar completo: entrega, padrón y un solo AGENTS.md.** «debemos proibir a los repos agregando en sus agents.md prohibir hacer commit por otros medios que no sea por /flow-commit»; «debe ser solo sobre tareas»; «versiona»; «para nuestros proyecto solo ya cuenta AGENTS.md y los otros ya son obsoletos»; «vamos a aplicar en todos los repos» (vista global, RP42); «hay excepciones como el de no hacer test en tecnomyl, pero podriamos retomar eso»; «el resto me cierra totalmente, todos tus propuestan esta bien».
 - **S39. Historial y pendientes «sin verificar».** «lo que podriamos hacer es dejar como historial e importar lo que falta hacer todavia si es que valen la pena todavia»; «pero dificil que yo sepa si las tareas ya se implementaron o no… podemos dejar como pendietes y despues cuando se intente aplicar se verificara»; «quiero que hagas ya la correccion y aplicamos a todas».
 - **S40. Padrón 1.2.** «no seria una limpiaza de registros viejos que ya se migraron a otros archivos acorde a lo que el panel requiere»; «agrega la decision del cliclo obligatorio para todos los repos». El `ciclo` es obligatorio para todos; el marcador es «Migrada; sin verificar» al principio de `Notas`; un índice viejo se reemplaza por un puntero tras pasar a la ficha lo que no es un estado; una fila que apunta a un archivo de instrucciones obsoleto se queda.
+- **S41. Archivos de instrucciones obsoletos con reglas técnicas.** «hace lo mas recomendado, y para proximos casos como tratamos eso?»; «registra rp46 con esa regla». Se compara por contenido; se mueve a `AGENTS.md` lo que falte, textual; no se copia la jerarquía de autoridad; se reescriben los punteros y las filas de «autoridad»; se registra en `docs/ORQUESTACION.md`; se pregunta solo ante una contradicción.
 
 ## Tasks
 
@@ -95,6 +96,7 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 | RP41 | S38 | en línea (bloques, chequeo, orden, instrucciones, ejemplos y pruebas); RED primero (29 de 39); 7 mutaciones en copias temporales; el refresco de la huella se niega a aceptar texto cambiado sin versión | PR #59 (22602ab) |
 | RP43 | S39 | en línea (bloque, instrucciones, ejemplos y pruebas); RED primero (10 de 11); 7 mutaciones; huella aceptada sin force por la subida de versión | pendiente de commit |
 | RP44 | S40 | en línea (bloque, instrucciones, requisito y pruebas); RED primero (7 de 9); huella aceptada sin force por la subida de versión | pendiente de commit |
+| RP46 | S41 | registrada, sin implementar | pendiente |
 
 Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a → RP11b → RP12a → RP12b → RP12 → RP13 → RP14. RP12 puede ir antes de RP11 si la persona lo prefiere.
 
@@ -593,3 +595,26 @@ Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a →
 > y que te parece que exita un boton de play o ejecutar siguiente tarea en la tarjeta del repo en el panel cuanto esta en rama base limpia en estado disponible para empezar un nuevo ciclo?
 
 *Aplicado: RP44. El botón de «siguiente» en la tarjeta queda como idea, sin decidir.*
+
+**L59.**
+
+> ampliemos la idea sobre el boton siguiente:
+> - y que tal si hacemos un comando /flow-new que ejecute la skill flow-new y tenga toda una regla sobre busvar la siguiente tarea y si todo esta acorde o lo planificado y si podra avanzar normal que avance con la implementacion o debe mostrar un resumen de la tarea y lo que hara para su confirmacion a implementacion?
+>
+> - si, debe vivir en flow-skills, y te autorizo a escribir en ese repositorio, cuando este hago el commit y pr de esa repo con el boton del panel ejecutando.
+> - si, debe ir en el panel /flow-new o next? creo que me confundi, debe ser next en vez de new? que nombre le darias tu de acuerdo a la funcion que cumple?
+>
+> el /flow-next no aparece todavia como comando en gentle shell, debemos agregar en el settings
+>
+> - ids, los nuestros.
+> - vamos a probar enseguida.
+> - podes cambiar.
+> - podes borrar todas.
+> - mas adelante consultaremos la grabado o ya acumulo mucho?
+> - ya esta aplicado en cross.pushnotifications, podes revisar que tal fue y que aprendemos.
+>
+> hace lo mas recomendado, y para proximos casos como tratamos eso?
+>
+> registra rp46 con esa regla
+
+*Aplicado: skill `flow-next` en `flow-skills` (FS5, PR #75) y su alta en el `settings.json` de Gentle Shell; las 12 ramas viejas de `repo-panel` borradas; la cadena `L1→…→L6` de `pi-usage-audit` pasada a `—`; reglas técnicas de `copilot-instructions.md` movidas a `AGENTS.md` de `CROSS.PushNotifications`; RP46 registrada como Pendiente. Decisión: los IDs de fila son los nuestros.*
