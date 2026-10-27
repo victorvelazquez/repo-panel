@@ -47,6 +47,7 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 - **S37. Un solo mecanismo de tareas.** «pero yo quiero que se adopte en todos los proyectos el mismo mecanismo de trabajo. quiero abandonar la manera vieja y tener un padron unificado de trabajo»; «quiero abandonar totalmente cualquier otra practica de crear y gestionar las tareas, tambien si tiene instrucciones en el agents.md de seguir como crear tarea quiero que se olvide e implemente el nuevo mecanismo de generar tareas. que de deje bien explicito el nuevo mecanismo. que deben ser.»; y después: «no, las reglas de ramas y commits, y prs quiero que siga de acuerdo al panel».
 - **S38. El estándar completo: entrega, padrón y un solo AGENTS.md.** «debemos proibir a los repos agregando en sus agents.md prohibir hacer commit por otros medios que no sea por /flow-commit»; «debe ser solo sobre tareas»; «versiona»; «para nuestros proyecto solo ya cuenta AGENTS.md y los otros ya son obsoletos»; «vamos a aplicar en todos los repos» (vista global, RP42); «hay excepciones como el de no hacer test en tecnomyl, pero podriamos retomar eso»; «el resto me cierra totalmente, todos tus propuestan esta bien».
 - **S39. Historial y pendientes «sin verificar».** «lo que podriamos hacer es dejar como historial e importar lo que falta hacer todavia si es que valen la pena todavia»; «pero dificil que yo sepa si las tareas ya se implementaron o no… podemos dejar como pendietes y despues cuando se intente aplicar se verificara»; «quiero que hagas ya la correccion y aplicamos a todas».
+- **S40. Padrón 1.2.** «no seria una limpiaza de registros viejos que ya se migraron a otros archivos acorde a lo que el panel requiere»; «agrega la decision del cliclo obligatorio para todos los repos». El `ciclo` es obligatorio para todos; el marcador es «Migrada; sin verificar» al principio de `Notas`; un índice viejo se reemplaza por un puntero tras pasar a la ficha lo que no es un estado; una fila que apunta a un archivo de instrucciones obsoleto se queda.
 
 ## Tasks
 
@@ -93,6 +94,7 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 | RP40 | S37 | en línea (bloque, requisito, instrucciones y pruebas); RED primero (14 de 16); supera las pruebas de «frenar» de RP39; reescrita por RP41 antes de publicarse | PR #59 (22602ab) |
 | RP41 | S38 | en línea (bloques, chequeo, orden, instrucciones, ejemplos y pruebas); RED primero (29 de 39); 7 mutaciones en copias temporales; el refresco de la huella se niega a aceptar texto cambiado sin versión | PR #59 (22602ab) |
 | RP43 | S39 | en línea (bloque, instrucciones, ejemplos y pruebas); RED primero (10 de 11); 7 mutaciones; huella aceptada sin force por la subida de versión | pendiente de commit |
+| RP44 | S40 | en línea (bloque, instrucciones, requisito y pruebas); RED primero (7 de 9); huella aceptada sin force por la subida de versión | pendiente de commit |
 
 Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a → RP11b → RP12a → RP12b → RP12 → RP13 → RP14. RP12 puede ir antes de RP11 si la persona lo prefiere.
 
@@ -579,3 +581,15 @@ Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a →
 > quiero que hagas ya la correccion y aplicamos a todas
 
 *Aplicado: revisión de los cuatro repos ya adoptados (todos en 9 de 9 y 4 de 4) y de `CROSS.BackofficeApi` (frenó por un stash; parche movido fuera del repo) y RP43. La verificación de lo «sin verificar» queda como regla del bloque `tareas`; un botón del panel para pedirla queda abierto.*
+
+**L58.**
+
+> pero justamente queriamos evitar ya cualquier metodo de gestion de tareas antiguas. en tanto nos afecta eso? no seria una limpiaza de registros viejos que ya se migraron a otros archivos acorde a lo que el panel requiere y tambien con la manera nueva de dar seguimiento a las tareas?
+>
+> y esa mejora que sujeris como hacemos despues?
+>
+> agrega la decision del cliclo obligatorio para todos los repos. y una consulta mas, esta estructura de gestionar  de esta manera las tareas tambien sirven para implementar la siguiente tarea escribiendo en el chat la palabra 'siguiente' eso se incluira a todos los repos que tengas esa capasidad de 'siguiente'?
+>
+> y que te parece que exita un boton de play o ejecutar siguiente tarea en la tarjeta del repo en el panel cuanto esta en rama base limpia en estado disponible para empezar un nuevo ciclo?
+
+*Aplicado: RP44. El botón de «siguiente» en la tarjeta queda como idea, sin decidir.*
