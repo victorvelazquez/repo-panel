@@ -48,7 +48,7 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 - **S38. El estándar completo: entrega, padrón y un solo AGENTS.md.** «debemos proibir a los repos agregando en sus agents.md prohibir hacer commit por otros medios que no sea por /flow-commit»; «debe ser solo sobre tareas»; «versiona»; «para nuestros proyecto solo ya cuenta AGENTS.md y los otros ya son obsoletos»; «vamos a aplicar en todos los repos» (vista global, RP42); «hay excepciones como el de no hacer test en tecnomyl, pero podriamos retomar eso»; «el resto me cierra totalmente, todos tus propuestan esta bien».
 - **S39. Historial y pendientes «sin verificar».** «lo que podriamos hacer es dejar como historial e importar lo que falta hacer todavia si es que valen la pena todavia»; «pero dificil que yo sepa si las tareas ya se implementaron o no… podemos dejar como pendietes y despues cuando se intente aplicar se verificara»; «quiero que hagas ya la correccion y aplicamos a todas».
 - **S40. Padrón 1.2.** «no seria una limpiaza de registros viejos que ya se migraron a otros archivos acorde a lo que el panel requiere»; «agrega la decision del cliclo obligatorio para todos los repos». El `ciclo` es obligatorio para todos; el marcador es «Migrada; sin verificar» al principio de `Notas`; un índice viejo se reemplaza por un puntero tras pasar a la ficha lo que no es un estado; una fila que apunta a un archivo de instrucciones obsoleto se queda.
-- **S41. Archivos de instrucciones obsoletos con reglas técnicas.** «hace lo mas recomendado, y para proximos casos como tratamos eso?»; «registra rp46 con esa regla». Se compara por contenido; se mueve a `AGENTS.md` lo que falte, textual; no se copia la jerarquía de autoridad; se reescriben los punteros y las filas de «autoridad»; se registra en `docs/ORQUESTACION.md`; se pregunta solo ante una contradicción.
+- **S41. Padrón 1.3: lo que enseñó la ronda de prueba.** «registra rp46 con esa regla»; «podes corregir con tu propuesta lo de tecnomyl y agregar a la lista de mejoras esa observacion»; «registro aparte que se ejecuta o implementa de otra manera»; «podes excluir, siempre debe excluirse en todos los repos». Se compara por contenido y se mueve a `AGENTS.md` lo que falte, textual; no se copia la jerarquía de autoridad; se reescriben los punteros y las filas de «autoridad»; se registra en `docs/ORQUESTACION.md`; se pregunta solo ante una contradicción. Migrar nunca escribe `En curso`. Un registro con su propio flujo no se migra. `panel-ignored` es obligatorio.
 - **S42. Los clics no se pierden.** «muchas veces me falla el click en los botones del panel de cada 4 click 3 me fallan, y no es el mouse porque solo en la ventana del panel me sucede y con distintos mouses». Una región cuyo HTML no cambió no se reescribe; un redibujado espera a que se suelte el botón del mouse, con un tope corto para que una suelta perdida no congele la página.
 
 ## Tasks
@@ -97,7 +97,7 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 | RP41 | S38 | en línea (bloques, chequeo, orden, instrucciones, ejemplos y pruebas); RED primero (29 de 39); 7 mutaciones en copias temporales; el refresco de la huella se niega a aceptar texto cambiado sin versión | PR #59 (22602ab) |
 | RP43 | S39 | en línea (bloque, instrucciones, ejemplos y pruebas); RED primero (10 de 11); 7 mutaciones; huella aceptada sin force por la subida de versión | pendiente de commit |
 | RP44 | S40 | en línea (bloque, instrucciones, requisito y pruebas); RED primero (7 de 9); huella aceptada sin force por la subida de versión | pendiente de commit |
-| RP46 | S41 | registrada, sin implementar | pendiente |
+| RP46 | S41 | en línea (INSTALL, EXAMPLES, requisito, checklist y pruebas); RED primero (11 de 12); huella aceptada con force porque el padrón 1.3 no se instaló todavía | pendiente de commit |
 | RP47 | S42 | en línea; medido en un Edge real (148 reemplazos por minuto y 23 de 30 clics antes; 13,5 y 60 de 60 después); RED primero (8 de 10) | pendiente de commit |
 
 Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a → RP11b → RP12a → RP12b → RP12 → RP13 → RP14. RP12 puede ir antes de RP11 si la persona lo prefiere.
@@ -626,3 +626,23 @@ Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a →
 > porque muchas veces me falla el click en los botones del panel de cada 4 click 3 me fallan, y no es el mouse porque solo en la ventana del panel me sucede y con distintos mouses.
 
 *Aplicado: RP47. Falta que la persona lo confirme usando el panel después de reiniciarlo.*
+
+**L61.**
+
+> creo que debemos poner a prueba por los repos que todavia no aplicamos para aprender mas y asi poder corregir de una despues y dar una pasada devuelta por cada repo despues de corregido
+>
+> de los grupos de upen podemos poner ya a prueba si crees conveniente, pero esos repos no podre commitear al finalizar la aplicacion porque su sala despues analisara cada repo para que entienda como trabaja el panel. que me decis sobre eso? podes aplicar para aprender, solo no voy a poder commitear hasta avisar a su sala que es upen-ceo.
+>
+> o podemos excluir todo el grupo de upen de nuestras pruebas y asi que tengamos todo listo, aplicamos de verdad a los productos de upen y si aparece algo para aprender cuando se apliquen a ellos, lo guardamos y mejoramos al panel despues de eso.
+>
+> CROSS.BackofficeFront quisera que dejemos fuera de la prueba por el momento porque estara tranbajando por un bbuen rato en otra tarea. podes pasar por todos los otros devuelta excepto esos que ya excluimos
+>
+> revisa
+>
+> 1. podes corregir con tu propuesta lo de tecnomyl y agregar a la lista de mejoras esa observacion.
+> 2. registro aparte que se ejecuta o implementa de otra manera.
+> 3. podes excluir, siempre debe excluirse en todos los repos.
+>
+> dale
+
+*Aplicado: RP46 (padrón 1.3). UPEN y `CROSS.BackofficeFront` quedan fuera de la ronda de prueba; se aplica en UPEN de verdad al final, declarando antes su sala. En `TecnomylPY.Backend` se pasaron a mano las 22 filas `En curso` a `Pendiente` y se excluyó `.panel/`.*
