@@ -49,6 +49,7 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 - **S39. Historial y pendientes «sin verificar».** «lo que podriamos hacer es dejar como historial e importar lo que falta hacer todavia si es que valen la pena todavia»; «pero dificil que yo sepa si las tareas ya se implementaron o no… podemos dejar como pendietes y despues cuando se intente aplicar se verificara»; «quiero que hagas ya la correccion y aplicamos a todas».
 - **S40. Padrón 1.2.** «no seria una limpiaza de registros viejos que ya se migraron a otros archivos acorde a lo que el panel requiere»; «agrega la decision del cliclo obligatorio para todos los repos». El `ciclo` es obligatorio para todos; el marcador es «Migrada; sin verificar» al principio de `Notas`; un índice viejo se reemplaza por un puntero tras pasar a la ficha lo que no es un estado; una fila que apunta a un archivo de instrucciones obsoleto se queda.
 - **S41. Archivos de instrucciones obsoletos con reglas técnicas.** «hace lo mas recomendado, y para proximos casos como tratamos eso?»; «registra rp46 con esa regla». Se compara por contenido; se mueve a `AGENTS.md` lo que falte, textual; no se copia la jerarquía de autoridad; se reescriben los punteros y las filas de «autoridad»; se registra en `docs/ORQUESTACION.md`; se pregunta solo ante una contradicción.
+- **S42. Los clics no se pierden.** «muchas veces me falla el click en los botones del panel de cada 4 click 3 me fallan, y no es el mouse porque solo en la ventana del panel me sucede y con distintos mouses». Una región cuyo HTML no cambió no se reescribe; un redibujado espera a que se suelte el botón del mouse, con un tope corto para que una suelta perdida no congele la página.
 
 ## Tasks
 
@@ -97,6 +98,7 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 | RP43 | S39 | en línea (bloque, instrucciones, ejemplos y pruebas); RED primero (10 de 11); 7 mutaciones; huella aceptada sin force por la subida de versión | pendiente de commit |
 | RP44 | S40 | en línea (bloque, instrucciones, requisito y pruebas); RED primero (7 de 9); huella aceptada sin force por la subida de versión | pendiente de commit |
 | RP46 | S41 | registrada, sin implementar | pendiente |
+| RP47 | S42 | en línea; medido en un Edge real (148 reemplazos por minuto y 23 de 30 clics antes; 13,5 y 60 de 60 después); RED primero (8 de 10) | pendiente de commit |
 
 Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a → RP11b → RP12a → RP12b → RP12 → RP13 → RP14. RP12 puede ir antes de RP11 si la persona lo prefiere.
 
@@ -618,3 +620,9 @@ Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a →
 > registra rp46 con esa regla
 
 *Aplicado: skill `flow-next` en `flow-skills` (FS5, PR #75) y su alta en el `settings.json` de Gentle Shell; las 12 ramas viejas de `repo-panel` borradas; la cadena `L1→…→L6` de `pi-usage-audit` pasada a `—`; reglas técnicas de `copilot-instructions.md` movidas a `AGENTS.md` de `CROSS.PushNotifications`; RP46 registrada como Pendiente. Decisión: los IDs de fila son los nuestros.*
+
+**L60.**
+
+> porque muchas veces me falla el click en los botones del panel de cada 4 click 3 me fallan, y no es el mouse porque solo en la ventana del panel me sucede y con distintos mouses.
+
+*Aplicado: RP47. Falta que la persona lo confirme usando el panel después de reiniciarlo.*
