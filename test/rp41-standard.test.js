@@ -134,7 +134,7 @@ test('step 5 makes AGENTS.md the ONLY instruction file and asks for a report of 
   assert.match(s, /do not follow them, do not edit them and do not delete them/);
   assert.match(s, /replace that statement with one line/i);
   assert.match(s, /git log -1 --format=%cs/);
-  assert.match(s, /headings it has that `AGENTS\.md` does not/);
+  assert.match(s, /what you moved from it into `AGENTS\.md`/); // RP46: it reports what it MOVED, no longer headings left for the person
   assert.match(s, /Never delete existing rules from `AGENTS\.md`/);
 });
 
@@ -211,7 +211,7 @@ test('example B: the tasks migrated from another system become rows that pass, k
   assert.deepEqual(rows[1].dependsOn, ['kubernetes-health-probes'], 'declared in the source as a blocker');
 });
 
-test('example C: every source state word translates to one of the four states, and none translates to a computed one', () => {
+test('example C: every source state word translates to a state, never to a computed one, and never to En curso (RP46)', () => {
   const lines = example('c-estados').split('\n').filter((l) => /^\|/.test(l) && !/^\|\s*-/.test(l)).slice(1);
   assert.ok(lines.length >= 4);
   const targets = new Set();
@@ -220,7 +220,7 @@ test('example C: every source state word translates to one of the four states, a
     assert.ok(FOUR.includes(write), `"${write}" is not one of the four states`);
     targets.add(write);
   }
-  assert.deepEqual([...targets].sort(), [...FOUR].sort());
+  assert.deepEqual([...targets].sort(), FOUR.filter((s) => s !== 'En curso').sort(), 'migrating never writes En curso');
   assert.doesNotMatch(example('c-estados'), /Lista|En revisión/);
 });
 

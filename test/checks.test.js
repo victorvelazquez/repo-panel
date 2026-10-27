@@ -249,7 +249,7 @@ const ignored = (v) => ({ ...GOOD, local: { panelIgnored: v } });
 
 test('panel-ignored: passes when ignored, fails when not, unavailable when git could not say', () => {
   const req = REAL.requirements.find((r) => r.id === 'panel-ignored');
-  assert.deepEqual([req.category, req.level], ['verificable', 'recommended']);
+  assert.deepEqual([req.category, req.level], ['verificable', 'required']); // RP46: every repo ignores .panel/
   const res = (v) => by(evaluate(REAL, ignored(v)), 'panel-ignored');
   assert.equal(res({ available: true, ignored: true }).status, 'pass');
   assert.equal(res({ available: true, ignored: false }).status, 'fail');
@@ -259,11 +259,14 @@ test('panel-ignored: passes when ignored, fails when not, unavailable when git c
   assert.equal(by(evaluate(REAL, { base: { status: 'no-repo' }, files: {}, local: { panelIgnored: { available: true, ignored: true } } }), 'panel-ignored').status, 'pass');
 });
 
-test('the two panel requirements are recommended: failing them never makes a ready repo not ready', () => {
+test('estado-block is recommended and panel-ignored is required: only failing the second makes a ready repo not ready (RP46)', () => {
   const out = evaluate(REAL, { ...GOOD, files: { ...GOOD.files, agents: file(block('1.0') + TAREAS + ENTREGA + block(CURRENT_RULES.blocks.ciclo, 'ciclo')) }, local: { panelIgnored: { available: true, ignored: false } } });
   assert.equal(by(out, 'estado-block').status, 'fail');
   assert.equal(by(out, 'panel-ignored').status, 'fail');
-  assert.equal(out.summary.ready, true);
+  assert.equal(out.summary.ready, false);
+  const onlyEstado = evaluate(REAL, { ...GOOD, files: { ...GOOD.files, agents: file(block('1.0') + TAREAS + ENTREGA + block(CURRENT_RULES.blocks.ciclo, 'ciclo')) }, local: { panelIgnored: { available: true, ignored: true } } });
+  assert.equal(by(onlyEstado, 'estado-block').status, 'fail');
+  assert.equal(onlyEstado.summary.ready, true, 'a missing estado block never blocks');
   assert.deepEqual(out.summary.recommended.total, REAL.requirements.filter((r) => r.level === 'recommended').length);
 });
 

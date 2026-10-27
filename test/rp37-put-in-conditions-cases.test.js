@@ -63,21 +63,21 @@ test('a repo with nothing but a README: the required gaps come first in the orde
   const out = await requirementsFor(r.repo, null);
   assert.equal(out.available, true);
   assert.equal(out.summary.ready, false);
-  assert.deepEqual(orderIds(out.results), ['agents-file', 'registro-block', 'tareas-block', 'entrega-block', 'roadmap-file', 'roadmap-header', 'roadmap-table', 'ciclo-block', 'padron-record', 'adoption-record', 'estado-block', 'panel-ignored']);
+  assert.deepEqual(orderIds(out.results), ['agents-file', 'registro-block', 'tareas-block', 'entrega-block', 'roadmap-file', 'roadmap-header', 'roadmap-table', 'ciclo-block', 'padron-record', 'panel-ignored', 'adoption-record', 'estado-block']);
   assert.equal(statusOf(out)['base-branch'], 'pass', 'what already passes is never named');
 });
 
 test('a repo that meets everything: the blocks the agent is told to copy pass as they are, and the order is refused with 409', async () => {
   const out = await requirementsFor(makeRepo(CONFORMING).repo, null);
   assert.deepEqual(failing(out), []);
-  assert.deepEqual([out.summary.ready, out.summary.required, out.summary.recommended], [true, { pass: 10, total: 10 }, { pass: 3, total: 3 }]);
+  assert.deepEqual([out.summary.ready, out.summary.required, out.summary.recommended], [true, { pass: 11, total: 11 }, { pass: 2, total: 2 }]);
   refusesNothingToDo(out.results);
 });
 
-test('only panel-ignored is missing: the order names it alone, and it is recommended so the repo is still ready', async () => {
+test('only panel-ignored is missing: the order names it alone, and it is required so the repo is not ready (RP46)', async () => {
   const out = await requirementsFor(makeRepo(CONFORMING, { ignored: false }).repo, null);
   assert.deepEqual(orderIds(out.results), ['panel-ignored']);
-  assert.equal(out.summary.ready, true);
+  assert.equal(out.summary.ready, false);
 });
 
 test('a block with an old version is outdated, and the order names only that block', async () => {
