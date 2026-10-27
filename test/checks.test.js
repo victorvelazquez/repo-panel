@@ -6,6 +6,11 @@ const { parseBlock, headerCheck, evaluate } = require('../checks.js');
 const HEAD = '**Dónde está:** a\n**Qué sigue:** b\n**Qué lo bloquea:** c\n';
 const TABLE = '| ID | Entrega | Resultado visible | Depende de | Estado | Notas | Ficha |\n| --- | --- | --- | --- | --- | --- | --- |\n| A1 | e | r | — | Pendiente | | — |\n';
 const block = (v, name = 'registro') => `# R\n<!-- orquestacion:${name} v${v} -->\nrules\n<!-- /orquestacion:${name} -->\n`;
+// The required panel block of RP40: a repo that meets everything carries it next to registro.
+const TAREAS = '<!-- panel:tareas v1.0 -->\nrules\n<!-- /panel:tareas -->\n';
+const ENTREGA = '<!-- panel:entrega v1.0 -->\nrules\n<!-- /panel:entrega -->\n';
+// RP41: the adoption record of a repo that meets everything carries the padrón line.
+const ADOPTION = '# Adopción\n\n- **Padrón del panel:** 1.0\n';
 
 test('parseBlock: a closed block is ok, with or without an expected version', () => {
   assert.deepEqual(parseBlock(block('1.0'), 'registro'), { status: 'ok', version: '1.0' });
@@ -64,7 +69,7 @@ const REG = {
   ],
 };
 const file = (text) => ({ available: true, text, path: 'x' });
-const GOOD = { base: { status: 'ok', name: 'main' }, files: { agents: file(block('1.0')), roadmap: file(HEAD + TABLE) } };
+const GOOD = { base: { status: 'ok', name: 'main' }, files: { agents: file(block('1.0') + TAREAS + ENTREGA), roadmap: file(HEAD + TABLE), adoption: file(ADOPTION) } };
 const by = (out, id) => out.results.find((r) => r.id === id);
 
 test('evaluate: everything required passing makes it ready; a failing recommended one does not matter', () => {
@@ -138,7 +143,7 @@ test('evaluate: an unknown check type is unavailable; an empty registry is not r
 const REAL = require('../requirements.json');
 const SALA_REGION = '<!-- SALA -->\nthe room line\n<!-- /SALA -->\n';
 const ciclo = (inner) => `<!-- orquestacion:ciclo v1.0 -->\nrules\n${inner}<!-- /orquestacion:ciclo -->\n`;
-const registro = block('1.0');
+const registro = block('1.0') + TAREAS + ENTREGA;
 const memberFacts = (agents, room = { name: 'UPEN' }) => ({ ...GOOD, room, files: { ...GOOD.files, agents: file(agents) } });
 const ids = (out) => out.results.map((r) => r.id);
 
@@ -255,7 +260,7 @@ test('panel-ignored: passes when ignored, fails when not, unavailable when git c
 });
 
 test('the two panel requirements are recommended: failing them never makes a ready repo not ready', () => {
-  const out = evaluate(REAL, { ...GOOD, files: { ...GOOD.files, agents: file(block('1.0')) }, local: { panelIgnored: { available: true, ignored: false } } });
+  const out = evaluate(REAL, { ...GOOD, files: { ...GOOD.files, agents: file(block('1.0') + TAREAS + ENTREGA) }, local: { panelIgnored: { available: true, ignored: false } } });
   assert.equal(by(out, 'estado-block').status, 'fail');
   assert.equal(by(out, 'panel-ignored').status, 'fail');
   assert.equal(out.summary.ready, true);

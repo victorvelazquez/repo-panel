@@ -22,9 +22,9 @@ const CICLO_WITHOUT_SALA = '<!-- orquestacion:ciclo v1.0 -->\nx\n<!-- /orquestac
 const agents = (...blocks) => `# Repo\n\n${blocks.join('\n')}`;
 // A repo that meets every requirement: the three blocks copied verbatim, the roadmap in the panel's format, the adoption record.
 const CONFORMING = {
-  'AGENTS.md': agents(block('registro'), block('ciclo'), block('estado')),
+  'AGENTS.md': agents(block('registro'), block('tareas'), block('entrega'), block('ciclo'), block('estado')),
   'docs/ROADMAP.md': ROADMAP,
-  'docs/ORQUESTACION.md': '# Orquestación\n',
+  'docs/ORQUESTACION.md': '# Orquestación\n\n- **Padrón del panel:** 1.0\n',
 };
 
 const made = [];
@@ -62,14 +62,14 @@ test('a repo with nothing but a README: the required gaps come first in the orde
   const out = await requirementsFor(r.repo, null);
   assert.equal(out.available, true);
   assert.equal(out.summary.ready, false);
-  assert.deepEqual(orderIds(out.results), ['agents-file', 'registro-block', 'roadmap-file', 'roadmap-header', 'roadmap-table', 'ciclo-block', 'adoption-record', 'estado-block', 'panel-ignored']);
+  assert.deepEqual(orderIds(out.results), ['agents-file', 'registro-block', 'tareas-block', 'entrega-block', 'roadmap-file', 'roadmap-header', 'roadmap-table', 'padron-record', 'ciclo-block', 'adoption-record', 'estado-block', 'panel-ignored']);
   assert.equal(statusOf(out)['base-branch'], 'pass', 'what already passes is never named');
 });
 
 test('a repo that meets everything: the blocks the agent is told to copy pass as they are, and the order is refused with 409', async () => {
   const out = await requirementsFor(makeRepo(CONFORMING).repo, null);
   assert.deepEqual(failing(out), []);
-  assert.deepEqual([out.summary.ready, out.summary.required, out.summary.recommended], [true, { pass: 6, total: 6 }, { pass: 4, total: 4 }]);
+  assert.deepEqual([out.summary.ready, out.summary.required, out.summary.recommended], [true, { pass: 9, total: 9 }, { pass: 4, total: 4 }]);
   refusesNothingToDo(out.results);
 });
 
@@ -95,7 +95,7 @@ test('a roadmap table with other column names fails alone: the validator is what
 });
 
 test('a repo of a room needs the SALA region of the ciclo block; outside a room the same repo is fine', async () => {
-  const files = { ...CONFORMING, 'AGENTS.md': agents(block('registro'), CICLO_WITHOUT_SALA, block('estado')) };
+  const files = { ...CONFORMING, 'AGENTS.md': agents(block('registro'), block('tareas'), block('entrega'), CICLO_WITHOUT_SALA, block('estado')) };
   const r = makeRepo(files);
   const outside = await requirementsFor(r.repo, null);
   assert.deepEqual(failing(outside), []);
@@ -121,6 +121,52 @@ test('the updater loop: after the agent applies the fix and it reaches the base 
   const after = await requirementsFor(r.repo, null);
   assert.deepEqual(failing(after), []);
   refusesNothingToDo(after.results);
+});
+
+test('a repo that meets everything except the tareas block: the order names only that block and the repo is not ready', async () => {
+  const without = CONFORMING['AGENTS.md'].replace(block('tareas'), '');
+  const out = await requirementsFor(makeRepo({ ...CONFORMING, 'AGENTS.md': without }).repo, null);
+  assert.equal(statusOf(out)['tareas-block'], 'fail');
+  assert.deepEqual(orderIds(out.results), ['tareas-block']);
+  assert.equal(out.summary.ready, false, 'the mechanism is required');
+});
+
+test('a repo that meets everything except the entrega block: the order names only that block and the repo is not ready', async () => {
+  const without = CONFORMING['AGENTS.md'].replace(block('entrega'), '');
+  const out = await requirementsFor(makeRepo({ ...CONFORMING, 'AGENTS.md': without }).repo, null);
+  assert.equal(statusOf(out)['entrega-block'], 'fail');
+  assert.deepEqual(orderIds(out.results), ['entrega-block']);
+  assert.equal(out.summary.ready, false, 'the delivery mechanism is required');
+});
+
+test('a repo whose adoption record names an OLD padrón: the order names only padron-record, and the repo is not ready', async () => {
+  const old = { ...CONFORMING, 'docs/ORQUESTACION.md': '# Orquestación\n\n- **Padrón del panel:** 0.9\n' };
+  const out = await requirementsFor(makeRepo(old).repo, null);
+  assert.equal(statusOf(out)['padron-record'], 'outdated');
+  assert.match(out.results.find((r) => r.id === 'padron-record').detail, /padrón 0\.9 found/);
+  assert.deepEqual(orderIds(out.results), ['padron-record']);
+  assert.equal(out.summary.ready, false);
+});
+
+test('a repo whose adoption record has no padrón line: adoption-record passes (the file exists) and padron-record fails', async () => {
+  const bare = { ...CONFORMING, 'docs/ORQUESTACION.md': '# Orquestación\n\nsolo texto\n' };
+  const out = await requirementsFor(makeRepo(bare).repo, null);
+  assert.equal(statusOf(out)['adoption-record'], 'pass');
+  assert.equal(statusOf(out)['padron-record'], 'fail');
+  assert.deepEqual(orderIds(out.results), ['padron-record']);
+});
+
+test('the updater loop for the padrón: when the rules move to a new padrón every repo that recorded the old one shows up again', async () => {
+  const r = makeRepo(CONFORMING);
+  const before = await requirementsFor(r.repo, null);
+  assert.deepEqual(failing(before), []);
+  const registry = require('../server/requirements.js');
+  assert.equal(typeof registry.padronVersion(), 'string');
+  r.push({ 'docs/ORQUESTACION.md': '# Orquestación\n\n- **Padrón del panel:** 0.1\n' });
+  const after = await requirementsFor(r.repo, null);
+  assert.deepEqual(orderIds(after.results), ['padron-record']);
+  r.push({ 'docs/ORQUESTACION.md': `# Orquestación\n\n- **Padrón del panel:** ${registry.padronVersion()}\n` });
+  assert.deepEqual(failing(await requirementsFor(r.repo, null)), []);
 });
 
 test('the order carries ids from the registry, never text taken from the repo', async () => {

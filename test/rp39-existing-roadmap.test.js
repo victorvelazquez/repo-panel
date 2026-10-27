@@ -14,23 +14,11 @@ const read = (...p) => lf(fs.readFileSync(path.join(ROOT, ...p), 'utf8'));
 const registry = JSON.parse(read('requirements.json'));
 const remedyOf = (id) => registry.requirements.find((r) => r.id === id).remedy;
 // A step of INSTALL.md is its own line, from "N. " to the next numbered line.
-const step = (n) => read('requirements', 'INSTALL.md').split('\n').find((l) => l.startsWith(`${n}. `));
+const { step } = require('./install-steps.js');
 
-test('step 7 tells the agent to STOP and ask before touching a roadmap that already exists elsewhere or in another format', () => {
-  const s = step(7);
-  assert.match(s, /already (has|exists)/i);
-  assert.match(s, /STOP/);
-  assert.match(s, /move, rename, convert or restructure/i);
-  assert.match(s, /wait for (the user's|their) answer/i);
-});
-
-test('step 7 lists the options the agent offers instead of choosing one', () => {
-  const s = step(7);
-  assert.match(s, /convert it in place/i);
-  assert.match(s, /move it to `docs\/ROADMAP\.md`/i);
-  assert.match(s, /update the links/i);
-  assert.match(s, /leave it where it is/i);
-});
+// RP39 first told the agent to STOP before touching a roadmap that already exists and to offer three options. The user then
+// decided to abandon every other way of managing tasks (RP40), so step 7 now migrates by default: those two tests moved to
+// test/rp40-task-mechanism.test.js, which pins the new policy. What stays here is what RP39 added and RP40 keeps.
 
 test('step 7 forbids inventing dependencies: a unit without one gets a dash', () => {
   const s = step(7);
@@ -46,10 +34,12 @@ test('step 7 keeps writing the single row U0 for a project with no plan yet, and
   assert.match(s, /ask the user for the plan/i);
 });
 
-test('the remedies of roadmap-file and roadmap-table point to the stop rule, so the agent meets it from the order too', () => {
+test('the remedies of roadmap-file and roadmap-table point to the migration rule, so the agent meets it from the order too', () => {
   for (const id of ['roadmap-file', 'roadmap-table']) {
-    assert.match(remedyOf(id), /already has a roadmap|already exists/i, id);
+    assert.match(remedyOf(id), /already tracks tasks/i, id);
+    assert.match(remedyOf(id), /migrate them/i, id);
     assert.match(remedyOf(id), /INSTALL\.md step 7/, id);
+    assert.doesNotMatch(remedyOf(id), /stop and ask/i, id);
   }
 });
 
@@ -65,14 +55,15 @@ test('what RP35 pinned is still there: the exact column names and the rename rul
   assert.match(s, /Do not invent units/);
 });
 
-test('the other steps are untouched: step 6 still stops on a conflict with AGENTS.md and step 8 still forbids commits', () => {
+test('the other steps keep their core: step 6 still stops on a conflict that is not about tasks and step 8 still forbids commits', () => {
   assert.match(step(6), /STOP/);
-  assert.match(step(8), /Do not commit, push or open PRs/);
+  assert.match(step(8), /Never commit by any means other than `\/flow-commit`/);
 });
 
 test('the manual checklist no longer says the ciclo block is copied as is: it names the SALA region rule', () => {
   const doc = read('docs', 'PRUEBAS-put-in-conditions.md');
   assert.doesNotMatch(doc, /tres bloques[^.]*copiados \*\*tal cual\*\*/);
   assert.match(doc, /regiones `SALA`/);
-  assert.match(doc, /roadmap que ya existe/i);
+  assert.match(doc, /otro sistema de tareas/i);
+  assert.match(doc, /migra/);
 });

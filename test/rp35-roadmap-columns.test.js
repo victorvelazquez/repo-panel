@@ -13,7 +13,7 @@ const lf = (text) => text.replace(/\r\n/g, '\n');
 const read = (...p) => lf(fs.readFileSync(path.join(ROOT, ...p), 'utf8'));
 const registry = JSON.parse(read('requirements.json'));
 const remedyOf = (id) => registry.requirements.find((r) => r.id === id).remedy;
-const installStep = (n) => read('requirements', 'INSTALL.md').split('\n').find((l) => l.startsWith(`${n}. `));
+const { step: installStep } = require('./install-steps.js');
 
 test('the validator exports the list of required columns', () => {
   assert.deepEqual(lib.RM_REQUIRED, ['ID', 'Entrega', 'Depende de', 'Estado']);

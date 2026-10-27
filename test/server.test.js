@@ -644,7 +644,9 @@ test('GET /api/local reports the staged files next to the unchanged fields, and 
 });
 
 // ---------- /api/requirements and /api/prerequisites ----------
-const REG_BLOCK = '# Rules\n<!-- orquestacion:registro v1.0 -->\nrules\n<!-- /orquestacion:registro -->\n';
+const REG_BLOCK = '# Rules\n<!-- orquestacion:registro v1.0 -->\nrules\n<!-- /orquestacion:registro -->\n<!-- panel:tareas v1.0 -->\nrules\n<!-- /panel:tareas -->\n<!-- panel:entrega v1.0 -->\nrules\n<!-- /panel:entrega -->\n';
+// RP41: the adoption record of a repo that meets everything names the padrón of the panel.
+const ORQ = '# Adopción\n\n- **Padrón del panel:** 1.0\n';
 const HEADER = '**Dónde está:** a\n**Qué sigue:** b\n**Qué lo bloquea:** c\n\n';
 const statuses = (json) => Object.fromEntries(json.results.map((r) => [r.id, r.status]));
 
@@ -664,18 +666,18 @@ test('GET /api/requirements needs the token and answers 404 for an unknown repo'
 });
 
 test('GET /api/requirements: a conforming base branch passes the required ones; recommended gaps do not block', async () => {
-  const repo = originAndClone({ 'AGENTS.md': REG_BLOCK, 'docs/ROADMAP.md': HEADER + rows(['A1', 'Pendiente']) });
+  const repo = originAndClone({ 'AGENTS.md': REG_BLOCK, 'docs/ROADMAP.md': HEADER + rows(['A1', 'Pendiente']), 'docs/ORQUESTACION.md': ORQ });
   await withRepoPanel(repo, async ({ getApi, id }) => {
     const r = await getApi(`/api/requirements?id=${id}`);
     assert.equal(r.status, 200);
     assert.equal(r.json.available, true);
     assert.equal(r.json.base, 'main');
     assert.deepEqual(statuses(r.json), {
-      'base-branch': 'pass', 'agents-file': 'pass', 'registro-block': 'pass', 'roadmap-file': 'pass',
-      'roadmap-header': 'pass', 'roadmap-table': 'pass', 'ciclo-block': 'fail', 'adoption-record': 'fail',
+      'base-branch': 'pass', 'agents-file': 'pass', 'registro-block': 'pass', 'tareas-block': 'pass', 'entrega-block': 'pass', 'roadmap-file': 'pass',
+      'roadmap-header': 'pass', 'roadmap-table': 'pass', 'ciclo-block': 'fail', 'adoption-record': 'pass', 'padron-record': 'pass',
       'estado-block': 'fail', 'panel-ignored': 'fail',
     });
-    assert.deepEqual(r.json.summary, { required: { pass: 6, total: 6 }, recommended: { pass: 0, total: 4 }, ready: true });
+    assert.deepEqual(r.json.summary, { required: { pass: 9, total: 9 }, recommended: { pass: 1, total: 4 }, ready: true });
     assert.ok(r.json.results.every((x) => typeof x.remedy === 'string' && x.remedy));
   });
 });
@@ -710,7 +712,7 @@ test('GET /api/state: missing, then a valid file, then an invalid one; /api/loca
 
 test('GET /api/requirements: estado-block reads the panel block from the base branch, panel-ignored asks the local Git', async () => {
   const PANEL = '# Rules\n<!-- panel:estado v1.0 -->\nrules\n<!-- /panel:estado -->\n';
-  const repo = originAndClone({ 'AGENTS.md': REG_BLOCK + PANEL, 'docs/ROADMAP.md': HEADER + rows(['A1', 'Pendiente']) });
+  const repo = originAndClone({ 'AGENTS.md': REG_BLOCK + PANEL, 'docs/ROADMAP.md': HEADER + rows(['A1', 'Pendiente']), 'docs/ORQUESTACION.md': ORQ });
   await withRepoPanel(repo, async ({ getApi, id }) => {
     const before = statuses((await getApi(`/api/requirements?id=${id}`)).json);
     assert.equal(before['estado-block'], 'pass');
@@ -1017,7 +1019,7 @@ test('roomRequirementsFor: reads AGENTS.md and ENLACES.md (root or estrategia/) 
 test('GET /api/requirements: a room member also gets the member-only results and its room; others are unchanged', async () => {
   const lib = require('../lib.js');
   const member = originAndClone({ 'AGENTS.md': REG_BLOCK, 'docs/ROADMAP.md': HEADER + rows(['A1', 'Pendiente']) });
-  const outside = originAndClone({ 'AGENTS.md': REG_BLOCK + CICLO_SALA, 'docs/ROADMAP.md': HEADER + rows(['A1', 'Pendiente']) });
+  const outside = originAndClone({ 'AGENTS.md': REG_BLOCK + CICLO_SALA, 'docs/ROADMAP.md': HEADER + rows(['A1', 'Pendiente']), 'docs/ORQUESTACION.md': ORQ });
   const config = {
     groups: [{ name: 'g', repos: [{ path: member.work, base: 'main' }, { path: outside.work, base: 'main' }] }],
     rooms: [{ name: 'UPEN', path: ABS('ceo'), repos: [lib.repoId(member.work)] }],
@@ -1034,9 +1036,9 @@ test('GET /api/requirements: a room member also gets the member-only results and
       // A repo outside every room: same keys, same results (no sala-region, ciclo-block stays recommended), no room field.
       const o = (await getApi(`/api/requirements?id=${lib.repoId(outside.work)}`)).json;
       assert.deepEqual(Object.keys(o), ['available', 'base', 'results', 'summary']);
-      assert.deepEqual(o.results.map((x) => x.id), ['base-branch', 'agents-file', 'registro-block', 'roadmap-file', 'roadmap-header', 'roadmap-table', 'ciclo-block', 'adoption-record', 'estado-block', 'panel-ignored']);
+      assert.deepEqual(o.results.map((x) => x.id), ['base-branch', 'agents-file', 'registro-block', 'tareas-block', 'entrega-block', 'roadmap-file', 'roadmap-header', 'roadmap-table', 'ciclo-block', 'adoption-record', 'padron-record', 'estado-block', 'panel-ignored']);
       assert.equal(o.results.find((x) => x.id === 'ciclo-block').level, 'recommended');
-      assert.deepEqual(o.summary, { required: { pass: 6, total: 6 }, recommended: { pass: 1, total: 4 }, ready: true });
+      assert.deepEqual(o.summary, { required: { pass: 9, total: 9 }, recommended: { pass: 2, total: 4 }, ready: true });
     });
   } finally { for (const r of [member, outside]) fs.rmSync(r.tmp, { recursive: true, force: true }); }
 });

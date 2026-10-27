@@ -222,7 +222,7 @@ test('orders: fix-pr and put-in-conditions both ask for an empty index, stay one
     assert.equal(/[\x00-\x1f\x7f]/.test(text), false);
     assert.equal(text.startsWith('/'), false);
   }
-  assert.ok(put.startsWith('Put this repo in conditions for repo-panel: read "'));
+  assert.match(put, /^Put this repo in conditions for repo-panel \(padrón \d+(\.\d+)*\): read "/);
   assert.match(put, /apply these requirement ids: agents-file\./);
 });
 

@@ -1,6 +1,7 @@
 {
   "version": 1,
-  "blocks": { "registro": "1.0", "ciclo": "1.0", "estado": "1.0" },
+  "padron": "1.0",
+  "blocks": { "registro": "1.0", "ciclo": "1.0", "estado": "1.0", "tareas": "1.0", "entrega": "1.0" },
   "requirements": [
     {
       "id": "base-branch",
@@ -27,12 +28,28 @@
       "remedy": "Add the Orquestación 'registro' block (version 1.0) to AGENTS.md exactly as in requirements/blocks/registro.md, between <!-- orquestacion:registro v1.0 --> and <!-- /orquestacion:registro -->; if AGENTS.md has rules that conflict, stop and ask the user."
     },
     {
+      "id": "tareas-block",
+      "title": "Panel 'tareas' block in AGENTS.md",
+      "category": "verificable",
+      "level": "required",
+      "check": { "type": "block", "file": "agents", "name": "tareas", "namespace": "panel" },
+      "remedy": "Add the panel 'tareas' block (version 1.0) to AGENTS.md exactly as in requirements/blocks/tareas.md, between <!-- panel:tareas v1.0 --> and <!-- /panel:tareas -->, and remove from AGENTS.md every instruction about how to create or manage tasks (requirements/INSTALL.md step 7): the new mechanism replaces them."
+    },
+    {
+      "id": "entrega-block",
+      "title": "Panel 'entrega' block in AGENTS.md",
+      "category": "verificable",
+      "level": "required",
+      "check": { "type": "block", "file": "agents", "name": "entrega", "namespace": "panel" },
+      "remedy": "Add the panel 'entrega' block (version 1.0) to AGENTS.md exactly as in requirements/blocks/entrega.md, between <!-- panel:entrega v1.0 --> and <!-- /panel:entrega -->, and remove from AGENTS.md every instruction about branches, commits and pull requests for day-to-day work (requirements/INSTALL.md step 8): the new mechanism replaces them. Nothing commits but /flow-commit."
+    },
+    {
       "id": "roadmap-file",
       "title": "Roadmap file on the base branch",
       "category": "verificable",
       "level": "required",
       "check": { "type": "file-exists", "file": "roadmap" },
-      "remedy": "If the repo already has a roadmap somewhere else or in another format, do not move or restructure it: stop and ask the user (requirements/INSTALL.md step 7). Otherwise create docs/ROADMAP.md (or the roadmap path configured for this repo) with the three header lines and a units table whose header has exactly these column names: `ID`, `Entrega`, `Depende de` and `Estado` (optional: `Resultado visible`, `Notas`, `Ficha`)."
+      "remedy": "If the repo already tracks tasks somewhere else (a roadmap in another path or format, planning/, task lists kept in files), migrate them into docs/ROADMAP.md instead of keeping a second system (requirements/INSTALL.md step 7). Otherwise create docs/ROADMAP.md (or the roadmap path configured for this repo) with the three header lines and a units table whose header has exactly these column names: `ID`, `Entrega`, `Depende de` and `Estado` (optional: `Resultado visible`, `Notas`, `Ficha`)."
     },
     {
       "id": "roadmap-header",
@@ -48,7 +65,7 @@
       "category": "verificable",
       "level": "required",
       "check": { "type": "roadmap-table", "file": "roadmap" },
-      "remedy": "Fix the units table in the roadmap so it has no errors (required columns, one-word states, unique IDs): rename any header that does not match so the table has exactly `ID`, `Entrega`, `Depende de` and `Estado` (a column called `Unidad` or `Dependencias` is not recognised); the panel's Conformity drawer lists the problems. If the repo already has a roadmap in another path or format, do not restructure it: stop and ask the user (requirements/INSTALL.md step 7)."
+      "remedy": "Fix the units table in the roadmap so it has no errors (required columns, one-word states, unique IDs): rename any header that does not match so the table has exactly `ID`, `Entrega`, `Depende de` and `Estado` (a column called `Unidad` or `Dependencias` is not recognised); the panel's Conformity drawer lists the problems. If the repo already tracks tasks in another path or format, migrate them into this table instead of keeping a second system (requirements/INSTALL.md step 7)."
     },
     {
       "id": "ciclo-block",
@@ -75,6 +92,14 @@
       "level": "recommended",
       "check": { "type": "file-exists", "file": "adoption" },
       "remedy": "Create docs/ORQUESTACION.md recording how this repo adopted the Orquestación profile: the date of adoption, the profile, the version of each block installed (say when the `ciclo` block was installed without its SALA regions) and every rule not adopted or changed (write none when there is none)."
+    },
+    {
+      "id": "padron-record",
+      "title": "Padrón of the panel recorded in docs/ORQUESTACION.md",
+      "category": "verificable",
+      "level": "required",
+      "check": { "type": "padron", "file": "adoption" },
+      "remedy": "Once every other requirement of the order is applied, write the line `- **Padrón del panel:** 1.0` in docs/ORQUESTACION.md (create the file if it does not exist), using the padrón version of requirements.json (requirements/INSTALL.md step 10). It records which version of the panel's rules this repo was put in conditions with, so a later change of the rules marks the repo as outdated."
     },
     {
       "id": "estado-block",
