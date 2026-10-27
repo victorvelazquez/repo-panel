@@ -37,6 +37,10 @@ Se comprueba en Git del repo de prueba, no leyendo lo que dijo el agente:
 12. **Notas con las palabras «sin verificar» en otro lugar** (una nota como «esquema del JSONL sin verificar»). Esperado: la fila **no** se trata como migrada; solo se verifican las filas cuyas `Notas` **empiezan con «Migrada; sin verificar»**.
 13. **Un índice viejo con datos que no son estados** (solicitante, prioridad, puntos o fases recomendadas, como en `planning/` de `CROSS.BackofficeApi`). Esperado: el agente pasa esos datos a la ficha de cada tarea **antes** de reemplazar el índice por una línea que apunta a `docs/ROADMAP.md`; si un dato no pertenece a ninguna tarea, **se detiene y pregunta**. Una fila de `AGENTS.md` que apunta a un archivo de instrucciones obsoleto **se queda**; el archivo solo se informa.
 14. **Falta el bloque `ciclo`.** Esperado: el repo no queda en condiciones aunque no pertenezca a una sala; la orden lo pide siempre.
+15. **Un sistema viejo con estados «En progreso»** (como `planning/atc/` de `TecnomylPY.Backend`). Esperado: el agente **nunca escribe `En curso`** al migrar; esas filas quedan `Pendiente` con `Notas` que **empiezan** con «Migrada; sin verificar si ya se implementó», seguido del estado original.
+16. **Un registro aparte con su propio flujo** (como `.flow/debt` de deuda técnica). Esperado: el agente **lo deja donde está**, no lo migra, no lo edita ni lo borra, y lo menciona en el informe.
+17. **Un archivo de instrucciones obsoleto con reglas técnicas vivas** (como `.github/copilot-instructions.md` de `CROSS.PushNotifications`). Esperado: el agente compara por **contenido** y no por títulos, mueve a `AGENTS.md` **textual** lo que falte, no copia su jerarquía de autoridad, reescribe los punteros y las filas que lo llamaban autoridad, lo anota en `docs/ORQUESTACION.md`, deja el archivo viejo intacto y solo pregunta si dos reglas se contradicen.
+18. **`.panel/` sin excluir.** Esperado: `panel-ignored` es **obligatorio** en todos los repos; sin él el repo no queda «listo».
 
 ## Qué anotar si algo falla
 

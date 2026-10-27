@@ -59,7 +59,7 @@ The source says on the left; you write on the right. A word that is not here: ST
 | La fuente dice | Escribí |
 | --- | --- |
 | Ready to Start, Pending, Todo, Backlog, Pendiente | Pendiente |
-| In progress, WIP, En progreso, En curso | En curso |
+| In progress, WIP, En progreso, En curso (without evidence: nobody works on it now) | Pendiente |
 | Done, Delivered, Merged, Entregado, Integrado, Completada | Completada |
 | Blocked, Bloqueado, Bloqueada | Bloqueada |
 | Paused or On hold, naming what blocks it (`Paused - Bloqueado por DevOps`) | Bloqueada |
@@ -111,8 +111,8 @@ In the user's language; the report, then ONE last line.
 Migré 2 tareas a docs/ROADMAP.md: kubernetes-health-probes (Pendiente) y bullmq-health-indicator (Completada).
 Quité de AGENTS.md: «Commit Convention (Spanish)» (3 líneas) y la línea `feature/ABC-123-descripcion` de «Branching Strategy (Git Flow)» (1 línea). Conservé las ramas de larga vida y la regla de pruebas.
 Otros archivos de instrucciones, ahora obsoletos (no los toqué):
-- .cursorrules — último commit 2025-11-27 — encabezados que AGENTS.md no tiene: «Cursor rules», «Prompts»
-- .github/copilot-instructions.md — último commit 2026-08-05 — encabezados que AGENTS.md no tiene: «Input Validation», «Security Checklist»
+- .cursorrules — último commit 2025-11-27 — no tenía reglas que AGENTS.md no tuviera
+- .github/copilot-instructions.md — último commit 2026-08-05 — moví a AGENTS.md, sin cambios de texto: «DTO Security Patterns», «Environment Variables»
 Siguiente: correr /flow-commit; el ID de la tarea para el título del PR es kubernetes-health-probes.
 ```
 
@@ -136,4 +136,22 @@ After: the folder stays untouched, as history, and the roadmap gets ONE row for 
 | ID | Entrega | Resultado visible | Depende de | Estado | Notas | Ficha |
 | --- | --- | --- | --- | --- | --- | --- |
 | export-users | Exportar usuarios en CSV | — | — | Pendiente | Migrada; sin verificar si ya se implementó (3 de 5 pasos sin marcar) | openspec/changes/export-users/ |
+```
+
+## G. An obsolete instruction file with technical rules (step 5)
+
+Compare by content, move what AGENTS.md lacks verbatim, never copy the authority hierarchy, rewrite the authority row, record it.
+
+```md ejemplo:g-archivo-obsoleto
+Antes (AGENTS.md, «Key Files»):
+| `.github/copilot-instructions.md` | Primary architectural and constitutional authority |
+El archivo viejo tiene «Environment Variables» y AGENTS.md no.
+
+Después (AGENTS.md):
+- Sección nueva «Environment Variables», copiada textual del archivo viejo.
+- No se copia su «Document Hierarchy».
+| `.github/copilot-instructions.md` | Legacy instructions: a legacy file kept for another tool; agents do not follow it (see Source of Instructions) |
+
+Después (docs/ORQUESTACION.md, línea de reglas no adoptadas o cambiadas):
+- De `.github/copilot-instructions.md` se movió a AGENTS.md «Environment Variables», sin cambios de texto; el archivo no se tocó.
 ```

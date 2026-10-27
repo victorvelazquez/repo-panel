@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "padron": "1.2",
+  "padron": "1.3",
   "blocks": { "registro": "1.0", "ciclo": "1.0", "estado": "1.0", "tareas": "1.2", "entrega": "1.0" },
   "requirements": [
     {
@@ -112,9 +112,9 @@
       "id": "panel-ignored",
       "title": ".panel/ ignored by Git in this clone",
       "category": "verificable",
-      "level": "recommended",
+      "level": "required",
       "check": { "type": "panel-ignored" },
-      "remedy": "Append the line .panel/ to .git/info/exclude of this repo (create the file if it does not exist); never add it to .gitignore and never commit it. It is local to this clone, so there is nothing to deliver with /flow-commit."
+      "remedy": "Every repo must ignore .panel/ in its clone: append the line .panel/ to .git/info/exclude of this repo (create the file if it does not exist); never add it to .gitignore and never commit it. It is local to this clone, so there is nothing to deliver with /flow-commit."
     }
   ],
   "roomRequirements": [
