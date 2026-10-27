@@ -76,4 +76,7 @@ async function prerequisites(runner = run) {
   return { items };
 }
 
-module.exports = { requirementsFor, roomRequirementsFor, prerequisites };
+// The version of the whole set of rules, written in requirements.json: the order cites it and each repo records it.
+const padronVersion = () => loadRegistry().padron || null;
+
+module.exports = { requirementsFor, roomRequirementsFor, prerequisites, padronVersion };

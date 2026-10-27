@@ -44,6 +44,8 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 - **S34. Casos de prueba de «Put in conditions».** Parte 1 de lo aprobado con «podemos vanazar con todos»: lo que decide el panel se prueba con repos de mentira, lo que hace el agente queda en una lista para la persona.
 - **S35. Un clic por repo desde la lista de pendientes.** Parte 3 de lo aprobado con «podemos vanazar con todos»: la lista de repos desactualizados con un clic por repo y sin botón masivo. Se redujo a un botón en el cajón de conformidad, que ya era la lista.
 - **S36. Frenar y preguntar ante un roadmap existente.** De las pruebas reales sobre `implementation-guides` y `pi-usage-audit`: «no me pregunto nada» y «mejor arrancamos ya con rp39».
+- **S37. Un solo mecanismo de tareas.** «pero yo quiero que se adopte en todos los proyectos el mismo mecanismo de trabajo. quiero abandonar la manera vieja y tener un padron unificado de trabajo»; «quiero abandonar totalmente cualquier otra practica de crear y gestionar las tareas, tambien si tiene instrucciones en el agents.md de seguir como crear tarea quiero que se olvide e implemente el nuevo mecanismo de generar tareas. que de deje bien explicito el nuevo mecanismo. que deben ser.»; y después: «no, las reglas de ramas y commits, y prs quiero que siga de acuerdo al panel».
+- **S38. El estándar completo: entrega, padrón y un solo AGENTS.md.** «debemos proibir a los repos agregando en sus agents.md prohibir hacer commit por otros medios que no sea por /flow-commit»; «debe ser solo sobre tareas»; «versiona»; «para nuestros proyecto solo ya cuenta AGENTS.md y los otros ya son obsoletos»; «vamos a aplicar en todos los repos» (vista global, RP42); «hay excepciones como el de no hacer test en tecnomyl, pero podriamos retomar eso»; «el resto me cierra totalmente, todos tus propuestan esta bien».
 
 ## Tasks
 
@@ -86,7 +88,9 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 | RP36 | S33 | en línea (tests y documentación); RED primero (2 de 9); experimento de 5 escenarios en copia temporal | PR #55 (0027337) |
 | RP37 | S34 | en línea (tests y documentación); sin RED natural, 5 mutaciones en copia temporal; repos de mentira con Git real | PR #56 (2df925e) |
 | RP38 | S35 | en línea (un botón y una regla de estilo); RED primero (5 de 7); reutiliza la acción de la tarjeta | PR #57 (3b5e114) |
-| RP39 | S36 | en línea (texto de instrucciones y pruebas); RED primero (7 de 9); decisión A y A tomada sobre mi recomendación | pendiente de commit |
+| RP39 | S36 | en línea (texto de instrucciones y pruebas); RED primero (7 de 9); decisión A y A tomada sobre mi recomendación | PR #58 (fca69e5) |
+| RP40 | S37 | en línea (bloque, requisito, instrucciones y pruebas); RED primero (14 de 16); supera las pruebas de «frenar» de RP39; reescrita por RP41 antes de publicarse | pendiente de commit |
+| RP41 | S38 | en línea (bloques, chequeo, orden, instrucciones, ejemplos y pruebas); RED primero (29 de 39); 7 mutaciones en copias temporales; el refresco de la huella se niega a aceptar texto cambiado sin versión | pendiente de commit |
 
 Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a → RP11b → RP12a → RP12b → RP12 → RP13 → RP14. RP12 puede ir antes de RP11 si la persona lo prefiere.
 
@@ -500,3 +504,56 @@ Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a →
 > - podemos acumular mas aprendizaje con otras pruebas o mejor arrancamos ya con rp39?
 
 *Aplicado: se revisaron `implementation-guides` y `pi-usage-audit` en solo lectura y se hizo RP39 con la recomendación A y A (frenar y preguntar ante un roadmap existente; `U0` como convención). La persona no contestó expresamente ese «sí»: se tomó su pregunta «mejor arrancamos ya con rp39?» como la señal.*
+
+**L54.**
+
+> La cadena de dependencias L1 → … → L6 que escribió el agente. no entendi esta parte
+>
+> botón del cajón «Roadmap conformity» no entendi esa parte, esto como para probar en otro repositorio ahora.
+>
+> podes revisaro los repos TecnomylPY.Backend, CROSS.PushNotifications, CROSS.BackofficeApi.
+>
+> me pide opciones para elegir, y cual me recomiendas para elegir?
+>
+> pero yo quiero que se adopte en todos los proyectos el mismo mecanismo de trabajo. quiero abandonar la manera vieja y tener un padron unificado de trabajo
+>
+> - si, quiero abandonar totalmente cualquier otra practica de crear y gestionar las tareas, tambien si tiene instrucciones en el agents.md de seguir como crear tarea quiero que se olvide e implemente el nuevo mecanismo de generar tareas. que de deje bien explicito el nuevo mecanismo. que deben ser.
+
+*Aplicado: lectura previa de los tres repos de H2O y RP40. La última frase de la persona quedó cortada («que deben ser.»); se interpretó como «que quede explícito» y se avisó para que la complete si quería decir otra cosa.*
+
+**L55.**
+
+> La clave de Jira como ID de fila en Tecnomyl (ABC-123), no entiendo este punto?
+>
+> en realidad muy probable supuso eso tecnomyl, no es una regla real del proyecto de tecnomyl, no quiero que adoptemos algo que no esta bien decidido, mas adelante talvez sirva eso, pero debo definir bien primero
+>
+> no, las reglas de ramas y commits, y prs quiero que siga de acuerdo al panel
+
+*Aplicado: RP40 se amplió a ramas, commits y PR (sección en el bloque `tareas` y pasos 5, 6 y 7 de `INSTALL.md`); no se escribió nada de Jira ni de IDs con clave de ticket; el formato de los IDs queda sin decidir.*
+
+**L56.**
+
+> puedes listarme todo lo que repo-panel va a imponer como condicion? y todo lo que le puede dejar que siga el repo? lo que pasa es que quiero que todos los repos se corrijan y trabajen de acurdo a lo que dice el panel porque en las reglas del panel estaremos aplicando buenas practicas y queremos que todos los repos apliquen esas buenas practicas. tambien hay que tener en cuenta que a todos los repos usamos netamente /flow-commit, /flow-pr, /flow-base.
+>
+> entre todo esto que te parece que esta mal y que podriamos mejorar?
+>
+> 1. podes revisar como actua /flow-commit, creo que considera algunas ramas protegidas y debemos proibir a los repos agregando en sus agents.md prohibir hacer commit por otros medios que no sea por /flow-commit.
+> 2. debe ser solo sobre tareas, revisa bien si la regla de tareas en bueno o recomendada.
+> 3. versiona.
+> 4. no es necesario.
+> 5. puedes mejorar. que es paso 7?
+> 6. el paso 8 pide rama de tarea, la «puerta» del
+> - explocame mejor este problema: ciclo pide estar en la rama base, y tareas dice que el agente no crea ramas. Hay que dejar una sola regla y explicar que durante la instalación sí se usa rama.
+> -
+> 7. para nuestros proyecto solo ya cuenta AGENTS.md y los otros ya son obsoletos.
+> 8. podriamos mejorar eso, vamos a aplicar en todos los repos.
+> 9. mejoresmos y corrijamos ese punto.
+> 10. hay excepciones como el de no hacer test en tecnomyl, pero podriamos retomar eso de test en tecnomyl. en su epoca era que se me uso complicado los test en tecnomyl y por eso pedi desactivar
+>
+> 3. confirmo lo de versionado.
+>
+> 3. confirmo lo de versionado.
+> 7. no podemos reconstruir a todos los repos sus agents.md correctamente? los otros muy probables son muy antiguos.
+> - el resto me cierra totalmente, todos tus propuestan esta bien
+
+*Aplicado: RP41 (bloque `entrega`, padrón versionado, `INSTALL.md` en pasos cortos con ejemplos que se ejecutan, huella que se niega a aceptar texto cambiado sin versión) y la lista de pruebas manuales ampliada; RP42 (vista global) queda para después. Sobre el punto 7: «reconstruir» se resolvió como estandarizar el principio del `AGENTS.md` (los bloques) sin reordenar ni resumir su contenido técnico, e informar los otros archivos con su fecha para que la persona decida.*

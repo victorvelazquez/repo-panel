@@ -7,7 +7,7 @@ const path = require('node:path');
 const lib = require('../lib.js');
 const { HttpError } = require('./errors.js');
 const { run } = require('./exec.js');
-const { requirementsFor } = require('./requirements.js');
+const { requirementsFor, padronVersion } = require('./requirements.js');
 const { prState } = require('./github.js');
 
 const INSTALL_PATH = path.join(__dirname, '..', 'requirements', 'INSTALL.md');
@@ -48,12 +48,12 @@ async function orcaTerminal(args) {
 
 // The one-line order that sends the agent to requirements/INSTALL.md. Built here from the requirement results
 // (non-pass ids, required first); the browser never supplies text or ids.
-function conditionsOrder(results, installPath = INSTALL_PATH) {
+function conditionsOrder(results, installPath = INSTALL_PATH, padron = padronVersion()) {
   if (/["\x00-\x1f\x7f]/.test(installPath)) throw new HttpError(500, 'The path of requirements/INSTALL.md has unsupported characters');
   const open = results.filter((r) => r.status !== 'pass');
   if (!open.length) throw new HttpError(409, 'Every requirement already passes: nothing to do');
   const ids = [...open.filter((r) => r.level === 'required'), ...open.filter((r) => r.level !== 'required')].map((r) => r.id);
-  return `Put this repo in conditions for repo-panel: read "${installPath}" (the user authorizes reading that one file outside this repo) and apply these requirement ids: ${ids.join(', ')}. ${INDEX_RULE}`;
+  return `Put this repo in conditions for repo-panel${padron ? ` (padrón ${padron})` : ''}: read "${installPath}" (the user authorizes reading that one file outside this repo) and apply these requirement ids: ${ids.join(', ')}. ${INDEX_RULE}`;
 }
 
 // Text that comes from GitHub (titles, branch and check names) goes into the order only after this: control

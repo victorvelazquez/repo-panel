@@ -88,6 +88,9 @@ function fileOfAny(facts, roles) {
 
 const rolesOf = (c) => (Array.isArray(c.files) ? c.files : [c.file]);
 
+// A whole line of the adoption record: `- **Padrón del panel:** 1.0` (the bullet and a `v` before the number are optional).
+const PADRON_LINE = /^[ \t]*(?:[-*][ \t]+)?\*\*Padrón del panel:\*\*[ \t]*v?(\d+(?:\.\d+)*)[ \t]*\r?$/m;
+
 const TYPES = {
   'base-branch': (c, facts) => {
     const s = facts.base && facts.base.status;
@@ -134,6 +137,18 @@ const TYPES = {
     if (b.status === 'ok') return make('pass', `${c.name} block version ${b.version}`);
     const detail = BLOCK_DETAIL[b.status]({ ...b, expected });
     return make(b.status === 'outdated' || b.status === 'legacy' ? 'outdated' : 'fail', detail);
+  },
+  // The adoption record names the padrón (the version of the panel's whole set of rules) the repo was put in conditions
+  // with. Another version is outdated, no line at all is a failure. It is what marks every repo when INSTALL.md changes.
+  padron: (c, facts, registry) => {
+    const f = fileOf(facts, c.file);
+    if (f.result) return f.result;
+    if (f.absent) return make('fail', `${f.path || c.file} not found on the base branch`);
+    const m = PADRON_LINE.exec(stripBom(f.text));
+    if (!m) return make('fail', 'no "Padrón del panel" line');
+    const expected = registry.padron;
+    if (expected && m[1] !== expected) return make('outdated', `padrón ${m[1]} found, ${expected} expected`);
+    return make('pass', `padrón ${m[1]}`);
   },
   // A local fact, not a file of the base branch: Git must ignore .panel/state.json in the working tree.
   'panel-ignored': (c, facts) => {
