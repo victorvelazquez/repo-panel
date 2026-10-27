@@ -154,16 +154,15 @@ test('onlyInRoom: a requirement marked for members is omitted outside a room and
   assert.equal(ids(evaluate(REAL, memberFacts(registro + ciclo(SALA_REGION)))).includes('sala-region'), true);
 });
 
-test('levelInRoom: ciclo-block is recommended outside a room and required for members only', () => {
-  const agents = registro; // no ciclo block
-  const outside = evaluate(REAL, memberFacts(agents, null));
-  assert.equal(by(outside, 'ciclo-block').level, 'recommended');
-  assert.equal(by(outside, 'ciclo-block').status, 'fail');
+test('levelInRoom: a requirement can be recommended outside a room and required for members only (mechanism; no real requirement uses it since RP44)', () => {
+  const reg = { ...REG, requirements: [{ id: 'b', title: 'B', category: 'verificable', level: 'required', check: { type: 'base-branch' }, remedy: 'r' }, { id: 'x', title: 'X', category: 'verificable', level: 'recommended', levelInRoom: 'required', check: { type: 'block', file: 'agents', name: 'registro' }, remedy: 'r' }] };
+  const facts = (room) => ({ ...GOOD, room, files: { ...GOOD.files, agents: file('# nothing') } });
+  const outside = evaluate(reg, facts(null));
+  assert.equal(by(outside, 'x').level, 'recommended');
   assert.equal(outside.summary.ready, true);
-  const member = evaluate(REAL, memberFacts(agents));
-  assert.equal(by(member, 'ciclo-block').level, 'required');
+  const member = evaluate(reg, facts({ name: 'UPEN' }));
+  assert.equal(by(member, 'x').level, 'required');
   assert.equal(member.summary.ready, false);
-  assert.equal(evaluate(REAL, memberFacts(registro + ciclo(SALA_REGION))).summary.ready, true);
 });
 
 test('sala-region: passes only when the ciclo block holds both SALA markers', () => {
@@ -261,7 +260,7 @@ test('panel-ignored: passes when ignored, fails when not, unavailable when git c
 });
 
 test('the two panel requirements are recommended: failing them never makes a ready repo not ready', () => {
-  const out = evaluate(REAL, { ...GOOD, files: { ...GOOD.files, agents: file(block('1.0') + TAREAS + ENTREGA) }, local: { panelIgnored: { available: true, ignored: false } } });
+  const out = evaluate(REAL, { ...GOOD, files: { ...GOOD.files, agents: file(block('1.0') + TAREAS + ENTREGA + block(CURRENT_RULES.blocks.ciclo, 'ciclo')) }, local: { panelIgnored: { available: true, ignored: false } } });
   assert.equal(by(out, 'estado-block').status, 'fail');
   assert.equal(by(out, 'panel-ignored').status, 'fail');
   assert.equal(out.summary.ready, true);

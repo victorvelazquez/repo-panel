@@ -12,15 +12,15 @@
     "sha256": "873d25e8e04618d7890f86533372f8b73e4e1a27f9f30e82812c0b6ffd11dd28"
   },
   "tareas": {
-    "version": "1.1",
-    "sha256": "edf65227bbfd69c6a0175520cf7e9fbeb801dd33928ff25d1fddc73ed06763c0"
+    "version": "1.2",
+    "sha256": "d11a3bba5e50b61ba6d56633851a941c860ad3f6bca867ee25ed82bd668b581f"
   },
   "entrega": {
     "version": "1.0",
     "sha256": "819e7544b863a6c74a09eca88ebd8835c2b14c2bd2d96cfb12edf174ee7444a3"
   },
   "padron": {
-    "version": "1.1",
-    "sha256": "a5406dc99bdb9f8d73c98f6e822f6e7aba684e5b4215c2d82835eaa5a0a4880c"
+    "version": "1.2",
+    "sha256": "7570948c2bd6645b6e3621b4f9f79d0d00244fc88f6fb94740c4696cedf4e14c"
   }
 }
