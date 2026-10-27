@@ -54,7 +54,7 @@ test('the block talks ONLY about tasks: nothing about branches, commits or pull 
 
 // ---------- the registry ----------
 test('the registry versions the block and asks for it as a REQUIRED requirement right after registro-block', () => {
-  assert.equal(registry.blocks.tareas, '1.0');
+  assert.match(registry.blocks.tareas, /^\d+\.\d+$/);
   const ids = registry.requirements.map((r) => r.id);
   assert.equal(ids[ids.indexOf('registro-block') + 1], 'tareas-block');
   const req = registry.requirements.find((r) => r.id === 'tareas-block');
@@ -66,8 +66,11 @@ test('the registry versions the block and asks for it as a REQUIRED requirement 
 });
 
 test('a repo without the block, or with an old version of it, does not pass', () => {
-  assert.equal(parseBlock('# Repo\n', 'tareas', '1.0', 'panel').status, 'missing');
-  assert.equal(parseBlock(BLOCK().replace('panel:tareas v1.0', 'panel:tareas v0.9'), 'tareas', '1.0', 'panel').status, 'outdated');
+  const wanted = registry.blocks.tareas;
+  assert.equal(parseBlock('# Repo\n', 'tareas', wanted, 'panel').status, 'missing');
+  const older = BLOCK().replace(/panel:tareas v\d+\.\d+/, 'panel:tareas v0.1');
+  assert.notEqual(older, BLOCK(), 'the marker was really changed');
+  assert.equal(parseBlock(older, 'tareas', wanted, 'panel').status, 'outdated');
 });
 
 // ---------- the procedure ----------

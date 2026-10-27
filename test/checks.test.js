@@ -7,10 +7,11 @@ const HEAD = '**Dónde está:** a\n**Qué sigue:** b\n**Qué lo bloquea:** c\n';
 const TABLE = '| ID | Entrega | Resultado visible | Depende de | Estado | Notas | Ficha |\n| --- | --- | --- | --- | --- | --- | --- |\n| A1 | e | r | — | Pendiente | | — |\n';
 const block = (v, name = 'registro') => `# R\n<!-- orquestacion:${name} v${v} -->\nrules\n<!-- /orquestacion:${name} -->\n`;
 // The required panel block of RP40: a repo that meets everything carries it next to registro.
-const TAREAS = '<!-- panel:tareas v1.0 -->\nrules\n<!-- /panel:tareas -->\n';
-const ENTREGA = '<!-- panel:entrega v1.0 -->\nrules\n<!-- /panel:entrega -->\n';
+const CURRENT_RULES = require('../requirements.json'); // the versions come from the registry, never written by hand
+const TAREAS = `<!-- panel:tareas v${CURRENT_RULES.blocks.tareas} -->\nrules\n<!-- /panel:tareas -->\n`;
+const ENTREGA = `<!-- panel:entrega v${CURRENT_RULES.blocks.entrega} -->\nrules\n<!-- /panel:entrega -->\n`;
 // RP41: the adoption record of a repo that meets everything carries the padrón line.
-const ADOPTION = '# Adopción\n\n- **Padrón del panel:** 1.0\n';
+const ADOPTION = `# Adopción\n\n- **Padrón del panel:** ${CURRENT_RULES.padron}\n`;
 
 test('parseBlock: a closed block is ok, with or without an expected version', () => {
   assert.deepEqual(parseBlock(block('1.0'), 'registro'), { status: 'ok', version: '1.0' });

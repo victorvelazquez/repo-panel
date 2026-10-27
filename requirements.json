@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "padron": "1.0",
-  "blocks": { "registro": "1.0", "ciclo": "1.0", "estado": "1.0", "tareas": "1.0", "entrega": "1.0" },
+  "padron": "1.1",
+  "blocks": { "registro": "1.0", "ciclo": "1.0", "estado": "1.0", "tareas": "1.1", "entrega": "1.0" },
   "requirements": [
     {
       "id": "base-branch",
@@ -33,7 +33,7 @@
       "category": "verificable",
       "level": "required",
       "check": { "type": "block", "file": "agents", "name": "tareas", "namespace": "panel" },
-      "remedy": "Add the panel 'tareas' block (version 1.0) to AGENTS.md exactly as in requirements/blocks/tareas.md, between <!-- panel:tareas v1.0 --> and <!-- /panel:tareas -->, and remove from AGENTS.md every instruction about how to create or manage tasks (requirements/INSTALL.md step 7): the new mechanism replaces them."
+      "remedy": "Add the panel 'tareas' block to AGENTS.md exactly as in requirements/blocks/tareas.md, between its opening and closing markers (a block already there with an older version is replaced where it stands), and remove from AGENTS.md every instruction about how to create or manage tasks (requirements/INSTALL.md step 7): the new mechanism replaces them."
     },
     {
       "id": "entrega-block",
@@ -41,7 +41,7 @@
       "category": "verificable",
       "level": "required",
       "check": { "type": "block", "file": "agents", "name": "entrega", "namespace": "panel" },
-      "remedy": "Add the panel 'entrega' block (version 1.0) to AGENTS.md exactly as in requirements/blocks/entrega.md, between <!-- panel:entrega v1.0 --> and <!-- /panel:entrega -->, and remove from AGENTS.md every instruction about branches, commits and pull requests for day-to-day work (requirements/INSTALL.md step 8): the new mechanism replaces them. Nothing commits but /flow-commit."
+      "remedy": "Add the panel 'entrega' block to AGENTS.md exactly as in requirements/blocks/entrega.md, between its opening and closing markers (a block already there with an older version is replaced where it stands), and remove from AGENTS.md every instruction about branches, commits and pull requests for day-to-day work (requirements/INSTALL.md step 8): the new mechanism replaces them. Nothing commits but /flow-commit."
     },
     {
       "id": "roadmap-file",
@@ -99,7 +99,7 @@
       "category": "verificable",
       "level": "required",
       "check": { "type": "padron", "file": "adoption" },
-      "remedy": "Once every other requirement of the order is applied, write the line `- **Padrón del panel:** 1.0` in docs/ORQUESTACION.md (create the file if it does not exist), using the padrón version of requirements.json (requirements/INSTALL.md step 10). It records which version of the panel's rules this repo was put in conditions with, so a later change of the rules marks the repo as outdated."
+      "remedy": "Once every other requirement of the order is applied, write the line `- **Padrón del panel:** ` followed by the padrón version of requirements.json in docs/ORQUESTACION.md (create the file if it does not exist), as requirements/INSTALL.md step 10 says. It records which version of the panel's rules this repo was put in conditions with, so a later change of the rules marks the repo as outdated."
     },
     {
       "id": "estado-block",
@@ -107,7 +107,7 @@
       "category": "verificable",
       "level": "recommended",
       "check": { "type": "block", "file": "agents", "name": "estado", "namespace": "panel" },
-      "remedy": "Add the panel 'estado' block (version 1.0) to AGENTS.md exactly as in requirements/blocks/estado.md, between <!-- panel:estado v1.0 --> and <!-- /panel:estado -->; if AGENTS.md has rules that conflict, stop and ask the user."
+      "remedy": "Add the panel 'estado' block to AGENTS.md exactly as in requirements/blocks/estado.md, between its opening and closing markers (a block already there with an older version is replaced where it stands); if AGENTS.md has rules that conflict, stop and ask the user."
     },
     {
       "id": "panel-ignored",

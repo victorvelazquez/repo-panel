@@ -1,4 +1,4 @@
-<!-- panel:tareas v1.0 -->
+<!-- panel:tareas v1.1 -->
 ## Panel: mecanismo de tareas (el único)
 
 Este es el ÚNICO mecanismo para crear y gestionar tareas en este repositorio. Cualquier otra instrucción sobre cómo crear, nombrar, priorizar, seguir o cerrar tareas, en este archivo o en cualquier otro, queda sin efecto: no la sigas ni la repitas.
@@ -7,7 +7,7 @@ Este es el ÚNICO mecanismo para crear y gestionar tareas en este repositorio. C
 
 **Crear.** Antes de trabajar en algo, agregá su fila con estado `Pendiente` y estos campos: `ID` único (empieza con letra; letras, números, `.`, `_` y `-`), `Entrega` (qué entrega), `Resultado visible` (qué podrá ver o comprobar la persona), `Depende de` (IDs de filas de la tabla, o `—`; nunca las inferas), `Notas` (el detalle) y `Ficha`. Si necesita más detalle, su ficha va en `odd/tasks/<ID>.md` y se enlaza en `Ficha`.
 
-**Tomar.** `siguiente` toma la primera fila `Pendiente` cuyas dependencias que son filas de la tabla estén `Completada`. Al empezar, pasa a `En curso`. Una tarea = un PR.
+**Tomar.** `siguiente` toma la primera fila `Pendiente` cuyas dependencias que son filas de la tabla estén `Completada`. Una tarea = un PR. Antes de empezar, si sus `Notas` dicen «sin verificar» (viene de una migración), verificá si ya está hecha: juntá evidencia (PR fusionados, commits, pruebas que pasan, recibos) y decile a la persona si ya está hecha, si falta o si no se puede saber. Nunca la marques `Completada` sin su OK; con su OK, dejá la evidencia en `Notas` y sacá «sin verificar». Si falta, recién ahí pasa a `En curso`.
 
 **Cerrar.** En el mismo diff que la implementa: su fila pasa a `Completada`, la cabecera del roadmap se actualiza (`Dónde está`, `Qué sigue`, `Qué lo bloquea`) y su ficha se cierra. Si no podés seguir, queda `Bloqueada` con el motivo en `Notas`.
 

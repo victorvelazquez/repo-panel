@@ -14,6 +14,7 @@ const { requirementsFor } = require('../server/requirements.js');
 const { conditionsOrder } = require('../server/pi.js');
 
 const ROOT = path.join(__dirname, '..');
+const CURRENT_RULES = require('../requirements.json'); // the padrón comes from the registry, never written by hand
 const lf = (text) => text.replace(/\r\n/g, '\n');
 const block = (name) => lf(fs.readFileSync(path.join(ROOT, 'requirements', 'blocks', `${name}.md`), 'utf8'));
 
@@ -24,7 +25,7 @@ const agents = (...blocks) => `# Repo\n\n${blocks.join('\n')}`;
 const CONFORMING = {
   'AGENTS.md': agents(block('registro'), block('tareas'), block('entrega'), block('ciclo'), block('estado')),
   'docs/ROADMAP.md': ROADMAP,
-  'docs/ORQUESTACION.md': '# Orquestación\n\n- **Padrón del panel:** 1.0\n',
+  'docs/ORQUESTACION.md': `# Orquestación\n\n- **Padrón del panel:** ${CURRENT_RULES.padron}\n`,
 };
 
 const made = [];

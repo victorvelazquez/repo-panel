@@ -46,6 +46,7 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 - **S36. Frenar y preguntar ante un roadmap existente.** De las pruebas reales sobre `implementation-guides` y `pi-usage-audit`: «no me pregunto nada» y «mejor arrancamos ya con rp39».
 - **S37. Un solo mecanismo de tareas.** «pero yo quiero que se adopte en todos los proyectos el mismo mecanismo de trabajo. quiero abandonar la manera vieja y tener un padron unificado de trabajo»; «quiero abandonar totalmente cualquier otra practica de crear y gestionar las tareas, tambien si tiene instrucciones en el agents.md de seguir como crear tarea quiero que se olvide e implemente el nuevo mecanismo de generar tareas. que de deje bien explicito el nuevo mecanismo. que deben ser.»; y después: «no, las reglas de ramas y commits, y prs quiero que siga de acuerdo al panel».
 - **S38. El estándar completo: entrega, padrón y un solo AGENTS.md.** «debemos proibir a los repos agregando en sus agents.md prohibir hacer commit por otros medios que no sea por /flow-commit»; «debe ser solo sobre tareas»; «versiona»; «para nuestros proyecto solo ya cuenta AGENTS.md y los otros ya son obsoletos»; «vamos a aplicar en todos los repos» (vista global, RP42); «hay excepciones como el de no hacer test en tecnomyl, pero podriamos retomar eso»; «el resto me cierra totalmente, todos tus propuestan esta bien».
+- **S39. Historial y pendientes «sin verificar».** «lo que podriamos hacer es dejar como historial e importar lo que falta hacer todavia si es que valen la pena todavia»; «pero dificil que yo sepa si las tareas ya se implementaron o no… podemos dejar como pendietes y despues cuando se intente aplicar se verificara»; «quiero que hagas ya la correccion y aplicamos a todas».
 
 ## Tasks
 
@@ -89,8 +90,9 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 | RP37 | S34 | en línea (tests y documentación); sin RED natural, 5 mutaciones en copia temporal; repos de mentira con Git real | PR #56 (2df925e) |
 | RP38 | S35 | en línea (un botón y una regla de estilo); RED primero (5 de 7); reutiliza la acción de la tarjeta | PR #57 (3b5e114) |
 | RP39 | S36 | en línea (texto de instrucciones y pruebas); RED primero (7 de 9); decisión A y A tomada sobre mi recomendación | PR #58 (fca69e5) |
-| RP40 | S37 | en línea (bloque, requisito, instrucciones y pruebas); RED primero (14 de 16); supera las pruebas de «frenar» de RP39; reescrita por RP41 antes de publicarse | pendiente de commit |
-| RP41 | S38 | en línea (bloques, chequeo, orden, instrucciones, ejemplos y pruebas); RED primero (29 de 39); 7 mutaciones en copias temporales; el refresco de la huella se niega a aceptar texto cambiado sin versión | pendiente de commit |
+| RP40 | S37 | en línea (bloque, requisito, instrucciones y pruebas); RED primero (14 de 16); supera las pruebas de «frenar» de RP39; reescrita por RP41 antes de publicarse | PR #59 (22602ab) |
+| RP41 | S38 | en línea (bloques, chequeo, orden, instrucciones, ejemplos y pruebas); RED primero (29 de 39); 7 mutaciones en copias temporales; el refresco de la huella se niega a aceptar texto cambiado sin versión | PR #59 (22602ab) |
+| RP43 | S39 | en línea (bloque, instrucciones, ejemplos y pruebas); RED primero (10 de 11); 7 mutaciones; huella aceptada sin force por la subida de versión | pendiente de commit |
 
 Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a → RP11b → RP12a → RP12b → RP12 → RP13 → RP14. RP12 puede ir antes de RP11 si la persona lo prefiere.
 
@@ -557,3 +559,23 @@ Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a →
 > - el resto me cierra totalmente, todos tus propuestan esta bien
 
 *Aplicado: RP41 (bloque `entrega`, padrón versionado, `INSTALL.md` en pasos cortos con ejemplos que se ejecutan, huella que se niega a aceptar texto cambiado sin versión) y la lista de pruebas manuales ampliada; RP42 (vista global) queda para después. Sobre el punto 7: «reconstruir» se resolvió como estandarizar el principio del `AGENTS.md` (los bloques) sin reordenar ni resumir su contenido técnico, e informar los otros archivos con su fecha para que la persona decida.*
+
+**L57.**
+
+> aplique put in conditions en repo-panel, implementation-guides, flow-skills, pi-usage-audit
+>
+> revisa backofficeapi porque freno
+>
+> ya ejecute los dos comandos, puedes revisar devuelta y decirme que falta
+>
+> puedes revisar devuelta
+>
+> No migres openspec/ ni crees filas para esos tasks.md: dejalo como está. n entiendo esa parte
+>
+> lo que podriamos hacer es dejar como historial e importar lo que falta hacer todavia si es que valen la pena todavia o si corresponden todavia, o si no corresponden mas dejamos como historial?
+>
+> pero dificil que yo sepa si las tareas ya se implementaron o no, si te parece bien podemos dejar como pendietes y despues cuando se intente aplicar se verificara que ya esta completo y ahi se marca como completo. despues le mando revisar y actualizar todo, o si puede ya actualizar mistras se hace la migracion? que me decis de eso? de simpre revisar las tareas viejas de los repos y los pendietnes revisar si falta ejecutar o no y los que falta se migran a la manera nueva de gestionar las tareas? seria bueno eso o no seria factible?
+>
+> quiero que hagas ya la correccion y aplicamos a todas
+
+*Aplicado: revisión de los cuatro repos ya adoptados (todos en 9 de 9 y 4 de 4) y de `CROSS.BackofficeApi` (frenó por un stash; parche movido fuera del repo) y RP43. La verificación de lo «sin verificar» queda como regla del bloque `tareas`; un botón del panel para pedirla queda abierto.*

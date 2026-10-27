@@ -1,6 +1,6 @@
 # Worked examples for INSTALL.md
 
-Every example is checked by `test/rp41-standard.test.js`: the "after" tables must pass the panel's validator. If an example and INSTALL.md disagree, INSTALL.md wins; say so in your report.
+Every example is checked by the tests (`test/rp41-standard.test.js` and `test/rp43-history-and-pending.test.js`): the "after" tables must pass the panel's validator. If an example and INSTALL.md disagree, INSTALL.md wins; say so in your report.
 
 ## A. A table with other column names (step 7)
 
@@ -62,6 +62,8 @@ The source says on the left; you write on the right. A word that is not here: ST
 | In progress, WIP, En progreso, En curso | En curso |
 | Done, Delivered, Merged, Entregado, Integrado, Completada | Completada |
 | Blocked, Bloqueado, Bloqueada | Bloqueada |
+| Paused or On hold, naming what blocks it (`Paused - Bloqueado por DevOps`) | Bloqueada |
+| Paused or On hold, naming nothing (`Paused - Nice-to-have`) | Pendiente |
 ```
 
 ## D. Rules about branches, commits and pull requests in `AGENTS.md` (step 8)
@@ -112,4 +114,26 @@ Otros archivos de instrucciones, ahora obsoletos (no los toqué):
 - .cursorrules — último commit 2025-11-27 — encabezados que AGENTS.md no tiene: «Cursor rules», «Prompts»
 - .github/copilot-instructions.md — último commit 2026-08-05 — encabezados que AGENTS.md no tiene: «Input Validation», «Security Checklist»
 Siguiente: correr /flow-commit; el ID de la tarea para el título del PR es kubernetes-health-probes.
+```
+
+## F. A checklist inside each change (step 7)
+
+Before: `openspec/changes/export-users/tasks.md`. It is the breakdown of ONE change, not a list of the project's tasks.
+
+```md ejemplo:f-antes
+# Tasks: export-users (openspec/changes/export-users/tasks.md)
+
+- [x] 1.1 Export endpoint contract
+- [x] 1.2 Export endpoint implementation
+- [ ] 2.1 CSV streaming for large exports
+- [ ] 2.2 Rate limit of the export endpoint
+- [ ] 3.1 Document the export in the API guide
+```
+
+After: the folder stays untouched, as history, and the roadmap gets ONE row for the whole change: pending, marked "sin verificar", with the count of unchecked steps. A change with every step checked, and an archived one, gets no row.
+
+```md ejemplo:f-despues
+| ID | Entrega | Resultado visible | Depende de | Estado | Notas | Ficha |
+| --- | --- | --- | --- | --- | --- | --- |
+| export-users | Exportar usuarios en CSV | — | — | Pendiente | Migrada; sin verificar si ya se implementó (3 de 5 pasos sin marcar) | openspec/changes/export-users/ |
 ```
