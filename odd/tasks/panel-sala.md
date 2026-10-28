@@ -19,7 +19,7 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 - **S11. `implementation-guides`.** «quiero que sea como tu recomendacion de que solo de referencia del panel, y que todo haga panel ya y elimines todo lo necesario de este tema de la implementation-guides, que solo quede la referencia de instalar panel opcional.» La fuente única de lo que el panel exige es el archivo de requisitos del panel. Es otro proyecto de la persona: las ediciones allí se hacen con su autorización y por su propio ciclo.
 - **S12. Repartir `server.js`.** «me parece ideal ya repartir server.js para estar preparado al crecimiento». Sin cambio de comportamiento, protegido por los tests.
 - **S13. Sala.** «cumplir con las condiciones de sala y mostrar en el panel en cada tarjeta o repo a que sala esta incluida y si la sala esta activa o no», poder «elegir cual es la carpeta de la sala», varias salas posibles (ej. grupo H2O, grupo TOOLS) y condiciones que debe cumplir una carpeta/repo para ser sala y para integrarse. Referencia: `upen-ceo`. Hallazgos: la sala no tiene marcador formal ni los repos declaran a qué sala pertenecen (solo `ENLACES.md` sección 2, `proyectos.conf` o listas fijas); los repos de `upen` usan un bloque viejo sin versión; `repo-panel` está fuera de la sala de UPEN por diseño. La pertenencia la declara la configuración del panel y se contrasta con `ENLACES.md`. «Sala abierta» = hay una terminal `π` en su carpeta (Orca); «sala atrasada» = último barrido anterior a PR fusionados (parcial, markdown libre).
-- **S14. Chat de la sala.** «lo ideal seria tener la conversacion del chat de la sala en el panel, pero eso no se todavia si es factible o conveniente.» Hallazgo: factible (JSONL de pi) pero privado y sin verificar el esquema; recomendado: no mostrarlo y ofrecer un botón que lleve a la terminal de la sala. Decisión pendiente de la persona; es la última unidad y opcional.
+- **S14. Chat de la sala.** «lo ideal seria tener la conversacion del chat de la sala en el panel, pero eso no se todavia si es factible o conveniente.» Hallazgo: factible (JSONL de pi). Reescrita el 2026-10-28 (L70): «la descartas creo, cambiamos de requerimiento.» Ya no se ofrece solo un botón hacia la terminal de la sala: el chat se muestra en el panel (RP54 a RP57) y RP14 se descartó.
 - **S15. Sin base de datos.** «no necesitamos de historial de ejecuciones, cola, caché, eventos, consultas sobre historial, escrituras desde varios procesos a la vez (panel y agentes) o garantías de atomicidad.» Todo en archivos, sin dependencias, Node sin compilar.
 - **S16. Nombre.** Se mantiene `repo-panel` por ahora; revisar cuando la sala esté integrada, con un identificador interno estable.
 - **S17. Idea futura de la persona.** Una sola sesión de pi como sala que orquesta los repos integrados, pudiendo abrir una sesión en un repo sin actividad según su estado (limpio o no), y la persona solo presiona: commitear, hacer PR, confirmar el PR en GitHub, volver a la base actualizada y limpia, nuevo ciclo. La persona ampliará la idea más adelante; no implementar sin su detalle.
@@ -59,6 +59,11 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 - **S49. Escribir a la sesión.** «acepto texto libre si la sesion esta libre.»; «no debeemos perder la accion rapida de enviar los comando desde la lisa»; «podemos asegurar de alguna manera que la primera vez al iniciar sesion se inicie todo primero antes de enviar cualquuier orden.». Unidad RP55.
 - **S50. Diálogos de pi en el chat.** «cuando la sesion de pi esta esperando una repuesta o una accion si se puede presentar en el chat como para elegir o responder?»; «podemos revocar esa desicion de 'seguridad' que deja de ser conveniente si nos bloquea una accion productiva». Unidad RP56.
 - **S51. Chat de la sala.** «lo mas util seria poder abrir una conversacion con la sesion de la sala, asi podriamos poder enviar acciones o coordinar tareas, conversar sobre ideas o planificar futuras tareas para cualquier proyecto». Unidad RP57.
+- **S52. Tarjetas compactas y su orden.** «muy grande se vven cada tarjetas, podriamos hacer mas razonable el tamaño.»; «me gusta como quedo»; «1. confirmo el orden.» El Resumen es una lista de tarjetas de dos líneas (nombre y rama, estado con ícono y palabra, avance, siguiente y UNA acción). Orden estable: la sala fija arriba, luego por grupo en el orden de `config.json`; nunca por estado. La urgencia se ve con borde y palabra, y el filtro «Necesitan atención» ordena con el ranking de `lib.workQueue`. Maqueta D: `design/panel-chat/05-tarjetas-y-chat.html`. Unidad RP59.
+- **S53. Divisor ajustable y lista como selector.** «y cuando la pantalla sea mas chica podrias hacer que sea flexible y que ocupen mitad y mitad la pantalla y que se redimensionen tanto la anchura de la tarejas y el chat, o mejor si se puede ajustar a mano la barra que divide a los dos y dejar a gusto el ancho del chat mas grande y las tarjetas mas chica o inversa.»; «ya esta demas repetir la lista de repos arriba». Las tarjetas son el único selector del chat. El divisor se arrastra, responde a las flechas y el doble clic lo restablece; el chat no baja de 340 px ni las tarjetas de 360 px; la proporción se guarda; menos de 1100 px reparte 50/50 y menos de 720 px apila. Unidad RP54.
+- **S54. Acciones rápidas.** «las acciones rapidas de /flow-new, /flow-commit, /flow-pr, /flow-base podrian aparecer dentro de cada tarjeta de cada repos dependiendo de que esta habilitado como siguiente accion. tambien podriamos eliminar del chat de la parte de arriba y colocar de abajo al lado izquirdo del boton del chat de enviar». Se entiende `/flow-new` como `/flow-next`. Cada tarjeta muestra la única acción que corresponde (RP59) y el chat tiene un menú «/ Acciones» junto a Enviar con las disponibles y las no disponibles con su motivo (RP55).
+- **S55. El diff de los cambios no se pierde.** «una cosa que no vi en ningun lugar de la pantalla, los diff que nos mostraba la cantidad de archivos modificados y al dar clic encima que mostraba los codigos cambiados». Cada tarjeta con cambios conserva sus chips: «● N archivos +A −D» (al hacer clic abre el diff, con la lista de archivos y el código cambiado), «↑ N sin subir» y «↓ N atrás». Con el chat (RP54) el diff se muestra en una pestaña «Cambios» del mismo panel derecho, sin otro cajón. Unidades RP59 y RP54.
+- **S56. El chat vive solo en Summary.** «chat va solo en summary.» El chat y su pestaña «Cambios» se muestran solo en la pestaña Summary; Work conserva el tablero por etapas, su tira «Go work on» y su cajón de diff tal como hoy, a todo el ancho. Unidad RP54.
 
 ## Tasks
 
@@ -75,7 +80,7 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 | RP12c | S3, S4 | worker acotado; la franja «Go work on» con tipos `manual` y `waiting`, `API_VERSION` 9 y icono; fusionado en PR #32 | `e4d4d66` |
 | RP12d | S1, S13 | worker acotado; `piScreenState`, `terminalsOfWorktree`, `scanSessions` y presencia por pantalla; fusionado en PR #33 | `9088a00` |
 | RP13 | S11 | hecho en `implementation-guides` (perfil renombrado, afirmaciones falsas corregidas, párrafo opcional del panel; 58 pruebas bien); su commit y PR los hace la persona en ese repositorio | `2418264` (PR #8 de `implementation-guides`) |
-| RP14 | S14, S17 | opcional: botón hacia la terminal de la sala; chat solo si la persona lo decide | pendiente por decisión de la persona: solo el botón hacia la sala, sin chat, cuando ya use una sala | — |
+| RP14 | S14, S17 | descartada por cambio de requerimiento (L70); la absorben RP54 a RP57 | — |
 | RP15 | S6 | worker acotado; `tray.ps1`, `install-tray.ps1`, `uninstall-tray.ps1` y `test/tray.test.js`; hecho y verificado salvo lo que depende del escritorio | `f1ca93f` (PR #34) |
 | RP16 | S6 | `min-width: 0` en `.clean-row .roadmap`; defecto de la columna CLEAN visto en el panel real; medido antes y después en Edge | `cf76fb0` (PR #35) |
 | RP17 | S18 | worker acotado; `flowButtons`, botón `/flow-branch`, orden `fix-pr` («Fix with pi») y `test/flow-scenario.test.js`; verificado en Edge real con `gh` simulado; ajustado con `/flow-branch --stash` para una rama fusionada y sucia y con una orden `fix-pr` más amplia | pendiente de commit |
@@ -114,11 +119,12 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 | RP51 | S46 | worker `gentle-ai-worker` con encargo cerrado; RED (módulo inexistente), GREEN 16 de 16; el padre revisó el diff y corrió la suite completa (889 de 890, 1 salteada) | pendiente de commit |
 | RP52 | S46 | worker `gentle-ai-worker` con encargo cerrado; RED (módulo inexistente), GREEN 39 de 39; una segunda vuelta corrigió 4 defectos visuales vistos con Edge sobre los 15 repos reales; el padre corrió la suite completa (945 de 946, 1 salteada) | pendiente de commit |
 | RP53 | S47 | worker `gentle-ai-worker` con encargo cerrado; RED (módulo inexistente), GREEN 16 de 16; el padre revisó el diff y corrió la suite completa (905 de 906, 1 salteada) | pendiente de commit |
-| RP54 | S48 | pendiente | — |
-| RP55 | S49 | pendiente; verificación independiente | — |
+| RP54 | S48, S53, S55, S56 | pendiente | — |
+| RP55 | S49, S54 | pendiente; verificación independiente | — |
 | RP56 | S50 | pendiente; verificación independiente | — |
 | RP57 | S51 | pendiente | — |
 | RP58 | S46 | worker `gentle-ai-worker` con encargo cerrado; RED 7 fallos en lo del botón y 2 en lo de RP51; el padre corrió la suite completa, que encontró una prueba que fija la lista exacta de comandos y la actualizó | pendiente de commit |
+| RP59 | S52, S54, S55 | pendiente; la persona la aprueba mirándola | — |
 
 Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a → RP11b → RP12a → RP12b → RP12 → RP13 → RP14. RP12 puede ir antes de RP11 si la persona lo prefiere.
 
@@ -756,3 +762,40 @@ Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a →
 > confirmo la estrategia y podes cerrar las terminales.
 
 *Aplicado: dos terminales de prueba creadas y cerradas; el historial de `gentle-shell` queda en `~/.gentle-shell/agent/sessions/--ruta--/<fecha>_<id>.jsonl` y se crea con el primer mensaje real; el detalle está en `.panel/PLAN-MAESTRO.md`, sección 10.*
+
+**L70.**
+
+> en el 01-chat-repo, podriamos cambiar estos detalles, me gustaria que la interfaz sea limpia, cuando menos en mejor, pero sin descartar utilidad o funcionalidad. puedes realizar algunos ajustes y mostrarme devuelta para ver?
+> y en 02-chat entiendo que son ejemplos posibles y que no va a ser una venta real con varios chats verdad? si es asi el ultimo ejemplo no entendi bien que propone enviar los mensajes a los repos pero muestra el bonton ver en el repo.
+>
+> podes presentar tambien la version anterior a lado y te digo que me gusta y que no me gusta? si queres una tercera opcion no estaria mal tambien
+>
+> - creo que me retracto de lo de menos es mas, porque me parecio muy simple ya otra vez las alternativas B y C me parecio muy desordenado ya. tengamos nuevos enfoque en el ui/ux; quiero algo lindo, moderno, agradable, completo pero sin repetir funciones o bloques. asi que puedes ajustar devuelta con esos criterios y te paso mas detalles de mi gusto:
+> - me gusta mas la interfaz general de A.
+> - me gusta la lista de A, en fotmato de tarjetas con sus detalles mas los detalles; estado, barra de avance, siguiente y demas que pueda ser util.
+> - me gusta mas el chat de A con sus estilos en burbujas, solo creo que ya esta demas repetir la lista de repos arriba, pero no se si da utilidad para seleccionar los chats o podria solo seleccionar por la lista de repos?
+> - las acciones rapidas de /flow-new, /flow-commit, /flow-pr, /flow-base podrian aparecer dentro de cada tarjeta de cada repos dependiendo de que esta habilitado como siguiente accion. tambien podriamos eliminar del chat de la parte de arriba y colocar de abajo al lado izquirdo del boton del chat de enviar, asi como usan los otros chats de ias. seria bueno investigar como funcionan los otros chats de ias y traer alguna sujerencia de diseño o funcionalidades que puedan ser util para nosotros.
+>
+> - muy grande se vven cada tarjetas, podriamos hacer mas razonable el tamaño.
+> - y cuando la pantalla sea mas chica podrias hacer que sea flexible y que ocupen mitad y mitad la pantalla y que se redimensionen tanto la anchura de la tarejas y el chat, o mejor si se puede ajustar a mano la barra que divide a los dos y dejar a gusto el ancho del chat mas grande y las tarjetas mas chica o inversa.
+>
+> me gusta como quedo, y la lista de tarjetas como se ordenaran? se reordenara de acuerdo al estado o no es necesario, analisa que convien y que no confunda todo.
+>
+> 1. confirmo el orden.
+> 2. la descartas creo, cambiamos de requerimiento.
+
+*Aplicado: la fila que la persona descartó es RP14 (el asistente la llamó RP11 por error durante varios turnos; RP11a y RP11b están completadas). Se quita de `docs/ROADMAP.md` porque el estándar no tiene un estado «descartada» y su ficha queda marcada. S14 se reescribe; S52 a S54 recogen el rediseño; se registra RP59 y se reescriben RP54, RP55 y RP57. Maqueta aprobada: `design/panel-chat/05-tarjetas-y-chat.html` (D).*
+
+**L71.**
+
+> una cosa que no vi en ningun lugar de la pantalla, los diff que nos mostraba la cantidad de archivos modificados y al dar clic encima que mostraba los codigos cambiados
+
+*Aplicado: era una omisión del asistente: el chip de cambios existe hoy en la pestaña Work pero no estaba en el Resumen ni en la maqueta D. Se agrega S55 y se ajustan RP59 y RP54; la maqueta D lo muestra como chip en la tarjeta y pestaña «Cambios» en el panel derecho. Al verificarla con Edge se encontró y corrigió que el chat seguía dibujado bajo el diff (el CSS pisaba el atributo `hidden`).*
+
+**L72.**
+
+> y en las otras pestañas como work y conformity que se mostrara?
+>
+> - chat va solo en summary.
+
+*Aplicado: S56. El chat y la pestaña «Cambios» viven solo en Summary; Work no cambia. Queda abierta, sin registrar, la propuesta de que Conformity pase de cajón lateral a una vista a todo el ancho con el número de pendientes en la pestaña, hasta que la persona la confirme.*
