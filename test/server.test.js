@@ -79,13 +79,24 @@ test('GET /view.js is served and /health reports the api of that same file', asy
   } finally { child.kill(); }
 });
 
-test('the page loads view.js before app.js and has the outdated banner', async () => {
+test('GET /resumen.js is served as the file on disk (RP52)', async () => {
+  const port = await freePort();
+  const child = launch(port);
+  try {
+    const res = await waitFor(() => get(port, '/resumen.js'));
+    assert.equal(res.status, 200);
+    assert.equal(res.body, fs.readFileSync(path.join(PUBLIC, 'resumen.js'), 'utf8'));
+  } finally { child.kill(); }
+});
+
+test('the page loads view.js, then resumen.js, then app.js and has the outdated banner', async () => {
   const port = await freePort();
   const child = launch(port);
   try {
     const html = (await waitFor(() => get(port, '/'))).body;
     assert.ok(html.indexOf('<script src="/view.js">') > -1);
-    assert.ok(html.indexOf('/view.js') < html.indexOf('/app.js'));
+    assert.ok(html.indexOf('/view.js') < html.indexOf('/resumen.js'));
+    assert.ok(html.indexOf('/resumen.js') < html.indexOf('/app.js'));
     assert.match(html, /id="outdated"[^>]*hidden/);
   } finally { child.kill(); }
 });
