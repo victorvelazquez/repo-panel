@@ -53,6 +53,12 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 - **S43. La sala se pone en condiciones.** «la sala debe tener tambien su lista de put in conditions tambien y debe reemplazar todo lo que deba como lo haciamos con los repos normales»; «primero deberia haber la sala para ir agregando repos»; «cuando se agregue otro repo y la sala ya existe, se debe installar los requisitos al repo e inscribirse a la sala existente»; «3. una orden del panel a la sala»; «1. lo recomendado»; «4. hacemos lo que creas necesario». Un solo número de padrón; la sala lleva los bloques `entrega`, `estado` y uno propio `sala`, y no `registro` ni `tareas` (su registro es `estrategia/TABLERO.md`). RP48 ya; RP49 a RP52 con el padrón 1.4.
 - **S44. Padrón 1.4.** «arrancamos padron 1.4 con las reglas aprendidas»; «ya estan todos entregados los pendientes, verifica»; «despues hacemos lo de la sala». Una sección manual que repite un bloque se reemplaza entera; un párrafo mixto se parte; una ficha solo recibe la línea puntero; la ficha nueva va donde el repo ya las guarda; clases de filas = orden de la tabla; ejecutores propios y tablas de herramientas se informan y no se tocan.
 - **S45. La limpieza del 1.4 se dispara sola.** «hace rp50». El panel detecta las secciones manuales que un bloque ya dice y el comando viejo `/flow-branch`, para que la orden nombre al repo y el agente aplique el paso 3 de `INSTALL.md`; sin subir el padrón.
+- **S46. Visualizador con alcance y Resumen.** «la pantalla 1 me parece bueno.»; «la pantalla 2 me parece bueno tambien». Maquetas aprobadas en `design/panel-resumen/` (datos ilustrativos). Los contratos productor×consumidor quedan fuera de la primera versión: «no veo utilidad de los contratos». Unidades RP51 y RP52.
+- **S47. Sesiones adoptadas.** «que si una repo agregada al panel no tiene sesion iniciada que inicie la sesion, le de nombre para identificar u obtenga su id para identificar y reservar ese identificador como la sesion adoptada por el panel y siempre interactuar con esa sesion»; «debemos hacer con gentle shell, ahi tengo todo configurado»; «confirmo la estrategia». Unidad RP53.
+- **S48. Un solo chat que cambia.** «no es necesario ver dos chats, mejor una nomas y que se cambie al seleccionar cada repo o sala»; «que se pueda leer tambien los ultimos mensajes de la sesion en ese chat». Unidad RP54.
+- **S49. Escribir a la sesión.** «acepto texto libre si la sesion esta libre.»; «no debeemos perder la accion rapida de enviar los comando desde la lisa»; «podemos asegurar de alguna manera que la primera vez al iniciar sesion se inicie todo primero antes de enviar cualquuier orden.». Unidad RP55.
+- **S50. Diálogos de pi en el chat.** «cuando la sesion de pi esta esperando una repuesta o una accion si se puede presentar en el chat como para elegir o responder?»; «podemos revocar esa desicion de 'seguridad' que deja de ser conveniente si nos bloquea una accion productiva». Unidad RP56.
+- **S51. Chat de la sala.** «lo mas util seria poder abrir una conversacion con la sesion de la sala, asi podriamos poder enviar acciones o coordinar tareas, conversar sobre ideas o planificar futuras tareas para cualquier proyecto». Unidad RP57.
 
 ## Tasks
 
@@ -105,6 +111,13 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 | RP48 | S43 | worker `gentle-ai-worker` con encargo cerrado; RED 6 de 7 en una copia limpia de HEAD; el padre revisó el diff y reprobó las pruebas | pendiente de commit |
 | RP49 | S44 | en línea (INSTALL, bloque tareas 1.3, EXAMPLES, requirements.json, checklist y prueba); RED primero (12 de 12); huella aceptada sin force por la subida de versión | pendiente de commit |
 | RP50 | S45 | worker `gentle-ai-worker` con encargo cerrado; RED 11 de 12; el padre revisó el diff y probó el chequeo contra los 15 repos reales | pendiente de commit |
+| RP51 | S46 | pendiente | — |
+| RP52 | S46 | pendiente; la persona la aprueba mirándola | — |
+| RP53 | S47 | pendiente | — |
+| RP54 | S48 | pendiente | — |
+| RP55 | S49 | pendiente; verificación independiente | — |
+| RP56 | S50 | pendiente; verificación independiente | — |
+| RP57 | S51 | pendiente | — |
 
 Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a → RP11b → RP12a → RP12b → RP12 → RP13 → RP14. RP12 puede ir antes de RP11 si la persona lo prefiere.
 
@@ -683,3 +696,62 @@ Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a →
 > hace rp50
 
 *Aplicado: se comprobó por la API que el panel ya tenía el registro 1.4; la segunda pasada en `upen-pages` aplicó solo lo ordenado (no limpió la sección duplicada) y por eso RP50.*
+
+**L65.**
+
+> - me gustan todos los ajustes y propuestas.
+> - te comento otro detalle, no tengo ningun problema de que despues debamos hacer una pasada devuelta por cada repo para que aplique devuelta las condiciones que requieran la sala o panel. con eso te digo que si hay algo que los repos necesitan mejorar o agregar para acoplarse de la mejor manera a la sala panel, que podemos hacer devuelta. asi tambien cualquier repo que no este en la sala pero que necesite ajustarse para que se muestre bien en el panel vamos a ajustar.
+> - te parece bien que nos enfoquemos a como genera las tareas gentle shell con ODD y que sigamos los mismos padrones que el y asi no crear listas de tareas que gentle shell ve diferente o no reconozca, podemos hacer tambien si es necesario que todos los repos que tengan las listas de tareas diferente se migren todos a lo nuevo como deben ser y que se archiven los viejos. te parece factible eso, solo si en necesario?
+> - siempre que el panel y sala sean utiles y entendibles.
+>
+> perfecto. confirmo todo y podes avanzar
+
+*Aplicado: plan maestro en `.panel/PLAN-MAESTRO.md` (local) y observación de memoria; la fase de ajustes al estándar de tareas (padrón 1.5) queda para después del Resumen.*
+
+**L66.**
+
+> avanza
+>
+> lo que presentas en esas dos pantallas se harian las dos o debo elegir una de ellas?
+>
+> - la pantalla 1 me parece bueno.
+> - la pantalla 2 me parece bueno tambien, solo que puede que haya algunas cosas que no necesitemos tanto o no entiendo muy bien su utilidad que es la del bloque de contratos productor x consumidor.
+> - pero me gusto muchisimo lo de bandeja de mensajes. yy pensaba si no podemos mostrar como un chat de claude code en donde escribamos el mensaje y que se envie a la sesion del repo seleccionado, y al seleccionar otro repo que recargue el chat con ese repo, y que se pueda leer tambien los ultimos mensajes de la sesion en ese chat. que te parece sobre esa idea y que opinas si seria facil de hacer o complicado y si es facil que mejoraria de mi idea.
+> - no olvides que la utilidad prinicpal de la sala y panel son la de poder ver los avances, realizar acciiones rapidas y mucho mejor seria si podemos abrir un chat con cada una de la sesion de cada repo.
+
+*Aplicado: dos maquetas en `design/panel-resumen/` y `design/system.md`; se registran S46 a S51 y RP51 a RP57.*
+
+**L67.**
+
+> 1. podes buscar e investigar si pi guarda las sesiones en disco y leerlas de ahí.
+> 2. no debeemos perder la accion rapida de enviar los comando desde la lisa, y para el chat podemos abrir esa seguridad de poder enviar o conversar en una sesion del repo o sala. y cuando la sesion de pi esta esperando una repuesta o una accion si se puede presentar en el chat como para elegir o responder? podemos revocar esa desicion de 'seguridad' que deja de ser conveniente si nos bloquea una accion productiva.
+> 3. lo mas util seria poder abrir una conversacion con la sesion de la sala, asi podriamos poder enviar acciones o coordinar tareas, conversar sobre ideas o planificar futuras tareas para cualquier proyecto. lo maximo seria tener el chat de sala para organizar y coordinar todo lo que tenga que ver con los proyectos de la sala.
+> - el problema de chat o sesion no podriamos resolver nombrando cada sesion? por ejemplo que una repo tenga una sesion iniciada con un nombre especifico y con eso poder identificar la lectura de lo que hace e identificar a que sesion mandar la orden o el chat. asi si sirve eso creo que podriamos tambien iniciar mas de una sesion en pi para una repo, ejemplo que el panel tenga su sesion identificada por nombre y que en la terminal normal de orca tenga otras sesiones independientes ya ssea para conultar algo o para planificar algo para adelantar tareas. solo ideas que tengo, no se que tan complicados o dificiles de hacer o gestionar. pero si vamos a complicar no es necesario.no se si entendiste y podes mejorar mi idea.
+> - mis respuestas:
+> 1. acepto texto libre si la sesion esta libre.
+> 2. no entendi muy bien esa duda? creo que debo tener chat de la sala para coordinar cosas. no se si tenemos una sesion exclusiva de la sala para chat y otra sesion de sala para que se comunique con los otros repos? pero ahi se perderia lo que sucede.
+> 3. no veo utilidad de los contratos, no se para que serviria claramente?
+
+*Aplicado: pi guarda cada sesión en un `.jsonl`; los contratos se sacan de la primera versión; una sola sesión de sala.*
+
+**L68.**
+
+> - si, te confirmo todo y podes avanzar con la verificacion.
+> - una consulta, el panel mostrara un chat por cada repo uno debajo de otro o solo sera un bloque de chat que se cambia de acuerdo al repo elegido? quiero que sea bueno en ux/ui
+>
+> - no es necesario ver dos chats, mejor una nomas y que se cambie al seleccionar cada repo o sala.
+> - el tema de la sesion no podemos hacer que si una repo agregada al panel no tiene sesion iniciada que inicie la sesion, le de nombre para identificar u obtenga su id para identificar y reservar ese identificador como la sesion adoptada por el panel y siempre interactuar con esa sesion, ya sea de repo sin sala o en sala. asi tambien la sesion de la sala que se inicie si es necesario e identificar renonbrando o con su id. o si no se puede iniciar sesion desde el panel que me pida a mi iniciar una sesion manual y pida su id para copiar y pegar en el repo o que yo le renombre la sesion manualmente y que desde ahi lo adopte.?
+
+*Aplicado: verificado en solo lectura lo que Orca expone de cada terminal (el título no trae el nombre de forma fiable).*
+
+**L69.**
+
+> - si, te confirmo y autorizo que hagas las pruebas necesarias para determinar la mejor estrategia para el uso de sesiones. tambien si crees que quiieras hacer otras pruebas y consultas para ampliar las posibilidades de uso te autorizo tambien.
+>
+> - debemos hacer con gentle shell, ahi tengo todo configurado las skills y demas herramientas, conexiones mcp y demas.
+> - podemos asegurar de alguna manera que la primera vez al iniciar sesion se inicie todo primero antes de enviar cualquuier orden.
+> - averiguemos bien donde se guardan los historiales de sesiones o conversaciones de gentle shell para poder usar en el chat. probemos enviar si mensajes mas largas para ver si necesita de una conversacion real para crear sesion o busquemos mas en otras carpetas. el podemos preguntas al chat mismo de la sesion de donde se guardan y que nos responda donde se guardan su historial.
+>
+> confirmo la estrategia y podes cerrar las terminales.
+
+*Aplicado: dos terminales de prueba creadas y cerradas; el historial de `gentle-shell` queda en `~/.gentle-shell/agent/sessions/--ruta--/<fecha>_<id>.jsonl` y se crea con el primer mensaje real; el detalle está en `.panel/PLAN-MAESTRO.md`, sección 10.*
