@@ -64,6 +64,12 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 - **S54. Acciones rápidas.** «las acciones rapidas de /flow-new, /flow-commit, /flow-pr, /flow-base podrian aparecer dentro de cada tarjeta de cada repos dependiendo de que esta habilitado como siguiente accion. tambien podriamos eliminar del chat de la parte de arriba y colocar de abajo al lado izquirdo del boton del chat de enviar». Se entiende `/flow-new` como `/flow-next`. Cada tarjeta muestra la única acción que corresponde (RP59) y el chat tiene un menú «/ Acciones» junto a Enviar con las disponibles y las no disponibles con su motivo (RP55).
 - **S55. El diff de los cambios no se pierde.** «una cosa que no vi en ningun lugar de la pantalla, los diff que nos mostraba la cantidad de archivos modificados y al dar clic encima que mostraba los codigos cambiados». Cada tarjeta con cambios conserva sus chips: «● N archivos +A −D» (al hacer clic abre el diff, con la lista de archivos y el código cambiado), «↑ N sin subir» y «↓ N atrás». Con el chat (RP54) el diff se muestra en una pestaña «Cambios» del mismo panel derecho, sin otro cajón. Unidades RP59 y RP54.
 - **S56. El chat vive solo en Summary.** «chat va solo en summary.» El chat y su pestaña «Cambios» se muestran solo en la pestaña Summary; Work conserva el tablero por etapas, su tira «Go work on» y su cajón de diff tal como hoy, a todo el ancho. Unidad RP54.
+- **S57. Conformity a todo el ancho.** «puede pasar a vista todo el ancho». La pestaña Conformity deja de abrir un cajón lateral y muestra, a todo el ancho, la lista de repos que no cumplen sus requisitos, con las mismas acciones («Put in conditions») y el número de pendientes en la pestaña; el botón duplicado del encabezado se quita. Unidad RP60.
+- **S58. Jerarquía de las barras y funciones compartidas.** «no senti muy bien que al cambiar de pestañas se cambian los botones de arriba, creo que la gerarquia falta mejorar, que las pestañas esten arriba de los botones que se muestran segun su ventana.»; «por ejemplo tambien estas funciones: filtro, selector de grupo, Merge method rebase, delete branch, Clean column se muestran en una pestaña y en otro no.» Tres niveles fijos: barra global, pestañas y barra de la vista; buscar, grupo y alcance son iguales en Summary y Work y no se mueven; Merge method y Delete branch pasan a un menú global «⚙ Fusión»; Clean column queda solo en Work. «me parece bien»: el filtro «All» duplicado se reemplaza por un solo botón «Needs attention», y una unidad bloqueada cuenta para él solo si el repo no tiene otra tomable. Unidad RP61.
+- **S59. Paleta suave de acciones.** «los botones de acciones como /flow-new y demas no seria mejor colorear de acuerdo a la accion?»; «el commit es igual al de pr y me parece que debe diferenciarse, y el boton del base medio que se siente como desactivado.»; «el boton de fix with pi no te parece mejor cambiar por fix in chat o algo mejor?»; «se sienten muy pesados a la vista todos»; «falto cambiar el boton Responder y Fix CI»; «quedaron super bien ahora». Color por tipo de efecto (azul /flow-next, ámbar /flow-commit y Responder, verde /flow-pr y Merge, violeta /flow-base, naranja Fix CI), todo suave y sin botones sólidos, con texto siempre; «Fix with pi» pasa a «Fix CI» (el chat vive solo en Summary). Maqueta `design/panel-chat/06-barras-y-colores.html`. Unidad RP61.
+- **S60. Tareas por tarjeta.** «un visualizador de tareas que muestre como una lista de las tareas completadas y pendientes de cada tarjeta.» Pestaña «Tareas» en el panel derecho con las filas del ROADMAP. Unidad RP63.
+- **S61. Uso de Claude por 5 horas y semanal.** «un visualizador de uso de tokens de cluade por 5 horas y semanal.»; «1. autorizo.» (editar `claude-usage.ts`, fuera del repo). El panel muestra los porcentajes y el reinicio de cada ventana que ya calcula la extensión. Unidad RP62.
+- **S62. Explorador de archivos y visor único.** «un explorador y lectura de archivos del repo resaltando los editados que están en diff y al seleccionar un archivo que muestre las líneas de códigos, tanto editado o no.»; «usar esa misma visualizador de leer códigos de archivos para visualizar también diffs.»; «poder verlos igual. es mi front visualiador. es seguro.» (los archivos con pinta de secreto se ven); «lo que pueda ser complicado podemos dejar para después.» Unidades RP64 (visor), RP65 (explorador) y RP66 (resaltado, después).
 
 ## Tasks
 
@@ -124,7 +130,14 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 | RP56 | S50 | pendiente; verificación independiente | — |
 | RP57 | S51 | pendiente | — |
 | RP58 | S46 | worker `gentle-ai-worker` con encargo cerrado; RED 7 fallos en lo del botón y 2 en lo de RP51; el padre corrió la suite completa, que encontró una prueba que fija la lista exacta de comandos y la actualizó | pendiente de commit |
-| RP59 | S52, S54, S55 | pendiente; la persona la aprueba mirándola | — |
+| RP59 | S52, S54, S55 | worker `gentle-ai-worker` con encargo cerrado; RED 36 de 49 pruebas nuevas, GREEN 49 de 49; el padre leyó el código, corrió la suite completa (1003 de 1004, 1 salteada) y la miró con Edge sobre los 15 repos reales | pendiente de commit |
+| RP60 | S57 | pendiente | — |
+| RP61 | S58, S59 | pendiente; la persona la aprueba mirándola | — |
+| RP62 | S61 | pendiente | — |
+| RP63 | S60 | pendiente | — |
+| RP64 | S62 | pendiente | — |
+| RP65 | S62 | pendiente; verificación independiente | — |
+| RP66 | S62 | pendiente | — |
 
 Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a → RP11b → RP12a → RP12b → RP12 → RP13 → RP14. RP12 puede ir antes de RP11 si la persona lo prefiere.
 
@@ -799,3 +812,37 @@ Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a →
 > - chat va solo en summary.
 
 *Aplicado: S56. El chat y la pestaña «Cambios» viven solo en Summary; Work no cambia. Queda abierta, sin registrar, la propuesta de que Conformity pase de cajón lateral a una vista a todo el ancho con el número de pendientes en la pestaña, hasta que la persona la confirme.*
+
+**L73.**
+
+> puede pasar a vista todo el ancho
+
+*Aplicado: respuesta a la propuesta de que Conformity pase de cajón lateral a vista a todo el ancho (L72). Se registra S57 y la unidad RP60.*
+
+**L74.**
+
+> me parece bien, pero podriamos analizar si se puede mejorar algunos detalles:
+> - no senti muy bien que al cambiar de pestañas se cambian los botones de arriba, creo que la gerarquia falta mejorar, que las pestañas esten arriba de los botones que se muestran segun su ventana.
+> - por ejemplo tambien estas funciones: filtro, selector de grupo, Merge method rebase, delete branch, Clean column se muestran en una pestaña y en otro no.
+> - y una consulta, los botones de acciones como /flow-new y demas no seria mejor colorear de acuerdo a la accion? solo consulto, si crees que sea feo igual esta bien todo azul.
+> - el bloque de chat aun no veo
+>
+> me paren muy lindos todos los diseños, pero:
+> - que color usa github para los botones de commits y volver a rama base limpia? o no tiene? es que el commit es igual al de pr y me parece que debe diferenciarse, y el boton del base medio que se siente como desactivado.
+> - y el boton de fix with pi no te parece mejor cambiar por fix in chat o algo mejor?
+>
+> me gustan, pero se sienten muy pesados a la vista todos, como podriamos mejorar todos en conjunto y que se ven mas agradable?
+>
+> falto cambiar el boton Responder y Fix CI
+>
+> quedaron super bien ahora, antes de avanzar quisiera comentarte algunas ideas mas que tengo para que analises si metemos en el plan o como hacemos:
+> - podríamos agregar un visualizador de tareas que muestre como una lista de las tareas completadas y pendientes de cada tarjeta.
+> - podríamos agregar un visualizador de uso de tokens de cluade por 5 horas y semanal.
+> - podríamos agregar también un explorador y lectura de archivos del repo resaltando los editados que están en diff y al seleccionar un archivo que muestre las líneas de códigos, tanto editado o no. podríamos usar esa misma visualizador de leer códigos de archivos para visualizar también diffs.
+> - dame una propuesta de como podríamos hacer cada uno de esos ítems y si serán fáciles, lo que pueda ser complicado podemos dejar para después.
+>
+> 1. autorizo.
+> 2. poder verlos igual. es mi front visualiador. es seguro.
+> 3. me sirve el orden.
+
+*Aplicado: S58 a S62 y las unidades RP61 a RP66. Orden acordado: RP59 → RP61 → RP54 → RP62 → RP63 → RP64 → RP65 → RP60 → RP66. Se autoriza editar `claude-usage.ts` (fuera del repo, con copia de respaldo). Los archivos con pinta de secreto se ven; el visor lee solo dentro del repo y no la carpeta `.git/`. «me parece bien» se tomó como aprobación de las dos observaciones de RP59 y de que el alcance de sala filtre también Work (maqueta 06). La persona pegó dos capturas del tablero y de las filas del Resumen, que no se copian acá.*
