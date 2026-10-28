@@ -67,9 +67,9 @@ test('a repo with an order on its way (sending) has its pi button disabled', () 
   assert.match(merge, /data-act="merge"[^>]*disabled/);
 });
 
-test('every row has the "⋯" button that focuses the repo, and no action means no primary button', () => {
+test('a card has no "⋯" button (RP59) and no action means no primary button', () => {
   const html = view([row()]);
-  assert.match(html, /<button[^>]*data-act="focus-repo" data-id="r1"[^>]*aria-label="More actions for alpha"[^>]*>⋯</);
+  assert.doesNotMatch(html, /⋯|More actions/);
   assert.doesNotMatch(html, /class="primary"|class="merge"/);
 });
 
@@ -93,10 +93,10 @@ test('every text that comes from data is HTML-escaped', () => {
 });
 
 // ---------- pure: progress ----------
-test('the segmented bar has an aria-label and the n / total text, and its widths never exceed 100', () => {
+test('the segmented bar has an aria-label and the short n/total text, and its widths never exceed 100', () => {
   const html = view([row({ progress: progress({ total: 7, completada: 3, enRevision: 1, bloqueada: 1, pendiente: 1, enCurso: 1 }) })]);
-  assert.match(html, /role="img" aria-label="3 completed, 1 in review, 1 blocked, 2 pending"/);
-  assert.match(html, /3 \/ 7/);
+  assert.match(html, /role="img" aria-label="3 of 7 completed · 1 in review · 1 blocked"/);
+  assert.match(html, />3\/7</);
   const widths = [...html.matchAll(/class="rs-seg [a-z-]+" style="width:(\d+(?:\.\d+)?)%"/g)].map((m) => Number(m[1]));
   assert.equal(widths.length, 4);
   assert.ok(widths.reduce((a, b) => a + b, 0) <= 100);
@@ -123,13 +123,12 @@ test('an error row shows the error text, "no data" and no zeros', () => {
   assert.doesNotMatch(html, /rs-seg|\b0 \/ |data-act="merge"/);
 });
 
-test('the next unit shows id, entrega and "Result: ..." ; blocked-by names what it waits for', () => {
-  const html = view([row({ blocking: [{ unit: 'E3', waitsFor: ['E1', 'E2'], external: ['other repo'] }] })]);
-  assert.match(html, /T5/);
-  assert.match(html, /Do five/);
-  assert.match(html, /Result: See five/);
-  assert.match(html, /■ E3 waits for E1, E2/);
-  assert.match(html, /other repo/);
+test('the next unit shows id and entrega with "Result: ..." in the title; with no next unit a blocked repo shows what it waits for', () => {
+  const html = view([row()]);
+  assert.match(html, /T5 — Do five/);
+  assert.match(html, /title="T5 — Do five\nResult: See five"/);
+  const blocked = view([row({ next: null, blocking: [{ unit: 'E3', waitsFor: ['E1', 'E2'], external: ['other repo'] }] })]);
+  assert.match(blocked, /Waiting<\/span> · E3 → E1, E2, other repo/);
   assert.match(view([row({ next: null })]), /rs-none/);
 });
 
@@ -155,25 +154,24 @@ const SCOPE_ROWS = [
 ];
 const attention = [{ id: 'b', name: 'also-room', why: 'asks' }, { id: 'c', name: 'loose-one', why: 'blocked' }];
 
-test('countersOf classifies each row once like the server and skips error rows', () => {
-  assert.deepEqual(R.countersOf(SCOPE_ROWS), { working: 1, waiting: 1, blocked: 1, idle: 1 });
-  assert.deepEqual(R.countersOf([]), { working: 0, waiting: 0, blocked: 0, idle: 0 });
+test('the filter counts are computed from the rows in the current scope (the KPI counters are gone)', () => {
+  const html = view(SCOPE_ROWS.map((r) => ({ ...r, needs: r.id === 'b' || r.id === 'c' })));
+  assert.match(html, /All · 5/);
+  assert.match(html, /Needs attention · 2/);
+  assert.doesNotMatch(html, /rs-kpi|waiting for you/);
 });
 
-test('scope filters rows and the counters and the attention box are recomputed from them', () => {
-  const upen = R.summaryView(payload(SCOPE_ROWS, { attention }), { now: NOW, scope: { kind: 'room', name: 'UPEN' }, rooms: [{ name: 'UPEN', repos: ['a', 'b'] }] });
-  assert.match(upen, /in-room/);
-  assert.match(upen, /also-room/);
-  assert.doesNotMatch(upen, /loose-one|loose-two|broken/);
-  assert.match(upen, /Needs your attention \(1\)/);
-  assert.match(upen, /<b>0<\/b><span>■ blocked/);
-  assert.match(upen, /<b>1<\/b><span>● working/);
-  const none = R.summaryView(payload(SCOPE_ROWS, { attention }), { now: NOW, scope: { kind: 'none' }, rooms: [] });
-  assert.match(none, /loose-one/);
-  assert.doesNotMatch(none, /in-room|also-room/);
-  assert.match(none, /Needs your attention \(1\)/);
-  const all = R.summaryView(payload(SCOPE_ROWS, { attention }), { now: NOW, scope: { kind: 'all' }, rooms: [] });
-  assert.match(all, /Needs your attention \(2\)/);
+test('scope filters the cards and the filter counts', () => {
+  const ids = (html) => [...html.matchAll(/<article class="rs-card[^"]*" data-id="([^"]*)"/g)].map((m) => m[1]);
+  const rows = SCOPE_ROWS.map((r) => ({ ...r, needs: r.id === 'b' || r.id === 'c' }));
+  const upen = R.summaryView(payload(rows), { now: NOW, scope: { kind: 'room', name: 'UPEN' }, rooms: [{ name: 'UPEN', repos: ['a', 'b'] }] });
+  assert.deepEqual(ids(upen), ['a', 'b']);
+  assert.match(upen, /Needs attention · 1</);
+  const none = R.summaryView(payload(rows), { now: NOW, scope: { kind: 'none' }, rooms: [] });
+  assert.deepEqual(ids(none), ['c', 'd', 'e']);
+  assert.match(none, /Needs attention · 1</);
+  const all = R.summaryView(payload(rows), { now: NOW, scope: { kind: 'all' }, rooms: [] });
+  assert.match(all, /Needs attention · 2</);
   assert.deepEqual(R.filterRows(SCOPE_ROWS, { kind: 'room', name: 'UPEN' }).map((r) => r.id), ['a', 'b']);
   assert.deepEqual(R.filterRows(SCOPE_ROWS, { kind: 'none' }).map((r) => r.id), ['c', 'd', 'e']);
   assert.equal(R.filterRows(SCOPE_ROWS, { kind: 'all' }).length, 5);
@@ -201,22 +199,22 @@ test('a scope that points to a room that no longer exists falls back to All', ()
 });
 
 // ---------- pure: empty and unavailable ----------
-test('an empty payload and a missing payload say so instead of drawing an empty table', () => {
+test('an empty payload and a missing payload say so instead of drawing empty cards', () => {
   assert.match(view([]), /No repositories in this scope/);
   assert.doesNotMatch(view([]), /<table/);
   assert.match(R.summaryView(null, { now: NOW, scope: { kind: 'all' }, rooms: [] }), /Loading summary/);
   assert.match(R.summaryView(null, { now: NOW, scope: { kind: 'all' }, rooms: [], failed: true }), /Summary unavailable/);
 });
 
-test('a failed refresh keeps the table and adds a small note', () => {
+test('a failed refresh keeps the cards and adds a small note', () => {
   const html = view([row()], { failed: true });
   assert.match(html, /summary unavailable/i);
   assert.match(html, /alpha/);
 });
 
-test('the legend and the four counters are drawn', () => {
+test('the one-line bar legend is drawn', () => {
   const html = view(SCOPE_ROWS);
-  for (const t of ['● working', '◐ waiting for you', '■ blocked', '○ idle', 'Completed', 'In review', 'Blocked', 'Pending']) assert.ok(html.includes(t), t);
+  for (const t of ['Completed', 'In review', 'Blocked', 'Pending']) assert.ok(html.includes(t), t);
 });
 
 // ---------- page ----------
@@ -354,7 +352,7 @@ test('an unchanged payload (only generatedAt differs) does not rewrite #summary 
   assert.match(page.get('#summary').html, /other/);
 });
 
-test('a failed fetch keeps the last data and shows a small note instead of blanking the table', async () => {
+test('a failed fetch keeps the last data and shows a small note instead of blanking the cards', async () => {
   const page = loadPage();
   withRepos(page);
   page.answer(payload([row({ id: 'abc', name: 'demo' })]));
@@ -441,16 +439,11 @@ test('API_VERSION is still 15: the page needs no new route', () => {
 // ---------- visual review of RP52 (real data) ----------
 test('the project name and branch stay on one clipped line with the full text in title', () => {
   const html = view([row({ name: 'CROSS.BackofficeFront', branch: 'feat/a-very-long-branch-name' })]);
-  assert.match(html, /<td class="rs-proj"><div class="rs-name" title="CROSS.BackofficeFront">CROSS.BackofficeFront<\/div>/);
-  assert.match(html, /class="rs-sub mono rs-branch" title="feat\/a-very-long-branch-name"/);
+  assert.match(html, /<b class="rs-name" title="CROSS.BackofficeFront">CROSS.BackofficeFront<\/b>/);
+  assert.match(html, /class="mono rs-branch" title="feat\/a-very-long-branch-name"/);
   const css = fs.readFileSync(path.join(PUBLIC, 'style.css'), 'utf8');
-  assert.match(css, /\.rs-name[^{]*\{[^}]*white-space:\s*nowrap[^}]*text-overflow:\s*ellipsis/);
-  assert.match(css, /\.rs-proj\s*\{[^}]*min-width:\s*170px/);
-});
-
-test('the counter cards align to the top instead of stretching to the attention box', () => {
-  const css = fs.readFileSync(path.join(PUBLIC, 'style.css'), 'utf8');
-  assert.match(css, /\.rs-kpis\s*\{[^}]*align-items:\s*start/);
+  assert.match(css, /\.rs-branch[^{]*\{[^}]*white-space:\s*nowrap[^}]*text-overflow:\s*ellipsis/);
+  assert.match(css, /\.rs-next\s*\{[^}]*white-space:\s*nowrap[^}]*text-overflow:\s*ellipsis/);
 });
 
 test('the start button keeps a fixed /flow-next label however long the unit id is, with the id escaped in the title', () => {
