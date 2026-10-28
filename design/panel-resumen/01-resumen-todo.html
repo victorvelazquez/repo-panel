@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Repo Panel — Resumen (Todo)</title>
+<style>
+:root { --bg:#0f1216; --panel:#171b21; --panel2:#1e242c; --line:#2a323c; --text:#d7dde5; --muted:#8b96a3; --green:#3fb950; --red:#f85149; --yellow:#d29922; --blue:#58a6ff; --gray:#6e7681; --purple:#a371f7; }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--text); font:14px/1.45 system-ui,"Segoe UI",sans-serif; }
+a { color:var(--blue); text-decoration:none; } a:hover { text-decoration:underline; }
+button,select,input { font:inherit; color:var(--text); background:var(--panel2); border:1px solid var(--line); border-radius:6px; padding:4px 10px; cursor:pointer; }
+button:hover { border-color:var(--blue); }
+:focus-visible { outline:2px solid var(--blue); outline-offset:2px; }
+button.primary { background:#1f6feb; border-color:#1f6feb; color:#fff; }
+button.merge { background:#238636; border-color:#238636; color:#fff; font-weight:600; }
+button.quiet { background:transparent; }
+.mono { font-family:ui-monospace,Consolas,monospace; font-size:12px; color:var(--muted); }
+header { position:sticky; top:0; z-index:5; display:flex; gap:10px; align-items:center; padding:10px 16px; background:var(--panel); border-bottom:1px solid var(--line); }
+header h1 { font-size:16px; margin:0 8px 0 0; }
+.spacer { flex:1; }
+.scope { display:flex; gap:6px; align-items:center; }
+.scope button[aria-pressed="true"] { border-color:var(--blue); background:#12253d; }
+nav.tabs { display:flex; gap:2px; padding:0 16px; background:var(--panel); border-bottom:1px solid var(--line); }
+nav.tabs button { border:0; border-bottom:2px solid transparent; border-radius:0; background:transparent; padding:8px 14px; color:var(--muted); }
+nav.tabs button[aria-selected="true"] { color:var(--text); border-bottom-color:var(--blue); }
+nav.tabs .n { margin-left:6px; padding:0 6px; border-radius:10px; background:var(--line); font-size:12px; }
+main { padding:16px; max-width:1360px; margin:0 auto; }
+.kpis { display:grid; grid-template-columns:repeat(4,1fr) 2fr; gap:10px; margin-bottom:14px; }
+.kpi { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:10px 12px; border-top:3px solid var(--gray); }
+.kpi b { font-size:22px; display:block; line-height:1.1; }
+.kpi span { color:var(--muted); font-size:12px; }
+.kpi.go { border-top-color:var(--green); } .kpi.wait { border-top-color:var(--yellow); } .kpi.block { border-top-color:var(--red); } .kpi.idle { border-top-color:var(--gray); }
+.attn { background:var(--panel); border:1px solid #5a1f1c; border-radius:8px; padding:10px 12px; }
+.attn h2 { font-size:13px; margin:0 0 6px; text-transform:uppercase; letter-spacing:.06em; color:var(--red); }
+.attn ul { list-style:none; margin:0; padding:0; display:grid; gap:4px; font-size:13px; }
+.attn li::before { content:"▲ "; color:var(--red); }
+.toolbar { display:flex; gap:8px; align-items:center; margin:0 0 8px; }
+.toolbar input { width:240px; }
+table { width:100%; border-collapse:separate; border-spacing:0; background:var(--panel); border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+th { text-align:left; font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); padding:8px 10px; border-bottom:1px solid var(--line); font-weight:600; }
+td { padding:10px; border-bottom:1px solid var(--line); vertical-align:top; }
+tr:last-child td { border-bottom:0; }
+tr.group td { background:var(--panel2); color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.06em; padding:6px 10px; }
+tr.row:hover td { background:#1a2028; }
+.name { font-weight:600; font-size:15px; }
+.sub { color:var(--muted); font-size:12px; }
+.bar { display:flex; height:8px; border-radius:4px; overflow:hidden; background:var(--line); min-width:140px; margin:4px 0; }
+.bar i { display:block; } .b-done { background:var(--green); } .b-pr { background:var(--blue); } .b-blk { background:var(--red); } .b-pend { background:#3a4350; }
+.chip { font-size:12px; padding:1px 8px; border-radius:10px; border:1px solid var(--line); white-space:nowrap; display:inline-block; }
+.chip.green { color:var(--green); border-color:#1d4a28; background:#0f2416; } .chip.red { color:var(--red); border-color:#5a1f1c; background:#2a1213; }
+.chip.yellow { color:var(--yellow); border-color:#53410f; background:#251d08; } .chip.blue { color:var(--blue); border-color:#1d3a5f; background:#0f1d30; } .chip.gray { color:var(--muted); }
+.act { display:flex; gap:6px; align-items:center; justify-content:flex-end; white-space:nowrap; }
+.legend { display:flex; gap:14px; color:var(--muted); font-size:12px; margin:10px 2px; }
+.legend i { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:5px; vertical-align:-1px; }
+.since { background:var(--panel); border:1px solid #1d3a5f; border-radius:8px; padding:8px 12px; margin-bottom:14px; display:flex; gap:12px; align-items:center; color:var(--muted); }
+.since b { color:var(--text); }
+@media (prefers-reduced-motion: reduce) { * { transition:none !important; animation:none !important; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Repo Panel</h1>
+  <div class="scope" role="group" aria-label="Alcance">
+    <button aria-pressed="true">Todo <span class="mono">15</span></button>
+    <button aria-pressed="false">Sala UPEN <span class="mono">6</span></button>
+    <button aria-pressed="false">Sin sala <span class="mono">8</span></button>
+  </div>
+  <span class="spacer"></span>
+  <button title="Ctrl+K">Buscar o ejecutar… <span class="mono">Ctrl+K</span></button>
+  <button>Actualizar todo</button>
+  <button>Traer cambios</button>
+</header>
+<nav class="tabs" role="tablist" aria-label="Vistas">
+  <button role="tab" aria-selected="true">Resumen</button>
+  <button role="tab" aria-selected="false">Trabajo</button>
+  <button role="tab" aria-selected="false">Actividad</button>
+  <button role="tab" aria-selected="false">Conformidad <span class="n">0</span></button>
+</nav>
+<main>
+  <div class="since">⏱ <span><b>Desde tu última visita (ayer 18:40):</b> 4 PR fusionados · 2 unidades completadas · 1 CI roto en upen-pages · 1 sesión esperándote</span><span class="spacer"></span><button class="quiet">Entendido</button></div>
+
+  <section class="kpis" aria-label="Estado de todos los proyectos">
+    <div class="kpi go"><b>6</b><span>● en marcha</span></div>
+    <div class="kpi wait"><b>3</b><span>◐ esperándote</span></div>
+    <div class="kpi block"><b>2</b><span>■ bloqueados</span></div>
+    <div class="kpi idle"><b>4</b><span>○ detenidos</span></div>
+    <div class="attn">
+      <h2>Necesita tu atención (4)</h2>
+      <ul>
+        <li><a href="#">upen-pages</a> — CI roto en el PR #31 (<span class="mono">lint</span>)</li>
+        <li><a href="#">upen-erp</a> — la sesión te pregunta: «¿B2b antes que B3?»</li>
+        <li><a href="#">TecnomylPY.Backend</a> — PR #88 listo para fusionar</li>
+        <li><a href="#">upen-chat</a> — bloqueado por <a href="#">upen-core</a> E03</li>
+      </ul>
+    </div>
+  </section>
+
+  <div class="toolbar">
+    <input type="search" placeholder="Filtrar proyectos…" aria-label="Filtrar proyectos">
+    <button aria-pressed="true">Solo lo que pide atención</button>
+    <button>Ordenar: prioridad ▾</button>
+    <span class="spacer"></span>
+    <button>Densidad: cómoda</button>
+  </div>
+
+  <table>
+    <thead><tr><th>Proyecto</th><th>Avance</th><th>Ahora</th><th>Siguiente</th><th>Frena</th><th>Último movimiento</th><th style="text-align:right">Acción</th></tr></thead>
+    <tbody>
+      <tr class="group"><td colspan="7">UPEN · sala UPEN</td></tr>
+      <tr class="row">
+        <td><div class="name">upen-erp</div><div class="sub mono">develop · fix/b2b-ledger</div></td>
+        <td><div class="bar" role="img" aria-label="6 hechas, 1 en revisión, 0 bloqueadas, 67 pendientes"><i class="b-done" style="width:8%"></i><i class="b-pr" style="width:2%"></i><i class="b-pend" style="width:90%"></i></div><span class="sub">6 / 74 · 1 en revisión</span></td>
+        <td><span class="chip yellow">◐ te pregunta</span><div class="sub">«¿B2b antes que B3?»</div></td>
+        <td>B2b — Libro mayor B2B<div class="sub">Resultado: ver saldos por cliente</div></td>
+        <td><span class="sub">—</span></td>
+        <td class="sub">hace 12 min<br>commit en <span class="mono">fix/b2b-ledger</span></td>
+        <td><div class="act"><button class="primary">Responder</button><button aria-label="Más acciones">⋯</button></div></td>
+      </tr>
+      <tr class="row">
+        <td><div class="name">upen-pages</div><div class="sub mono">develop · feat/pricing</div></td>
+        <td><div class="bar"><i class="b-done" style="width:40%"></i><i class="b-pr" style="width:7%"></i><i class="b-pend" style="width:53%"></i></div><span class="sub">6 / 15 · 1 en revisión</span></td>
+        <td><span class="chip red">▲ CI roto</span><div class="sub">PR #31 · lint</div></td>
+        <td>P7 — Página de precios<div class="sub">Resultado: ver los 3 planes</div></td>
+        <td><span class="sub">—</span></td>
+        <td class="sub">hace 1 h<br>CI falló en #31</td>
+        <td><div class="act"><button class="primary">Arreglar PR</button><button aria-label="Más acciones">⋯</button></div></td>
+      </tr>
+      <tr class="row">
+        <td><div class="name">upen-chat</div><div class="sub mono">develop · limpio</div></td>
+        <td><div class="bar"><i class="b-done" style="width:33%"></i><i class="b-blk" style="width:8%"></i><i class="b-pend" style="width:59%"></i></div><span class="sub">4 / 12 · 1 bloqueada</span></td>
+        <td><span class="chip gray">○ sin sesión</span></td>
+        <td>T005 — Entorno de chat<div class="sub">Resultado: chat local arranca</div></td>
+        <td><span class="chip red">■ espera a <a href="#">upen-core</a> E03</span></td>
+        <td class="sub">hace 2 d<br>PR #14 fusionado</td>
+        <td><div class="act"><button>Ver bloqueo</button><button aria-label="Más acciones">⋯</button></div></td>
+      </tr>
+      <tr class="row">
+        <td><div class="name">upen-core</div><div class="sub mono">develop · limpio</div></td>
+        <td><div class="bar"><i class="b-done" style="width:63%"></i><i class="b-pr" style="width:3%"></i><i class="b-pend" style="width:34%"></i></div><span class="sub">24 / 38 · 1 en revisión</span></td>
+        <td><span class="chip green">● trabajando</span><div class="sub">E03 — dominio multi-tenant</div></td>
+        <td>E03 — Dominio multi-tenant<div class="sub">Resultado: crear un tenant</div></td>
+        <td><span class="sub">—</span></td>
+        <td class="sub">hace 3 min<br>sesión editando</td>
+        <td><div class="act"><button disabled>Trabajando…</button><button aria-label="Más acciones">⋯</button></div></td>
+      </tr>
+      <tr class="group"><td colspan="7">H2O · sin sala</td></tr>
+      <tr class="row">
+        <td><div class="name">TecnomylPY.Backend</div><div class="sub mono">development · feat/atc-22</div></td>
+        <td><div class="bar"><i class="b-done" style="width:30%"></i><i class="b-pr" style="width:4%"></i><i class="b-pend" style="width:66%"></i></div><span class="sub">9 / 31 · 1 en revisión</span></td>
+        <td><span class="chip blue">◔ PR abierto</span><div class="sub">#88 · CI verde</div></td>
+        <td>ATC-23 — Reporte diario<div class="sub">Resultado: descargar el reporte</div></td>
+        <td><span class="sub">—</span></td>
+        <td class="sub">hace 40 min<br>CI verde en #88</td>
+        <td><div class="act"><button class="merge">Fusionar #88</button><button aria-label="Más acciones">⋯</button></div></td>
+      </tr>
+      <tr class="row">
+        <td><div class="name">CROSS.BackofficeFront</div><div class="sub mono">development · limpio</div></td>
+        <td><div class="bar"><i class="b-done" style="width:21%"></i><i class="b-pend" style="width:79%"></i></div><span class="sub">8 / 39</span></td>
+        <td><span class="chip gray">○ libre</span></td>
+        <td>BF-09 — Filtros de pedidos<div class="sub">Resultado: filtrar por estado</div></td>
+        <td><span class="sub">—</span></td>
+        <td class="sub">hace 5 d<br>PR #52 fusionado</td>
+        <td><div class="act"><button class="primary">/flow-next</button><button aria-label="Más acciones">⋯</button></div></td>
+      </tr>
+      <tr class="row">
+        <td><div class="name">repo-panel</div><div class="sub mono">main · limpio</div></td>
+        <td><div class="bar"><i class="b-done" style="width:98%"></i><i class="b-pend" style="width:2%"></i></div><span class="sub">54 / 55</span></td>
+        <td><span class="chip gray">○ libre</span></td>
+        <td>RP51 — Resumen<div class="sub">Resultado: ver todo en una pantalla</div></td>
+        <td><span class="sub">—</span></td>
+        <td class="sub">hace 2 h<br>PR #71 fusionado</td>
+        <td><div class="act"><button class="primary">/flow-next</button><button aria-label="Más acciones">⋯</button></div></td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="legend" aria-label="Leyenda de la barra"><span><i style="background:var(--green)"></i>Completada</span><span><i style="background:var(--blue)"></i>En revisión</span><span><i style="background:var(--red)"></i>Bloqueada</span><span><i style="background:#3a4350"></i>Pendiente</span><span>El botón principal es la <b>mejor próxima acción</b>; el resto vive en ⋯</span></div>
+</main>
+</body>
+</html>
