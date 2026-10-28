@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "padron": "1.3",
-  "blocks": { "registro": "1.0", "ciclo": "1.0", "estado": "1.0", "tareas": "1.2", "entrega": "1.0" },
+  "padron": "1.4",
+  "blocks": { "registro": "1.0", "ciclo": "1.0", "estado": "1.0", "tareas": "1.3", "entrega": "1.0" },
   "requirements": [
     {
       "id": "base-branch",

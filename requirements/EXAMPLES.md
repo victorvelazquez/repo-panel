@@ -155,3 +155,25 @@ Después (AGENTS.md):
 Después (docs/ORQUESTACION.md, línea de reglas no adoptadas o cambiadas):
 - De `.github/copilot-instructions.md` se movió a AGENTS.md «Environment Variables», sin cambios de texto; el archivo no se tocó.
 ```
+
+## H. A manual section that a block replaces (step 3)
+
+Replace the whole section, keep only what the block does not say, and the old command names go with it.
+
+```md ejemplo:h-seccion-manual
+Antes (AGENTS.md, sección «## Orquestación» escrita a mano, después de los bloques):
+### Puerta: verificar con git que estás en la rama base y limpio (normalmente `/flow-branch`)
+### Avisos a Dirección: FUSIONADO, NO LISTO; LISTO PARA CICLO NUEVO
+### Verificación según el riesgo: «Pantallas: el propietario las aprueba mirándolas, y en esta web además `npm run verificar`»
+### Contratos entre proyectos: los identificadores llevan prefijo (`WEB-...`, `ERP-...`)
+
+Después (AGENTS.md):
+- La sección «## Orquestación» ya no existe: el bloque `ciclo` dice lo mismo, con `/flow-base`.
+- Una sección corta del repo con solo lo que el bloque no dice:
+  ## Propio de esta web
+  - Las pantallas las aprueba el propietario mirándolas, y además se corre `npm run verificar`.
+  - Los identificadores que cruzan proyectos llevan prefijo `WEB-...` o `ERP-...`.
+
+Después (docs/ORQUESTACION.md, línea de reglas no adoptadas o cambiadas):
+- Se reemplazó la sección manual «Orquestación» por los bloques; se conservaron dos líneas propias: `npm run verificar` y los prefijos `WEB-` y `ERP-`.
+```
