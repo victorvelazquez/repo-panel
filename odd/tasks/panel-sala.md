@@ -52,6 +52,7 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 - **S42. Los clics no se pierden.** «muchas veces me falla el click en los botones del panel de cada 4 click 3 me fallan, y no es el mouse porque solo en la ventana del panel me sucede y con distintos mouses». Una región cuyo HTML no cambió no se reescribe; un redibujado espera a que se suelte el botón del mouse, con un tope corto para que una suelta perdida no congele la página.
 - **S43. La sala se pone en condiciones.** «la sala debe tener tambien su lista de put in conditions tambien y debe reemplazar todo lo que deba como lo haciamos con los repos normales»; «primero deberia haber la sala para ir agregando repos»; «cuando se agregue otro repo y la sala ya existe, se debe installar los requisitos al repo e inscribirse a la sala existente»; «3. una orden del panel a la sala»; «1. lo recomendado»; «4. hacemos lo que creas necesario». Un solo número de padrón; la sala lleva los bloques `entrega`, `estado` y uno propio `sala`, y no `registro` ni `tareas` (su registro es `estrategia/TABLERO.md`). RP48 ya; RP49 a RP52 con el padrón 1.4.
 - **S44. Padrón 1.4.** «arrancamos padron 1.4 con las reglas aprendidas»; «ya estan todos entregados los pendientes, verifica»; «despues hacemos lo de la sala». Una sección manual que repite un bloque se reemplaza entera; un párrafo mixto se parte; una ficha solo recibe la línea puntero; la ficha nueva va donde el repo ya las guarda; clases de filas = orden de la tabla; ejecutores propios y tablas de herramientas se informan y no se tocan.
+- **S45. La limpieza del 1.4 se dispara sola.** «hace rp50». El panel detecta las secciones manuales que un bloque ya dice y el comando viejo `/flow-branch`, para que la orden nombre al repo y el agente aplique el paso 3 de `INSTALL.md`; sin subir el padrón.
 
 ## Tasks
 
@@ -103,6 +104,7 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 | RP47 | S42 | en línea; medido en un Edge real (148 reemplazos por minuto y 23 de 30 clics antes; 13,5 y 60 de 60 después); RED primero (8 de 10) | pendiente de commit |
 | RP48 | S43 | worker `gentle-ai-worker` con encargo cerrado; RED 6 de 7 en una copia limpia de HEAD; el padre revisó el diff y reprobó las pruebas | pendiente de commit |
 | RP49 | S44 | en línea (INSTALL, bloque tareas 1.3, EXAMPLES, requirements.json, checklist y prueba); RED primero (12 de 12); huella aceptada sin force por la subida de versión | pendiente de commit |
+| RP50 | S45 | worker `gentle-ai-worker` con encargo cerrado; RED 11 de 12; el padre revisó el diff y probó el chequeo contra los 15 repos reales | pendiente de commit |
 
 Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a → RP11b → RP12a → RP12b → RP12 → RP13 → RP14. RP12 puede ir antes de RP11 si la persona lo prefiere.
 
@@ -671,3 +673,13 @@ Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a →
 > - despues hacemos lo de la sala.
 
 *Aplicado: se verificó que los 15 repos dan «listo» sobre su rama base remota; RP49 (padrón 1.4). Lo de la sala (RP50 a RP53) sigue después, como pidió la persona.*
+
+**L64.**
+
+> revisa si ya esta actualizado el panel
+>
+> revisa
+>
+> hace rp50
+
+*Aplicado: se comprobó por la API que el panel ya tenía el registro 1.4; la segunda pasada en `upen-pages` aplicó solo lo ordenado (no limpió la sección duplicada) y por eso RP50.*
