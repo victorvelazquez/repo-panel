@@ -115,6 +115,7 @@ You can also create `config.json` by hand; copy `config.example.json` as a start
 | `port` | Port to listen on | `4310` |
 | `priority` | Optional list of repo names (e.g. `["repo-panel", "api"]`) that go first in the "Go work on" strip, in that order; case-insensitive, unknown names ignored | none |
 | `dismissed` | Optional list of repo ids whose "requirements missing" warning is hidden; written by the panel (`POST /api/dismiss` `{ id, on }`), invalid entries and duplicates ignored | none |
+| `sessions` | Optional map of the pi session the panel adopted, `{ "<repoId>" or "room:<name>": { "id", "name", "adoptedAt" } }`; written by `POST /api/sessions/adopt` and `/start`, cleared by `/release`; entries with an invalid id (only `A-Za-z0-9._-`, 1 to 80 characters) are ignored | none |
 | `rooms` | Optional list of rooms, `[{ "name", "path", "repos": [repoId] }]`; written by the panel's **+ Room** screen and the card menu, or by hand (see Rooms) | none |
 | `groups` | Named groups of repos (`{ "name", "repos": [{ "path", "base", "roadmap" }] }`); `base` and `roadmap` are optional | `[]` |
 
@@ -225,6 +226,14 @@ By hand, the same data is (remember to escape backslashes in JSON, or use forwar
 - **Not covered**: that a member repo is listed in `ENLACES.md` (free markdown, it would give false positives) and whether the room is behind (last sweep older than merged PRs). Nothing here edits the room or its members; the agent applies remedies and you deliver them with `/flow-commit` and `/flow-pr`.
 
 `base` is the branch work is merged into. When omitted, the panel reads it from `origin/HEAD` and falls back to `main`. `roadmap` is the repo-relative path of its plan file (default `docs/ROADMAP.md`); unsafe values (absolute, starting with `-`, or containing `..`) are ignored.
+
+### Adopted sessions
+
+The panel keeps ONE adopted pi session per repo and per room (`sessions` in `config.json`). Sessions are read from Gentle Shell's folder (`~/.gentle-shell/agent/sessions/--<folder>--/<timestamp>_<id>.jsonl`, overridable with `REPO_PANEL_SESSIONS_DIR`); only the first and last 64 KB of a file are read. Routes (token required; `id` is a repo id or `room:<name>`, 404 when unknown):
+
+- `GET /api/sessions?id=` answers `{ key, adopted, adoptedFound, sessions, live }`: `sessions` are the newest 20, `live` is `{ state: none | free | working | waiting | unknown, count }` from one `orca terminal list`; an Orca failure is `unknown`, never `none`.
+- `POST /api/sessions/adopt` `{ id, session }` (400 when `session` is not one of the listed ids) and `POST /api/sessions/release` `{ id }`.
+- `POST /api/sessions/start` `{ id }` opens a terminal that runs `gentle-shell -n <panel:repo | sala:room> --session-id <panel-slug | sala-slug>` and adopts that id. It answers 409 when the folder already has a live pi session (adopt it instead) or Orca cannot be listed. It never sends text to a session.
 
 ## Merge behaviour
 
