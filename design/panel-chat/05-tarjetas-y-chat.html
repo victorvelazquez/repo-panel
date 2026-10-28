@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Repo Panel — Tarjetas y chat (D)</title>
+<style>
+:root { --bg:#0f1216; --panel:#171b21; --panel2:#1e242c; --line:#2a323c; --text:#d7dde5; --muted:#8b96a3; --green:#3fb950; --red:#f85149; --yellow:#d29922; --blue:#58a6ff; --gray:#6e7681; --purple:#a371f7; }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--text); font:14px/1.45 system-ui,"Segoe UI",sans-serif; }
+button,textarea,summary { font:inherit; color:var(--text); }
+button { background:var(--panel2); border:1px solid var(--line); border-radius:6px; padding:3px 10px; cursor:pointer; white-space:nowrap; }
+button:hover:not(:disabled) { border-color:var(--blue); } button:disabled { opacity:.45; cursor:not-allowed; }
+button.primary { background:#1f6feb; border-color:#1f6feb; color:#fff; }
+button.ghost { background:transparent; border-color:transparent; color:var(--muted); padding:2px 8px; } button.ghost:hover { color:var(--text); border-color:var(--line); }
+:focus-visible { outline:2px solid var(--blue); outline-offset:2px; }
+.mono { font-family:ui-monospace,Consolas,monospace; font-size:12px; color:var(--muted); } .sub { color:var(--muted); font-size:12px; } .spacer { flex:1; }
+header { display:flex; gap:10px; align-items:center; padding:10px 16px; background:var(--panel); border-bottom:1px solid var(--line); }
+header h1 { font-size:16px; margin:0 8px 0 0; }
+.scope { display:flex; gap:6px; } .scope button[aria-pressed="true"] { border-color:var(--blue); background:#12253d; }
+nav.tabs { display:flex; gap:2px; padding:0 16px; background:var(--panel); border-bottom:1px solid var(--line); }
+nav.tabs button { border:0; border-bottom:2px solid transparent; border-radius:0; background:transparent; padding:8px 14px; color:var(--muted); }
+nav.tabs button[aria-selected="true"] { color:var(--text); border-bottom-color:var(--blue); }
+
+/* ---------- layout con divisor ajustable ---------- */
+.layout { display:flex; height:calc(100vh - 86px); min-height:560px; }
+.cards { flex:1 1 0; min-width:360px; container-type:inline-size; overflow:auto; padding:12px 14px 18px; display:flex; flex-direction:column; gap:8px; }
+.split { flex:none; width:10px; cursor:col-resize; position:relative; touch-action:none; background:var(--panel); border-left:1px solid var(--line); }
+.split::after { content:""; position:absolute; top:50%; left:50%; width:4px; height:36px; transform:translate(-50%,-50%); border-radius:2px; background:var(--line); }
+.split:hover::after, .split:focus-visible::after, .split.drag::after { background:var(--blue); }
+.split:focus-visible { outline-offset:-2px; }
+.chat { flex:none; width:var(--chat-w, 460px); min-width:340px; display:flex; flex-direction:column; background:var(--panel); min-height:0; }
+body.dragging { user-select:none; cursor:col-resize; }
+@media (max-width:720px) { .layout { flex-direction:column; height:auto; } .cards { min-width:0; max-height:50vh; } .split { display:none; } .chat { width:auto; min-width:0; height:60vh; border-top:1px solid var(--line); } }
+
+/* ---------- tarjetas compactas ---------- */
+.filters { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.filters button[aria-pressed="true"] { border-color:var(--blue); background:#12253d; }
+.chip { font-size:12px; padding:0 8px; border-radius:10px; border:1px solid var(--line); white-space:nowrap; display:inline-block; line-height:1.55; }
+.chip.green { color:var(--green); border-color:#1d4a28; background:#0f2416; } .chip.red { color:var(--red); border-color:#5a1f1c; background:#2a1213; }
+.chip.yellow { color:var(--yellow); border-color:#53410f; background:#251d08; } .chip.gray { color:var(--muted); } .chip.purple { color:var(--purple); border-color:#3d2f6b; background:#1a1530; }
+.card { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:8px 12px; display:grid; gap:6px; cursor:pointer; flex:none; }
+.card:hover { border-color:#3a4553; }
+.card[aria-current="true"] { border-color:var(--blue); background:#12253d; }
+.card.sala { border-color:#3d2f6b; background:linear-gradient(180deg,#1a1530,var(--panel)); }
+.card.ask { border-left:3px solid var(--yellow); } .card.block { border-left:3px solid var(--red); }
+.c-top { display:flex; align-items:center; gap:8px; min-width:0; } .c-top b { font-size:14px; white-space:nowrap; }
+.c-top .mono { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+.c-row { display:grid; grid-template-columns:minmax(110px,150px) minmax(0,1fr) auto; gap:12px; align-items:center; }
+.c-prog { display:flex; align-items:center; gap:8px; }
+.bar { display:flex; height:6px; border-radius:3px; overflow:hidden; background:var(--line); flex:1; min-width:60px; } .bar i { display:block; } .g { background:var(--green); } .b { background:var(--blue); } .r { background:var(--red); }
+.c-next { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+@container (max-width:520px) {
+  .c-row { grid-template-columns:minmax(0,1fr) auto; }
+  .c-prog { grid-column:1 / -1; order:2; }
+}
+
+/* ---------- chat ---------- */
+.chat-head { padding:10px 14px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:8px; }
+.chat-head b { font-size:15px; }
+.msgs { flex:1; overflow:auto; padding:12px 14px; display:flex; flex-direction:column; gap:10px; }
+.m { max-width:90%; padding:8px 11px; border-radius:12px; border:1px solid var(--line); background:var(--panel2); white-space:pre-wrap; }
+.m.me { align-self:flex-end; background:#12253d; border-color:#1d3a5f; border-radius:12px 12px 3px 12px; }
+.m .who { font-size:11px; color:var(--muted); display:block; margin-bottom:2px; }
+.tools { align-self:flex-start; font-size:12px; color:var(--muted); border:1px dashed var(--line); border-radius:8px; padding:3px 10px; }
+.composer { margin:0 12px 12px; border:1px solid var(--line); border-radius:12px; background:var(--bg); padding:8px 8px 6px; display:grid; gap:6px; }
+.composer:focus-within { border-color:var(--blue); }
+.composer textarea { width:100%; min-height:42px; max-height:150px; resize:none; border:0; background:transparent; padding:4px 6px; }
+.composer textarea:focus-visible { outline:none; }
+.c-bar { display:flex; align-items:center; gap:6px; }
+details.menu { position:relative; }
+details.menu > summary { list-style:none; cursor:pointer; border:1px solid var(--line); border-radius:6px; padding:3px 10px; background:var(--panel2); display:inline-flex; gap:6px; align-items:center; }
+details.menu > summary::-webkit-details-marker { display:none; }
+details.menu[open] > summary { border-color:var(--blue); }
+.pop { position:absolute; bottom:calc(100% + 6px); left:0; width:310px; max-width:calc(100vw - 24px); background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:6px; box-shadow:0 8px 24px rgba(0,0,0,.45); z-index:3; }
+.pop h4 { margin:4px 8px 6px; font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); font-weight:600; }
+.opt { display:grid; grid-template-columns:auto 1fr; gap:0 10px; align-items:center; width:100%; text-align:left; border:0; background:transparent; padding:6px 8px; border-radius:6px; white-space:normal; }
+.opt:hover:not(:disabled) { background:var(--panel2); }
+.opt .why { grid-column:2; color:var(--muted); font-size:12px; }
+.opt code { font:12px ui-monospace,Consolas,monospace; color:var(--blue); }
+.hint { color:var(--muted); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+/* el atributo hidden debe ganarle a los display de las clases */
+[hidden] { display:none !important; }
+/* chips de cambios (clic = pestana Cambios) y pestanas del panel derecho */
+button.chip-btn { cursor:pointer; padding:0 8px; background:#251d08; }
+button.chip-btn:hover { border-color:var(--yellow); }
+.add { color:var(--green); } .del { color:var(--red); }
+.chip.blue { color:var(--blue); border-color:#1d3a5f; background:#0f1d30; }
+.ptabs { display:flex; gap:2px; padding:0 10px; border-bottom:1px solid var(--line); }
+.ptabs button { border:0; border-bottom:2px solid transparent; border-radius:0; background:transparent; padding:6px 12px; color:var(--muted); }
+.ptabs button[aria-selected="true"] { color:var(--text); border-bottom-color:var(--blue); }
+.ptabs .n { font-size:11px; padding:0 6px; border-radius:9px; background:#251d08; color:var(--yellow); border:1px solid #53410f; margin-left:4px; }
+.diffview { flex:1; overflow:auto; padding:12px 14px; display:flex; flex-direction:column; gap:10px; }
+.files { border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+.files > div { display:grid; grid-template-columns:18px minmax(0,1fr) auto auto; gap:10px; padding:5px 10px; border-bottom:1px solid var(--line); font:12px ui-monospace,Consolas,monospace; }
+.files > div:last-child { border-bottom:0; }
+.files .st { color:var(--yellow); }
+.files .p { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+details.file { border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+details.file > summary { cursor:pointer; padding:6px 10px; background:var(--panel2); font:12px ui-monospace,Consolas,monospace; }
+.dl { font:12px/1.5 ui-monospace,Consolas,monospace; white-space:pre; padding:0 10px; overflow:hidden; text-overflow:ellipsis; }
+.dl.a { background:#0f2416; color:var(--green); } .dl.d { background:#2a1213; color:var(--red); } .dl.h { color:var(--muted); }
+@media (prefers-reduced-motion: reduce) { * { transition:none !important; animation:none !important; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Repo Panel</h1>
+  <div class="scope" role="group" aria-label="Alcance"><button aria-pressed="false">All <span class="mono">15</span></button><button aria-pressed="true">UPEN <span class="mono">6</span></button><button aria-pressed="false">No room <span class="mono">9</span></button></div>
+  <span class="spacer"></span>
+  <button class="ghost">Buscar o ejecutar… <span class="mono">Ctrl+K</span></button><button>Refresh</button>
+</header>
+<nav class="tabs" role="tablist" aria-label="Vistas"><button role="tab" aria-selected="true">Summary</button><button role="tab" aria-selected="false">Work</button><button role="tab" aria-selected="false">Conformity</button></nav>
+
+<div class="layout" id="layout">
+  <section class="cards" aria-label="Proyectos y sala">
+    <div class="filters" role="group" aria-label="Filtro"><button aria-pressed="true">Todos · 7</button><button aria-pressed="false">Necesitan atención · 3</button><span class="spacer"></span><span class="sub">Tocá una tarjeta para abrir su chat</span></div>
+
+    <article class="card sala" tabindex="0" aria-label="Sala UPEN">
+      <div class="c-top"><b>★ Sala UPEN</b><span class="chip purple">sala</span><span class="spacer"></span><span class="sub">hito beta 29 nov</span><span class="chip gray">○ libre</span></div>
+      <div class="c-row">
+        <div class="c-prog" title="38 de 91 hechas · 4 en revisión · 3 bloqueadas"><div class="bar"><i class="g" style="width:42%"></i><i class="b" style="width:4%"></i><i class="r" style="width:3%"></i></div><span class="sub">38/91</span></div>
+        <div class="c-next"><span class="sub">Frena</span> · upen-core E03</div>
+        <span class="chip yellow">2 propuestas</span>
+      </div>
+    </article>
+
+    <article class="card ask" tabindex="0" data-repo="pages" aria-label="upen-pages">
+      <div class="c-top"><b>upen-pages</b><span class="mono">feat/pricing</span><span class="chip blue" title="1 commit sin subir">↑ 1 sin subir</span><span class="spacer"></span><span class="sub">hace 2 min</span><span class="chip yellow">◐ te pregunta</span></div>
+      <div class="c-row">
+        <div class="c-prog" title="6 de 15 hechas · 3 bloqueadas"><div class="bar"><i class="g" style="width:40%"></i><i class="r" style="width:20%"></i></div><span class="sub">6/15</span></div>
+        <div class="c-next"><span class="sub">Siguiente</span> · P1a — Esqueleto Astro SSR</div>
+        <button class="primary">Responder</button>
+      </div>
+    </article>
+
+    <article class="card" tabindex="0" aria-current="true" data-repo="erp" aria-label="upen-erp, chat abierto">
+      <div class="c-top"><b>upen-erp</b><span class="mono">fix/b2b-ledger</span><span class="spacer"></span><span class="sub">hace 12 min</span><span class="chip gray">○ libre</span></div>
+      <div class="c-row">
+        <div class="c-prog" title="30 de 74 hechas · 1 en revisión"><div class="bar"><i class="g" style="width:40%"></i><i class="b" style="width:2%"></i></div><span class="sub">30/74</span></div>
+        <div class="c-next"><span class="sub">Siguiente</span> · B2b — Validar el ownerId de las fotos</div>
+        <button class="primary">/flow-next</button>
+      </div>
+    </article>
+
+    <article class="card block" tabindex="0" aria-label="upen-chat">
+      <div class="c-top"><b>upen-chat</b><span class="mono">develop</span><span class="spacer"></span><span class="sub">hace 7 h</span><span class="chip red">■ bloqueado</span></div>
+      <div class="c-row">
+        <div class="c-prog" title="4 de 12 hechas · 8 bloqueadas"><div class="bar"><i class="g" style="width:33%"></i><i class="r" style="width:67%"></i></div><span class="sub">4/12</span></div>
+        <div class="c-next"><span class="sub">Espera</span> · CHAT-U1 → CORE-E09</div>
+        <button>Ver bloqueo</button>
+      </div>
+    </article>
+
+    <article class="card" tabindex="0" aria-label="upen-core">
+      <div class="c-top"><b>upen-core</b><span class="mono">develop</span><span class="spacer"></span><span class="sub">hace 6 h</span><span class="chip gray">○ sin sesión</span></div>
+      <div class="c-row">
+        <div class="c-prog" title="25 de 38 hechas · 1 en revisión"><div class="bar"><i class="g" style="width:63%"></i><i class="b" style="width:3%"></i></div><span class="sub">25/38</span></div>
+        <div class="c-next"><span class="sub">Siguiente</span> · E05c2 — Invitaciones: listar y tope diario</div>
+        <button>Iniciar sesión</button>
+      </div>
+    </article>
+
+    <article class="card" tabindex="0" data-repo="web" aria-label="upen-web">
+      <div class="c-top"><b>upen-web</b><span class="mono">feat/legal</span><button class="chip chip-btn yellow" data-diff="web" title="Ver los cambios">● 3 archivos <span class="add">+120</span> <span class="del">−4</span></button><span class="spacer"></span><span class="sub">ahora</span><span class="chip green">● trabajando</span></div>
+      <div class="c-row">
+        <div class="c-prog" title="2 de 7 hechas"><div class="bar"><i class="g" style="width:28%"></i></div><span class="sub">2/7</span></div>
+        <div class="c-next"><span class="sub">Ahora</span> · W4 — /privacidad y /terminos</div>
+        <button disabled>Trabajando…</button>
+      </div>
+    </article>
+
+    <article class="card" tabindex="0" aria-label="upen-brand">
+      <div class="c-top"><b>upen-brand</b><span class="mono">develop</span><span class="spacer"></span><span class="sub">hace 6 h</span><span class="chip gray">○ sin sesión</span></div>
+      <div class="c-row">
+        <div class="c-prog" title="3 de 10 hechas"><div class="bar"><i class="g" style="width:30%"></i></div><span class="sub">3/10</span></div>
+        <div class="c-next"><span class="sub">Siguiente</span> · M2b — Contraste claro y oscuro</div>
+        <button>Iniciar sesión</button>
+      </div>
+    </article>
+  </section>
+
+  <div class="split" id="split" role="separator" aria-orientation="vertical" tabindex="0" aria-label="Ajustar el ancho del chat (flechas izquierda y derecha; doble clic para restablecer)" aria-valuemin="20" aria-valuemax="70" aria-valuenow="45"></div>
+
+  <aside class="chat" id="chat" aria-label="Chat con la sesión de upen-erp">
+    <div class="chat-head"><b id="pName">upen-erp</b><span class="chip gray" id="pState">○ libre</span><span class="mono" id="pSess">panel:upen-erp</span><span class="spacer"></span><button class="ghost" aria-label="Menú de la sesión" title="Cambiar sesión · Soltar · Abrir en Orca">⋯</button></div>
+    <div class="ptabs" role="tablist" aria-label="Vista del panel"><button role="tab" id="tabChat" aria-selected="true">Chat</button><button role="tab" id="tabDiff" aria-selected="false" hidden>Cambios <span class="n" id="diffN">3</span></button></div>
+    <div class="msgs" id="msgs" role="log" aria-live="polite">
+      <div class="m me"><span class="who">Vos · 14:02</span>/flow-next</div>
+      <div class="tools">▸ 4 herramientas · leer ROADMAP, leer ficha, git status…</div>
+      <div class="m"><span class="who">upen-erp · 14:03</span>Tomo B2b del ROADMAP. Encontré el PR #58 fusionado que toca el ownerId, pero falta la prueba de rechazo. Es 1 archivo y unas 60 líneas.</div>
+      <div class="m me"><span class="who">Vos · 14:05</span>Dale, hacelo. Pero primero mostrame la prueba que falla.</div>
+      <div class="tools">▸ 2 herramientas · escribir prueba, correr prueba</div>
+      <div class="m"><span class="who">upen-erp · 14:08</span>Prueba escrita y en rojo: «rechaza una foto de otro negocio» devuelve 200 en vez de 403. Ahora implemento el chequeo.</div>
+    </div>
+    <div class="diffview" id="diffview" hidden></div>
+    <form class="composer" id="composer" onsubmit="return false">
+      <textarea id="msgBox" aria-label="Mensaje para upen-erp" placeholder="Escribí a upen-erp…  o  /  para acciones"></textarea>
+      <div class="c-bar">
+        <details class="menu">
+          <summary aria-label="Acciones rápidas"><b>/</b> Acciones</summary>
+          <div class="pop" role="menu">
+            <h4>Disponibles ahora</h4>
+            <button class="opt" role="menuitem"><code>/flow-next</code><span>Tomar la siguiente unidad</span><span class="why">B2b — Validar el ownerId</span></button>
+            <h4>No disponibles</h4>
+            <button class="opt" role="menuitem" disabled><code>/flow-commit</code><span>Commitear cambios</span><span class="why">No hay cambios para commitear</span></button>
+            <button class="opt" role="menuitem" disabled><code>/flow-pr</code><span>Abrir el pull request</span><span class="why">Nada commiteado todavía</span></button>
+            <button class="opt" role="menuitem" disabled><code>/flow-base</code><span>Volver a la rama base</span><span class="why">La rama no está fusionada</span></button>
+          </div>
+        </details>
+        <span class="hint">Enter envía · Shift+Enter nueva línea</span>
+        <span class="spacer"></span>
+        <button class="primary" aria-label="Enviar">Enviar</button>
+      </div>
+    </form>
+  </aside>
+</div>
+
+<script>
+// Divisor ajustable: arrastrar, flechas del teclado, doble clic para restablecer. El ancho se guarda como proporcion,
+// asi que al redimensionar la ventana el reparto se mantiene. En pantallas chicas (< 1100 px) el reparto por defecto es 50/50.
+(function () {
+  var layout = document.getElementById('layout'), chat = document.getElementById('chat'), split = document.getElementById('split');
+  var MIN_CHAT = 340, MIN_CARDS = 360, KEY = 'repo-panel.chatRatio';
+  var ratio = null;
+  try { var s = parseFloat(localStorage.getItem(KEY)); if (s > 0.1 && s < 0.9) ratio = s; } catch (e) {}
+  function total() { return layout.clientWidth - split.offsetWidth; }
+  function defaults() { return total() < 1100 ? 0.5 : 0.4; }
+  function apply() {
+    var t = total(), r = ratio === null ? defaults() : ratio;
+    var w = Math.round(t * r);
+    w = Math.max(MIN_CHAT, Math.min(w, t - MIN_CARDS));
+    chat.style.setProperty('--chat-w', w + 'px');
+    split.setAttribute('aria-valuenow', String(Math.round((w / t) * 100)));
+  }
+  function setWidth(w) {
+    var t = total();
+    w = Math.max(MIN_CHAT, Math.min(w, t - MIN_CARDS));
+    ratio = w / t;
+    try { localStorage.setItem(KEY, String(ratio)); } catch (e) {}
+    apply();
+  }
+  split.addEventListener('pointerdown', function (e) {
+    split.setPointerCapture(e.pointerId); split.classList.add('drag'); document.body.classList.add('dragging');
+  });
+  split.addEventListener('pointermove', function (e) {
+    if (!split.hasPointerCapture(e.pointerId)) return;
+    setWidth(layout.getBoundingClientRect().right - e.clientX - split.offsetWidth / 2);
+  });
+  function end(e) { split.classList.remove('drag'); document.body.classList.remove('dragging'); if (split.hasPointerCapture(e.pointerId)) split.releasePointerCapture(e.pointerId); }
+  split.addEventListener('pointerup', end); split.addEventListener('pointercancel', end);
+  split.addEventListener('keydown', function (e) {
+    var cur = chat.getBoundingClientRect().width;
+    if (e.key === 'ArrowLeft') { setWidth(cur + 24); e.preventDefault(); }
+    else if (e.key === 'ArrowRight') { setWidth(cur - 24); e.preventDefault(); }
+    else if (e.key === 'Enter') { ratio = null; try { localStorage.removeItem(KEY); } catch (x) {} apply(); }
+  });
+  split.addEventListener('dblclick', function () { ratio = null; try { localStorage.removeItem(KEY); } catch (e) {} apply(); });
+  window.addEventListener('resize', apply);
+  apply();
+})();
+
+// Seleccion de tarjeta y pestanas Chat / Cambios (datos de ejemplo). Clic en una tarjeta abre su chat; clic en su chip de
+// cambios abre la pestana Cambios del MISMO panel, asi el diff no necesita otro cajon.
+(function () {
+  var msgs = document.getElementById('msgs'), diffview = document.getElementById('diffview'), composer = document.getElementById('composer');
+  var box = document.getElementById('msgBox'), tabChat = document.getElementById('tabChat'), tabDiff = document.getElementById('tabDiff');
+  var erpMsgs = msgs.innerHTML;
+  function m(who, t, me) { return '<div class="m' + (me ? ' me' : '') + '"><span class="who">' + who + '</span>' + t + '</div>'; }
+  var D = {
+    erp: { name: 'upen-erp', chip: ['gray', '○ libre'], sess: 'panel:upen-erp', msgs: erpMsgs, ph: 'Escribí a upen-erp…  o  /  para acciones', off: false, files: null },
+    web: { name: 'upen-web', chip: ['green', '● trabajando'], sess: 'panel:upen-web', ph: 'La sesión está trabajando. Podés escribir cuando termine.', off: true,
+      msgs: m('Vos · 14:20', '/flow-next', true) + m('upen-web · ahora', 'Tomo W4. Escribo la página de privacidad con el texto legal que dejó el equipo…'),
+      files: [['M', 'src/pages/privacidad.astro', 84, 2], ['A', 'src/content/legal/privacidad.md', 30, 0], ['M', 'src/layouts/Base.astro', 6, 2]] },
+    pages: { name: 'upen-pages', chip: ['yellow', '◐ te pregunta'], sess: 'panel:upen-pages', ph: 'Respondé la pregunta de la sesión para continuar', off: true,
+      msgs: m('upen-pages · hace 2 min', 'El CI de #31 falla en lint. Para arreglarlo tengo que correr un comando de Git: git switch feat/pricing.'), files: null }
+  };
+  var SNIP = ['@@ -12,7 +12,9 @@ export const prerender = true', ' import Base from "../layouts/Base.astro";', '-const title = "Legal";', '+const title = "Política de privacidad";', '+const updated = "2026-10-28";', ' ---', ' <Base title={title}>'];
+  function diffHtml(files) {
+    var list = files.map(function (f) { return '<div><span class="st">' + f[0] + '</span><span class="p">' + f[1] + '</span><span class="add">+' + f[2] + '</span><span class="del">−' + f[3] + '</span></div>'; }).join('');
+    var body = files.map(function (f, i) {
+      return '<details class="file"' + (i === 0 ? ' open' : '') + '><summary>' + f[1] + '</summary>' + SNIP.map(function (l) {
+        var c = l.charAt(0) === '+' ? 'a' : l.charAt(0) === '-' ? 'd' : l.charAt(0) === '@' ? 'h' : '';
+        return '<div class="dl ' + c + '">' + l.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</div>';
+      }).join('') + '</details>';
+    }).join('');
+    return '<div class="files">' + list + '</div>' + body;
+  }
+  function show(repo, tab) {
+    var d = D[repo];
+    document.getElementById('pName').textContent = d.name;
+    var st = document.getElementById('pState'); st.className = 'chip ' + d.chip[0]; st.textContent = d.chip[1];
+    document.getElementById('pSess').textContent = d.sess;
+    document.querySelectorAll('.card[data-repo]').forEach(function (c) { if (c.dataset.repo === repo) c.setAttribute('aria-current', 'true'); else c.removeAttribute('aria-current'); });
+    var hasDiff = !!d.files;
+    tabDiff.hidden = !hasDiff;
+    if (hasDiff) document.getElementById('diffN').textContent = d.files.length;
+    if (tab === 'diff' && !hasDiff) tab = 'chat';
+    var isDiff = tab === 'diff';
+    tabChat.setAttribute('aria-selected', String(!isDiff)); tabDiff.setAttribute('aria-selected', String(isDiff));
+    msgs.hidden = isDiff; composer.hidden = isDiff; diffview.hidden = !isDiff;
+    msgs.innerHTML = d.msgs; box.disabled = d.off; box.placeholder = d.ph;
+    if (isDiff) diffview.innerHTML = diffHtml(d.files);
+    current = repo;
+  }
+  var current = 'erp';
+  document.querySelectorAll('.card[data-repo]').forEach(function (c) {
+    c.addEventListener('click', function (e) { var b = e.target.closest('[data-diff]'); show(c.dataset.repo, b ? 'diff' : 'chat'); });
+    c.addEventListener('keydown', function (e) { if (e.key === 'Enter' && e.target === c) show(c.dataset.repo, 'chat'); });
+  });
+  tabChat.addEventListener('click', function () { show(current, 'chat'); });
+  tabDiff.addEventListener('click', function () { show(current, 'diff'); });
+})();
+</script>
+</body>
+</html>

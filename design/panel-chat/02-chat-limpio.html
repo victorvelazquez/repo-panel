@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Repo Panel — Chat de un repo</title>
+<style>
+:root { --bg:#0f1216; --panel:#171b21; --panel2:#1e242c; --line:#2a323c; --text:#d7dde5; --muted:#8b96a3; --green:#3fb950; --red:#f85149; --yellow:#d29922; --blue:#58a6ff; --gray:#6e7681; --purple:#a371f7; }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--text); font:14px/1.5 system-ui,"Segoe UI",sans-serif; }
+button,textarea { font:inherit; color:var(--text); background:var(--panel2); border:1px solid var(--line); border-radius:6px; padding:4px 10px; }
+button { cursor:pointer; } button:hover:not(:disabled) { border-color:var(--blue); } button:disabled { opacity:.45; cursor:not-allowed; }
+button.primary { background:#1f6feb; border-color:#1f6feb; color:#fff; }
+button.ghost { background:transparent; border-color:transparent; color:var(--muted); padding:2px 8px; } button.ghost:hover { color:var(--text); border-color:var(--line); }
+:focus-visible { outline:2px solid var(--blue); outline-offset:2px; }
+.sub { color:var(--muted); font-size:12px; } .spacer { flex:1; }
+header { display:flex; gap:10px; align-items:center; padding:10px 16px; background:var(--panel); border-bottom:1px solid var(--line); }
+header h1 { font-size:16px; margin:0 8px 0 0; }
+nav.tabs { display:flex; gap:2px; padding:0 16px; background:var(--panel); border-bottom:1px solid var(--line); }
+nav.tabs button { border:0; border-bottom:2px solid transparent; border-radius:0; background:transparent; padding:8px 14px; color:var(--muted); }
+nav.tabs button[aria-selected="true"] { color:var(--text); border-bottom-color:var(--blue); }
+
+.layout { display:grid; grid-template-columns:minmax(0,1fr) 480px; height:calc(100vh - 86px); min-height:700px; }
+
+/* lista = selector de conversaciones */
+.list { padding:16px; overflow:auto; }
+.list .group { font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin:14px 0 6px; } .list .group:first-child { margin-top:0; }
+.row { display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:8px; cursor:pointer; border:1px solid transparent; }
+.row:hover { background:var(--panel); }
+.row[aria-current="true"] { background:#12253d; border-color:#1d3a5f; }
+.row .dot { width:9px; height:9px; border-radius:50%; flex:none; background:var(--gray); }
+.dot.green { background:var(--green); } .dot.yellow { background:var(--yellow); } .dot.red { background:var(--red); } .dot.sala { background:var(--purple); }
+.row .name { font-weight:600; } .row .grow { flex:1; min-width:0; } .row .grow .sub { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.row .state { font-size:12px; color:var(--muted); white-space:nowrap; }
+.row.sala .name::before { content:"★ "; color:var(--purple); }
+
+/* chat */
+.chat { display:flex; flex-direction:column; background:var(--panel); border-left:1px solid var(--line); min-height:0; }
+.head { padding:14px 16px 10px; display:flex; align-items:center; gap:8px; }
+.head h2 { margin:0; font-size:16px; }
+.state { display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--muted); }
+.state i { width:8px; height:8px; border-radius:50%; background:var(--gray); display:inline-block; }
+.next { margin:0 16px 8px; padding:8px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); display:flex; align-items:center; gap:10px; }
+.next .t { flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.msgs { flex:1; overflow:auto; padding:8px 16px 16px; display:flex; flex-direction:column; gap:14px; }
+.who { font-size:12px; color:var(--muted); margin-bottom:2px; }
+.a { max-width:94%; white-space:pre-wrap; }
+.u { align-self:flex-end; max-width:84%; background:#12253d; border:1px solid #1d3a5f; border-radius:12px 12px 2px 12px; padding:7px 11px; white-space:pre-wrap; }
+.tools { font-size:12px; color:var(--muted); }
+.tools summary { cursor:pointer; list-style:none; } .tools summary::before { content:"▸ "; }
+.composer { margin:0 16px 16px; border:1px solid var(--line); border-radius:10px; background:var(--bg); display:flex; align-items:flex-end; gap:8px; padding:8px; }
+.composer:focus-within { border-color:var(--blue); }
+.composer textarea { flex:1; min-height:44px; max-height:160px; resize:none; border:0; background:transparent; padding:4px 6px; }
+.composer textarea:focus-visible { outline:none; }
+@media (prefers-reduced-motion: reduce) { * { transition:none !important; animation:none !important; } }
+</style>
+</head>
+<body>
+<header><h1>Repo Panel</h1><span class="spacer"></span><button class="ghost">Buscar o ejecutar… Ctrl+K</button></header>
+<nav class="tabs" role="tablist" aria-label="Vistas"><button role="tab" aria-selected="true">Resumen</button><button role="tab" aria-selected="false">Work</button><button role="tab" aria-selected="false">Conformity</button></nav>
+
+<div class="layout">
+  <section class="list" aria-label="Conversaciones">
+    <div class="group">Sala</div>
+    <div class="row sala"><span class="dot sala"></span><div class="grow"><span class="name">UPEN</span><div class="sub">te propuso 2 mensajes</div></div><span class="state">libre</span></div>
+    <div class="group">Proyectos</div>
+    <div class="row"><span class="dot"></span><div class="grow"><span class="name">upen-brand</span><div class="sub">M2b — contraste claro y oscuro</div></div><span class="state">sin sesión</span></div>
+    <div class="row"><span class="dot red"></span><div class="grow"><span class="name">upen-chat</span><div class="sub">espera CORE-E09</div></div><span class="state">bloqueado</span></div>
+    <div class="row"><span class="dot"></span><div class="grow"><span class="name">upen-core</span><div class="sub">E05c2 — invitaciones</div></div><span class="state">sin sesión</span></div>
+    <div class="row" aria-current="true"><span class="dot"></span><div class="grow"><span class="name">upen-erp</span><div class="sub">B2b — validar el ownerId</div></div><span class="state">libre</span></div>
+    <div class="row"><span class="dot yellow"></span><div class="grow"><span class="name">upen-pages</span><div class="sub">te hace una pregunta</div></div><span class="state">esperando</span></div>
+    <div class="row"><span class="dot green"></span><div class="grow"><span class="name">upen-web</span><div class="sub">W4 — /privacidad y /terminos</div></div><span class="state">trabajando</span></div>
+  </section>
+
+  <aside class="chat" aria-label="Chat con la sesión de upen-erp">
+    <div class="head">
+      <h2>upen-erp</h2><span class="state"><i></i>libre</span>
+      <span class="spacer"></span>
+      <button class="ghost" aria-label="Menú de la sesión" title="Sesión panel:upen-erp · Cambiar · Soltar">⋯</button>
+      <button class="ghost" aria-label="Cerrar el chat">✕</button>
+    </div>
+    <div class="next"><span class="t"><span class="sub">Siguiente</span> · B2b — Validar el ownerId</span><button class="primary">/flow-next</button></div>
+
+    <div class="msgs" role="log" aria-live="polite">
+      <div class="u">/flow-next</div>
+      <div>
+        <details class="tools"><summary>4 herramientas</summary>leer ROADMAP, leer ficha, git status, git log</details>
+        <div class="a">Tomo B2b del ROADMAP. Encontré el PR #58 fusionado que toca el ownerId, pero falta la prueba de rechazo. Es 1 archivo y unas 60 líneas.</div>
+      </div>
+      <div class="u">Dale, hacelo. Pero primero mostrame la prueba que falla.</div>
+      <div>
+        <details class="tools"><summary>2 herramientas</summary>escribir prueba, correr prueba</details>
+        <div class="a">Prueba escrita y en rojo: «rechaza una foto de otro negocio» devuelve 200 en vez de 403. Ahora implemento el chequeo.</div>
+      </div>
+    </div>
+
+    <form class="composer" onsubmit="return false">
+      <textarea aria-label="Mensaje para upen-erp" placeholder="Escribí a upen-erp…" title="Enter envía · Shift+Enter nueva línea · solo se envía con la sesión libre"></textarea>
+      <button class="primary" aria-label="Enviar">Enviar</button>
+    </form>
+  </aside>
+</div>
+</body>
+</html>
