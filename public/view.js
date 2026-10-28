@@ -444,7 +444,7 @@
   const RUNNING_LABEL = {
     'flow-commit': 'committing…', 'flow-commit-unstage': 'committing…', 'flow-pr': 'creating pull request…',
     'flow-base': 'updating base branch…', 'flow-base-stash': 'updating base branch…',
-    'fix-pr': 'fixing pull request…', 'put-in-conditions': 'putting repo in conditions…',
+    'fix-pr': 'fixing pull request…', 'put-in-conditions': 'putting repo in conditions…', 'flow-next': 'starting the next task…',
   };
   // The GitHub-like color of the progress line of each command (the pending CI chip is always yellow).
   const RUN_COLOR = { 'flow-commit': 'blue', 'flow-commit-unstage': 'blue', 'flow-pr': 'green', 'flow-base': 'purple', 'flow-base-stash': 'purple', 'fix-pr': 'orange' };
@@ -483,7 +483,7 @@
     }
     const running = (reason) => done({ state: 'running', reason });
     const attention = (reason) => done({ state: 'attention', reason });
-    const noCommit = sent.cmd === 'fix-pr' || sent.cmd === 'put-in-conditions';
+    const noCommit = sent.cmd === 'fix-pr' || sent.cmd === 'put-in-conditions' || sent.cmd === 'flow-next';
     if (!hasLocal(local)) return running('Waiting for the repo state');
     if (session === 'busy') return running('The pi session is working');
     const text = CMD_TEXT[sent.cmd] || `/${sent.cmd}`;

@@ -36,8 +36,7 @@ test('merge, branch and start actions produce the exact data-act attributes', ()
   const branch = view([row({ action: { kind: 'branch', label: 'x', pr: null } })]);
   assert.match(branch, /<button[^>]*data-act="pi" data-id="r1" data-cmd="flow-base"/);
   const start = view([row({ action: { kind: 'start', label: 'Start T5: Do five', pr: null } })]);
-  assert.match(start, /<button[^>]*data-act="focus-repo" data-id="r1"[^>]*>Start T5</);
-  assert.doesNotMatch(start, /data-act="pi"/);
+  assert.match(start, /<button[^>]*data-act="pi" data-id="r1" data-cmd="flow-next"[^>]*>\/flow-next</);
 });
 
 test('deliver uses the flow button the board would show; without local state it is disabled and sends nothing', () => {
@@ -454,14 +453,14 @@ test('the counter cards align to the top instead of stretching to the attention 
   assert.match(css, /\.rs-kpis\s*\{[^}]*align-items:\s*start/);
 });
 
-test('long primary labels are clipped to 24 characters, with the full text escaped in title and aria-label', () => {
+test('the start button keeps a fixed /flow-next label however long the unit id is, with the id escaped in the title', () => {
   const id = 'standardize-cross-api-errors-push-producer-x'.padEnd(60, 'z');
   assert.equal(id.length, 60);
   const html = view([row({ next: { id, entrega: 'e', resultadoVisible: 'r' }, action: { kind: 'start', label: 'x', pr: null } })]);
-  const m = html.match(/<button class="primary" data-act="focus-repo" data-id="r1"([^>]*)>([^<]*)<\/button>/);
+  const m = html.match(/<button class="primary" data-act="pi" data-id="r1" data-cmd="flow-next"([^>]*)>([^<]*)<\/button>/);
   assert.ok(m, 'start button');
-  assert.ok(m[2].length <= 24 && m[2].endsWith('…'), m[2]);
-  assert.ok(m[1].includes(`title="Start ${id}"`) && m[1].includes(`aria-label="Start ${id}"`));
+  assert.equal(m[2], '/flow-next');
+  assert.ok(m[1].includes(`(starts ${id})`));
   const bad = view([row({ next: { id: BAD, entrega: 'e', resultadoVisible: 'r' }, action: { kind: 'start', label: 'x', pr: null } })]);
   assert.doesNotMatch(bad, /<img/);
   const merge = view([row({ action: { kind: 'merge', label: 'm', pr: 123456789012345678901234567890 } })]);

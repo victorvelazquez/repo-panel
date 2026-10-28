@@ -12,7 +12,10 @@ const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'rp51-'));
 const goodRepo = path.join(scratch, 'good');
 const missingRepo = path.join(scratch, 'missing');
 fs.mkdirSync(goodRepo);
-const g = (...args) => spawnSync('git', ['-C', goodRepo, '-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { encoding: 'utf8' });
+// The caller's git environment (a hook, a worktree) must not leak into the throwaway repo.
+const gitEnv = { ...process.env };
+for (const k of ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE']) delete gitEnv[k];
+const g = (...args) => spawnSync('git', ['-C', goodRepo, '-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { encoding: 'utf8', env: gitEnv });
 g('init', '-q');
 fs.writeFileSync(path.join(goodRepo, 'a.txt'), 'x\n');
 g('add', 'a.txt');
@@ -221,5 +224,73 @@ test('GET /api/summary is a registered route that needs the token', async () => 
       http.get({ host: '127.0.0.1', port, path: '/api/summary' }, (res) => { res.resume(); resolve(res.statusCode); }).on('error', reject);
     });
     assert.equal(status, 401);
+  } finally { real.close(); }
+});
+
+// ---------- RP58: follow-ups of the review ----------
+test('summaryFor: an exception while analysing one repo gives an error row for it only and never rejects', async () => {
+  const local = async (repo) => (repo.path === goodRepo ? { branch: 'main', files: null, ahead: 0 } : { branch: 'main', files: [], ahead: 0, behind: 0, base: 'main' });
+  const out = await summaryFor({ orca: fakeOrca().orca, prs: async () => ({ prs: [], stale: null }), local }, { fresh: '1' });
+  assert.equal(out.rows.length, 2);
+  const [bad, ok] = out.rows;
+  assert.ok(bad.error);
+  assert.deepEqual([bad.action, bad.next, bad.progress.total, bad.blocking], [null, null, null, []]);
+  assert.deepEqual([bad.name, bad.group], ['good', 'G']);
+  assert.equal(ok.error, null);
+  assert.deepEqual(out.counts, { working: 0, waiting: 0, blocked: 0, idle: 1 });
+});
+
+test('summaryFor: the 10 s cache counts from when the build finished, not from when it started', async () => {
+  let t = 1000000;
+  const f = fakeOrca();
+  let slowed = false;
+  const slow = async () => { if (!slowed) { slowed = true; t += 8000; } return { prs: [], stale: null }; };
+  const deps = { orca: f.orca, prs: slow, now: () => t };
+  const a = await summaryFor(deps, {});
+  assert.equal(t, 1000000 + 8000);
+  t += 5000; // 13 s after the start, 5 s after the end
+  assert.equal(await summaryFor(deps, {}), a);
+  t += 5001; // 10.001 s after the end
+  assert.notEqual(await summaryFor(deps, {}), a);
+});
+
+const blockedRoadmap = async () => ({ available: true, rows: [unit('B', 'Bloqueada')], derived: {}, next: null });
+const cleanLocal = async () => ({ branch: 'main', files: [], ahead: 0, behind: 0, base: 'main' });
+
+test('summaryFor: counts and attention come from the rows (waiting session, failing CI, blocked unit)', async () => {
+  const ask = '▎ ✿ waiting for input\nAllow guarded git operation?\n  ↑↓ navigate  enter select  escape/ctrl+c cancel\n';
+  const failing = async (repo) => (repo.path === goodRepo ? { prs: [{ number: 3, title: 'T', ready: false, checks: { state: 'failed' } }], stale: null } : { prs: [], stale: null });
+  const out = await summaryFor({ orca: fakeOrca({ preview: ask }).orca, prs: failing, local: cleanLocal, roadmap: blockedRoadmap, state: async () => ({ available: false }) }, { fresh: '1' });
+  const [waiting, blocked] = out.rows;
+  assert.deepEqual([waiting.session.state, blocked.session.state], ['waiting', 'none']);
+  assert.deepEqual(blocked.blocking, [{ unit: 'B', waitsFor: [], external: [] }]);
+  assert.deepEqual(out.counts, { working: 0, waiting: 1, blocked: 1, idle: 0 });
+  assert.deepEqual(out.attention, [
+    { id: waiting.id, name: 'good', why: 'The pi session is waiting for an answer; PR #3 has failing checks; Blocked: B' },
+    { id: blocked.id, name: 'missing', why: 'Blocked: B' },
+  ]);
+});
+
+test('GET /api/summary with a valid token answers 200 with the summary keys', async () => {
+  const http = require('node:http');
+  const { createServer } = require('../server/http.js');
+  const probe = http.createServer();
+  await new Promise((r) => probe.listen(0, '127.0.0.1', r));
+  const port = probe.address().port;
+  await new Promise((r) => probe.close(r));
+  const real = createServer(port, { orca: fakeOrca().orca, prs });
+  await new Promise((r) => real.listen(port, '127.0.0.1', r));
+  const get = (p, headers = {}) => new Promise((resolve, reject) => {
+    http.get({ host: '127.0.0.1', port, path: p, headers }, (res) => {
+      let body = '';
+      res.on('data', (c) => { body += c; });
+      res.on('end', () => resolve({ status: res.statusCode, body }));
+    }).on('error', reject);
+  });
+  try {
+    const token = /name="?token"? content="([0-9a-f]+)"/.exec((await get('/')).body)[1];
+    const res = await get('/api/summary?fresh=1', { 'x-token': token });
+    assert.equal(res.status, 200);
+    assert.deepEqual(Object.keys(JSON.parse(res.body)), ['rows', 'counts', 'attention', 'generatedAt']);
   } finally { real.close(); }
 });
