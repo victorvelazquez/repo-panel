@@ -1,5 +1,5 @@
 'use strict';
-// Config file: groups of repos, rooms, snoozed PRs, dismissed warnings and the manual priority order. REPO_PANEL_CONFIG picks the file.
+// Config file: groups of repos, rooms, snoozed PRs, dismissed warnings, adopted pi sessions and the manual priority order. REPO_PANEL_CONFIG picks the file.
 const fs = require('node:fs');
 const path = require('node:path');
 const lib = require('../lib.js');
@@ -73,6 +73,20 @@ function cleanRooms(list) {
   return { rooms, issues, invalid };
 }
 
+const SESSION_ID = /^[A-Za-z0-9._-]{1,80}$/;
+
+// Adopted pi sessions, { "<repoId>" | "room:<name>": { id, name, adoptedAt } }; an invalid entry is ignored.
+function cleanSessions(map) {
+  const out = {};
+  if (!map || typeof map !== 'object' || Array.isArray(map)) return out;
+  for (const [key, v] of Object.entries(map)) {
+    if (!key || !v || typeof v !== 'object' || typeof v.id !== 'string' || !SESSION_ID.test(v.id)) continue;
+    if (typeof v.name !== 'string' || typeof v.adoptedAt !== 'string' || Number.isNaN(Date.parse(v.adoptedAt))) continue;
+    out[key] = { id: v.id, name: v.name.replace(/[\x00-\x1f\x7f]/g, ' ').slice(0, 100), adoptedAt: v.adoptedAt };
+  }
+  return out;
+}
+
 function loadConfig() {
   let cfg = {};
   try { cfg = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8')); } catch { /* first run */ }
@@ -89,6 +103,8 @@ function loadConfig() {
     ...(Array.isArray(cfg.dismissed) ? { dismissed: cleanIds(cfg.dismissed) } : {}),
     // Rooms the user declared by hand; written back only when present.
     ...(cleaned ? { rooms: cleaned.rooms } : {}),
+    // The pi session the panel adopted per repo and room; written back only when present.
+    ...(cfg.sessions !== undefined ? { sessions: cleanSessions(cfg.sessions) } : {}),
     // Optional manual order of the "Go work on" strip; written back only when present.
     ...(Array.isArray(cfg.priority) ? { priority: cleanPriority(cfg.priority) } : {}),
   };

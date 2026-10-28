@@ -19,6 +19,7 @@ const { requirementsFor, prerequisites } = require('./requirements.js');
 const { roomsState, createRoom, removeRoom, assignRoom } = require('./rooms.js');
 const { queueFor, conformityFor } = require('./queue.js');
 const { summaryFor } = require('./summary.js');
+const { sessionsState, adoptSession, releaseSession, startSession } = require('./sessions.js');
 
 const ROOT = path.join(__dirname, '..');
 const TOKEN = crypto.randomBytes(24).toString('hex');
@@ -47,6 +48,7 @@ const routes = {
   'GET /api/pi-status': (q, b, d) => piStatus(findRepo(q.id), d.orca, { tail: q.tail === '1' }),
   'GET /api/rooms': () => roomsState(),
   'GET /api/summary': (q, b, d) => summaryFor(d, q),
+  'GET /api/sessions': (q, b, d) => sessionsState(q.id, d.orca, d.sessionsDir),
   'GET /api/prerequisites': () => prerequisites(),
   'GET /api/diff': (q) => diffText(findRepo(q.id)),
   'POST /api/fetch': async (q, b) => {
@@ -60,6 +62,9 @@ const routes = {
   'POST /api/snooze': (q, b) => setSnoozed(b.id, Number(b.number), !!b.on, !!b.wasReady),
   'POST /api/dismiss': (q, b) => setDismissed(b.id, !!b.on),
   'POST /api/pi': (q, b, d) => piSend(findRepo(b.id), b.command, d.orca, d.wait, d.requirements, { pr: b.pr, prs: d.prs, guard: d.guard }),
+  'POST /api/sessions/adopt': (q, b, d) => adoptSession(b.id, b.session, d.orca, d.sessionsDir),
+  'POST /api/sessions/release': (q, b, d) => releaseSession(b.id, d.orca, d.sessionsDir),
+  'POST /api/sessions/start': (q, b, d) => startSession(b.id, d.orca),
   'POST /api/queue': (q, b) => queueFor(b),
   'POST /api/conformity': (q, b) => conformityFor(b),
   'POST /api/repos': (q, b) => addRepo(b.path, b.group),
