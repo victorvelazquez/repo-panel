@@ -4,6 +4,8 @@ const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 // view.js is missing when an old server (which does not serve it) answers: the page must still run.
 const V = window.RepoPanelView || null;
+// resumen.js (the Summary tab) is optional in the same way: without it the tab simply does not paint.
+const R = window.RepoPanelResumen || null;
 const store = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
 
 // RP47: a region is written only when its HTML changed. The board was replaced on every redraw (about 150 times a minute at
@@ -28,7 +30,9 @@ const S = {
   rooms: [], roomIssues: [], roomData: { state: 'loading', data: null }, roomSeq: 0,
   prefs: store('prefs', { method: 'squash', del: true }),
   lastRefresh: 0, lastAt: {}, scan: [],
+  tab: 'summary', scope: { kind: 'all' }, summary: null, summaryKey: '', summaryFailed: false,
 };
+S.tab = S.prefs.tab === 'work' ? 'work' : 'summary';
 
 // ---------- api + request pool ----------
 async function api(url, body) {
@@ -271,7 +275,7 @@ async function refreshAll() {
   checkHealth();
   if (S.conf.failed) S.conf.key = ''; // ask again once per refresh, never on every redraw
   S.lastRefresh = Date.now();
-  await Promise.all([loadPrerequisites(), loadRooms(), ...allRepos().map((r) => refreshRepo(r.id))]);
+  await Promise.all([loadPrerequisites(), loadRooms(), loadSummary(), ...allRepos().map((r) => refreshRepo(r.id))]);
   pollLive();
 }
 
@@ -537,6 +541,58 @@ function openConformity() {
   drawConformity();
 }
 
+// ---------- summary ----------
+// GET /api/summary on the 60 s cycle and every 20 s while the tab is shown. generatedAt changes on every answer, so it is left
+// out of the comparison: the page redraws only when the payload really changed. A failed read keeps the last data.
+async function loadSummary() {
+  try {
+    const d = await api('/api/summary');
+    const key = JSON.stringify({ ...d, generatedAt: null });
+    const recovered = S.summaryFailed;
+    S.summaryFailed = false;
+    if (key === S.summaryKey && !recovered) return;
+    S.summary = d;
+    S.summaryKey = key;
+    draw();
+  } catch {
+    if (!S.summaryFailed) { S.summaryFailed = true; draw(); }
+  }
+}
+const summaryTick = () => { if (S.tab === 'summary' && !document.hidden) loadSummary(); };
+
+// Tabs only toggle `hidden` (the board keeps its own painting); the board-only header controls hide through a body class.
+function applyTab() {
+  const summary = S.tab === 'summary';
+  $('#summary').hidden = !summary;
+  $('#work').hidden = summary;
+  if (document.body && document.body.classList) { document.body.classList.toggle('tab-summary', summary); document.body.classList.toggle('tab-work', !summary); }
+  for (const b of Array.from((document.querySelectorAll && document.querySelectorAll('[role=tab][data-tab]')) || [])) b.setAttribute('aria-selected', String(b.dataset.tab === S.tab));
+}
+function setTab(tab) {
+  S.tab = tab;
+  applyTab();
+  setPref('tab', tab);
+  if (tab === 'summary') loadSummary();
+}
+
+// The "deliver" button of a Summary row is the first button the board's own card would show for that repo.
+function summaryFlow(id) {
+  const r = allRepos().find((x) => x.id === id);
+  const l = S.local[id];
+  const p = S.prs[id];
+  if (!r || !l || l.error || !Array.isArray(l.files) || !p || p.error) return null;
+  return flowFor(r, l, p, verdictOf(r))[0] || null;
+}
+
+function drawSummary() {
+  applyTab();
+  if (!R) return;
+  const scope = R.normalizeScope(S.scope, S.rooms);
+  const hadFocus = !!(document.activeElement && document.activeElement.dataset && document.activeElement.dataset.act === 'scope');
+  if (paint($('#scope'), R.scopeBar(S.rooms, allRepos().length, scope)) && hadFocus) { const on = $('#scope [aria-pressed="true"]'); if (on && on.focus) on.focus(); }
+  paint($('#summary'), R.summaryView(S.summary, { now: Date.now(), scope, rooms: S.rooms, failed: S.summaryFailed, flowFor: summaryFlow, sending: S.sending, busy: S.busy }));
+}
+
 // ---------- board ----------
 let raf = 0;
 function draw() { if (!raf) raf = requestAnimationFrame(() => { raf = 0; render(); }); }
@@ -659,6 +715,7 @@ function render() {
   syncRefreshIcon();
   drawQueue();
   drawConformity();
+  drawSummary();
   if (!allRepos().length) {
     paint($('#app'), '<div class="empty">No repositories yet.<br><br><button class="primary" data-act="add-dialog">+ Add your first repo</button></div>');
     return;
@@ -821,16 +878,22 @@ function stagedBar(l) {
 
 const COMMIT_CMDS = ['flow-commit', 'flow-commit-unstage'];
 
+// The flow buttons of a repo come from view.js; without it only /flow-commit is offered, as before. Only a /flow-commit
+// verdict hides the delivery buttons; any running command disables the buttons it leaves. The board card and the Summary
+// row both read them here.
+function flowFor(r, l, p, verdict) {
+  const override = S.showCommit.has(r.id);
+  const commitVerdict = verdict && COMMIT_CMDS.includes(verdict.cmd) ? verdict.state : null;
+  const running = verdict && verdict.state === 'running' ? { cmd: verdict.cmd, label: verdict.label } : null;
+  const retry = commitVerdict === 'attention';
+  return V ? V.flowButtons(l, p, S.state[r.id], { override, verdict: commitVerdict, running, retry, session: sessionOf(r.id) }) : (l.files || []).length > 0 ? [{ cmd: 'flow-commit', label: '/flow-commit' }] : [];
+}
+
 function repoCard(r, attn = false, verdict = null) {
   const { l, p, dirty, unpushed } = info(r);
   const manual = V ? V.manualAction(l, l.base) : null;
   const override = S.showCommit.has(r.id);
-  // The flow buttons come from view.js; without it only /flow-commit is offered, as before.
-  // Only a /flow-commit verdict hides the delivery buttons; any running command disables the buttons it leaves.
-  const commitVerdict = verdict && COMMIT_CMDS.includes(verdict.cmd) ? verdict.state : null;
-  const running = verdict && verdict.state === 'running' ? { cmd: verdict.cmd, label: verdict.label } : null;
-  const retry = commitVerdict === 'attention';
-  const flow = V ? V.flowButtons(l, p, S.state[r.id], { override, verdict: commitVerdict, running, retry, session: sessionOf(r.id) }) : dirty ? [{ cmd: 'flow-commit', label: '/flow-commit' }] : [];
+  const flow = flowFor(r, l, p, verdict);
   const overrideItem = !manual && dirty && V ? V.commitOverrideItem(S.state[r.id], { override, stale: !!p.stale, session: sessionOf(r.id) }) : null;
   const chips = [];
   if (dirty) chips.push(`<button class="chip yellow chip-btn" data-act="diff" data-id="${r.id}" title="View diff">● ${l.files.length} file${l.files.length === 1 ? '' : 's'} <span class="add">+${l.added}</span> <span class="del">−${l.deleted}</span></button>`);
@@ -996,6 +1059,11 @@ const ACTIONS = {
   'diff': (el) => openDiff(el.dataset.id),
   'close-drawer': () => { S.confOpen = false; $('#drawer').hidden = true; },
   'conformity': () => openConformity(),
+  // Conformity is a drawer, not a view: it opens over the current tab.
+  'tab': (el) => { if (el.dataset.tab === 'conformity') openConformity(); else if (el.dataset.tab === 'summary' || el.dataset.tab === 'work') setTab(el.dataset.tab); },
+  'scope': (el) => { S.scope = el.dataset.kind === 'room' ? { kind: 'room', name: el.dataset.name } : { kind: el.dataset.kind === 'none' ? 'none' : 'all' }; draw(); },
+  // "Open", "Start" and "⋯" of the Summary: show only this repo on the board.
+  'focus-repo': (el) => { S.q = nameOf(el.dataset.id); $('#search').value = S.q; setTab('work'); },
   'pi': async (el) => {
     const { id, cmd, pr } = el.dataset;
     if (S.sending[id]) return; // a second click while the first order is on its way never sends another
@@ -1142,6 +1210,7 @@ setInterval(() => {
   if (!document.hidden && !Object.keys(S.busy).length) refreshAll();
 }, V ? V.FULL_REFRESH_MS : 60000);
 setInterval(() => refreshTick(), 2000);
+setInterval(summaryTick, 20000);
 setInterval(pollLive, 10000);
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) return;

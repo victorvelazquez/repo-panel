@@ -77,6 +77,7 @@ const routes = {
 
 const STATIC = {
   '/view.js': ['view.js', 'text/javascript; charset=utf-8'],
+  '/resumen.js': ['resumen.js', 'text/javascript; charset=utf-8'],
   '/app.js': ['app.js', 'text/javascript; charset=utf-8'],
   '/style.css': ['style.css', 'text/css; charset=utf-8'],
 };
