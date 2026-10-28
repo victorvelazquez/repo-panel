@@ -125,7 +125,7 @@ main { max-width: none; padding: 8px; }
 .snoozed-row button { padding: 0 6px; font-size: 12px; }
 .muted { color: var(--gray); }
 
-header .opt { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
+.opt { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
 .card-top { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .card-top .repo-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 button.x { margin-left: auto; background: transparent; border-color: transparent; color: var(--muted); padding: 0 6px; }
@@ -246,16 +246,24 @@ a.repo-name:hover { text-decoration: none; color: var(--blue); }
 .mono { font-family: ui-monospace, Consolas, monospace; font-size: 12px; color: var(--muted); }
 .rs-scope { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .rs-scope button[aria-pressed="true"] { border-color: var(--blue); background: #12253d; }
-body.tab-summary #search, body.tab-summary #groupFilter, body.tab-summary #alerts, body.tab-summary header .opt { display: none; }
-body.tab-work #scope { display: none; }
+body.tab-summary #workTools, body.tab-work #summaryTools { display: none; }
 .rs-tabs { display: flex; gap: 2px; padding: 0 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
 .rs-tabs button { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; padding: 8px 14px; color: var(--muted); }
 .rs-tabs button[aria-selected="true"] { color: var(--text); border-bottom-color: var(--blue); }
 .rs-tabs button:focus-visible, .rs-scope button:focus-visible, .rs-panel :focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 .rs-panel { padding: 12px 16px; max-width: 1360px; margin: 0 auto; container-type: inline-size; }
 .rs-note { margin-bottom: 10px; padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--yellow); background: #251d08; border: 1px solid #53410f; }
-.rs-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 8px; }
-.rs-filters button[aria-pressed="true"] { border-color: var(--blue); background: #12253d; }
+/* RP61: header (global), tabs, then the view bar: shared filters on the left, the view's own controls on the right. */
+.viewbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
+.viewbar .shared, .viewbar .own { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.viewbar .own button[aria-pressed="true"] { border-color: var(--blue); background: #12253d; }
+details.pop { position: relative; }
+details.pop > summary { list-style: none; cursor: pointer; background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; padding: 4px 10px; }
+details.pop > summary::-webkit-details-marker { display: none; }
+details.pop[open] > summary { border-color: var(--blue); }
+details.pop > summary:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.pop-body { position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; width: 250px; display: grid; gap: 8px; padding: 10px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px rgba(0, 0, 0, .45); }
+.pop-body .opt { justify-content: space-between; }
 .rs-list { display: flex; flex-direction: column; gap: 8px; }
 .rs-group { align-self: stretch; text-align: left; background: transparent; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; padding: 4px 2px; margin-top: 4px; }
 .rs-card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; display: grid; gap: 6px; }

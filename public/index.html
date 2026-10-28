@@ -12,28 +12,39 @@
   <div id="outdated" class="outdated" hidden>The panel server is out of date or out of sync with this page. Restart the panel, then reload the page.</div>
   <header>
     <h1>Repo Panel</h1>
-    <div id="scope" class="rs-scope" role="group" aria-label="Scope"></div>
-    <input id="search" type="search" placeholder="Filter repos…">
-    <select id="groupFilter"></select>
-    <button id="alerts" class="alerts" data-act="toggle-problems" title="PRs that need a fix (failed checks, conflicts, outdated branch) — click to show only those" hidden></button>
     <button id="conformity" data-act="conformity" title="Repositories without a usable docs/ROADMAP.md or whose file has problems">Conformity <span id="confBadge" class="badge" hidden></span></button>
     <span class="spacer"></span>
-    <label class="opt" title="Merge method used by every Merge button"><span>Merge method</span>
-      <select id="method" data-pref="method"><option>squash</option><option>merge</option><option>rebase</option></select></label>
-    <label class="opt" title="Delete the head branch after merging (ignored when the repo deletes merged branches itself)">
-      <input id="delBranch" type="checkbox" data-pref="del"> delete branch</label>
-    <label class="opt" title="Show the Clean column on the board instead of the collapsible Idle bar">
-      <input id="cleanAsColumn" type="checkbox" data-pref="cleanAsColumn"> Clean column</label>
     <button data-act="refresh-all" title="Refresh everything"><span class="ico">↻</span> Refresh</button>
     <button data-act="fetch-all" title="git fetch --prune on every repo">⇣ Fetch all</button>
     <button data-act="room-dialog" title="Register a room: a repo where you coordinate a group of repos">+ Room</button>
     <button data-act="add-dialog" class="primary">+ Repo</button>
+    <details class="pop" id="mergeMenu"><summary aria-label="Merge settings">⚙ Merge</summary><div class="pop-body">
+      <label class="opt" title="Merge method used by every Merge button"><span>Merge method</span>
+        <select id="method" data-pref="method"><option>squash</option><option>merge</option><option>rebase</option></select></label>
+      <label class="opt" title="Delete the head branch after merging (ignored when the repo deletes merged branches itself)">
+        <input id="delBranch" type="checkbox" data-pref="del"> delete branch</label>
+      <div class="rs-sub">Used by the Merge buttons of Summary and Work</div>
+    </div></details>
   </header>
   <nav class="rs-tabs" role="tablist" aria-label="Views">
     <button type="button" role="tab" id="tab-summary" data-act="tab" data-tab="summary" aria-selected="true" aria-controls="summary">Summary</button>
     <button type="button" role="tab" id="tab-work" data-act="tab" data-tab="work" aria-selected="false" aria-controls="work">Work</button>
     <button type="button" role="tab" id="tab-conformity" data-act="tab" data-tab="conformity" aria-selected="false" aria-controls="drawer">Conformity</button>
   </nav>
+  <div class="viewbar" id="viewbar">
+    <div class="shared" role="group" aria-label="Shared filters">
+      <input id="search" type="search" placeholder="Filter repos…">
+      <select id="groupFilter"></select>
+      <div id="scope" class="rs-scope" role="group" aria-label="Scope"></div>
+    </div>
+    <span class="spacer"></span>
+    <div id="summaryTools" class="own"></div>
+    <div id="workTools" class="own">
+      <label class="opt" title="Show the Clean column on the board instead of the collapsible Idle bar">
+        <input id="cleanAsColumn" type="checkbox" data-pref="cleanAsColumn"> Clean column</label>
+      <button id="alerts" class="alerts" data-act="toggle-problems" title="PRs that need a fix (failed checks, conflicts, outdated branch) — click to show only those" hidden></button>
+    </div>
+  </div>
   <section id="summary" class="rs-panel" role="tabpanel" aria-labelledby="tab-summary"></section>
   <div id="work" role="tabpanel" aria-labelledby="tab-work" hidden>
     <div id="queue" class="queue" hidden></div>

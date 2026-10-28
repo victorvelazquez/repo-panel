@@ -340,9 +340,14 @@ function info(r) {
   };
 }
 
+// The shared filters (text, group, room scope) of both tabs. Without resumen.js the scope degrades to all.
 function visibleRepos() {
   const q = S.q.toLowerCase();
-  return allRepos().filter((r) => (!S.group || r.group === S.group) && (!q || r.name.toLowerCase().includes(q)));
+  const scope = R ? R.normalizeScope(S.scope, S.rooms) : { kind: 'all' };
+  const members = scope.kind === 'room' ? ((S.rooms.find((m) => m.name === scope.name) || {}).repos || []) : [];
+  const assigned = scope.kind === 'none' ? new Set(S.rooms.flatMap((m) => m.repos || [])) : null;
+  const inScope = (r) => (scope.kind === 'room' ? members.includes(r.id) : assigned ? !assigned.has(r.id) : true);
+  return allRepos().filter((r) => (!S.group || r.group === S.group) && (!q || r.name.toLowerCase().includes(q)) && inScope(r));
 }
 
 // ---------- go work on ----------
@@ -560,7 +565,7 @@ async function loadSummary() {
 }
 const summaryTick = () => { if (S.tab === 'summary' && !document.hidden) loadSummary(); };
 
-// Tabs only toggle `hidden` (the board keeps its own painting); the board-only header controls hide through a body class.
+// Tabs only toggle `hidden` (the board keeps its own painting); the view-specific zone of the view bar hides through a body class.
 function applyTab() {
   const summary = S.tab === 'summary';
   $('#summary').hidden = !summary;
@@ -597,15 +602,17 @@ function drawSummary() {
   const scope = R.normalizeScope(S.scope, S.rooms);
   const hadFocus = !!(document.activeElement && document.activeElement.dataset && document.activeElement.dataset.act === 'scope');
   if (paint($('#scope'), R.scopeBar(S.rooms, allRepos().length, scope)) && hadFocus) { const on = $('#scope [aria-pressed="true"]'); if (on && on.focus) on.focus(); }
-  // The filter and group buttons live inside #summary: keep the keyboard focus on the one that was pressed.
+  // The group buttons live inside #summary and the Needs attention toggle in the view bar: keep the focus on the pressed one.
   const ae = document.activeElement;
   const kept = ae && ae.dataset && (ae.dataset.act === 'sfilter' || ae.dataset.act === 'toggle-group') ? { act: ae.dataset.act, filter: ae.dataset.filter, group: ae.dataset.group } : null;
   const box = $('#summary');
-  const changed = paint(box, R.summaryView(S.summary, {
-    now: Date.now(), scope, rooms: S.rooms, roomData: S.roomData.data, filter: S.sfilter, collapsed: S.collapsed, failed: S.summaryFailed,
+  const ctx = {
+    now: Date.now(), scope, rooms: S.rooms, q: S.q, group: S.group, roomData: S.roomData.data, filter: S.sfilter, collapsed: S.collapsed, failed: S.summaryFailed,
     flowFor: summaryFlow, changesFor: summaryChanges, sending: S.sending, busy: S.busy,
-  }));
-  if (changed && kept && box.querySelectorAll) {
+  };
+  if (paint($('#summaryTools'), R.summaryTools(S.summary, ctx)) && kept && kept.act === 'sfilter') { const on = $('#summaryTools [data-act="sfilter"]'); if (on && on.focus) on.focus(); }
+  const changed = paint(box, R.summaryView(S.summary, ctx));
+  if (changed && kept && kept.act === 'toggle-group' && box.querySelectorAll) {
     const again = Array.from(box.querySelectorAll('[data-act]')).find((b) => b.dataset && b.dataset.act === kept.act && b.dataset.filter === kept.filter && b.dataset.group === kept.group);
     if (again && again.focus) again.focus();
   }
@@ -1219,6 +1226,16 @@ document.addEventListener('change', (e) => {
   const key = e.target.dataset.pref;
   if (!key) return;
   setPref(key, e.target.type === 'checkbox' ? e.target.checked : e.target.value);
+});
+
+// The Merge menu is static HTML (never painted by draw()): it closes with Escape and with a click outside.
+document.addEventListener('keydown', (e) => {
+  const menu = $('#mergeMenu');
+  if (e.key === 'Escape' && menu && menu.open) { menu.open = false; const s = menu.querySelector && menu.querySelector('summary'); if (s && s.focus) s.focus(); }
+});
+document.addEventListener('click', (e) => {
+  const menu = $('#mergeMenu');
+  if (menu && menu.open && !(menu.contains && menu.contains(e.target))) menu.open = false;
 });
 
 $('#search').addEventListener('input', (e) => { S.q = e.target.value; draw(); });

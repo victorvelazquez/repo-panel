@@ -213,23 +213,24 @@ test('the order is stable: payload order, never by state or rank', () => {
   assert.deepEqual(ids(view(MIX)), ['a', 'b', 'c', 'd', 'e', 'f']);
 });
 
-test('the filter has two aria-pressed buttons with the counts of the current scope', () => {
-  const html = view(MIX);
-  assert.match(html, /<button type="button" data-act="sfilter" data-filter="all" aria-pressed="true">All · 6<\/button>/);
+const tools = (rows, ctx = {}) => R.summaryTools(payload(rows), { now: NOW, scope: { kind: 'all' }, rooms: [], ...ctx });
+
+test('the filter is ONE aria-pressed toggle with the count of the current scope (RP61: no All button)', () => {
+  const html = tools(MIX);
+  assert.doesNotMatch(html, /All|data-filter="all"/);
   assert.match(html, /<button type="button" data-act="sfilter" data-filter="attention" aria-pressed="false">Needs attention · 4<\/button>/);
   assert.match(html, /updated 0? ?just now/);
   const g1 = view(MIX, { scope: { kind: 'room', name: 'R' }, rooms: [{ name: 'R', repos: ['a', 'b'] }] });
   assert.equal(ids(g1).length, 0);
   const scoped = view(MIX.map((r) => (r.id === 'a' || r.id === 'b' ? { ...r, room: 'R' } : r)), { scope: { kind: 'room', name: 'R' }, rooms: [{ name: 'R', repos: ['a', 'b'] }] });
-  assert.match(scoped, /All · 2</);
-  assert.match(scoped, /Needs attention · 1</);
+  assert.deepEqual(ids(scoped), ['a', 'b']);
+  assert.match(tools(MIX.map((r) => (r.id === 'a' || r.id === 'b' ? { ...r, room: 'R' } : r)), { scope: { kind: 'room', name: 'R' }, rooms: [{ name: 'R', repos: ['a', 'b'] }] }), /Needs attention · 1</);
 });
 
 test('the "attention" filter shows only the rows that need it, by rank, ties in payload order, without headers or room cards', () => {
   const html = view(MIX, { filter: 'attention', roomData: { rooms: [{ name: 'R', repos: ['a'], presence: { state: 'idle' }, lastCommit: null }] }, rooms: [{ name: 'R', repos: ['a'] }] });
   assert.deepEqual(ids(html), ['b', 'c', 'e', 'd']);
-  assert.match(html, /data-filter="attention" aria-pressed="true"/);
-  assert.match(html, /data-filter="all" aria-pressed="false"/);
+  assert.match(tools(MIX, { filter: 'attention' }), /data-filter="all" aria-pressed="true"/);
   assert.doesNotMatch(html, /toggle-group|rs-room/);
   assert.match(view([row()], { filter: 'attention' }), /Nothing needs your attention/);
 });
@@ -245,7 +246,7 @@ test('a collapsed group hides its cards and keeps its header', () => {
   const html = view(MIX, { collapsed: { G2: true } });
   assert.deepEqual(ids(html), ['a', 'b']);
   assert.match(html, /data-group="G2" aria-expanded="false"[^>]*>[^<]*<span[^>]*>▸<\/span> G2 <span class="mono">4<\/span>/);
-  assert.match(html, /Needs attention · 4/, 'the counts ignore collapsing');
+  assert.match(tools(MIX, { collapsed: { G2: true } }), /Needs attention · 4/, 'the counts ignore collapsing');
 });
 
 // ---------- scope ----------
@@ -453,9 +454,9 @@ test('the filter and the collapsed groups are kept in memory only, never persist
   assert.match(src, /sfilter: 'all', collapsed: \{\}/);
 });
 
-test('the page keeps the keyboard focus on a filter or group button after the redraw', () => {
-  const on = { dataset: { act: 'sfilter', filter: 'attention' }, focused: 0, focus() { this.focused++; } };
-  const off = { dataset: { act: 'sfilter', filter: 'all' }, focused: 0, focus() { this.focused++; } };
+test('the page keeps the keyboard focus on a group button (inside #summary) after the redraw', () => {
+  const on = { dataset: { act: 'toggle-group', group: 'G1' }, focused: 0, focus() { this.focused++; } };
+  const off = { dataset: { act: 'toggle-group', group: 'G2' }, focused: 0, focus() { this.focused++; } };
   const page = loadPage({ doc: { activeElement: on } });
   const S = withRepos(page);
   page.get('#summary').querySelectorAll = () => [off, on];
