@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Repo Panel — Jerarquía de barras y color de acciones</title>
+<style>
+:root { --bg:#0f1216; --panel:#171b21; --panel2:#1e242c; --line:#2a323c; --text:#d7dde5; --muted:#8b96a3; --green:#3fb950; --red:#f85149; --yellow:#d29922; --blue:#58a6ff; --gray:#6e7681; --purple:#a371f7; --orange:#db6d28; }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--text); font:14px/1.45 system-ui,"Segoe UI",sans-serif; }
+button,input,select,summary { font:inherit; color:var(--text); }
+button,input,select { background:var(--panel2); border:1px solid var(--line); border-radius:6px; padding:3px 10px; }
+button { cursor:pointer; white-space:nowrap; } button:hover:not(:disabled) { border-color:var(--blue); } button:disabled { opacity:.45; cursor:not-allowed; }
+:focus-visible { outline:2px solid var(--blue); outline-offset:2px; }
+.mono { font-family:ui-monospace,Consolas,monospace; font-size:12px; color:var(--muted); } .sub { color:var(--muted); font-size:12px; } .spacer { flex:1; }
+.ghost { background:transparent; border-color:transparent; color:var(--muted); } .ghost:hover { color:var(--text); border-color:var(--line) !important; }
+
+/* NIVEL 1: barra global (siempre igual) */
+.top { display:flex; align-items:center; gap:8px; padding:10px 16px; background:var(--panel); }
+.top h1 { font-size:16px; margin:0 8px 0 0; }
+/* NIVEL 2: pestanas (navegacion) */
+nav.tabs { display:flex; gap:2px; padding:0 16px; background:var(--panel); border-bottom:1px solid var(--line); }
+nav.tabs button { border:0; border-bottom:2px solid transparent; border-radius:0; background:transparent; padding:8px 14px; color:var(--muted); }
+nav.tabs button[aria-selected="true"] { color:var(--text); border-bottom-color:var(--blue); }
+nav.tabs .n { margin-left:6px; padding:0 6px; border-radius:10px; background:#251d08; color:var(--yellow); border:1px solid #53410f; font-size:12px; }
+/* NIVEL 3: barra de la vista (misma zona; la parte compartida no se mueve) */
+.view { display:flex; align-items:center; gap:8px; padding:8px 16px; background:var(--bg); border-bottom:1px solid var(--line); flex-wrap:wrap; }
+.view .shared { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.view .own { display:flex; align-items:center; gap:8px; }
+.view input[type=search] { width:200px; }
+.seg button[aria-pressed="true"] { border-color:var(--blue); background:#12253d; }
+.badge { font-size:11px; color:var(--muted); border:1px dashed var(--line); border-radius:6px; padding:0 6px; }
+
+details.pop { position:relative; }
+details.pop > summary { list-style:none; cursor:pointer; background:var(--panel2); border:1px solid var(--line); border-radius:6px; padding:3px 10px; }
+details.pop > summary::-webkit-details-marker { display:none; }
+details.pop[open] > summary { border-color:var(--blue); }
+.pop-body { position:absolute; right:0; top:calc(100% + 6px); width:250px; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:10px 12px; box-shadow:0 8px 24px rgba(0,0,0,.45); z-index:5; display:grid; gap:8px; }
+.pop-body h4 { margin:0; font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); font-weight:600; }
+
+main { padding:14px 16px 24px; display:grid; gap:8px; }
+.panel[hidden] { display:none; }
+.compare { display:flex; align-items:center; gap:10px; margin-bottom:8px; padding:8px 10px; border:1px dashed var(--line); border-radius:8px; }
+
+/* tarjetas (resumen) */
+.card { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:8px 12px; display:grid; gap:6px; }
+.l1,.l2 { display:flex; align-items:center; gap:10px; } .l1 b { font-size:14px; }
+.bar { display:flex; height:6px; border-radius:3px; overflow:hidden; background:var(--line); width:130px; } .bar i { display:block; background:var(--green); }
+.l2 .t { flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.chip { font-size:12px; padding:0 8px; border-radius:10px; border:1px solid var(--line); white-space:nowrap; line-height:1.55; color:var(--muted); }
+.chip.green { color:var(--green); border-color:#1d4a28; background:#0f2416; } .chip.yellow { color:var(--yellow); border-color:#53410f; background:#251d08; } .chip.red { color:var(--red); border-color:#5a1f1c; background:#2a1213; }
+
+/* ACCIONES: por defecto cada una por tipo de efecto; con body.mono todas azules */
+.act { border:1px solid var(--line); }
+.act.next { background:#1f6feb; border-color:#1f6feb; color:#fff; }
+.act.commit, .act.ask { background:var(--yellow); border-color:var(--yellow); color:var(--bg); font-weight:600; }
+.act.pr, .act.merge { background:#238636; border-color:#238636; color:#fff; font-weight:600; }
+.act.base { background:color-mix(in srgb, var(--purple) 72%, #000); border-color:color-mix(in srgb, var(--purple) 72%, #000); color:#fff; font-weight:600; }
+.act.fix { background:var(--orange); border-color:var(--orange); color:var(--bg); font-weight:600; }
+.act.quiet { background:var(--panel2); color:var(--text); }
+body.mono .act:not(.quiet) { background:#1f6feb; border-color:#1f6feb; color:#fff; font-weight:400; }
+
+/* work (esqueleto) */
+.cols { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; }
+.col { background:var(--panel); border:1px solid var(--line); border-top:3px solid var(--gray); border-radius:8px; padding:8px; min-height:150px; display:grid; gap:8px; align-content:start; }
+.col h3 { margin:0; font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); }
+.col.c2 { border-top-color:var(--yellow); } .col.c3 { border-top-color:var(--blue); } .col.c4 { border-top-color:#238636; } .col.c5 { border-top-color:var(--purple); }
+.mini { background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:8px; display:grid; gap:6px; }
+/* conformity (esqueleto) */
+.crow { display:flex; align-items:center; gap:10px; background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:8px 12px; }
+.legend { display:flex; gap:12px; flex-wrap:wrap; font-size:12px; color:var(--muted); margin-top:6px; }
+/* ---------- CALMO: menos peso visual (por defecto) ----------
+   1) un color solido SOLO cuando algo te necesita ya (.urgent); el resto es suave: fondo tenue, borde medio y texto claro del mismo color
+   2) los botones no se estiran: ancho propio y mas bajos, peso 500
+   3) los chips pierden borde y fondo: texto de color con su glifo
+   4) menos lineas: bordes mas cercanos al fondo y barras de columna de 2 px */
+.act.next { --h:var(--blue); } .act.commit, .act.ask { --h:var(--yellow); } .act.pr, .act.merge { --h:var(--green); } .act.base { --h:var(--purple); } .act.fix { --h:var(--orange); } .act.quiet { --h:var(--gray); }
+body.calm .card, body.calm .col, body.calm .crow, body.calm .mini { border-color:#222a33; }
+body.calm .col { border-top-width:2px; }
+body.calm .chip { border-color:transparent; background:transparent; padding:0 2px; }
+body.calm .act:not(.urgent):not(.quiet) { background:color-mix(in srgb, var(--h) 13%, var(--panel)); border-color:color-mix(in srgb, var(--h) 42%, var(--panel)); color:color-mix(in srgb, var(--h) 68%, #fff); font-weight:500; padding:2px 11px; }
+body.calm .act:not(.urgent):not(.quiet):hover { background:color-mix(in srgb, var(--h) 24%, var(--panel)); border-color:color-mix(in srgb, var(--h) 68%, var(--panel)); }
+/* lo urgente (Responder, Fix CI) tambien es suave, solo un escalon mas marcado: la urgencia la dice la tarjeta (borde de color y estado) */
+body.calm .act.urgent { background:color-mix(in srgb, var(--h) 20%, var(--panel)); border-color:color-mix(in srgb, var(--h) 62%, var(--panel)); color:color-mix(in srgb, var(--h) 62%, #fff); font-weight:600; padding:2px 11px; }
+body.calm .act.urgent:hover { background:color-mix(in srgb, var(--h) 30%, var(--panel)); border-color:var(--h); }
+body.calm .mini .act { justify-self:start; }
+body.calm.mono .act:not(.quiet) { background:#1f6feb; border-color:#1f6feb; color:#fff; font-weight:400; }
+@media (prefers-reduced-motion: reduce) { * { transition:none !important; animation:none !important; } }
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>Repo Panel</h1>
+  <span class="spacer"></span>
+  <button class="ghost" title="Buscar un repo o ejecutar una acción">Buscar o ejecutar… <span class="mono">Ctrl+K</span></button>
+  <button>Refresh</button><button>Fetch all</button><button>+ Room</button><button class="act next">+ Repo</button>
+  <details class="pop">
+    <summary aria-label="Ajustes de fusión">⚙ Fusión</summary>
+    <div class="pop-body">
+      <h4>Al fusionar un PR</h4>
+      <label class="sub">Método <select><option>squash</option><option>merge</option><option>rebase</option></select></label>
+      <label class="sub"><input type="checkbox" checked> Borrar la rama</label>
+      <div class="sub">Vale para el botón Merge del Resumen y para el tablero.</div>
+    </div>
+  </details>
+</header>
+
+<nav class="tabs" role="tablist" aria-label="Vistas">
+  <button role="tab" id="t-sum" aria-selected="true">Summary</button>
+  <button role="tab" id="t-work" aria-selected="false">Work</button>
+  <button role="tab" id="t-conf" aria-selected="false">Conformity <span class="n">2</span></button>
+</nav>
+
+<div class="view" aria-label="Barra de la vista">
+  <div class="shared" role="group" aria-label="Filtros compartidos">
+    <input type="search" id="q" placeholder="Filtrar repos…" aria-label="Filtrar repos">
+    <select aria-label="Grupo"><option>Todos los grupos</option><option>UPEN</option><option>H2O</option><option>TOOLS</option></select>
+    <span class="seg"><button aria-pressed="true">All <span class="mono">15</span></button> <button aria-pressed="false">UPEN <span class="mono">6</span></button> <button aria-pressed="false">No room <span class="mono">9</span></button></span>
+  </div>
+  <span class="spacer"></span>
+  <div class="own" id="own"></div>
+</div>
+
+<main>
+  <div class="compare"><b>Comparar</b><label><input type="checkbox" id="calmBox" checked> Calmo (menos peso)</label><label><input type="checkbox" id="monoBox"> Todo azul (como hoy)</label><span class="sub">Calmo: todo suave; lo urgente, un escalón más marcado.</span></div>
+
+  <section class="panel" id="p-sum" aria-label="Resumen">
+    <div class="card"><div class="l1"><b>upen-pages</b><span class="mono">feat/pricing</span><span class="spacer"></span><span class="chip yellow">◐ te pregunta</span></div><div class="l2"><div class="bar"><i style="width:40%"></i></div><span class="sub">6/15</span><span class="t"><span class="sub">Siguiente</span> · P1a — Esqueleto Astro SSR</span><button class="act ask urgent">Responder</button></div></div>
+    <div class="card"><div class="l1"><b>repo-panel</b><span class="mono">main</span><span class="chip yellow">● 11 files +698 −160</span><span class="spacer"></span><span class="chip">○ libre</span></div><div class="l2"><div class="bar"><i style="width:90%"></i></div><span class="sub">57/63</span><span class="t"><span class="sub">Siguiente</span> · RP7 — Dependencias con prefijo</span><button class="act commit">/flow-commit</button></div></div>
+    <div class="card"><div class="l1"><b>TecnomylPY.Backend</b><span class="mono">fix/ti-309</span><span class="chip">↑ 1 unpushed</span><span class="spacer"></span><span class="chip">○ libre</span></div><div class="l2"><div class="bar"><i style="width:3%"></i></div><span class="sub">0/31</span><span class="t"><span class="sub">Siguiente</span> · REQ-001 — Distributed lock</span><button class="act pr">/flow-pr</button></div></div>
+    <div class="card"><div class="l1"><b>upen-web</b><span class="mono">feat/legal</span><span class="spacer"></span><span class="chip">○ libre</span></div><div class="l2"><div class="bar"><i style="width:28%"></i></div><span class="sub">2/7</span><span class="t"><span class="sub">PR #12 verde</span> · listo para fusionar</span><button class="act merge">Merge #12</button></div></div>
+    <div class="card"><div class="l1"><b>upen-erp</b><span class="mono">develop</span><span class="spacer"></span><span class="chip">○ libre</span></div><div class="l2"><div class="bar"><i style="width:40%"></i></div><span class="sub">30/74</span><span class="t"><span class="sub">Rama fusionada</span> · empezá un ciclo nuevo</span><button class="act base">/flow-base</button></div></div>
+    <div class="card"><div class="l1"><b>upen-core</b><span class="mono">develop</span><span class="spacer"></span><span class="chip">○ libre</span></div><div class="l2"><div class="bar"><i style="width:63%"></i></div><span class="sub">25/38</span><span class="t"><span class="sub">Siguiente</span> · E05c2 — Invitaciones</span><button class="act next">/flow-next</button></div></div>
+    <div class="card"><div class="l1"><b>upen-chat</b><span class="mono">develop</span><span class="spacer"></span><span class="chip red">■ bloqueado</span></div><div class="l2"><div class="bar"><i style="width:33%"></i></div><span class="sub">4/12</span><span class="t"><span class="sub">Espera</span> · CHAT-U1 → CORE-E09</span><button class="act quiet">Ver bloqueo</button></div></div>
+    <div class="legend"><span><b style="color:#58a6ff">Azul</b> empezar (/flow-next)</span><span><b style="color:#d29922">Amarillo</b> algo espera de vos: guardar cambios (/flow-commit) o responder</span><span><b style="color:#3fb950">Verde</b> publicar (/flow-pr, Merge)</span><span><b style="color:#a371f7">Violeta</b> ciclo cerrado, base limpia (/flow-base)</span><span><b style="color:#db6d28">Naranja</b> algo falló (Fix CI)</span><span>Gris: secundaria. Siempre hay texto: el color nunca es lo único.</span></div>
+  </section>
+
+  <section class="panel" id="p-work" aria-label="Work" hidden>
+    <div class="cols">
+      <div class="col"><h3>Clean · 12</h3><div class="mini"><b>upen-brand</b><span class="sub">Siguiente: M2b</span><button class="act next">/flow-next</button></div></div>
+      <div class="col c2"><h3>Changes · 2</h3><div class="mini"><b>repo-panel</b><span class="chip yellow">● 11 files</span><button class="act commit">/flow-commit</button></div></div>
+      <div class="col c3"><h3>Committed · 1</h3><div class="mini"><b>TecnomylPY.Backend</b><span class="chip">↑ 1 unpushed</span><button class="act pr">/flow-pr</button></div></div>
+      <div class="col c4"><h3>Pull requests · 2</h3><div class="mini"><b>#12 upen-web</b><span class="chip green">checks ok</span><button class="act merge">Merge · squash</button></div><div class="mini"><b>#31 upen-pages</b><span class="chip red">lint falla</span><button class="act fix urgent">Fix CI</button></div></div>
+      <div class="col c5"><h3>Merged · 1</h3><div class="mini"><b>upen-erp</b><span class="sub">rama fusionada</span><button class="act base">/flow-base</button></div></div>
+    </div>
+  </section>
+
+  <section class="panel" id="p-conf" aria-label="Conformity" hidden>
+    <div class="crow"><b>upen-chat</b><span class="chip red">2 requisitos sin cumplir</span><span class="sub">manual-leftovers, ciclo</span><span class="spacer"></span><button class="act quiet">Put in conditions</button></div>
+    <div class="crow"><b>CROSS.BackofficeApi</b><span class="chip red">1 requisito sin cumplir</span><span class="sub">panel-ignored</span><span class="spacer"></span><button class="act quiet">Put in conditions</button></div>
+  </section>
+</main>
+
+<script>
+// Muestra como cambian solo la zona propia de cada vista; los filtros compartidos (buscar, grupo, alcance) no se mueven ni se repintan.
+(function () {
+  var own = document.getElementById('own');
+  var OWN = {
+    sum: '<span class="seg"><button aria-pressed="false" title="Mostrar solo lo que necesita tu atención">Needs attention · 1</button></span><span class="sub">updated 1 min ago</span>',
+    work: '<button class="act quiet" aria-pressed="true" title="Mostrar los repos limpios como una columna">✓ Clean column</button><button class="chip yellow" title="PRs que necesitan arreglo">⚠ 1 PR needs a fix</button>',
+    conf: '<span class="sub">Repos que no cumplen sus requisitos</span>'
+  };
+  var tabs = { sum: 't-sum', work: 't-work', conf: 't-conf' }, panels = { sum: 'p-sum', work: 'p-work', conf: 'p-conf' };
+  function show(k) {
+    Object.keys(tabs).forEach(function (x) {
+      document.getElementById(tabs[x]).setAttribute('aria-selected', String(x === k));
+      document.getElementById(panels[x]).hidden = x !== k;
+    });
+    own.innerHTML = OWN[k];
+  }
+  Object.keys(tabs).forEach(function (k) { document.getElementById(tabs[k]).addEventListener('click', function () { show(k); }); });
+  document.getElementById('monoBox').addEventListener('change', function (e) { document.body.classList.toggle('mono', e.target.checked); });
+  document.getElementById('calmBox').addEventListener('change', function (e) { document.body.classList.toggle('calm', e.target.checked); });
+  document.body.classList.add('calm');
+  show('sum');
+})();
+</script>
+</body>
+</html>

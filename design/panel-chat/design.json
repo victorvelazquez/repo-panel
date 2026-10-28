@@ -37,6 +37,13 @@
       "tradeoff": "Catalogo de seis estados del MISMO chat (no es una ventana con varios chats); la sala propone y envia desde su propio chat",
       "width": 1440,
       "height": 1000
+    },
+    {
+      "file": "06-barras-y-colores.html",
+      "title": "E · Jerarquia de barras y color de acciones",
+      "tradeoff": "Tres niveles fijos (barra global, pestanas, barra de la vista con filtros compartidos que no se mueven); ajustes de fusion en un menu global; acciones coloreadas por tipo de efecto con un interruptor para comparar con todo azul; es una maqueta de estructura, no cambia el chat",
+      "width": 1440,
+      "height": 900
     }
   ]
 }
