@@ -30,7 +30,7 @@ const S = {
   rooms: [], roomIssues: [], roomData: { state: 'loading', data: null }, roomSeq: 0,
   prefs: store('prefs', { method: 'squash', del: true }),
   lastRefresh: 0, lastAt: {}, scan: [],
-  tab: 'summary', scope: { kind: 'all' }, summary: null, summaryKey: '', summaryFailed: false,
+  tab: 'summary', scope: { kind: 'all' }, summary: null, summaryKey: '', summaryFailed: false, sfilter: 'all', collapsed: {},
 };
 S.tab = S.prefs.tab === 'work' ? 'work' : 'summary';
 
@@ -584,13 +584,31 @@ function summaryFlow(id) {
   return flowFor(r, l, p, verdictOf(r))[0] || null;
 }
 
+// The change chips of a Summary card come from the same local state as the board card; null until that repo is loaded.
+function summaryChanges(id) {
+  const l = S.local[id];
+  if (!l || l.error || !Array.isArray(l.files)) return null;
+  return { files: l.files.length, added: l.added || 0, deleted: l.deleted || 0, ahead: l.ahead || 0, behind: l.behind || 0, noUpstream: !!l.noUpstream };
+}
+
 function drawSummary() {
   applyTab();
   if (!R) return;
   const scope = R.normalizeScope(S.scope, S.rooms);
   const hadFocus = !!(document.activeElement && document.activeElement.dataset && document.activeElement.dataset.act === 'scope');
   if (paint($('#scope'), R.scopeBar(S.rooms, allRepos().length, scope)) && hadFocus) { const on = $('#scope [aria-pressed="true"]'); if (on && on.focus) on.focus(); }
-  paint($('#summary'), R.summaryView(S.summary, { now: Date.now(), scope, rooms: S.rooms, failed: S.summaryFailed, flowFor: summaryFlow, sending: S.sending, busy: S.busy }));
+  // The filter and group buttons live inside #summary: keep the keyboard focus on the one that was pressed.
+  const ae = document.activeElement;
+  const kept = ae && ae.dataset && (ae.dataset.act === 'sfilter' || ae.dataset.act === 'toggle-group') ? { act: ae.dataset.act, filter: ae.dataset.filter, group: ae.dataset.group } : null;
+  const box = $('#summary');
+  const changed = paint(box, R.summaryView(S.summary, {
+    now: Date.now(), scope, rooms: S.rooms, roomData: S.roomData.data, filter: S.sfilter, collapsed: S.collapsed, failed: S.summaryFailed,
+    flowFor: summaryFlow, changesFor: summaryChanges, sending: S.sending, busy: S.busy,
+  }));
+  if (changed && kept && box.querySelectorAll) {
+    const again = Array.from(box.querySelectorAll('[data-act]')).find((b) => b.dataset && b.dataset.act === kept.act && b.dataset.filter === kept.filter && b.dataset.group === kept.group);
+    if (again && again.focus) again.focus();
+  }
 }
 
 // ---------- board ----------
@@ -1061,6 +1079,8 @@ const ACTIONS = {
   'conformity': () => openConformity(),
   // Conformity is a drawer, not a view: it opens over the current tab.
   'tab': (el) => { if (el.dataset.tab === 'conformity') openConformity(); else if (el.dataset.tab === 'summary' || el.dataset.tab === 'work') setTab(el.dataset.tab); },
+  'sfilter': (el) => { S.sfilter = el.dataset.filter === 'attention' ? 'attention' : 'all'; draw(); },
+  'toggle-group': (el) => { S.collapsed[el.dataset.group] = !S.collapsed[el.dataset.group]; draw(); },
   'scope': (el) => { S.scope = el.dataset.kind === 'room' ? { kind: 'room', name: el.dataset.name } : { kind: el.dataset.kind === 'none' ? 'none' : 'all' }; draw(); },
   // "Open", "Start" and "⋯" of the Summary: show only this repo on the board.
   'focus-repo': (el) => { S.q = nameOf(el.dataset.id); $('#search').value = S.q; setTab('work'); },

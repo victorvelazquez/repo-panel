@@ -51,7 +51,7 @@ test('progress counts En revisión and En curso from the derived states, not the
 
 test('the row has every field; a repo without a roadmap has null progress values, no next and no blocking', () => {
   const row = summarize(facts({ roadmap: { available: false, reason: 'missing' } }));
-  assert.deepEqual(Object.keys(row), ['id', 'name', 'group', 'room', 'branch', 'progress', 'session', 'next', 'blocking', 'lastMovement', 'action', 'error']);
+  assert.deepEqual(Object.keys(row), ['id', 'name', 'group', 'room', 'branch', 'progress', 'session', 'next', 'blocking', 'lastMovement', 'action', 'error', 'needs', 'rank']);
   assert.deepEqual(row.progress, { total: null, completada: null, enRevision: null, bloqueada: null, pendiente: null, enCurso: null });
   assert.equal(row.next, null);
   assert.deepEqual(row.blocking, []);

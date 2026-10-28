@@ -23,20 +23,6 @@
   };
   const filterRows = (rows, scope) => rows.filter((r) => (scope.kind === 'room' ? r.room === scope.name : scope.kind === 'none' ? !r.room : true));
 
-  // Same classification as the server: each row once, error rows not counted.
-  function countersOf(rows) {
-    const c = { working: 0, waiting: 0, blocked: 0, idle: 0 };
-    for (const r of rows) {
-      if (r.error) continue;
-      const s = r.session && r.session.state;
-      if (s === 'waiting') c.waiting++;
-      else if (s === 'working') c.working++;
-      else if ((r.blocking || []).length) c.blocked++;
-      else c.idle++;
-    }
-    return c;
-  }
-
   function relativeTime(iso, now = Date.now()) {
     const t = Date.parse(iso);
     if (!iso || Number.isNaN(t)) return '—';
@@ -59,101 +45,126 @@
   const noData = '<span class="rs-sub rs-none">no data</span>';
   const dash = '<span class="rs-sub rs-none">—</span>';
   const pct = (n, total) => Math.floor((n * 1000) / total) / 10; // rounded down: the four never add up to more than 100
+  const num = (v) => Math.max(0, Math.floor(Number(v)) || 0);
+  const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+  const sessionChip = (state) => { const [color, text] = SESSION[state] || SESSION.unknown; return `<span class="chip ${color}">${text}</span>`; };
 
-  function progressCell(p) {
+  // Segmented bar plus a SHORT count; the full breakdown is the title and the aria-label. `p` is a row's progress or a sum of them.
+  function progressHtml(p) {
     if (!p || p.total === null || p.total === undefined) return noData;
     if (!p.total) return '<span class="rs-sub">no units</span>';
-    const pending = (p.pendiente || 0) + (p.enCurso || 0);
-    const seg = (cls, n) => `<i class="rs-seg ${cls}" style="width:${pct(n, p.total)}%"></i>`;
-    const label = `${p.completada} completed, ${p.enRevision} in review, ${p.bloqueada} blocked, ${pending} pending`;
-    const more = (p.enRevision ? ` · ${p.enRevision} in review` : '') + (p.bloqueada ? ` · ${p.bloqueada} blocked` : '');
-    return `<div class="rs-bar" role="img" aria-label="${label}">${seg('rs-done', p.completada)}${seg('rs-pr', p.enRevision)}${seg('rs-blk', p.bloqueada)}${seg('rs-pend', pending)}</div><span class="rs-sub">${p.completada} / ${p.total}${more}</span>`;
+    const pending = num(p.pendiente) + num(p.enCurso);
+    const seg = (cls, n) => `<i class="rs-seg ${cls}" style="width:${pct(num(n), num(p.total))}%"></i>`;
+    const text = `${num(p.completada)} of ${num(p.total)} completed${p.enRevision ? ` · ${num(p.enRevision)} in review` : ''}${p.bloqueada ? ` · ${num(p.bloqueada)} blocked` : ''}`;
+    return `<div class="rs-prog" title="${text}"><div class="rs-bar" role="img" aria-label="${text}">${seg('rs-done', p.completada)}${seg('rs-pr', p.enRevision)}${seg('rs-blk', p.bloqueada)}${seg('rs-pend', pending)}</div><span class="rs-sub rs-count">${num(p.completada)}/${num(p.total)}</span></div>`;
   }
 
-  function nowCell(r) {
-    if (r.error) return `<span class="chip red">▲ error</span><div class="rs-sub">${esc(r.error)}</div>`;
-    const [color, text] = SESSION[r.session && r.session.state] || SESSION.unknown;
-    const a = r.action;
-    const note = a && ['answer', 'waiting', 'manual'].includes(a.kind) ? a.label : r.session && r.session.state === 'working' && r.next ? r.next.id : '';
-    return `${a && a.kind === 'manual' ? '<span class="chip red">▲ manual action</span> ' : ''}<span class="chip ${color}">${text}</span>${note ? `<div class="rs-sub">${esc(clip(note, 90))}</div>` : ''}`;
+  // The change chips of the board card (S55): `c` is { files, added, deleted, ahead, behind, noUpstream } or null (not loaded).
+  function changeChips(c, id) {
+    if (!c) return '';
+    const files = num(c.files);
+    return (files ? `<button class="chip yellow chip-btn" data-act="diff" data-id="${id}" title="View diff">● ${plural(files, 'file')} <span class="add">+${num(c.added)}</span> <span class="del">−${num(c.deleted)}</span></button>` : '')
+      + (num(c.ahead) ? `<span class="chip blue">↑ ${num(c.ahead)} unpushed${c.noUpstream ? ' · no upstream' : ''}</span>` : '')
+      + (num(c.behind) ? `<span class="chip gray">↓ ${num(c.behind)} behind</span>` : '');
   }
 
-  const nextCell = (r) => (r.error || !r.next ? dash
-    : `${esc(r.next.id)} — ${esc(clip(r.next.entrega ?? '', 80))}${/[^\s—–-]/.test(r.next.resultadoVisible ?? '') ? `<div class="rs-sub">Result: ${esc(clip(r.next.resultadoVisible, 80))}</div>` : ''}`);
-
-  function blockedCell(r) {
-    if (!(r.blocking || []).length) return dash;
-    return r.blocking.map((b) => {
-      const waits = [...(b.waitsFor || []), ...(b.external || [])];
-      return `<div><span class="chip red">■ ${esc(b.unit)} ${waits.length ? `waits for ${esc(waits.join(', '))}` : 'is blocked'}</span></div>`;
-    }).join('');
+  // ONE line: the next unit (full entrega and result in the title), or what a blocked repo waits for.
+  function nextHtml(r) {
+    if (r.error) return `<div class="rs-next rs-err" title="${esc(r.error)}">${esc(r.error)}</div>`;
+    if (r.next) {
+      const line = `${r.next.id} — ${r.next.entrega ?? ''}`;
+      const result = /[^\s—–-]/.test(r.next.resultadoVisible ?? '') ? `\nResult: ${r.next.resultadoVisible}` : '';
+      return `<div class="rs-next" title="${esc(line + result)}"><span class="rs-sub">Next</span> · ${esc(line)}</div>`;
+    }
+    const waits = (b) => [...(b.waitsFor || []), ...(b.external || [])];
+    const text = (b) => (waits(b).length ? `${b.unit} → ${waits(b).join(', ')}` : `${b.unit} is blocked`);
+    if ((r.blocking || []).length) return `<div class="rs-next" title="${esc(r.blocking.map(text).join('\n'))}"><span class="rs-sub">Waiting</span> · ${esc(text(r.blocking[0]))}</div>`;
+    return `<div class="rs-next">${dash}</div>`;
   }
 
-  // ONE primary button reusing the page's own data-act machinery, plus "⋯" (which for now focuses the repo in Work).
-  function actionCell(r, ctx) {
+  // ONE primary button reusing the page's own data-act machinery.
+  function actionButton(r, ctx) {
     const id = esc(r.id);
     const a = r.error ? null : r.action;
-    // The visible label is clipped; the full text stays in title and aria-label.
-    const open = (text, cls = '') => `<button${cls ? ` class="${cls}"` : ''} data-act="focus-repo" data-id="${id}" title="${esc(text)}" aria-label="${esc(text)}">${esc(clip(text, LABEL_MAX))}</button>`;
-    let main = r.error ? open('Open') : '';
+    // The visible label is short; the full text stays in title and aria-label.
+    const open = (title, cls = '') => `<button${cls ? ` class="${cls}"` : ''} data-act="focus-repo" data-id="${id}" title="${esc(title)}" aria-label="${esc(title)}">Open</button>`;
     const sending = ctx.sending && ctx.sending[r.id] ? ' disabled' : '';
-    if (a && a.kind === 'merge') main = `<button class="merge" data-act="merge" data-id="${id}" data-n="${esc(a.pr)}" title="Merge #${esc(a.pr)}" aria-label="Merge #${esc(a.pr)}"${ctx.busy && ctx.busy[`${r.id}:${a.pr}`] ? ' disabled' : ''}>${esc(clip(`Merge #${a.pr}`, LABEL_MAX))}</button>`;
-    else if (a && a.kind === 'branch') main = `<button class="primary" data-act="pi" data-id="${id}" data-cmd="flow-base" title="Send /flow-base to the open pi session of this repo"${sending}>/flow-base</button>`;
-    else if (a && a.kind === 'deliver') {
+    if (r.error) return open('Open');
+    if (!a) return '';
+    if (a.kind === 'merge') return `<button class="merge" data-act="merge" data-id="${id}" data-n="${esc(a.pr)}" title="Merge #${esc(a.pr)}" aria-label="Merge #${esc(a.pr)}"${ctx.busy && ctx.busy[`${r.id}:${a.pr}`] ? ' disabled' : ''}>${esc(clip(`Merge #${a.pr}`, LABEL_MAX))}</button>`;
+    if (a.kind === 'branch') return `<button class="primary" data-act="pi" data-id="${id}" data-cmd="flow-base" title="Send /flow-base to the open pi session of this repo"${sending}>/flow-base</button>`;
+    if (a.kind === 'start') return `<button class="primary" data-act="pi" data-id="${id}" data-cmd="flow-next" title="Send /flow-next to the open pi session of this repo (starts ${esc(r.next ? r.next.id : '')})"${sending}>/flow-next</button>`;
+    if (a.kind === 'deliver') {
       const f = ctx.flowFor ? ctx.flowFor(r.id) : null;
-      main = f
+      return f
         ? `<button class="primary" data-act="pi" data-id="${id}" data-cmd="${esc(f.cmd)}" title="${esc(f.reason || `Send /${f.cmd} to the open pi session of this repo`)}"${f.disabled || sending ? ' disabled' : ''}>${esc(f.label)}</button>`
         : '<button class="primary" disabled title="This repo\'s local state is not loaded yet">Deliver</button>';
-    } else if (a && a.kind === 'start') main = `<button class="primary" data-act="pi" data-id="${id}" data-cmd="flow-next" title="Send /flow-next to the open pi session of this repo (starts ${esc(r.next ? r.next.id : '')})"${sending}>/flow-next</button>`;
-    else if (a) main = open('Open', 'primary');
-    return `<div class="rs-act">${main}<button data-act="focus-repo" data-id="${id}" aria-label="More actions for ${esc(r.name)}" title="Show this repo in the Work tab">⋯</button></div>`;
-  }
-
-  function rowHtml(r, ctx) {
-    const lm = r.lastMovement || {};
-    return `<tr class="rs-row">
-      <td class="rs-proj"><div class="rs-name" title="${esc(r.name)}">${esc(r.name)}</div><div class="rs-sub mono rs-branch" title="${esc(r.branch ?? '')}">${esc(r.branch ?? '')}</div></td>
-      <td>${r.error ? noData : progressCell(r.progress)}</td>
-      <td>${nowCell(r)}</td>
-      <td>${nextCell(r)}</td>
-      <td>${r.error ? dash : blockedCell(r)}</td>
-      <td class="rs-sub">${esc(relativeTime(lm.at, ctx.now))}${lm.what ? `<br>${esc(clip(lm.what, 60))}` : ''}</td>
-      <td>${actionCell(r, ctx)}</td>
-    </tr>`;
-  }
-
-  function tableHtml(rows, ctx) {
-    const body = [];
-    let group;
-    for (const r of rows) {
-      if (r.group !== group) { group = r.group; body.push(`<tr class="rs-group"><td colspan="7">${esc(group ?? '')}</td></tr>`); }
-      body.push(rowHtml(r, ctx));
     }
-    return `<table class="rs-table"><thead><tr><th scope="col">Project</th><th scope="col">Progress</th><th scope="col">Now</th><th scope="col">Next</th><th scope="col">Blocked by</th><th scope="col">Last movement</th><th scope="col" class="rs-right">Action</th></tr></thead><tbody>${body.join('')}</tbody></table>`;
+    return open(`Open · ${a.label ?? ''}`, 'primary');
   }
 
-  const LEGEND = '<div class="rs-legend" aria-label="Bar legend"><span><i class="rs-key rs-done"></i>Completed</span><span><i class="rs-key rs-pr"></i>In review</span><span><i class="rs-key rs-blk"></i>Blocked</span><span><i class="rs-key rs-pend"></i>Pending</span><span>The main button is the best next action; ⋯ shows the repo in Work</span></div>';
+  // Two lines: name, branch, change chips, time, session; then bar, next unit, the action.
+  function cardHtml(r, ctx) {
+    const id = esc(r.id);
+    const lm = r.lastMovement || {};
+    const a = r.error ? null : r.action;
+    const cls = r.session && r.session.state === 'waiting' ? ' ask' : !r.error && !r.next && (r.blocking || []).length ? ' block' : '';
+    const chips = r.error ? '' : changeChips(ctx.changesFor ? ctx.changesFor(r.id) : null, id) + (a && a.kind === 'manual' ? '<span class="chip red">▲ manual action</span>' : '');
+    return `<article class="rs-card${cls}" data-id="${id}" aria-label="${esc(r.name)}">
+      <div class="rs-l1"><b class="rs-name" title="${esc(r.name)}">${esc(r.name)}</b><span class="mono rs-branch" title="${esc(r.branch ?? '')}">${esc(r.branch ?? '')}</span>${chips}<span class="rs-spacer"></span><span class="rs-sub rs-when" title="${esc(lm.what ?? '')}">${esc(relativeTime(lm.at, ctx.now))}</span>${r.error ? '<span class="chip red">▲ error</span>' : sessionChip(r.session && r.session.state)}</div>
+      <div class="rs-l2">${r.error ? noData : progressHtml(r.progress)}${nextHtml(r)}${actionButton(r, ctx)}</div>
+    </article>`;
+  }
 
-  // ctx: { now, scope, rooms, failed, flowFor(id), sending, busy }
+  // Pinned room card (not clickable yet): the aggregate of its member rows and the room session.
+  const ROOM_SESSION = { idle: 'free', busy: 'working', closed: 'none' };
+  function roomCard(room, rows, ctx) {
+    const mine = rows.filter((r) => r.room === room.name);
+    const sum = { total: null, completada: 0, enRevision: 0, bloqueada: 0, pendiente: 0, enCurso: 0 };
+    for (const r of mine) {
+      const p = r.progress;
+      if (!p || p.total === null || p.total === undefined) continue;
+      sum.total = num(sum.total) + num(p.total);
+      for (const k of ['completada', 'enRevision', 'bloqueada', 'pendiente', 'enCurso']) sum[k] += num(p[k]);
+    }
+    const need = mine.filter((r) => r.needs).length;
+    return `<article class="rs-card rs-room" aria-label="Room ${esc(room.name)}">
+      <div class="rs-l1"><b class="rs-name" title="${esc(room.name)}">★ ${esc(room.name)}</b><span class="chip purple">room</span><span class="rs-spacer"></span><span class="rs-sub">last commit ${esc(relativeTime(room.lastCommit, ctx.now))}</span>${sessionChip(ROOM_SESSION[room.presence && room.presence.state] || 'unknown')}</div>
+      <div class="rs-l2">${progressHtml(sum)}<div class="rs-next"><span class="rs-sub">${plural(mine.length, 'project')} · ${need} need attention</span></div></div>
+    </article>`;
+  }
+
+  const LEGEND = '<div class="rs-legend" aria-label="Bar legend"><span><i class="rs-key rs-done"></i>Completed</span><span><i class="rs-key rs-pr"></i>In review</span><span><i class="rs-key rs-blk"></i>Blocked</span><span><i class="rs-key rs-pend"></i>Pending</span><span>The button on the right is the best next action</span></div>';
+
+  // ctx: { now, scope, rooms, roomData, filter, collapsed, failed, flowFor(id), changesFor(id), sending, busy }
   function summaryView(payload, ctx = {}) {
     if (!payload || !Array.isArray(payload.rows)) {
       return `<div class="empty" role="status">${ctx.failed ? 'Summary unavailable. Is the panel server up to date? Try Refresh.' : 'Loading summary…'}</div>`;
     }
     const scope = normalizeScope(ctx.scope, ctx.rooms);
     const rows = filterRows(payload.rows, scope);
-    const ids = new Set(rows.map((r) => r.id));
-    const att = (payload.attention || []).filter((a) => ids.has(a.id));
-    const c = countersOf(rows);
-    const kpi = (cls, n, label) => `<div class="rs-kpi ${cls}"><b>${n}</b><span>${label}</span></div>`;
-    const list = att.length
-      ? `<ul>${att.map((a) => `<li>▲ <button type="button" class="rs-link" data-act="focus-repo" data-id="${esc(a.id)}">${esc(a.name)}</button> — ${esc(a.why)}</li>`).join('')}</ul>`
-      : '<p class="rs-sub">Nothing needs you right now.</p>';
-    return `${ctx.failed ? '<div class="rs-note" role="status">⚠ Summary unavailable: showing the last data we have.</div>' : ''}
-      <section class="rs-kpis" aria-label="State of the projects">${kpi('go', c.working, '● working')}${kpi('wait', c.waiting, '◐ waiting for you')}${kpi('block', c.blocked, '■ blocked')}${kpi('idle', c.idle, '○ idle')}
-      <div class="rs-attn"><h2>Needs your attention (${att.length})</h2>${list}</div></section>
-      <div class="rs-toolbar"><span class="rs-sub">${rows.length} repo${rows.length === 1 ? '' : 's'} · updated ${esc(relativeTime(payload.generatedAt, ctx.now))}</span></div>
-      ${rows.length ? tableHtml(rows, ctx) + LEGEND : '<div class="empty">No repositories in this scope.</div>'}`;
+    const needing = rows.filter((r) => r.needs);
+    const attention = ctx.filter === 'attention';
+    const fbtn = (f, label, n) => `<button type="button" data-act="sfilter" data-filter="${f}" aria-pressed="${attention === (f === 'attention')}">${label} · ${n}</button>`;
+    const head = `<div class="rs-filters" role="group" aria-label="Filter">${fbtn('all', 'All', rows.length)}${fbtn('attention', 'Needs attention', needing.length)}<span class="rs-sub">updated ${esc(relativeTime(payload.generatedAt, ctx.now))}</span></div>`;
+    let body;
+    if (attention) {
+      // Most urgent first; Array#sort is stable, so ties keep the payload order.
+      body = needing.length ? needing.slice().sort((x, y) => num(x.rank) - num(y.rank)).map((r) => cardHtml(r, ctx)).join('') : '<div class="empty">Nothing needs your attention right now.</div>';
+    } else {
+      const rooms = ctx.roomData && Array.isArray(ctx.roomData.rooms) && scope.kind !== 'none' ? ctx.roomData.rooms.filter((m) => scope.kind === 'all' || m.name === scope.name) : [];
+      const groups = new Map();
+      for (const r of rows) groups.set(r.group ?? '', (groups.get(r.group ?? '') || []).concat(r));
+      const parts = rooms.map((m) => roomCard(m, payload.rows, ctx));
+      for (const [g, list] of groups) {
+        const shut = groups.size > 1 && !!(ctx.collapsed && ctx.collapsed[g]);
+        if (groups.size > 1) parts.push(`<button type="button" class="rs-group" data-act="toggle-group" data-group="${esc(g)}" aria-expanded="${!shut}"><span aria-hidden="true">${shut ? '▸' : '▾'}</span> ${esc(g)} <span class="mono">${list.length}</span></button>`);
+        if (!shut) for (const r of list) parts.push(cardHtml(r, ctx));
+      }
+      body = rows.length ? parts.join('') : '<div class="empty">No repositories in this scope.</div>';
+    }
+    return `${ctx.failed ? '<div class="rs-note" role="status">⚠ Summary unavailable: showing the last data we have.</div>' : ''}${head}<div class="rs-list">${body}</div>${rows.length ? LEGEND : ''}`;
   }
 
-  return { esc, normalizeScope, filterRows, countersOf, relativeTime, scopeBar, summaryView };
+  return { esc, normalizeScope, filterRows, relativeTime, scopeBar, summaryView };
 }));

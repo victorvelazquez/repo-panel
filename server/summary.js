@@ -18,6 +18,10 @@ const CACHE_MS = 10 * 1000;
 const MAX_BLOCKING = 3;
 const SESSION_OF = { closed: 'none', idle: 'free', busy: 'working', asking: 'waiting' };
 const ANSWER = 'Answer the question in the pi session';
+// Urgency for the filter, lower is more urgent: a session asking you 0, failing CI 1, then the workQueue kinds in their own order
+// (lib.QUEUE_RANK plus 2), then a working session, a blocked unit and everything else.
+const QUEUE_BASE = 2;
+const WORKING = QUEUE_BASE + Math.max(...Object.values(lib.QUEUE_RANK)) + 1;
 
 const caches = new WeakMap();
 
@@ -79,6 +83,14 @@ function actionOf(f, session, next) {
   return a ? { kind: a.kind, label: LABELS[a.kind](a), pr: a.kind === 'merge' ? a.pr : null } : null;
 }
 
+function rankOf(session, failingCi, action, blocking) {
+  if (session.state === 'waiting') return 0;
+  if (failingCi) return 1;
+  if (action && action.kind in lib.QUEUE_RANK) return QUEUE_BASE + lib.QUEUE_RANK[action.kind];
+  if (session.state === 'working') return WORKING;
+  return blocking.length ? WORKING + 1 : WORKING + 2;
+}
+
 // The row of one repo and why it needs attention (a list of reasons, empty when it does not).
 function analyse(f) {
   const { id, name, group, room } = f.repo;
@@ -86,7 +98,7 @@ function analyse(f) {
   const error = f.error || (f.local && f.local.error) || (f.prs && f.prs.error) || null;
   const last = f.last && f.last.at ? { at: f.last.at, what: f.last.what ?? null } : { at: null, what: null };
   if (error || !f.local || !f.prs) {
-    return { row: { id, name, group, room: room ?? null, branch: null, progress: noProgress, session, next: null, blocking: [], lastMovement: last, action: null, error: String(error || 'No data') }, why: [] };
+    return { row: { id, name, group, room: room ?? null, branch: null, progress: noProgress, session, next: null, blocking: [], lastMovement: last, action: null, error: String(error || 'No data'), needs: false, rank: WORKING + 2 }, why: [] };
   }
   const rm = f.roadmap;
   const nx = rm && rm.available === true ? rm.next : null;
@@ -94,11 +106,13 @@ function analyse(f) {
   const blocking = blockingOf(rm);
   const why = [];
   if (session.state === 'waiting') why.push('The pi session is waiting for an answer');
-  for (const p of f.prs.prs || []) if (p.checks && p.checks.state === 'failed') why.push(`PR #${p.number} has failing checks`);
+  const failingCi = (f.prs.prs || []).filter((p) => p.checks && p.checks.state === 'failed');
+  for (const p of failingCi) why.push(`PR #${p.number} has failing checks`);
   if (rm && rm.available === true && rm.rows.some((r) => r.estado === 'Bloqueada')) why.push(`Blocked: ${blocking.filter((b) => rm.rows.find((r) => r.id === b.unit && r.estado === 'Bloqueada')).map((b) => b.unit).join(', ')}`);
+  const action = actionOf(f, session, nx);
   const row = {
     id, name, group, room: room ?? null, branch: f.local.branch ?? null, progress: progressOf(rm), session, next, blocking,
-    lastMovement: last, action: actionOf(f, session, nx), error: null,
+    lastMovement: last, action, error: null, needs: why.length > 0, rank: rankOf(session, failingCi.length > 0, action, blocking),
   };
   return { row, why };
 }
