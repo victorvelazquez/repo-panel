@@ -50,6 +50,7 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 - **S40. Padrón 1.2.** «no seria una limpiaza de registros viejos que ya se migraron a otros archivos acorde a lo que el panel requiere»; «agrega la decision del cliclo obligatorio para todos los repos». El `ciclo` es obligatorio para todos; el marcador es «Migrada; sin verificar» al principio de `Notas`; un índice viejo se reemplaza por un puntero tras pasar a la ficha lo que no es un estado; una fila que apunta a un archivo de instrucciones obsoleto se queda.
 - **S41. Padrón 1.3: lo que enseñó la ronda de prueba.** «registra rp46 con esa regla»; «podes corregir con tu propuesta lo de tecnomyl y agregar a la lista de mejoras esa observacion»; «registro aparte que se ejecuta o implementa de otra manera»; «podes excluir, siempre debe excluirse en todos los repos». Se compara por contenido y se mueve a `AGENTS.md` lo que falte, textual; no se copia la jerarquía de autoridad; se reescriben los punteros y las filas de «autoridad»; se registra en `docs/ORQUESTACION.md`; se pregunta solo ante una contradicción. Migrar nunca escribe `En curso`. Un registro con su propio flujo no se migra. `panel-ignored` es obligatorio.
 - **S42. Los clics no se pierden.** «muchas veces me falla el click en los botones del panel de cada 4 click 3 me fallan, y no es el mouse porque solo en la ventana del panel me sucede y con distintos mouses». Una región cuyo HTML no cambió no se reescribe; un redibujado espera a que se suelte el botón del mouse, con un tope corto para que una suelta perdida no congele la página.
+- **S43. La sala se pone en condiciones.** «la sala debe tener tambien su lista de put in conditions tambien y debe reemplazar todo lo que deba como lo haciamos con los repos normales»; «primero deberia haber la sala para ir agregando repos»; «cuando se agregue otro repo y la sala ya existe, se debe installar los requisitos al repo e inscribirse a la sala existente»; «3. una orden del panel a la sala»; «1. lo recomendado»; «4. hacemos lo que creas necesario». Un solo número de padrón; la sala lleva los bloques `entrega`, `estado` y uno propio `sala`, y no `registro` ni `tareas` (su registro es `estrategia/TABLERO.md`). RP48 ya; RP49 a RP52 con el padrón 1.4.
 
 ## Tasks
 
@@ -99,6 +100,7 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 | RP44 | S40 | en línea (bloque, instrucciones, requisito y pruebas); RED primero (7 de 9); huella aceptada sin force por la subida de versión | pendiente de commit |
 | RP46 | S41 | en línea (INSTALL, EXAMPLES, requisito, checklist y pruebas); RED primero (11 de 12); huella aceptada con force porque el padrón 1.3 no se instaló todavía | pendiente de commit |
 | RP47 | S42 | en línea; medido en un Edge real (148 reemplazos por minuto y 23 de 30 clics antes; 13,5 y 60 de 60 después); RED primero (8 de 10) | pendiente de commit |
+| RP48 | S43 | worker `gentle-ai-worker` con encargo cerrado; RED 6 de 7 en una copia limpia de HEAD; el padre revisó el diff y reprobó las pruebas | pendiente de commit |
 
 Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a → RP11b → RP12a → RP12b → RP12 → RP13 → RP14. RP12 puede ir antes de RP11 si la persona lo prefiere.
 
@@ -646,3 +648,14 @@ Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a →
 > dale
 
 *Aplicado: RP46 (padrón 1.3). UPEN y `CROSS.BackofficeFront` quedan fuera de la ronda de prueba; se aplica en UPEN de verdad al final, declarando antes su sala. En `TecnomylPY.Backend` se pasaron a mano las 22 filas `En curso` a `Pendiente` y se excluyó `.panel/`.*
+
+**L62.**
+
+> la sala debe tener tambien su lista de put in conditions tambien y debe reemplazar todo lo que deba como lo haciamos con los repos normales. dame una propuesta de como hacer eso, puede que cuando creamos la sala y elejimos la carpeta deberia mandarle las intrucciones de leer el archivo install.md con lo que debe instalar una sala. debe ponerse acorde para trabajar con los repos integrantes de la sala, si crees que deba enviarse las instraucciones por ultimo al finalizar los integrantes igual. pero creo que primero deberia haber la sala para ir agregando repos porque va a haber ocaciones que se deba agregar otro repo y la sala ya existe, en ese caso se debe installar los requisitos al repo e inscribirse a la sala existente
+>
+> 1. lo recomendado.
+> 2. como asi me preguntas eso, pense que ya teniamos todo definido, en todo caso revisa en upen-ceo.
+> 3. una orden del panel a la sala.
+> 4. hacemos lo que creas necesario.
+
+*Aplicado: propuesta en `.panel/PROPUESTA-sala-en-condiciones.md` y RP48. Para decidir los bloques de la sala se revisó `upen-ceo`: el bloque `registro` fija `docs/ROADMAP.md` y la sala trabaja con `estrategia/TABLERO.md` sin `ROADMAP`, así que no lleva `registro` ni `tareas`.*
