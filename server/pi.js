@@ -89,6 +89,7 @@ async function orderText(repo, key, requirements, extra) {
   if (key === PUT_IN_CONDITIONS) {
     const req = await requirements(repo);
     if (!req.available) throw new HttpError(409, 'The requirements could not be evaluated (is the base branch available?)');
+    if (req.isRoom) throw new HttpError(409, `${req.room.name} is a room: a room is put in conditions with the room standard, which is not available yet`);
     return conditionsOrder(req.results);
   }
   return Object.hasOwn(lib.PI_COMMANDS, key) ? lib.PI_COMMANDS[key] : null;

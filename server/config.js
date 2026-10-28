@@ -129,4 +129,14 @@ function roomOf(id) {
   return (loadConfig().rooms || []).find((r) => r.repos.includes(id)) || null;
 }
 
-module.exports = { loadConfig, saveConfig, findRepo, roomOf, roomIssues, nameProblem, pathProblem, ROOM_NAME_MAX, ROOMS_NOT_LIST };
+// Paths compare by text: slashes, trailing slashes and case do not matter (no path.resolve, so it behaves the same on Linux).
+const normPath = (p) => String(p).replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+
+// The room whose folder is `p`, or null. The repo that is a room's folder is the room itself, not one of its members.
+function roomByPath(p) {
+  if (typeof p !== 'string' || !p) return null;
+  const want = normPath(p);
+  return (loadConfig().rooms || []).find((r) => normPath(r.path) === want) || null;
+}
+
+module.exports = { loadConfig, saveConfig, findRepo, roomOf, roomByPath, roomIssues, nameProblem, pathProblem, ROOM_NAME_MAX, ROOMS_NOT_LIST };
