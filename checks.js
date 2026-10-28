@@ -56,6 +56,26 @@ function blockBody(text, name) {
 // Text of the markdown heading lines (`# ...` to `###### ...`).
 const headingLines = (text) => stripBom(text).split(/\r?\n/).map((l) => /^#{1,6}\s+(.*?)\s*#*\s*$/.exec(l)).filter(Boolean).map((m) => m[1]);
 
+// Titles of sections the installed blocks already say (RP50); one that survives outside the blocks is a manual leftover.
+const LEFTOVER_TITLES = new Set(['estados', 'comando siguiente', 'al terminar una unidad', 'memoria', 'avisos a dirección', 'órdenes de dirección', 'órdenes y pases de dirección', 'tamaño', 'verificación según el riesgo', 'contratos entre proyectos', 'comandos del propietario', 'comandos de la persona', 'informar en pantalla', 'reporte de unidad', 'orquestación']);
+const LEFTOVER_PREFIXES = ['puerta', 'antes de escribir el primer archivo'];
+const BLOCK_REGION = /<!-- (orquestacion|panel):(registro|ciclo|estado|tareas|entrega) v\d+(?:\.\d+)* -->[\s\S]*?<!-- \/\1:\2 -->/g;
+
+// What AGENTS.md keeps outside the block regions that a block already says: level 2 to 4 headings and `/flow-branch`.
+function leftovers(text) {
+  const rest = stripBom(text).replace(BLOCK_REGION, '');
+  const found = [];
+  for (const line of rest.split(/\r?\n/)) {
+    const m = /^#{2,4}\s+(.*?)\s*#*\s*$/.exec(line);
+    if (m) {
+      const title = m[1].toLowerCase().replace(/`/g, '').replace(/[\s.:;,!?]+$/, '').trim();
+      if (LEFTOVER_TITLES.has(title) || LEFTOVER_PREFIXES.some((p) => title.startsWith(p))) found.push(m[1]);
+    }
+    if (line.includes('/flow-branch')) found.push('/flow-branch');
+  }
+  return found;
+}
+
 const BLOCK_DETAIL = {
   outdated: (b) => `version ${b.version} found, ${b.expected} expected`,
   legacy: () => 'unversioned legacy section found; update it',
@@ -137,6 +157,17 @@ const TYPES = {
     if (b.status === 'ok') return make('pass', `${c.name} block version ${b.version}`);
     const detail = BLOCK_DETAIL[b.status]({ ...b, expected });
     return make(b.status === 'outdated' || b.status === 'legacy' ? 'outdated' : 'fail', detail);
+  },
+  // Sections outside the block regions that restate a block, or the old /flow-branch: the order only names failing ids,
+  // so without this a repo with registro and ciclo installed never gets the leftover cleaned.
+  'leftover-sections': (c, facts) => {
+    const f = fileOf(facts, c.file);
+    if (f.result) return f.result;
+    if (f.absent) return unavailable('missing');
+    const found = leftovers(f.text);
+    if (!found.length) return make('pass', 'no manual section outside the blocks');
+    const more = found.length > 5 ? ` (+${found.length - 5} more)` : '';
+    return make('fail', `outside the blocks: ${found.slice(0, 5).join('; ')}${more}`);
   },
   // The adoption record names the padrón (the version of the panel's whole set of rules) the repo was put in conditions
   // with. Another version is outdated, no line at all is a failure. It is what marks every repo when INSTALL.md changes.
