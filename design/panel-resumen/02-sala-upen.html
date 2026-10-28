@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Repo Panel — Sala UPEN</title>
+<style>
+:root { --bg:#0f1216; --panel:#171b21; --panel2:#1e242c; --line:#2a323c; --text:#d7dde5; --muted:#8b96a3; --green:#3fb950; --red:#f85149; --yellow:#d29922; --blue:#58a6ff; --gray:#6e7681; --purple:#a371f7; }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--text); font:14px/1.45 system-ui,"Segoe UI",sans-serif; }
+a { color:var(--blue); text-decoration:none; } a:hover { text-decoration:underline; }
+button { font:inherit; color:var(--text); background:var(--panel2); border:1px solid var(--line); border-radius:6px; padding:4px 10px; cursor:pointer; }
+button:hover { border-color:var(--blue); } :focus-visible { outline:2px solid var(--blue); outline-offset:2px; }
+button.primary { background:#1f6feb; border-color:#1f6feb; color:#fff; } button.quiet { background:transparent; }
+.mono { font-family:ui-monospace,Consolas,monospace; font-size:12px; color:var(--muted); }
+.sub { color:var(--muted); font-size:12px; }
+header { position:sticky; top:0; z-index:5; display:flex; gap:10px; align-items:center; padding:10px 16px; background:var(--panel); border-bottom:1px solid var(--line); }
+header h1 { font-size:16px; margin:0 8px 0 0; } .spacer { flex:1; }
+.scope { display:flex; gap:6px; } .scope button[aria-pressed="true"] { border-color:var(--blue); background:#12253d; }
+nav.tabs { display:flex; gap:2px; padding:0 16px; background:var(--panel); border-bottom:1px solid var(--line); }
+nav.tabs button { border:0; border-bottom:2px solid transparent; border-radius:0; background:transparent; padding:8px 14px; color:var(--muted); }
+nav.tabs button[aria-selected="true"] { color:var(--text); border-bottom-color:var(--blue); }
+nav.tabs .n { margin-left:6px; padding:0 6px; border-radius:10px; background:var(--line); font-size:12px; }
+nav.tabs .n.red { background:#2a1213; color:var(--red); }
+main { padding:16px; max-width:1360px; margin:0 auto; display:grid; gap:14px; }
+.card { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:12px 14px; }
+.card h2 { margin:0 0 8px; font-size:13px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); }
+.hito { display:grid; grid-template-columns:1.2fr 1fr; gap:14px; }
+.hito .big { font-size:20px; font-weight:600; } .hito .days { font-size:34px; font-weight:700; line-height:1; }
+.bar { display:flex; height:12px; border-radius:6px; overflow:hidden; background:var(--line); margin:8px 0 4px; }
+.bar i { display:block; } .b-done { background:var(--green); } .b-pr { background:var(--blue); } .b-blk { background:var(--red); } .b-pend { background:#3a4350; }
+.chip { font-size:12px; padding:1px 8px; border-radius:10px; border:1px solid var(--line); white-space:nowrap; display:inline-block; }
+.chip.green { color:var(--green); border-color:#1d4a28; background:#0f2416; } .chip.red { color:var(--red); border-color:#5a1f1c; background:#2a1213; }
+.chip.yellow { color:var(--yellow); border-color:#53410f; background:#251d08; } .chip.blue { color:var(--blue); border-color:#1d3a5f; background:#0f1d30; } .chip.gray { color:var(--muted); }
+.two { display:grid; grid-template-columns:1.3fr 1fr; gap:14px; }
+.path { display:flex; align-items:stretch; gap:0; flex-wrap:wrap; }
+.node { background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:8px 10px; min-width:150px; }
+.node.done { border-color:#1d4a28; } .node.now { border-color:#1d3a5f; } .node.blk { border-color:#5a1f1c; }
+.node b { display:block; font-size:13px; } .arrow { align-self:center; padding:0 8px; color:var(--muted); }
+table { width:100%; border-collapse:collapse; }
+th, td { padding:7px 8px; border-bottom:1px solid var(--line); text-align:center; font-size:13px; }
+th:first-child, td:first-child { text-align:left; } th { color:var(--muted); font-size:12px; font-weight:600; }
+tr:last-child td { border-bottom:0; }
+.cell-p { color:var(--blue); font-weight:700; } .cell-c { color:var(--green); } .cell-hot { background:#251d08; color:var(--yellow); font-weight:600; }
+.msg { border:1px solid var(--line); border-radius:8px; padding:10px; margin-bottom:8px; background:var(--panel2); }
+.msg .to { display:flex; gap:8px; align-items:center; margin-bottom:4px; flex-wrap:wrap; }
+.msg pre { margin:6px 0; padding:8px; background:var(--bg); border-radius:6px; white-space:pre-wrap; font:12px/1.4 ui-monospace,Consolas,monospace; color:var(--text); }
+.gate { color:var(--green); font-size:12px; } .gate.no { color:var(--red); }
+.members { width:100%; border-collapse:collapse; }
+.members td { text-align:left; vertical-align:middle; }
+.kv { display:flex; gap:18px; flex-wrap:wrap; }
+@media (prefers-reduced-motion: reduce) { * { transition:none !important; animation:none !important; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Repo Panel</h1>
+  <div class="scope" role="group" aria-label="Alcance">
+    <button aria-pressed="false">Todo</button><button aria-pressed="true">Sala UPEN</button><button aria-pressed="false">Sin sala</button>
+  </div>
+  <span class="spacer"></span>
+  <button>Buscar o ejecutar… <span class="mono">Ctrl+K</span></button>
+  <button>Actualizar sala</button>
+</header>
+<nav class="tabs" role="tablist" aria-label="Vistas de la sala">
+  <button role="tab" aria-selected="true">Resumen</button>
+  <button role="tab" aria-selected="false">Trabajo</button>
+  <button role="tab" aria-selected="false">Hitos <span class="n">2</span></button>
+  <button role="tab" aria-selected="false">Contratos <span class="n red">1</span></button>
+  <button role="tab" aria-selected="false">Bandeja <span class="n red">3</span></button>
+  <button role="tab" aria-selected="false">Actividad</button>
+  <button role="tab" aria-selected="false">Conformidad</button>
+</nav>
+<main>
+  <section class="card hito" aria-label="Hito principal">
+    <div>
+      <h2>Hito principal</h2>
+      <div class="big">Beta cerrada con 3 empresas</div>
+      <div class="sub">Criterio: ERP, web y chat funcionando contra el mismo core · fecha <b>29 nov</b></div>
+      <div class="bar" role="img" aria-label="38 de 91 unidades hechas, 4 en revisión, 3 bloqueadas"><i class="b-done" style="width:42%"></i><i class="b-pr" style="width:4%"></i><i class="b-blk" style="width:3%"></i><i class="b-pend" style="width:51%"></i></div>
+      <div class="sub">38 / 91 unidades · 4 en revisión · 3 bloqueadas</div>
+    </div>
+    <div>
+      <div class="days">32 <span style="font-size:14px;font-weight:400;color:var(--muted)">días</span></div>
+      <div class="sub">Pronóstico (estimación con el ritmo de las últimas 2 semanas): <b style="color:var(--yellow)">termina el 9 dic</b> — 10 días tarde.</div>
+      <div style="margin-top:8px"><span class="chip yellow">en riesgo</span> <span class="chip red">frena: upen-core E03</span></div>
+    </div>
+  </section>
+
+  <div class="two">
+    <section class="card" aria-label="Camino crítico">
+      <h2>Camino crítico hacia el hito</h2>
+      <div class="path">
+        <div class="node done"><b>upen-core E02</b><span class="sub">Identidad · Completada</span></div><span class="arrow">→</span>
+        <div class="node now"><b>upen-core E03</b><span class="sub">Multi-tenant · trabajando</span></div><span class="arrow">→</span>
+        <div class="node blk"><b>upen-chat T005</b><span class="sub">Entorno · espera E03</span></div><span class="arrow">→</span>
+        <div class="node blk"><b>upen-erp B3</b><span class="sub">Facturación · espera E03</span></div>
+      </div>
+      <p class="sub">Todo lo que sigue de chat y erp espera una sola unidad: <b>upen-core E03</b>. Es el cuello de botella de la sala.</p>
+
+      <h2 style="margin-top:14px">Proyectos de la sala</h2>
+      <table class="members" aria-label="Proyectos de la sala">
+        <tr><td><b>upen-core</b><div class="sub">productor</div></td><td style="width:34%"><div class="bar" style="height:8px"><i class="b-done" style="width:63%"></i><i class="b-pr" style="width:3%"></i><i class="b-pend" style="width:34%"></i></div></td><td><span class="chip green">● trabajando</span></td><td><button>⋯</button></td></tr>
+        <tr><td><b>upen-erp</b><div class="sub">consumidor</div></td><td><div class="bar" style="height:8px"><i class="b-done" style="width:8%"></i><i class="b-pr" style="width:2%"></i><i class="b-pend" style="width:90%"></i></div></td><td><span class="chip yellow">◐ te pregunta</span></td><td><button class="primary">Responder</button></td></tr>
+        <tr><td><b>upen-pages</b><div class="sub">consumidor</div></td><td><div class="bar" style="height:8px"><i class="b-done" style="width:40%"></i><i class="b-pr" style="width:7%"></i><i class="b-pend" style="width:53%"></i></div></td><td><span class="chip red">▲ CI roto</span></td><td><button class="primary">Arreglar PR</button></td></tr>
+        <tr><td><b>upen-chat</b><div class="sub">consumidor</div></td><td><div class="bar" style="height:8px"><i class="b-done" style="width:33%"></i><i class="b-blk" style="width:8%"></i><i class="b-pend" style="width:59%"></i></div></td><td><span class="chip red">■ bloqueado</span></td><td><button>Ver bloqueo</button></td></tr>
+        <tr><td><b>upen-web</b><div class="sub">consumidor</div></td><td><div class="bar" style="height:8px"><i class="b-done" style="width:57%"></i><i class="b-pend" style="width:43%"></i></div></td><td><span class="chip gray">○ libre</span></td><td><button class="primary">/flow-next</button></td></tr>
+        <tr><td><b>upen-brand</b><div class="sub">apoyo</div></td><td><div class="bar" style="height:8px"><i class="b-done" style="width:80%"></i><i class="b-pend" style="width:20%"></i></div></td><td><span class="chip gray">○ libre</span></td><td><button>⋯</button></td></tr>
+      </table>
+    </section>
+
+    <section class="card" aria-label="Contratos">
+      <h2>Contratos (productor × consumidor)</h2>
+      <table aria-label="Matriz de contratos">
+        <thead><tr><th>Contrato</th><th>core</th><th>erp</th><th>pages</th><th>chat</th><th>web</th></tr></thead>
+        <tbody>
+          <tr><td>API de identidad</td><td class="cell-p">P</td><td class="cell-c">C</td><td class="cell-c">C</td><td class="cell-c">C</td><td class="cell-c">C</td></tr>
+          <tr><td>Modelo de tenant</td><td class="cell-p cell-hot" title="Tocado hace 3 min por el PR #41 de upen-core">P ⚠</td><td class="cell-c">C</td><td>—</td><td class="cell-c">C</td><td>—</td></tr>
+          <tr><td>Tokens de marca</td><td>—</td><td class="cell-c">C</td><td class="cell-c">C</td><td class="cell-c">C</td><td class="cell-c">C</td></tr>
+        </tbody>
+      </table>
+      <p class="sub">⚠ <b>Modelo de tenant</b> lo tocó el PR <a href="#">#41</a> de upen-core (hace 3 min). Consumen erp y chat: la sala redactó un aviso (ver Bandeja).</p>
+      <h2 style="margin-top:14px">Otros hitos</h2>
+      <div class="kv"><span><b>Demo interna</b> <span class="sub">12 nov · 78%</span></span><span><span class="chip green">en plazo</span></span></div>
+    </section>
+  </div>
+
+  <section class="card" aria-label="Bandeja de mensajes">
+    <h2>Bandeja — mensajes propuestos por la sala (salen solo con tu clic)</h2>
+    <div class="msg">
+      <div class="to"><span class="chip blue">Orden de cambio</span> <b>→ upen-erp</b> <span class="gate">✓ destino listo (rama develop, sin sesión esperando)</span></div>
+      <pre>Enmienda 4 · contrato «Modelo de tenant»
+Cambia: el campo tenantId pasa a ser obligatorio (PR core #41).
+Consume: ledger B2b y facturación B3 · Suma, no rompe si se lee tenantId.
+Unidad: B3 — agregar lectura de tenantId.</pre>
+      <button class="primary">Enviar a la sesión de upen-erp</button> <button class="quiet">Editar</button> <button class="quiet">Descartar</button>
+    </div>
+    <div class="msg">
+      <div class="to"><span class="chip gray">Aviso</span> <b>→ upen-chat</b> <span class="gate no">✗ destino ocupado: la sesión está trabajando</span></div>
+      <pre>E03 de upen-core llega el 5 nov. T005 queda esperando hasta entonces.</pre>
+      <button disabled>Enviar (esperá a que termine)</button> <button class="quiet">Descartar</button>
+    </div>
+    <div class="msg">
+      <div class="to"><span class="chip green">Pase</span> <b>→ upen-web</b> <span class="gate">✓ destino libre</span></div>
+      <pre>/flow-next</pre>
+      <button class="primary">Enviar /flow-next a upen-web</button>
+    </div>
+  </section>
+</main>
+</body>
+</html>

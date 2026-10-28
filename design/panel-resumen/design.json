@@ -1,0 +1,9 @@
+{
+  "title": "Repo Panel — Resumen y sala",
+  "brief": "Nueva estructura del panel: selector de alcance, pestañas, Resumen con una fila por proyecto y un boton principal; vista de sala con hito, camino critico, contratos y bandeja",
+  "feature": "odd/tasks/panel-sala.md",
+  "artboards": [
+    { "file": "01-resumen-todo.html", "title": "Resumen (alcance Todo)", "tradeoff": "Una fila por proyecto con un solo boton principal; denso y escaneable, pero oculta el detalle por unidad hasta abrir el repo", "width": 1440, "height": 900 },
+    { "file": "02-sala-upen.html", "title": "Sala UPEN", "tradeoff": "Hito, camino critico, contratos y bandeja en una sola pantalla; mucha informacion, depende de que SALA.md este completo", "width": 1440, "height": 1100 }
+  ]
+}
