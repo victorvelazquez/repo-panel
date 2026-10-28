@@ -76,6 +76,14 @@
       "remedy": "Add the Orquestación 'ciclo' block (version 1.0) to AGENTS.md exactly as in requirements/blocks/ciclo.md, between <!-- orquestacion:ciclo v1.0 --> and <!-- /orquestacion:ciclo -->; if AGENTS.md has rules that conflict, stop and ask the user."
     },
     {
+      "id": "manual-leftovers",
+      "title": "No manual section that a block replaces in AGENTS.md",
+      "category": "verificable",
+      "level": "required",
+      "check": { "type": "leftover-sections", "file": "agents" },
+      "remedy": "Replace every leftover section the panel lists (a section of AGENTS.md outside the blocks that restates what a block already says, or that still names /flow-branch) following requirements/INSTALL.md step 3: replace the WHOLE section, keep only the lines the blocks do not say in a short section of the repo, the blocks win, and record in docs/ORQUESTACION.md what was kept."
+    },
+    {
       "id": "sala-region",
       "title": "SALA region inside the 'ciclo' block",
       "category": "verificable",

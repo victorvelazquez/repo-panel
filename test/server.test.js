@@ -675,10 +675,10 @@ test('GET /api/requirements: a conforming base branch passes the required ones; 
     assert.equal(r.json.base, 'main');
     assert.deepEqual(statuses(r.json), {
       'base-branch': 'pass', 'agents-file': 'pass', 'registro-block': 'pass', 'tareas-block': 'pass', 'entrega-block': 'pass', 'roadmap-file': 'pass',
-      'roadmap-header': 'pass', 'roadmap-table': 'pass', 'ciclo-block': 'fail', 'adoption-record': 'pass', 'padron-record': 'pass',
+      'roadmap-header': 'pass', 'roadmap-table': 'pass', 'ciclo-block': 'fail', 'manual-leftovers': 'pass', 'adoption-record': 'pass', 'padron-record': 'pass',
       'estado-block': 'fail', 'panel-ignored': 'fail',
     });
-    assert.deepEqual(r.json.summary, { required: { pass: 9, total: 11 }, recommended: { pass: 1, total: 2 }, ready: false }); // RP46: panel-ignored is required
+    assert.deepEqual(r.json.summary, { required: { pass: 10, total: 12 }, recommended: { pass: 1, total: 2 }, ready: false }); // RP46: panel-ignored is required
     assert.ok(r.json.results.every((x) => typeof x.remedy === 'string' && x.remedy));
   });
 });
@@ -1037,9 +1037,9 @@ test('GET /api/requirements: a room member also gets the member-only results and
       // A repo outside every room: same keys, same results (no sala-region; ciclo-block is required for everybody since RP44), no room field.
       const o = (await getApi(`/api/requirements?id=${lib.repoId(outside.work)}`)).json;
       assert.deepEqual(Object.keys(o), ['available', 'base', 'results', 'summary']);
-      assert.deepEqual(o.results.map((x) => x.id), ['base-branch', 'agents-file', 'registro-block', 'tareas-block', 'entrega-block', 'roadmap-file', 'roadmap-header', 'roadmap-table', 'ciclo-block', 'adoption-record', 'padron-record', 'estado-block', 'panel-ignored']);
+      assert.deepEqual(o.results.map((x) => x.id), ['base-branch', 'agents-file', 'registro-block', 'tareas-block', 'entrega-block', 'roadmap-file', 'roadmap-header', 'roadmap-table', 'ciclo-block', 'manual-leftovers', 'adoption-record', 'padron-record', 'estado-block', 'panel-ignored']);
       assert.equal(o.results.find((x) => x.id === 'ciclo-block').level, 'required');
-      assert.deepEqual(o.summary, { required: { pass: 10, total: 11 }, recommended: { pass: 1, total: 2 }, ready: false }); // RP46: this clone does not ignore .panel/, and that is required
+      assert.deepEqual(o.summary, { required: { pass: 11, total: 12 }, recommended: { pass: 1, total: 2 }, ready: false }); // RP46: this clone does not ignore .panel/, and that is required
     });
   } finally { for (const r of [member, outside]) fs.rmSync(r.tmp, { recursive: true, force: true }); }
 });
