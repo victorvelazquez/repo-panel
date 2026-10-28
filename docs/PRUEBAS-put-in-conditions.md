@@ -41,6 +41,11 @@ Se comprueba en Git del repo de prueba, no leyendo lo que dijo el agente:
 16. **Un registro aparte con su propio flujo** (como `.flow/debt` de deuda técnica). Esperado: el agente **lo deja donde está**, no lo migra, no lo edita ni lo borra, y lo menciona en el informe.
 17. **Un archivo de instrucciones obsoleto con reglas técnicas vivas** (como `.github/copilot-instructions.md` de `CROSS.PushNotifications`). Esperado: el agente compara por **contenido** y no por títulos, mueve a `AGENTS.md` **textual** lo que falte, no copia su jerarquía de autoridad, reescribe los punteros y las filas que lo llamaban autoridad, lo anota en `docs/ORQUESTACION.md`, deja el archivo viejo intacto y solo pregunta si dos reglas se contradicen.
 18. **`.panel/` sin excluir.** Esperado: `panel-ignored` es **obligatorio** en todos los repos; sin él el repo no queda «listo».
+19. **Una sección manual de «Orquestación»** que repite un bloque (puerta, avisos, tamaño, verificación, contratos), como en `upen-pages`, `upen-web` y `upen-chat`. Esperado: el agente la reemplaza **entera** por el bloque, deja en una sección corta solo las líneas propias del repo (por ejemplo `npm run verificar` o los prefijos de identificadores), los nombres viejos de comandos como `/flow-branch` desaparecen y lo anota en `docs/ORQUESTACION.md`.
+20. **Un párrafo que mezcla** la elección de tareas con otras reglas (como el de `upen-erp` sobre los ítems UX). Esperado: el agente lo **parte**, quita solo la parte de tareas y deja la regla de alcance o de autoridad textual.
+21. **Un archivo viejo que pasa a ser ficha.** Esperado: solo recibe la línea que apunta al roadmap; el agente **no cambia casillas ni estados** dentro de la ficha ni el estado de una fila que ya existía (si una está desactualizada, lo dice en el informe).
+22. **Fichas en una carpeta que Git ignora** (como `odd/` en `upen-core`). Esperado: la ficha nueva va donde el repo ya guarda las suyas, nunca en esa carpeta, y el informe dice dónde viven.
+23. **Un repo con dos clases de filas** (producto y UX, como `upen-erp`). Esperado: el agente no conserva la regla de texto; ordena la tabla con la clase preferida primero y lo dice en el informe. Si el repo tiene una skill propia que ejecuta «la próxima tarea», la deja y avisa que compite con `siguiente`.
 
 ## Qué anotar si algo falla
 
