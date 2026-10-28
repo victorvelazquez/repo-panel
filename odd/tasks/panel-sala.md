@@ -112,7 +112,7 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 | RP49 | S44 | en línea (INSTALL, bloque tareas 1.3, EXAMPLES, requirements.json, checklist y prueba); RED primero (12 de 12); huella aceptada sin force por la subida de versión | pendiente de commit |
 | RP50 | S45 | worker `gentle-ai-worker` con encargo cerrado; RED 11 de 12; el padre revisó el diff y probó el chequeo contra los 15 repos reales | pendiente de commit |
 | RP51 | S46 | worker `gentle-ai-worker` con encargo cerrado; RED (módulo inexistente), GREEN 16 de 16; el padre revisó el diff y corrió la suite completa (889 de 890, 1 salteada) | pendiente de commit |
-| RP52 | S46 | pendiente; la persona la aprueba mirándola | — |
+| RP52 | S46 | worker `gentle-ai-worker` con encargo cerrado; RED (módulo inexistente), GREEN 39 de 39; una segunda vuelta corrigió 4 defectos visuales vistos con Edge sobre los 15 repos reales; el padre corrió la suite completa (945 de 946, 1 salteada) | pendiente de commit |
 | RP53 | S47 | worker `gentle-ai-worker` con encargo cerrado; RED (módulo inexistente), GREEN 16 de 16; el padre revisó el diff y corrió la suite completa (905 de 906, 1 salteada) | pendiente de commit |
 | RP54 | S48 | pendiente | — |
 | RP55 | S49 | pendiente; verificación independiente | — |
