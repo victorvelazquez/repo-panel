@@ -104,7 +104,7 @@
       main = f
         ? `<button class="primary" data-act="pi" data-id="${id}" data-cmd="${esc(f.cmd)}" title="${esc(f.reason || `Send /${f.cmd} to the open pi session of this repo`)}"${f.disabled || sending ? ' disabled' : ''}>${esc(f.label)}</button>`
         : '<button class="primary" disabled title="This repo\'s local state is not loaded yet">Deliver</button>';
-    } else if (a && a.kind === 'start') main = open(`Start ${r.next ? r.next.id : ''}`.trim(), 'primary');
+    } else if (a && a.kind === 'start') main = `<button class="primary" data-act="pi" data-id="${id}" data-cmd="flow-next" title="Send /flow-next to the open pi session of this repo (starts ${esc(r.next ? r.next.id : '')})"${sending}>/flow-next</button>`;
     else if (a) main = open('Open', 'primary');
     return `<div class="rs-act">${main}<button data-act="focus-repo" data-id="${id}" aria-label="More actions for ${esc(r.name)}" title="Show this repo in the Work tab">⋯</button></div>`;
   }

@@ -118,6 +118,7 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 | RP55 | S49 | pendiente; verificación independiente | — |
 | RP56 | S50 | pendiente; verificación independiente | — |
 | RP57 | S51 | pendiente | — |
+| RP58 | S46 | worker `gentle-ai-worker` con encargo cerrado; RED 7 fallos en lo del botón y 2 en lo de RP51; el padre corrió la suite completa, que encontró una prueba que fija la lista exacta de comandos y la actualizó | pendiente de commit |
 
 Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a → RP11b → RP12a → RP12b → RP12 → RP13 → RP14. RP12 puede ir antes de RP11 si la persona lo prefiere.
 

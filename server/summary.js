@@ -105,6 +105,11 @@ function analyse(f) {
 
 const summarize = (facts) => analyse(facts).row;
 
+// analyse runs outside the per-repo isolation of gather: an exception in it is that repo's error row, never the summary's.
+function safeAnalyse(f) {
+  try { return analyse(f); } catch (e) { return analyse({ repo: f.repo, last: f.last, session: f.session, error: e.message || 'Analysis failed' }); }
+}
+
 // The pi state of a repo (closed | idle | busy | asking | ambiguous | unknown) from the one `list` already fetched; null
 // terminals (Orca could not be listed) is unknown, never closed. Same reading as piStatus.
 async function sessionState(repoPath, orca, terminals) {
@@ -156,7 +161,7 @@ async function build(deps) {
   try { const listed = (await orca(['list'])).terminals; if (Array.isArray(listed)) terminals = listed; } catch { /* unknown, not none */ }
   const roomOf = new Map((cfg.rooms || []).flatMap((r) => r.repos.map((id) => [id, r.name])));
   const repos = cfg.groups.flatMap((g) => g.repos.map((r) => ({ ...r, id: lib.repoId(r.path), group: g.name })));
-  const results = await pool(repos, POOL, async (repo) => analyse(await gather(repo, { deps, terminals, orca, cfg, roomOf, now })));
+  const results = await pool(repos, POOL, async (repo) => safeAnalyse(await gather(repo, { deps, terminals, orca, cfg, roomOf, now })));
   const counts = { working: 0, waiting: 0, blocked: 0, idle: 0 };
   for (const { row } of results) {
     if (row.error) continue;
@@ -176,10 +181,12 @@ async function build(deps) {
 function summaryFor(deps = {}, query = {}) {
   const now = (deps.now || Date.now)();
   const hit = caches.get(deps);
-  if (hit && query.fresh !== '1' && now - hit.t < CACHE_MS) return hit.p;
+  // t stays null while the build runs (that promise is shared) and is the time it FINISHED once it resolves.
+  if (hit && query.fresh !== '1' && (hit.t === null || now - hit.t < CACHE_MS)) return hit.p;
   const p = build(deps);
-  caches.set(deps, { t: now, p });
-  p.catch(() => { if (caches.get(deps) && caches.get(deps).p === p) caches.delete(deps); });
+  const entry = { t: null, p };
+  caches.set(deps, entry);
+  p.then(() => { entry.t = (deps.now || Date.now)(); }, () => { if (caches.get(deps) === entry) caches.delete(deps); });
   return p;
 }
 
