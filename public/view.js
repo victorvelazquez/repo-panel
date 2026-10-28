@@ -67,7 +67,8 @@
   function cardMenu(entry, dismissed) {
     const open = openRequirements(entry);
     if (!open || !open.length) return [];
-    const items = [{ act: 'put-in-conditions', label: 'Put in conditions' }];
+    // A room is judged with the room requirements and never gets the member order.
+    const items = entry.data.isRoom ? [] : [{ act: 'put-in-conditions', label: 'Put in conditions' }];
     if (open.some((r) => r.level === 'required')) items.push({ act: 'toggle-warning', label: dismissed ? 'Show warning' : 'Hide warning' });
     return items;
   }

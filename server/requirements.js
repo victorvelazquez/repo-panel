@@ -7,7 +7,7 @@ const checks = require('../checks.js');
 const { HttpError } = require('./errors.js');
 const lib = require('../lib.js');
 const { run, git, firstLine } = require('./exec.js');
-const { roomOf } = require('./config.js');
+const { roomOf, roomByPath } = require('./config.js');
 const { remoteFile } = require('./roadmap.js');
 
 const REGISTRY_PATH = path.join(__dirname, '..', 'requirements.json');
@@ -46,7 +46,16 @@ async function evaluateRepo(repo, paths, list, room, local = null) {
 }
 
 // A repo that belongs to a room also gets the member-only requirements and a `room` field; any other repo's answer is unchanged.
-async function requirementsFor(repo, room = roomOf(repo.id), { git: gitRun = git } = {}) {
+// The repo that is the folder of a room is judged with the room requirements instead ({ isRoom: true }). It is looked up
+// only when `room` was omitted, or through `roomRepo`; an explicit null room stays hermetic (it never reads the config).
+async function requirementsFor(repo, room, { git: gitRun = git, roomRepo } = {}) {
+  const omitted = room === undefined;
+  if (omitted) room = roomOf(repo.id);
+  const own = roomRepo !== undefined ? roomRepo : (omitted ? roomByPath(repo.path) : null);
+  if (own) {
+    const out = await roomRequirementsFor({ ...own, id: repo.id, path: repo.path });
+    return { ...out, room: { name: own.name }, isRoom: true };
+  }
   const paths = { agents: 'AGENTS.md', roadmap: repo.roadmap || 'docs/ROADMAP.md', adoption: 'docs/ORQUESTACION.md' };
   const local = { panelIgnored: await panelIgnored(repo, gitRun) };
   const out = await evaluateRepo(repo, paths, 'requirements', room ? { name: room.name } : null, local);
