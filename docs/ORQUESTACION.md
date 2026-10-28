@@ -6,9 +6,9 @@ Registro de qué se adoptó y qué se desvió. Lo lee `verificar-adopcion.sh`.
 - **Perfil:** compatible con panel
 - **Bloque Registro en `AGENTS.md`:** versión 1.0
 - **Bloque Ciclo en `AGENTS.md`:** versión 1.0 (sin las regiones `SALA`)
-- **Bloques del panel en `AGENTS.md`:** `tareas` 1.2, `entrega` 1.0 y `estado` 1.0
+- **Bloques del panel en `AGENTS.md`:** `tareas` 1.3, `entrega` 1.0 y `estado` 1.0
 - **Métodos adoptados:** Registro, Ciclo
-- **Padrón del panel:** 1.3
+- **Padrón del panel:** 1.4
 
 El control de adopción compara las versiones con las vigentes mirando los marcadores `orquestacion:registro` y `orquestacion:ciclo` de `AGENTS.md`; este registro es para las personas.
 
