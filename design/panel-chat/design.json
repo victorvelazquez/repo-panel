@@ -1,0 +1,42 @@
+{
+  "title": "Repo Panel — Chat con las sesiones",
+  "brief": "Un solo chat que cambia segun el repo o la sala elegidos: historial real de su sesion adoptada, estado en vivo, acciones rapidas, caja de texto que solo envia con la sesion libre. Tres propuestas de estructura (A, B, C) y un catalogo de estados",
+  "feature": "odd/tasks/panel-sala.md",
+  "artboards": [
+    {
+      "file": "01-chat-completo.html",
+      "title": "A · Completo (lateral, con chips)",
+      "tradeoff": "Todo a la vista: tira de conversaciones, barra de contexto con dos botones, burbujas y ayuda de teclas; mas informacion pero mas cargado. Chat lateral de 540 px",
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "file": "02-chat-limpio.html",
+      "title": "B · Limpio (lateral, lista como selector)",
+      "tradeoff": "La lista de la izquierda es el selector (sala fijada primero) y cada cosa aparece una vez; el chat lateral de 480 px reduce el ancho del Resumen",
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "file": "03-chat-panel-inferior.html",
+      "title": "C · Panel inferior con pestanas",
+      "tradeoff": "El Resumen conserva todo el ancho y el chat vive abajo con una pestana por conversacion, como una terminal; deja menos alto al Resumen y a la conversacion",
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "file": "05-tarjetas-y-chat.html",
+      "title": "D · Tarjetas compactas + chat con divisor ajustable (basada en A)",
+      "tradeoff": "Tarjetas de dos lineas como unico selector, una accion por tarjeta, menu / junto a Enviar; el divisor se arrastra, responde a flechas y doble clic restablece; en pantallas chicas reparte 50/50; el chat lateral acorta las tarjetas",
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "file": "04-chat-estados.html",
+      "title": "Estados del chat (catalogo)",
+      "tradeoff": "Catalogo de seis estados del MISMO chat (no es una ventana con varios chats); la sala propone y envia desde su propio chat",
+      "width": 1440,
+      "height": 1000
+    }
+  ]
+}

@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Repo Panel — Estados del chat</title>
+<style>
+:root { --bg:#0f1216; --panel:#171b21; --panel2:#1e242c; --line:#2a323c; --text:#d7dde5; --muted:#8b96a3; --green:#3fb950; --red:#f85149; --yellow:#d29922; --blue:#58a6ff; --gray:#6e7681; --purple:#a371f7; }
+* { box-sizing:border-box; }
+body { margin:0; padding:20px; background:var(--bg); color:var(--text); font:14px/1.45 system-ui,"Segoe UI",sans-serif; }
+h1 { font-size:18px; margin:0 0 4px; } .lead { color:var(--muted); margin:0 0 16px; }
+button,textarea { font:inherit; color:var(--text); background:var(--panel2); border:1px solid var(--line); border-radius:6px; padding:4px 10px; }
+button { cursor:pointer; } button:hover:not(:disabled) { border-color:var(--blue); } button:disabled,textarea:disabled { opacity:.45; cursor:not-allowed; }
+button.primary { background:#1f6feb; border-color:#1f6feb; color:#fff; }
+:focus-visible { outline:2px solid var(--blue); outline-offset:2px; }
+.mono { font-family:ui-monospace,Consolas,monospace; font-size:12px; color:var(--muted); } .sub { color:var(--muted); font-size:12px; }
+.grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; }
+.case { display:flex; flex-direction:column; min-height:430px; background:var(--panel); border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+.case > h2 { margin:0; padding:8px 12px; font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); background:var(--panel2); border-bottom:1px solid var(--line); }
+.chip { font-size:12px; padding:1px 8px; border-radius:10px; border:1px solid var(--line); white-space:nowrap; display:inline-block; }
+.chip.green { color:var(--green); border-color:#1d4a28; background:#0f2416; } .chip.red { color:var(--red); border-color:#5a1f1c; background:#2a1213; }
+.chip.yellow { color:var(--yellow); border-color:#53410f; background:#251d08; } .chip.gray { color:var(--muted); }
+.head { padding:8px 12px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:8px; } .head b { font-size:14px; } .spacer { flex:1; }
+.body { flex:1; padding:12px; display:flex; flex-direction:column; gap:10px; overflow:auto; }
+.m { max-width:92%; padding:8px 11px; border-radius:10px; border:1px solid var(--line); background:var(--panel2); white-space:pre-wrap; }
+.m.me { align-self:flex-end; background:#12253d; border-color:#1d3a5f; }
+.composer { border-top:1px solid var(--line); padding:8px 12px; display:grid; gap:6px; } .composer textarea { width:100%; min-height:48px; resize:none; }
+.composer .bar { display:flex; gap:8px; align-items:center; }
+.sess { border:1px solid var(--line); border-radius:8px; padding:8px 10px; background:var(--panel2); display:grid; gap:2px; }
+.sess + .sess { margin-top:6px; }
+.banner { border:1px solid; border-radius:8px; padding:8px 10px; }
+.banner.warn { border-color:#53410f; background:#251d08; } .banner.ask { border-color:#53410f; background:#251d08; } .banner.err { border-color:#5a1f1c; background:#2a1213; }
+.opts { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+.spin { display:inline-block; width:14px; height:14px; border:2px solid var(--line); border-top-color:var(--blue); border-radius:50%; animation:spin 1s linear infinite; vertical-align:-2px; margin-right:6px; }
+@keyframes spin { to { transform:rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spin { animation:none; border-top-color:var(--line); } }
+</style>
+</head>
+<body>
+<h1>Estados del chat de un repo</h1>
+<p class="lead">Cada estado de la sesión adoptada cambia lo que se puede hacer. Nada de esto envía algo sin tu clic, y la caja solo escribe cuando la sesión está libre.</p>
+<div class="grid">
+
+  <section class="case" aria-label="Sin sesión adoptada">
+    <h2>1 · Sin sesión adoptada</h2>
+    <div class="head"><b>upen-core</b><span class="chip gray">○ sin sesión</span></div>
+    <div class="body">
+      <p style="margin:0">upen-core no tiene una sesión adoptada por el panel.</p>
+      <div><b>Adoptar una existente</b>
+        <div class="sess"><span><b>Coordinación de dominio</b> <span class="sub">· ayer 18:40</span></span><span class="sub">Último: «Dejo E05c1 listo para revisión»</span><button>Adoptar esta</button></div>
+        <div class="sess"><span><b>sin nombre</b> <span class="sub">· hace 3 d</span></span><span class="sub">Último: «¿Querés que también migre los tests?»</span><button>Adoptar esta</button></div>
+      </div>
+      <div><b>O iniciar una nueva</b><div class="sub" style="margin:2px 0 6px">Abre una terminal con <span class="mono">gentle-shell -n panel:upen-core --session-id panel-upen-core</span></div><button class="primary">Iniciar sesión del panel</button></div>
+    </div>
+    <div class="composer"><textarea disabled aria-label="Mensaje" placeholder="Adoptá o iniciá una sesión para escribir"></textarea></div>
+  </section>
+
+  <section class="case" aria-label="Iniciando">
+    <h2>2 · Iniciando</h2>
+    <div class="head"><b>upen-core</b><span class="chip yellow"><span class="spin" aria-hidden="true"></span>iniciando</span><span class="mono">panel:upen-core</span></div>
+    <div class="body">
+      <div class="banner warn" role="status">Cargando Gentle Shell: skills, MCP y extensiones. La caja se habilita cuando la sesión esté lista; el panel no manda nada mientras arranca.</div>
+      <span class="sub">La primera vez puede tardar más (configuración inicial de agentes).</span>
+    </div>
+    <div class="composer"><textarea disabled aria-label="Mensaje" placeholder="Esperando a que la sesión esté lista…"></textarea></div>
+  </section>
+
+  <section class="case" aria-label="Trabajando">
+    <h2>3 · La sesión está trabajando</h2>
+    <div class="head"><b>upen-web</b><span class="chip green">● trabajando</span><span class="mono">panel:upen-web</span></div>
+    <div class="body">
+      <div class="m me"><span class="sub">Vos · 14:20</span><br>/flow-next</div>
+      <div class="m"><span class="sub">upen-web · ahora</span><br>Tomo W4. Escribo la página de privacidad con el texto legal que dejó el equipo…</div>
+    </div>
+    <div class="composer"><textarea disabled aria-label="Mensaje" placeholder="La sesión está trabajando. Podés escribir cuando termine."></textarea><div class="bar"><span class="sub">Enviar se habilita al volver a «libre»</span><span class="spacer"></span><button disabled>Enviar</button></div></div>
+  </section>
+
+  <section class="case" aria-label="Esperando tu respuesta">
+    <h2>4 · La sesión te hace una pregunta</h2>
+    <div class="head"><b>upen-pages</b><span class="chip yellow">◐ te pregunta</span><span class="mono">panel:upen-pages</span></div>
+    <div class="body">
+      <div class="m"><span class="sub">upen-pages · hace 2 min</span><br>El CI de #31 falla en lint. Para arreglarlo tengo que correr un comando de Git.</div>
+      <div class="banner ask" role="alert"><b>Permitir operación guardada de git</b><div class="sub" style="margin-top:2px">git switch feat/pricing</div>
+        <div class="opts"><button class="primary">Permitir una vez</button><button>Denegar</button></div>
+        <div class="sub" style="margin-top:6px">Se responde dentro de la sesión de pi. Antes de enviar, el panel te muestra exactamente qué opción va a marcar.</div></div>
+    </div>
+    <div class="composer"><textarea disabled aria-label="Mensaje" placeholder="Respondé la pregunta de arriba para continuar"></textarea></div>
+  </section>
+
+  <section class="case" aria-label="Mensaje no entregado">
+    <h2>5 · No se pudo entregar</h2>
+    <div class="head"><b>upen-erp</b><span class="chip gray">○ libre</span><span class="mono">panel:upen-erp</span></div>
+    <div class="body">
+      <div class="banner err" role="alert"><b>El mensaje quedó escrito en la caja de la sesión, sin enviarse.</b><div class="sub" style="margin-top:2px">No apareció en su historial. No lo reenvío solo para no duplicarlo.</div>
+        <div class="opts"><button>Limpiar la caja</button><button>Abrir la terminal en Orca</button></div></div>
+      <div class="m me"><span class="sub">Vos · 14:31 · sin entregar</span><br>Dale, hacelo. Pero primero mostrame la prueba que falla.</div>
+    </div>
+    <div class="composer"><textarea disabled aria-label="Mensaje" placeholder="Resolvé el mensaje pendiente para seguir"></textarea></div>
+  </section>
+
+  <section class="case" aria-label="Sala">
+    <h2>6 · Chat de la sala (propone y envía desde acá)</h2>
+    <div class="head"><b>★ Sala UPEN</b><span class="chip green">● libre</span><span class="mono">sala:UPEN</span></div>
+    <div class="body">
+      <div class="m me"><span class="sub">Vos · 13:50</span><br>¿Qué proyecto frena hoy la beta?</div>
+      <div class="m"><span class="sub">sala:UPEN · 13:51</span><br>upen-core E03. Todo lo de chat y erp espera esa unidad. Propongo avisar a upen-erp:</div>
+      <div class="banner ask" role="group" aria-label="Mensaje propuesto para upen-erp"><b>Propuesto para upen-erp</b> <span class="sub">· orden de cambio</span>
+        <div class="m" style="margin-top:6px;max-width:100%">Enmienda 4 · «Modelo de tenant»: el campo tenantId pasa a ser obligatorio (PR core #41). Suma, no rompe. Unidad: B3 — leer tenantId.</div>
+        <div class="sub" style="margin-top:6px">✓ Destino listo: upen-erp está libre. Sale a su sesión adoptada <span class="mono">panel:upen-erp</span>.</div>
+        <div class="opts"><button class="primary">Enviar a upen-erp</button><button>Editar</button><button>Descartar</button></div></div>
+    </div>
+    <div class="composer"><textarea aria-label="Mensaje para la sala" placeholder="Coordiná, planificá o preguntale a la sala…"></textarea><div class="bar"><span class="sub">La sala conversa y propone; solo sale lo que enviás con tu clic.</span><span class="spacer"></span><button class="primary">Enviar</button></div></div>
+  </section>
+</div>
+</body>
+</html>
