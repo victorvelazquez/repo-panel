@@ -18,6 +18,7 @@ const { readState } = require('./state.js');
 const { requirementsFor, prerequisites } = require('./requirements.js');
 const { roomsState, createRoom, removeRoom, assignRoom } = require('./rooms.js');
 const { queueFor, conformityFor } = require('./queue.js');
+const { summaryFor } = require('./summary.js');
 
 const ROOT = path.join(__dirname, '..');
 const TOKEN = crypto.randomBytes(24).toString('hex');
@@ -45,6 +46,7 @@ const routes = {
   'GET /api/state': (q) => readState(findRepo(q.id)),
   'GET /api/pi-status': (q, b, d) => piStatus(findRepo(q.id), d.orca, { tail: q.tail === '1' }),
   'GET /api/rooms': () => roomsState(),
+  'GET /api/summary': (q, b, d) => summaryFor(d, q),
   'GET /api/prerequisites': () => prerequisites(),
   'GET /api/diff': (q) => diffText(findRepo(q.id)),
   'POST /api/fetch': async (q, b) => {
