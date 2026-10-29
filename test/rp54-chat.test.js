@@ -388,7 +388,8 @@ test('index.html: the static wrapper, the divider, the chat aside and the read-o
   assert.match(html, /<div id="sumLayout" class="chatlayout">\s*<section id="summary"[^>]*><\/section>\s*<div id="split" role="separator" aria-orientation="vertical" tabindex="0" aria-label="Adjust the chat width \(left and right arrows; double click to reset\)" hidden><\/div>\s*<aside id="chat" hidden aria-label="Chat">/);
   assert.match(html, /id="chatHead"/);
   assert.match(html, /id="chatBody"[^>]*role="log"[^>]*aria-live="polite"|id="chatBody"[^>]*aria-live="polite"[^>]*role="log"/);
-  assert.match(html, /Read-only for now: sending messages comes in the next unit/);
+  const aside = /<aside id="chat"[\s\S]*?<\/aside>/.exec(html);
+  assert.ok(aside && /id="composer"/.test(aside[0]) && /<textarea[^>]*id="msgBox"/.test(aside[0]) && /id="msgSend"/.test(aside[0]), 'the composer lives inside the aside');
   assert.match(html, /<\/aside>\s*<\/div>\s*<div id="work"/);
 });
 
