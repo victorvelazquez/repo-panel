@@ -195,4 +195,4 @@ async function piStatus(repo, orca = orcaTerminal, { tail = false } = {}) {
   } catch { return out('unknown'); }
 }
 
-module.exports = { piSend, piStatus, piSessions, scanSessions, conditionsOrder, fixPrOrder, orcaTerminal, sendGuard, setCaseRecorder, caseRecorderInstalled };
+module.exports = { piSend, piStatus, piSessions, scanSessions, conditionsOrder, fixPrOrder, orcaTerminal, sendGuard, setCaseRecorder, caseRecorderInstalled, piBusy };
