@@ -60,13 +60,16 @@ function createRecorder({ file, fs = fsp, now = Date.now, minGapMs = MIN_GAP_MS,
         if (old) old.text = null;
         return;
       }
-      const text = normalize(q.lines);
+      // The whole screen (up to 40 lines) is kept so the options of a long list can be studied; it is part of the key, so the same
+      // last lines under a different list count as a new case.
+      const screen = lib.piScreenTail(preview, 40);
+      const text = normalize(screen);
       const old = last.get(key);
       const t = now();
       if (old && old.text === text) return;
       if (old && t - old.at < minGapMs) return;
       last.set(key, { text, at: t });
-      const line = `${JSON.stringify({ at: new Date(t).toISOString(), folder, handle, state, recognized: lib.piScreenAsk(preview) !== null, signals: q.signals, lines: q.lines })}\n`;
+      const line = `${JSON.stringify({ at: new Date(t).toISOString(), folder, handle, state, recognized: lib.piScreenAsk(preview) !== null, signals: q.signals, lines: q.lines, screen })}\n`;
       chain = chain.then(() => write(line)).catch((e) => warn(String((e && e.message) || e)));
     } catch (e) {
       warn(String((e && e.message) || e));

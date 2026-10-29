@@ -522,16 +522,22 @@ function piScreenDialog(preview) {
   return { text: lines.join('\n').slice(-3000), lines, selected: selected < 0 ? null : selected };
 }
 
+// The last `n` non-empty lines of a screen (control characters replaced by a space, 200 characters per line). The Claude usage
+// widget under the screen (`5h 15% ↻lun 01:50 · 7d 37% ↻jue 11:00`) is not part of it: it says nothing about a question, it holds the
+// user's consumption, and it must not take one of the lines. Observation only; a non-string gives [].
+const USAGE_WIDGET = /^\d+h\s+\d+%\s+↻[^·]*·\s+\d+d\s+\d+%\s+↻/;
+function piScreenTail(preview, n = 40) {
+  if (typeof preview !== 'string') return [];
+  return preview.split('\n').map((l) => l.replace(/[\x00-\x1f\x7f-\x9f\u2028\u2029]/g, ' ').trim()).filter((l) => l && !USAGE_WIDGET.test(l)).slice(-n).map((l) => l.slice(0, 200));
+}
+
 // Whether the end of a screen LOOKS like a question for the user, however the panel classifies it (this is only
 // observed, never acted on: piScreenAsk and piScreenState are unchanged). From the last 14 non-empty lines (control
 // characters replaced by a space, 200 characters per line) it returns { signals, lines } or null. Signals: 'footer' (ONE
 // line holding a key word and an action word), 'agents-waiting' (`Agents 1 waiting`) and 'asked' (a line with `asked:`).
 function piScreenQuestionish(preview) {
   if (typeof preview !== 'string') return null;
-  // The Claude usage widget under the pi screen (`5h 15% ↻lun 01:50 · 7d 37% ↻jue 11:00`) is not part of the screen: it
-  // says nothing about a question, it holds the user's consumption, and it must not take one of the 14 lines.
-  const usageWidget = /^\d+h\s+\d+%\s+↻[^·]*·\s+\d+d\s+\d+%\s+↻/;
-  const lines = preview.split('\n').map((l) => l.replace(/[\x00-\x1f\x7f-\x9f\u2028\u2029]/g, ' ').trim()).filter((l) => l && !usageWidget.test(l)).slice(-14).map((l) => l.slice(0, 200));
+  const lines = piScreenTail(preview, 14);
   const signals = [];
   if (lines.some((l) => /\b(enter|return|esc|escape)\b|ctrl\+c/i.test(l) && /\b(confirm|select|cancel|submit|navigate|accept)\b/i.test(l))) signals.push('footer');
   if (lines.some((l) => /\bAgents?\s+\d+\s+waiting\b/i.test(l))) signals.push('agents-waiting');
@@ -549,7 +555,7 @@ function piPromptState(preview) {
 }
 
 module.exports = {
-  PI_COMMANDS, normPath, terminalsOfWorktree, piScreenState, piScreenAsk, piScreenDialog, piScreenQuestionish, piPromptState,
+  PI_COMMANDS, normPath, terminalsOfWorktree, piScreenState, piScreenAsk, piScreenDialog, piScreenTail, piScreenQuestionish, piPromptState,
   repoId, parseStatus, parseNumstat, parseGoneBranches, parseBaseBranch, staleBranch, statusLetter,
   summarizeChecks, blockedReason, enrichPr, encodeRef, parseRoadmap, safeRelPath, roadmapSummary,
   matchesUnitId, deriveUnitStates, nextUnit, workQueue, QUEUE_RANK, conformityReport, RM_REQUIRED,
