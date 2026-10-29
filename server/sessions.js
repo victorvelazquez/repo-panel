@@ -223,8 +223,8 @@ async function startSession(id, orca = orcaTerminal) {
     const sid = `${prefix}-${label.toLowerCase().replace(/[^a-z0-9.-]/g, '-')}`.slice(0, 80);
     const name = `${prefix === 'sala' ? 'sala' : 'panel'}:${label.replace(/[^A-Za-z0-9._-]/g, '-')}`.slice(0, 100);
     const live = await liveOf(folder, orca);
-    if (live.state === 'unknown') throw new HttpError(409, 'Orca could not be read, so it is not known whether a pi session is already open; try again');
-    if (live.state !== 'none') throw new HttpError(409, 'This folder already has a pi session open; adopt it instead of starting another');
+    if (live.state === 'unknown') throw new HttpError(409, 'Orca could not be read, so it is not known whether a session is already open; try again');
+    if (live.state !== 'none') throw new HttpError(409, 'This folder already has a session open; adopt it instead of starting another');
     const created = await orca(['create', '--worktree', `path:${folder}`, '--title', name, '--command', `gentle-shell -n ${name} --session-id ${sid}`]);
     store(key, { id: sid, name, adoptedAt: new Date().toISOString() });
     return { started: true, handle: (created.terminal && created.terminal.handle) || null, id: sid, name, state: 'starting' };

@@ -98,12 +98,12 @@
     if (r.error) return open('Open');
     if (!a) return '';
     if (a.kind === 'merge') return `<button class="merge" data-act="merge" data-id="${id}" data-n="${esc(a.pr)}" title="Merge #${esc(a.pr)}" aria-label="Merge #${esc(a.pr)}"${ctx.busy && ctx.busy[`${r.id}:${a.pr}`] ? ' disabled' : ''}>${esc(clip(`Merge #${a.pr}`, LABEL_MAX))}</button>`;
-    if (a.kind === 'branch') return `<button class="primary" data-act="pi" data-id="${id}" data-cmd="flow-base" title="Send /flow-base to the open pi session of this repo"${sending}>/flow-base</button>`;
-    if (a.kind === 'start') return `<button class="primary" data-act="pi" data-id="${id}" data-cmd="flow-next" title="Send /flow-next to the open pi session of this repo (starts ${esc(r.next ? r.next.id : '')})"${sending}>/flow-next</button>`;
+    if (a.kind === 'branch') return `<button class="primary" data-act="pi" data-id="${id}" data-cmd="flow-base" title="Send /flow-base to the open session of this repo"${sending}>/flow-base</button>`;
+    if (a.kind === 'start') return `<button class="primary" data-act="pi" data-id="${id}" data-cmd="flow-next" title="Send /flow-next to the open session of this repo (starts ${esc(r.next ? r.next.id : '')})"${sending}>/flow-next</button>`;
     if (a.kind === 'deliver') {
       const f = ctx.flowFor ? ctx.flowFor(r.id) : null;
       return f
-        ? `<button class="primary" data-act="pi" data-id="${id}" data-cmd="${esc(f.cmd)}" title="${esc(f.reason || `Send /${f.cmd} to the open pi session of this repo`)}"${f.disabled || sending ? ' disabled' : ''}>${esc(f.label)}</button>`
+        ? `<button class="primary" data-act="pi" data-id="${id}" data-cmd="${esc(f.cmd)}" title="${esc(f.reason || `Send /${f.cmd} to the open session of this repo`)}"${f.disabled || sending ? ' disabled' : ''}>${esc(f.label)}</button>`
         : '<button class="primary" disabled title="This repo\'s local state is not loaded yet">Deliver</button>';
     }
     // answer and waiting get data-kind so the stylesheet can colour them amber; manual stays neutral.
@@ -167,7 +167,7 @@
   // The composer (RP68, S49): can the person send free text now, and if not, why. c = { id, info, sending }.
   const REASON = {
     working: 'The session is working: wait until it is free', waiting: 'The session is asking you something: answer it in its terminal',
-    none: 'No open pi session of this repo', unknown: 'The session state is unknown',
+    none: 'No open session of this repo', unknown: 'The session state is unknown',
   };
   function composerState(c, ctx = {}) {
     const info = c.info;
@@ -177,7 +177,7 @@
     else if (!info.adoptedFound) reason = 'The session is loading';
     else if (c.sending) reason = 'Sending…';
     else if (liveOf(c) !== 'free') reason = REASON[liveOf(c)] || REASON.unknown;
-    return { canSend: !reason, reason, placeholder: reason || `Message the pi session of ${ctx.name ?? 'this repo'}` };
+    return { canSend: !reason, reason, placeholder: reason || `Message the session of ${ctx.name ?? 'this repo'}` };
   }
 
   // The "/ Actions" menu: always the four flow commands in a fixed order, each available or not with the reason. A deliver or
@@ -317,7 +317,7 @@
       const rows = (info.sessions || []).slice(0, 5).map((s) => `<div class="ch-pick"><div class="ch-pick-l1"><span class="mono ch-sname" title="${esc(s.id)}">${esc(s.name || s.id)}</span><span class="rs-sub">${esc(relativeTime(s.updatedAt, ctx.now))}</span><button type="button" data-act="chat-adopt" data-id="${id}" data-session="${esc(s.id)}">Adopt</button></div>${s.lastMessage ? `<div class="rs-sub ch-last">${esc(clip(s.lastMessage.text, 90))}</div>` : ''}</div>`).join('');
       return `${note}<div class="ch-state"><p>No session is adopted for this folder.${rows ? ' Adopt one, or start a new one.' : ''}</p>${rows}<button type="button" data-act="chat-start" data-id="${id}"${c.starting ? ' disabled' : ''}>Start panel session</button></div>`;
     }
-    if (!info.adoptedFound) return `${note}<div class="ch-state" role="status"><p>The session is loading (Gentle Shell: skills, MCP, extensions). The history appears with its first message.</p></div>`;
+    if (!info.adoptedFound) return `${note}<div class="ch-state" role="status"><p>The session is loading. The history appears with its first message.</p></div>`;
     const who = info.adopted.name || info.adopted.id;
     const items = (c.hist && c.hist.items) || [];
     return `${note}${c.hist && c.hist.truncated ? '<div class="rs-sub ch-older">Older messages are not shown</div>' : ''}${items.map((it) => bubble(it, who)).join('') || '<div class="empty">No messages yet.</div>'}`;

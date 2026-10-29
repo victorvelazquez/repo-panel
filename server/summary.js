@@ -17,7 +17,7 @@ const POOL = 6;
 const CACHE_MS = 10 * 1000;
 const MAX_BLOCKING = 3;
 const SESSION_OF = { closed: 'none', idle: 'free', busy: 'working', asking: 'waiting' };
-const ANSWER = 'Answer the question in the pi session';
+const ANSWER = 'Answer the question in the session';
 // Urgency for the filter, lower is more urgent: a session asking you 0, failing CI 1, then the workQueue kinds in their own order
 // (lib.QUEUE_RANK plus 2), then a working session, a blocked unit and everything else.
 const QUEUE_BASE = 2;
@@ -105,7 +105,7 @@ function analyse(f) {
   const next = nx ? { id: nx.id, entrega: nx.entrega, resultadoVisible: nx.resultadoVisible } : null;
   const blocking = blockingOf(rm);
   const why = [];
-  if (session.state === 'waiting') why.push('The pi session is waiting for an answer');
+  if (session.state === 'waiting') why.push('The session is waiting for an answer');
   const failingCi = (f.prs.prs || []).filter((p) => p.checks && p.checks.state === 'failed');
   for (const p of failingCi) why.push(`PR #${p.number} has failing checks`);
   // A Blocked unit only needs attention when nothing else can be taken (S58); `blocking` and `rank` do not change.

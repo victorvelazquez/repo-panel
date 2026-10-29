@@ -149,9 +149,9 @@ test('roomTag: while the rooms load or fail the dot is gray and nothing is claim
 });
 
 test('roomTag: the tooltip explains the state and gives the last commit date', () => {
-  assert.equal(roomTag(ROOMS, 'a', live('busy')).title, 'Room UPEN · pi session open, busy · last commit 2026-10-23');
-  assert.equal(roomTag(ROOMS, 'a', live('closed', { lastCommit: null })).title, 'Room UPEN · no pi session open in the room folder · last commit unknown');
-  assert.equal(presenceLabel({ state: 'ambiguous', sessions: 3 }), '3 pi sessions open: close the extra ones');
+  assert.equal(roomTag(ROOMS, 'a', live('busy')).title, 'Room UPEN · session open, busy · last commit 2026-10-23');
+  assert.equal(roomTag(ROOMS, 'a', live('closed', { lastCommit: null })).title, 'Room UPEN · no session open in the room folder · last commit unknown');
+  assert.equal(presenceLabel({ state: 'ambiguous', sessions: 3 }), '3 sessions open: close the extra ones');
   assert.match(presenceLabel({ state: 'unknown', sessions: null }), /Orca unavailable/);
 });
 

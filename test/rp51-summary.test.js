@@ -114,7 +114,7 @@ test('action: a clean repo with a next unit gives start; a waiting session gives
   assert.match(start.label, /A/);
   const dirty = { branch: 'x', files: [{ path: 'a' }], ahead: 0, behind: 0, base: 'main' };
   const ask = summarize(facts({ local: dirty, session: 'asking', prs: { prs: [{ number: 9, title: 'T', ready: true }], stale: null } })).action;
-  assert.deepEqual(ask, { kind: 'answer', label: 'Answer the question in the pi session', pr: null });
+  assert.deepEqual(ask, { kind: 'answer', label: 'Answer the question in the session', pr: null });
 });
 
 test('action: stale branch gives branch, a declared needs-input gives waiting', () => {
@@ -266,7 +266,7 @@ test('summaryFor: counts and attention come from the rows (waiting session, fail
   assert.deepEqual(blocked.blocking, [{ unit: 'B', waitsFor: [], external: [] }]);
   assert.deepEqual(out.counts, { working: 0, waiting: 1, blocked: 1, idle: 0 });
   assert.deepEqual(out.attention, [
-    { id: waiting.id, name: 'good', why: 'The pi session is waiting for an answer; PR #3 has failing checks; Blocked: B' },
+    { id: waiting.id, name: 'good', why: 'The session is waiting for an answer; PR #3 has failing checks; Blocked: B' },
     { id: blocked.id, name: 'missing', why: 'Blocked: B' },
   ]);
 });

@@ -39,12 +39,12 @@ test('liveSession: a command of the page in flight, or a repo never seen dirty, 
 
 // ---------- A: the buttons ----------
 test('flowButtons: session `checking` disables /flow-commit with the reason', () => {
-  assert.deepEqual(V.flowButtons(local(), PR, null, { session: 'checking' }), [{ cmd: 'flow-commit', label: '/flow-commit', disabled: true, reason: 'checking the pi session…' }]);
+  assert.deepEqual(V.flowButtons(local(), PR, null, { session: 'checking' }), [{ cmd: 'flow-commit', label: '/flow-commit', disabled: true, reason: 'checking the session…' }]);
 });
 
 test('flowButtons: session `checking` disables /flow-commit --unstage too and keeps its label', () => {
   const [b] = V.flowButtons(local({ stagedCount: 2, stagedPaths: ['a', 'b'] }), PR, null, { session: 'checking' });
-  assert.deepEqual([b.cmd, b.label, b.disabled, b.reason], ['flow-commit-unstage', '/flow-commit --unstage', true, 'checking the pi session…']);
+  assert.deepEqual([b.cmd, b.label, b.disabled, b.reason], ['flow-commit-unstage', '/flow-commit --unstage', true, 'checking the session…']);
 });
 
 test('flowButtons: `override` lifts the checking hold like the other holds', () => {
@@ -52,7 +52,7 @@ test('flowButtons: `override` lifts the checking hold like the other holds', () 
 });
 
 test('flowButtons: previous behaviour holds (busy, asking, idle, undefined)', () => {
-  assert.equal(V.flowButtons(local(), PR, null, { session: 'busy' })[0].reason, 'the pi session is still working');
+  assert.equal(V.flowButtons(local(), PR, null, { session: 'busy' })[0].reason, 'the session is still working');
   assert.equal(V.flowButtons(local(), PR, null, { session: 'asking' })[0].reason, 'waiting for your answer in the session');
   assert.deepEqual(V.flowButtons(local(), PR, null, { session: 'idle' }), [{ cmd: 'flow-commit', label: '/flow-commit' }]);
   assert.deepEqual(V.flowButtons(local(), PR, null, {}), [{ cmd: 'flow-commit', label: '/flow-commit' }]);
@@ -69,7 +69,7 @@ test('sendingVerdict: a running pseudo-verdict with the SAME label as the real r
   for (const cmd of ['flow-commit', 'flow-commit-unstage', 'flow-pr', 'flow-base', 'flow-base-stash', 'fix-pr', 'put-in-conditions']) {
     const real = V.flowVerdict({ cmd, at: Date.now() }, local(), undefined, PR);
     const v = V.sendingVerdict(cmd);
-    assert.deepEqual(v, { state: 'running', cmd, label: real.label, reason: 'Sending the order to the pi session' }, cmd);
+    assert.deepEqual(v, { state: 'running', cmd, label: real.label, reason: 'Sending the order to the session' }, cmd);
   }
   assert.equal(V.sendingVerdict('flow-commit').label, 'committing…');
   assert.equal(V.sendingVerdict('flow-pr').label, 'creating pull request…');

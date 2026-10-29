@@ -88,10 +88,10 @@ test('A: a repo first seen dirty asks for its live state at once and the commit 
   page.get('loadLocal')(R.id);
   await flush();
   assert.ok(page.urls().includes(STATUS(R.id)), 'the live state is asked for without waiting for the 10 s tick');
-  assert.match(btn(rendered(page), R.id, 'flow-commit'), /title="checking the pi session…" disabled>/);
+  assert.match(btn(rendered(page), R.id, 'flow-commit'), /title="checking the session…" disabled>/);
   status.resolve({ state: 'busy' });
   await flush();
-  assert.match(btn(rendered(page), R.id, 'flow-commit'), /title="the pi session is still working" disabled>/);
+  assert.match(btn(rendered(page), R.id, 'flow-commit'), /title="the session is still working" disabled>/);
 });
 
 test('A: the first answer ends the checking: idle enables the button, and so does a failed request', async () => {
@@ -207,7 +207,7 @@ test('C: the click disables the repo at once, shows the progress line, and survi
   for (let i = 0; i < 4; i++) {
     const html = rendered(page);
     assert.match(btn(html, R.id, 'flow-commit'), /disabled>/, `redraw ${i}`);
-    assert.match(html, /class="verdict-line"[^>]*title="Sending the order to the pi session"/);
+    assert.match(html, /class="verdict-line"[^>]*title="Sending the order to the session"/);
     assert.match(html, /committing<span class="ell"/);
     await flush();
   }
@@ -246,7 +246,7 @@ test('C: on success the real verdict takes over and the sending flag is cleared'
 });
 
 test('C: a rejected send clears the flag, enables the button again and allows a new click', async () => {
-  const page = await loadPage({ '/api/local': () => ({ json: local() }), '/api/pi': () => ({ status: 409, json: { error: 'The pi session is busy' } }) });
+  const page = await loadPage({ '/api/local': () => ({ json: local() }), '/api/pi': () => ({ status: 409, json: { error: 'The session is busy' } }) });
   const S = setup(page);
   S.live[R.id] = 'idle';
   S.liveAnswered[R.id] = true;

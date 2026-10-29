@@ -91,7 +91,7 @@ test('the click marks the repo as sending before any await, and it survives redr
   for (let i = 0; i < 4; i++) {
     const html = rendered(page);
     assert.match(btn(html, R.id, 'flow-commit'), /disabled>/, `redraw ${i}: the flow buttons of the repo are disabled`);
-    assert.match(html, /class="verdict-line"[^>]*title="Sending the order to the pi session"/);
+    assert.match(html, /class="verdict-line"[^>]*title="Sending the order to the session"/);
     assert.match(html, /putting repo in conditions<span class="ell"/);
     await flush();
   }
@@ -143,7 +143,7 @@ test('on success the real verdict takes over and the sending flag is cleared', a
 });
 
 test('a rejected send clears the flag and allows a new click', async () => {
-  const page = await loadPage({ '/api/local': () => ({ json: local() }), '/api/pi': () => ({ status: 409, json: { error: 'The pi session is busy' } }) });
+  const page = await loadPage({ '/api/local': () => ({ json: local() }), '/api/pi': () => ({ status: 409, json: { error: 'The session is busy' } }) });
   const S = setup(page);
   await page.get('ACTIONS')[CMD](el(R.id));
   assert.equal(S.sending[R.id], undefined);

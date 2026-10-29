@@ -110,12 +110,12 @@ test('page: the running line is a polite status with a pulsing dot, an animated 
   S.prs[R.id] = { prs: [], stale: null, repo: { url: 'https://github.com/o/demo' } };
   const labels = { 'flow-commit': 'committing…', 'flow-pr': 'creating pull request…', 'flow-base': 'updating base branch…', 'fix-pr': 'fixing pull request…', 'put-in-conditions': 'putting repo in conditions…' };
   for (const [cmd, label] of Object.entries(labels)) {
-    const html = get('verdictRow')(R, { state: 'running', reason: 'The pi session is working', label, cmd });
+    const html = get('verdictRow')(R, { state: 'running', reason: 'The session is working', label, cmd });
     assert.match(html, /^<div class="verdict-line"[^>]* role="status"[^>]* aria-live="polite"/, html);
     assert.match(html, /<span class="pulse-dot" aria-hidden="true" style="animation-delay:-?\d+ms"><\/span>/);
     assert.match(html, /<span class="ell" style="animation-delay:-?\d+ms">…<\/span>/);
     assert.equal(textOf(html), label, 'no text is removed');
-    assert.ok(html.includes('title="The pi session is working"'));
+    assert.ok(html.includes('title="The session is working"'));
     assert.ok(DELAY.test(html));
   }
 });

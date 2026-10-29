@@ -290,7 +290,7 @@ test('no adopted session: up to 5 sessions with Adopt buttons, a Start button, a
 
 test('adopted but not found yet: the Starting state', () => {
   const html = body({ info: info({ adopted: { id: 's1', name: 'panel:alpha' }, adoptedFound: false }) });
-  assert.match(html, /The session is loading \(Gentle Shell: skills, MCP, extensions\)\. The history appears with its first message\./);
+  assert.match(html, /The session is loading\. The history appears with its first message\./);
   assert.doesNotMatch(html, /chat-adopt|chat-start/);
 });
 
@@ -539,7 +539,7 @@ test('Adopt posts to /api/sessions/adopt and reloads; Start posts to /api/sessio
   const noSession = { key: 'abc', adopted: null, adoptedFound: false, sessions: [sess()], live: { state: 'none', count: 0 } };
   let startOk = false;
   const page = loadPage({ answers: {
-    '/api/sessions/adopt': { ok: true }, '/api/sessions/start': () => Promise.resolve(startOk ? { ok: true, json: async () => ({ started: true }) } : { ok: false, status: 409, statusText: 'Conflict', json: async () => ({ error: 'This folder already has a pi session open; adopt it instead of starting another' }) }),
+    '/api/sessions/adopt': { ok: true }, '/api/sessions/start': () => Promise.resolve(startOk ? { ok: true, json: async () => ({ started: true }) } : { ok: false, status: 409, statusText: 'Conflict', json: async () => ({ error: 'This folder already has a session open; adopt it instead of starting another' }) }),
     '/api/sessions?': noSession,
   } });
   seed(page);
@@ -563,7 +563,7 @@ test('Adopt posts to /api/sessions/adopt and reloads; Start posts to /api/sessio
   await page.tick();
   assert.equal(page.fetches.find((f) => f.url === '/api/sessions/start').method, 'POST');
   assert.deepEqual(JSON.parse(page.fetches.find((f) => f.url === '/api/sessions/start').body), { id: 'abc' });
-  assert.ok(toasts.some((t) => /already has a pi session open/.test(t.textContent)), '409 message shown');
+  assert.ok(toasts.some((t) => /already has a session open/.test(t.textContent)), '409 message shown');
   assert.equal(page.run('S.chat.starting'), false);
   assert.ok(page.fetches.some((f) => f.url === '/api/sessions?id=abc'), 'reloads');
   assert.equal(page.fetches.some((f) => f.url === '/api/pi'), false);

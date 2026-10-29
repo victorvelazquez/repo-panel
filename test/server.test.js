@@ -471,7 +471,7 @@ const REPO = { path: 'C:\\dev\\repo' };
 const noWait = async () => {};
 const refuses = (p, status, re) => assert.rejects(p, (e) => e.status === status && re.test(e.message));
 
-test('piSend types the fixed command and Enter into the one idle pi session and confirms it started', async () => {
+test('piSend types the fixed command and Enter into the one idle session and confirms it started', async () => {
   const f = fakeOrca();
   assert.deepEqual(await piSend(REPO, 'flow-commit', f.orca, noWait), { sent: true, confirmed: true });
   assert.deepEqual(f.sends(), [['send', '--terminal', 'h1', '--text', '/flow-commit', '--enter']]);
@@ -484,7 +484,7 @@ test('piSend finds the session by its screen: a title of Terminal 1 works, a π 
     assert.equal(f.sends().length, 1);
   }
   const f = fakeOrca({ terminals: [piTerm({ title: 'π - x' })], screens: { h1: PLAIN_PS } });
-  await refuses(piSend(REPO, 'flow-commit', f.orca, noWait), 409, /No open pi session found for this repo in Orca/);
+  await refuses(piSend(REPO, 'flow-commit', f.orca, noWait), 409, /No open session found for this repo in Orca/);
   assert.equal(f.sends().length, 0);
 });
 
@@ -494,7 +494,7 @@ test('piSend uses the one pi screen among several terminals and ignores a termin
   assert.deepEqual(await piSend(REPO, 'flow-commit', f.orca, noWait), { sent: true, confirmed: true });
   assert.deepEqual(f.sends(), [['send', '--terminal', 'pi', '--text', '/flow-commit', '--enter']]);
   const none = fakeOrca({ terminals: [piTerm({ handle: 'broken' })], failShow: ['broken'] });
-  await refuses(piSend(REPO, 'flow-commit', none.orca, noWait), 409, /No open pi session/);
+  await refuses(piSend(REPO, 'flow-commit', none.orca, noWait), 409, /No open session/);
   assert.equal(none.sends().length, 0);
 });
 
@@ -519,10 +519,10 @@ test('piSend refuses an unknown command before touching Orca', async () => {
 
 test('piSend refuses, and sends nothing, with no session, several sessions, a busy prompt or typed text', async () => {
   const cases = [
-    [{ terminals: [] }, /No open pi session/],
-    [{ terminals: [piTerm({ worktreePath: 'C:/dev/elsewhere' })] }, /No open pi session/],
-    [{ terminals: [piTerm(), piTerm({ handle: 'h2' })] }, /Several pi sessions/],
-    [{ terminals: [piTerm(), piTerm({ handle: 'h2' })], screens: { h1: BUSY_PI, h2: IDLE_PI } }, /Several pi sessions/],
+    [{ terminals: [] }, /No open session/],
+    [{ terminals: [piTerm({ worktreePath: 'C:/dev/elsewhere' })] }, /No open session/],
+    [{ terminals: [piTerm(), piTerm({ handle: 'h2' })] }, /Several sessions/],
+    [{ terminals: [piTerm(), piTerm({ handle: 'h2' })], screens: { h1: BUSY_PI, h2: IDLE_PI } }, /Several sessions/],
     [{ previews: [BUSY_PI] }, /busy or has text/],
     [{ previews: [IDLE_PI.replace('type, or / for commands', 'half typed')] }, /busy or has text/],
   ];
@@ -851,7 +851,7 @@ test('put-in-conditions: refuses with 409, touching nothing, when everything pas
 });
 
 test('put-in-conditions: keeps the session safeguards (busy prompt, several sessions) and sends nothing', async () => {
-  for (const [opts, re] of [[{ previews: [BUSY_PI] }, /busy or has text/], [{ terminals: [piTerm(), piTerm({ handle: 'h2' })] }, /Several pi sessions/]]) {
+  for (const [opts, re] of [[{ previews: [BUSY_PI] }, /busy or has text/], [{ terminals: [piTerm(), piTerm({ handle: 'h2' })] }, /Several sessions/]]) {
     const f = fakeOrca(opts);
     await refuses(piSend(REPO, 'put-in-conditions', f.orca, noWait, reqsOf(res('a', 'fail'))), 409, re);
     assert.equal(f.sends().length, 0);

@@ -106,10 +106,10 @@
   }
 
   const PRESENCE_TEXT = {
-    closed: () => 'no pi session open in the room folder',
-    idle: () => 'pi session open, idle',
-    busy: () => 'pi session open, busy',
-    ambiguous: (p) => `${p.sessions} pi sessions open: close the extra ones`,
+    closed: () => 'no session open in the room folder',
+    idle: () => 'session open, idle',
+    busy: () => 'session open, busy',
+    ambiguous: (p) => `${p.sessions} sessions open: close the extra ones`,
     unknown: () => 'Orca unavailable: session state unknown',
   };
 
@@ -159,9 +159,9 @@
   // Why the commit buttons are disabled while the work is still going on, or null. `session` is the state of
   // GET /api/pi-status for a repo with changes: busy, asking and 'checking' (see liveSession) hold; idle, closed,
   // ambiguous, unknown and a failed request never do (fail open, a flaky Orca must not hold a repo hostage).
-  const SESSION_BUSY = 'the pi session is still working';
+  const SESSION_BUSY = 'the session is still working';
   const SESSION_ASKING = 'waiting for your answer in the session';
-  const SESSION_CHECKING = 'checking the pi session…';
+  const SESSION_CHECKING = 'checking the session…';
   // How long a dirty repo, seen by the page for the first time, keeps its commit buttons disabled while the first
   // answer of the live session state is still on its way.
   const LIVE_CHECK_MS = 20 * 1000;
@@ -281,7 +281,7 @@
     if (manual) out.manual = manual;
     const s = override ? null : usableState(stateData, now);
     if (s && (s.state === 'needs-input' || s.state === 'blocked')) out.waiting = { state: s.state, next: typeof s.next === 'string' ? s.next : '' };
-    if (verdict && verdict.asking === true) out.waiting = { state: 'needs-input', next: 'Answer the question in the pi session' };
+    if (verdict && verdict.asking === true) out.waiting = { state: 'needs-input', next: 'Answer the question in the session' };
     return out;
   }
 
@@ -423,21 +423,21 @@
     const running = (reason) => ({ state: 'running', reason });
     const attention = (reason) => ({ state: 'attention', reason });
     if (!hasLocal(local)) return running('Waiting for the repo state');
-    if (session === 'busy') return running('The pi session is working');
+    if (session === 'busy') return running('The session is working');
     const n = local.files.length;
     const changed = !!local.head && local.head !== sent.head;
     if (n === 0 && changed && local.ahead > 0) return { state: 'ok', reason: 'Committed: clean tree and commits ready to deliver' };
     const elapsed = now - sent.at;
     const filesLeft = `${n} file${n === 1 ? '' : 's'} still uncommitted after /flow-commit`;
     if (session === 'idle' || session === 'closed') {
-      if (elapsed < SETTLE_MS) return running('Waiting for the pi session to start');
+      if (elapsed < SETTLE_MS) return running('Waiting for the session to start');
       if (n > 0) return attention(filesLeft);
-      if (!changed) return attention(session === 'closed' ? 'The pi session closed before /flow-commit made a commit' : 'No new commit after /flow-commit (HEAD did not change)');
+      if (!changed) return attention(session === 'closed' ? 'The session closed before /flow-commit made a commit' : 'No new commit after /flow-commit (HEAD did not change)');
       return attention('HEAD changed but no commits are left to deliver');
     }
-    if (elapsed < UNKNOWN_MS) return running('Waiting for the pi session');
+    if (elapsed < UNKNOWN_MS) return running('Waiting for the session');
     if (n > 0) return attention(filesLeft);
-    return attention(changed ? 'HEAD changed but no commits are left to deliver' : 'No change 15 minutes after /flow-commit and the pi session state is unknown');
+    return attention(changed ? 'HEAD changed but no commits are left to deliver' : 'No change 15 minutes after /flow-commit and the session state is unknown');
   }
 
   // What the status line says while each command a button can send is running.
@@ -452,8 +452,8 @@
   const CMD_TEXT = { 'flow-commit': '/flow-commit', 'flow-commit-unstage': '/flow-commit --unstage', 'flow-pr': '/flow-pr', 'flow-base': '/flow-base', 'flow-base-stash': '/flow-base --stash' };
   // The pseudo-verdict of a command whose order is still being sent to the session: it behaves as a running one, with
   // the label the real running verdict shows for that command.
-  const sendingVerdict = (cmd) => ({ state: 'running', cmd, label: RUNNING_LABEL[cmd] || '', reason: 'Sending the order to the pi session' });
-  const SESSION_CLOSED = 'The pi session closed while the command was running';
+  const sendingVerdict = (cmd) => ({ state: 'running', cmd, label: RUNNING_LABEL[cmd] || '', reason: 'Sending the order to the session' });
+  const SESSION_CLOSED = 'The session closed while the command was running';
   const ASKING = 'waiting for your answer in the session';
 
   // The CSS animations of the progress lines (pulsing dot, ellipsis) all last this long. The page re-renders #app on
@@ -485,7 +485,7 @@
     const attention = (reason) => done({ state: 'attention', reason });
     const noCommit = sent.cmd === 'fix-pr' || sent.cmd === 'put-in-conditions' || sent.cmd === 'flow-next';
     if (!hasLocal(local)) return running('Waiting for the repo state');
-    if (session === 'busy') return running('The pi session is working');
+    if (session === 'busy') return running('The session is working');
     const text = CMD_TEXT[sent.cmd] || `/${sent.cmd}`;
     const branch = local.branch || '(detached)';
     const base = local.base || 'the base branch';
@@ -507,11 +507,11 @@
     const settling = elapsed < SETTLE_MS && !sent.busySeen;
     if (session === 'closed') return noCommit || settling ? attention(SESSION_CLOSED) : attention(notOk);
     if (session === 'idle') {
-      if (settling) return running('Waiting for the pi session to start');
+      if (settling) return running('Waiting for the session to start');
       return noCommit ? null : attention(notOk);
     }
-    if (elapsed < UNKNOWN_MS) return running('Waiting for the pi session');
-    return attention(`No change 15 minutes after ${text} and the pi session state is unknown`);
+    if (elapsed < UNKNOWN_MS) return running('Waiting for the session');
+    return attention(`No change 15 minutes after ${text} and the session state is unknown`);
   }
 
   return { API_VERSION, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, piPollTargets, LIVE_CHECK_MS, liveSession, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, presenceLabel, presenceDot };

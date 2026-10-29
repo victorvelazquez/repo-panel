@@ -248,7 +248,7 @@ test('startSession for a room uses sala-<slug> and sala:<name>, with the room fo
   assert.match(r.id, /^[A-Za-z0-9._-]{1,80}$/);
 });
 
-test('startSession refuses with 409 when a live pi session exists or Orca cannot be listed: nothing is created or stored', async () => {
+test('startSession refuses with 409 when a live session exists or Orca cannot be listed: nothing is created or stored', async () => {
   resetDisk();
   writeConfig(baseConfig());
   const live = fakeOrca({ terminals: [{ handle: 't1', worktreePath: repoDir, connected: true, writable: true }], previews: { t1: '▎ repo waiting for input' } });

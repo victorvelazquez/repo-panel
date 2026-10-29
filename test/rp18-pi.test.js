@@ -50,8 +50,8 @@ test('flow-commit-unstage: piSend types exactly /flow-commit --unstage into the 
 
 test('flow-commit-unstage: keeps the session safeguards and sends nothing when they refuse', async () => {
   for (const [opts, re] of [
-    [{ terminals: [] }, /No open pi session/],
-    [{ terminals: [piTerm(), piTerm({ handle: 'h2' })] }, /Several pi sessions/],
+    [{ terminals: [] }, /No open session/],
+    [{ terminals: [piTerm(), piTerm({ handle: 'h2' })] }, /Several sessions/],
     [{ previews: [BUSY_PI] }, /busy or has text typed/],
   ]) {
     const f = fakeOrca(opts);
@@ -101,8 +101,8 @@ test('guard: fix-pr and put-in-conditions are covered, and an unconfirmed send d
 test('guard: the busy, typed, missing-session and unknown-key refusals keep their messages and win over it', async () => {
   const guard = sendGuard(() => 9_000_000);
   await piSend(REPO, 'flow-pr', fakeOrca().orca, noWait, NEVER, { guard });
-  await refuses(piSend(REPO, 'flow-pr', fakeOrca({ previews: [BUSY_PI] }).orca, noWait, NEVER, { guard }), 409, /^The pi session is busy or has text typed in its prompt$/);
-  await refuses(piSend(REPO, 'flow-pr', fakeOrca({ terminals: [] }).orca, noWait, NEVER, { guard }), 409, /^No open pi session found for this repo in Orca$/);
+  await refuses(piSend(REPO, 'flow-pr', fakeOrca({ previews: [BUSY_PI] }).orca, noWait, NEVER, { guard }), 409, /^The session is busy or has text typed in its prompt$/);
+  await refuses(piSend(REPO, 'flow-pr', fakeOrca({ terminals: [] }).orca, noWait, NEVER, { guard }), 409, /^No open session found for this repo in Orca$/);
   await refuses(piSend(REPO, 'nope', fakeOrca().orca, noWait, NEVER, { guard }), 400, /^Unknown command$/);
 });
 

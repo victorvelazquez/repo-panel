@@ -63,14 +63,14 @@ test('A: the override lifts a stale working gating and the menu item offers it; 
 
 test('B: a busy session shows the commit button disabled with the reason; asking has its own reason', () => {
   const busy = flowButtons(dirty(), prs(), null, ctx({ session: 'busy' }));
-  assert.deepEqual(busy, [{ cmd: 'flow-commit', label: '/flow-commit', disabled: true, reason: 'the pi session is still working' }]);
+  assert.deepEqual(busy, [{ cmd: 'flow-commit', label: '/flow-commit', disabled: true, reason: 'the session is still working' }]);
   const asking = flowButtons(dirty(), prs(), null, ctx({ session: 'asking' }));
   assert.deepEqual(asking, [{ cmd: 'flow-commit', label: '/flow-commit', disabled: true, reason: 'waiting for your answer in the session' }]);
 });
 
 test('B: the --unstage variant is disabled the same way, keeping its label', () => {
   const out = flowButtons(dirty({ stagedCount: 2 }), prs(), null, ctx({ session: 'busy' }));
-  assert.deepEqual(out, [{ cmd: 'flow-commit-unstage', label: '/flow-commit --unstage', disabled: true, reason: 'the pi session is still working' }]);
+  assert.deepEqual(out, [{ cmd: 'flow-commit-unstage', label: '/flow-commit --unstage', disabled: true, reason: 'the session is still working' }]);
 });
 
 test('B: idle, closed, ambiguous, unknown, undefined and null never block (fail open)', () => {
@@ -151,7 +151,7 @@ test('B2: the quiet period disables the --unstage variant too, the override lift
   const l = dirty({ stagedCount: 1, lastChangeMs: NOW - 1000 });
   assert.deepEqual(flowButtons(l, prs(), null, ctx()), [{ cmd: 'flow-commit-unstage', label: '/flow-commit --unstage', disabled: true, reason: 'files changed a few seconds ago' }]);
   assert.deepEqual(flowButtons(l, prs(), null, ctx({ override: true })), [{ cmd: 'flow-commit-unstage', label: '/flow-commit --unstage', reason: view.flowButtons(dirty({ stagedCount: 1 }), prs(), null, ctx())[0].reason }]);
-  assert.equal(flowButtons(l, prs(), null, ctx({ session: 'busy' }))[0].reason, 'the pi session is still working');
+  assert.equal(flowButtons(l, prs(), null, ctx({ session: 'busy' }))[0].reason, 'the session is still working');
 });
 
 test('B2: the quiet period alone does not put the "Show /flow-commit anyway" item in the menu', () => {

@@ -35,7 +35,7 @@ function sanitizeText(text) {
   const clean = text.replace(/\r\n?/g, '\n').replace(CONTROLS, '').trim();
   if (!clean) throw new HttpError(400, 'Write something to send');
   if (clean.length > TEXT_MAX) throw new HttpError(400, `The message is longer than ${TEXT_MAX} characters`);
-  if (clean.startsWith('!')) throw new HttpError(400, 'Messages that start with ! run a shell command in pi; type those in the terminal');
+  if (clean.startsWith('!')) throw new HttpError(400, 'Messages that start with ! run a shell command; type those in the terminal');
   return clean;
 }
 
@@ -58,8 +58,8 @@ async function liveSession(repo, orca) {
     throw e instanceof HttpError ? e : new HttpError(503, 'Orca CLI is unavailable or Orca is not running');
   }
   const { sessions, failed } = found;
-  if (!sessions.length) throw new HttpError(409, 'No open pi session found for this repo in Orca');
-  if (sessions.length > 1) throw new HttpError(409, 'Several pi sessions are open for this repo; close the extra ones');
+  if (!sessions.length) throw new HttpError(409, 'No open session found for this repo in Orca');
+  if (sessions.length > 1) throw new HttpError(409, 'Several sessions are open for this repo; close the extra ones');
   if (failed) throw new HttpError(409, 'Orca could not read every terminal of this repo; try again');
   return sessions[0];
 }
@@ -72,7 +72,7 @@ function checkIdentity(session, adopted) {
   const mine = ` • ${String(adopted.name).trim()}`;
   const lines = String(session.preview || '').split(/\r?\n/).map((l) => l.trim());
   const footer = lines.slice(lines.map((l) => l.startsWith('▎')).lastIndexOf(true) + 1);
-  if (!footer.some((l) => l.endsWith(mine))) throw new HttpError(409, 'The open pi session is not the adopted one');
+  if (!footer.some((l) => l.endsWith(mine))) throw new HttpError(409, 'The open session is not the adopted one');
 }
 
 const promptState = async (orca, handle) => lib.piPromptState(((await orca(['show', '--terminal', handle])).terminal || {}).preview);
@@ -89,9 +89,9 @@ async function sendChat(id, body, { orca = orcaTerminal, wait = sleep, sessionsD
   inFlight.add(repo.path);
   try {
     const session = await liveSession(repo, orca);
-    if (session.state === 'asking') throw new HttpError(409, 'The pi session is waiting for your answer to a question');
-    if (session.state === 'typed') throw new HttpError(409, 'The pi session already has text typed in its prompt');
-    if (session.state !== 'idle') throw new HttpError(409, 'The pi session is working; wait until it is free');
+    if (session.state === 'asking') throw new HttpError(409, 'The session is waiting for your answer to a question');
+    if (session.state === 'typed') throw new HttpError(409, 'The session already has text typed in its prompt');
+    if (session.state !== 'idle') throw new HttpError(409, 'The session is working; wait until it is free');
     checkIdentity(session, adopted);
     const last = recent.get(`${repo.path}|${text}`);
     if (last !== undefined && now() - last < DUPLICATE_MS) throw new HttpError(409, 'That message was just sent to this repo; wait a moment');
