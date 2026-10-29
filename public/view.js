@@ -356,7 +356,7 @@
     return `${why} Press the /flow-base button to start from a fresh, updated base branch.`;
   }
 
-  // Whether a PR card offers "Fix with pi": only when its checks failed (even with no GitHub Actions run to re-run).
+  // Whether a PR card offers "Fix CI": only when its checks failed (even with no GitHub Actions run to re-run).
   function fixPrAction(pr) {
     if (pr && pr.checks && pr.checks.state === 'failed') return { show: true, reason: null };
     return { show: false, reason: 'The checks have not failed' };

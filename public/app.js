@@ -977,7 +977,7 @@ function prCard(r, pr, meta, running = null) {
       <button data-act="snooze" ${n} title="Park this PR at the bottom of the column until it is ready to merge (stays parked if it is already ready)">💤</button>
     </div>
     ${pr.checks.failedRuns.length ? `<button data-act="rerun" ${n} ${busy || hold ? 'disabled' : ''}${hold ? ` title="${esc(hold)}"` : ''}>Re-run failed</button>` : ''}
-    ${V && V.fixPrAction(pr).show ? piBtn(r, 'fix-pr', 'Fix with pi', { pr: pr.number, title: hold || FIX_PR_HINT, disabled: !!hold }) : ''}
+    ${V && V.fixPrAction(pr).show ? piBtn(r, 'fix-pr', 'Fix CI', { pr: pr.number, title: hold || FIX_PR_HINT, disabled: !!hold }) : ''}
   </div>`;
 }
 

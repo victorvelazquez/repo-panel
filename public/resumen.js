@@ -93,7 +93,7 @@
     const id = esc(r.id);
     const a = r.error ? null : r.action;
     // The visible label is short; the full text stays in title and aria-label.
-    const open = (title, cls = '') => `<button${cls ? ` class="${cls}"` : ''} data-act="focus-repo" data-id="${id}" title="${esc(title)}" aria-label="${esc(title)}">Open</button>`;
+    const open = (title, cls = '', kind = '') => `<button${cls ? ` class="${cls}"` : ''} data-act="focus-repo" data-id="${id}"${kind ? ` data-kind="${kind}"` : ''} title="${esc(title)}" aria-label="${esc(title)}">Open</button>`;
     const sending = ctx.sending && ctx.sending[r.id] ? ' disabled' : '';
     if (r.error) return open('Open');
     if (!a) return '';
@@ -106,7 +106,8 @@
         ? `<button class="primary" data-act="pi" data-id="${id}" data-cmd="${esc(f.cmd)}" title="${esc(f.reason || `Send /${f.cmd} to the open pi session of this repo`)}"${f.disabled || sending ? ' disabled' : ''}>${esc(f.label)}</button>`
         : '<button class="primary" disabled title="This repo\'s local state is not loaded yet">Deliver</button>';
     }
-    return open(`Open · ${a.label ?? ''}`, 'primary');
+    // answer and waiting get data-kind so the stylesheet can colour them amber; manual stays neutral.
+    return open(`Open · ${a.label ?? ''}`, 'primary', a.kind === 'answer' || a.kind === 'waiting' ? a.kind : '');
   }
 
   // Two lines: name, branch, change chips, time, session; then bar, next unit, the action.

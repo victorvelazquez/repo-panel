@@ -11,9 +11,7 @@ button, select, input { font: inherit; color: var(--text); background: var(--pan
 button { cursor: pointer; }
 button:hover:not(:disabled) { border-color: var(--blue); }
 button:disabled { opacity: .45; cursor: not-allowed; }
-button.primary { background: #1f6feb; border-color: #1f6feb; color: #fff; }
-button.merge { background: #238636; border-color: #238636; color: #fff; font-weight: 600; }
-button.merge:disabled { background: var(--panel2); border-color: var(--line); color: var(--muted); }
+dialog button.primary { background: #1f6feb; border-color: #1f6feb; color: #fff; }
 
 header { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
 header h1 { font-size: 16px; margin: 0 8px 0 0; }
@@ -90,7 +88,7 @@ dialog .row.end { justify-content: flex-end; }
 /* ---------- kanban board ---------- */
 main { max-width: none; padding: 8px; }
 .board { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(200px, 1fr); gap: 8px; align-items: start; overflow-x: auto; padding-bottom: 12px; }
-.col { background: var(--panel); border: 1px solid var(--line); border-top: 3px solid var(--gray); border-radius: 8px; min-width: 0; }
+.col { background: var(--panel); border: 1px solid #222a33; border-top: 2px solid var(--gray); border-radius: 8px; min-width: 0; }
 .col-attention { border-top-color: var(--red); }
 .col-clean { border-top-color: var(--gray); }
 .col-changes { border-top-color: var(--yellow); }
@@ -111,7 +109,7 @@ main { max-width: none; padding: 8px; }
 .col-body { display: flex; flex-direction: column; gap: 10px; padding: 0 8px 8px; }
 .col-empty { text-align: center; color: var(--muted); padding: 14px 0; }
 
-.card { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.card { background: var(--panel2); border: 1px solid #222a33; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
 .card-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .tag { font-size: 11px; padding: 0 7px; border-radius: 8px; flex: none; }
 .pr-title { font-weight: 500; overflow-wrap: anywhere; }
@@ -266,7 +264,7 @@ details.pop > summary:focus-visible { outline: 2px solid var(--blue); outline-of
 .pop-body .opt { justify-content: space-between; }
 .rs-list { display: flex; flex-direction: column; gap: 8px; }
 .rs-group { align-self: stretch; text-align: left; background: transparent; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; padding: 4px 2px; margin-top: 4px; }
-.rs-card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; display: grid; gap: 6px; }
+.rs-card { background: var(--panel); border: 1px solid #222a33; border-radius: 8px; padding: 8px 12px; display: grid; gap: 6px; }
 .rs-card.ask { border-left: 3px solid var(--yellow); }
 .rs-card.block { border-left: 3px solid var(--red); }
 .rs-room { border-color: var(--purple); }
@@ -291,3 +289,31 @@ details.pop > summary:focus-visible { outline: 2px solid var(--blue); outline-of
   .rs-l2 { grid-template-columns: minmax(0, 1fr) auto; }
   .rs-l2 .rs-prog { grid-column: 1 / -1; order: 2; }
 }
+
+/* ---------- RP67: soft action palette (calm look) ----------
+   One hue per EFFECT of the action, through --h; the look is identical for all of them (13% tint at rest, 24% on hover):
+   blue = start (/flow-next, + Repo), amber = hand over your work or answer (/flow-commit, Summary Open on answer/waiting),
+   green = publish (/flow-pr, Merge), violet = new cycle (/flow-base), orange = fix (Fix CI). Urgent ones (answer, waiting,
+   Fix CI) are one step stronger. Gray stays for secondary buttons. Urgency is shown by the card, never by a solid button;
+   a disabled button loses its hue. */
+button:is([data-cmd="flow-next"], header .primary, .empty .primary) { --h: var(--blue); }
+button:is([data-cmd="flow-commit"], [data-cmd="flow-commit-unstage"], [data-kind="answer"], [data-kind="waiting"]) { --h: var(--yellow); }
+button:is([data-cmd="flow-pr"], .merge) { --h: var(--green); }
+button:is([data-cmd="flow-base"], [data-cmd="flow-base-stash"]) { --h: var(--purple); }
+button[data-cmd="fix-pr"] { --h: var(--orange); }
+button:is([data-cmd="flow-next"], [data-cmd="flow-commit"], [data-cmd="flow-commit-unstage"], [data-cmd="flow-pr"], [data-cmd="flow-base"], [data-cmd="flow-base-stash"], [data-cmd="fix-pr"], [data-kind="answer"], [data-kind="waiting"], header .primary, .empty .primary, .merge) {
+  background: color-mix(in srgb, var(--h) 13%, var(--panel)); border-color: color-mix(in srgb, var(--h) 42%, var(--panel)); color: color-mix(in srgb, var(--h) 68%, #fff); font-weight: 500; padding: 2px 11px;
+}
+button:is([data-cmd="flow-next"], [data-cmd="flow-commit"], [data-cmd="flow-commit-unstage"], [data-cmd="flow-pr"], [data-cmd="flow-base"], [data-cmd="flow-base-stash"], [data-cmd="fix-pr"], [data-kind="answer"], [data-kind="waiting"], header .primary, .empty .primary, .merge):hover:not(:disabled) {
+  background: color-mix(in srgb, var(--h) 24%, var(--panel)); border-color: color-mix(in srgb, var(--h) 68%, var(--panel));
+}
+button:is([data-kind="answer"], [data-kind="waiting"], [data-cmd="fix-pr"]) { background: color-mix(in srgb, var(--h) 20%, var(--panel)); border-color: color-mix(in srgb, var(--h) 62%, var(--panel)); color: color-mix(in srgb, var(--h) 62%, #fff); font-weight: 600; }
+button:is([data-kind="answer"], [data-kind="waiting"], [data-cmd="fix-pr"]):hover:not(:disabled) { background: color-mix(in srgb, var(--h) 30%, var(--panel)); border-color: var(--h); }
+.card button:is([data-cmd], .merge) { justify-self: start; align-self: flex-start; }
+.merge-row .merge { flex: 0 1 auto; padding: 2px 11px; }
+button:is([data-cmd], [data-kind], header .primary, .empty .primary, .merge):disabled { --h: var(--gray); background: var(--panel2); border-color: var(--line); color: var(--muted); font-weight: 400; opacity: .45; cursor: not-allowed; }
+
+/* RP67: calm chrome. Chips are plain text; only the clickable diff chip keeps a faint border. */
+.chip:not(.chip-btn), .chip.green:not(.chip-btn), .chip.red:not(.chip-btn), .chip.yellow:not(.chip-btn), .chip.blue:not(.chip-btn), .chip.purple:not(.chip-btn) { border-color: transparent; background: transparent; padding: 0 2px; }
+.chip.chip-btn { border-color: var(--line); background: transparent; }
+.chip.chip-btn:hover { border-color: var(--muted); }

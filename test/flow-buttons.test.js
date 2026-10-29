@@ -79,7 +79,7 @@ test('flowButtons: /flow-base is hidden when a manual action is needed or the co
   assert.deepEqual(flowButtons(undefined, prs({ stale }), null, ctx()), []);
 });
 
-test('fixPrAction: "Fix with pi" shows only for a PR whose checks failed', () => {
+test('fixPrAction: "Fix CI" shows only for a PR whose checks failed', () => {
   const withChecks = (state) => ({ number: 7, checks: { state, failedRuns: [] } });
   assert.equal(fixPrAction(withChecks('failed')).show, true);
   for (const state of ['pending', 'success', 'none']) {

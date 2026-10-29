@@ -36,7 +36,7 @@ test('the whole flow: column and flow buttons at every step', () => {
     for (const pr of s.pr ? s.p.prs : []) {
       assert.equal(prColumn(pr), s.pr.column, `${s.name}: PR column`);
       assert.equal(isProblem(pr), s.pr.problem, `${s.name}: PR problem`);
-      assert.equal(fixPrAction(pr).show, s.pr.fix, `${s.name}: Fix with pi`);
+      assert.equal(fixPrAction(pr).show, s.pr.fix, `${s.name}: Fix CI`);
     }
   }
   assert.equal(failed.checks.failedRuns.length > 0, true); // step 4 also offers Re-run failed
