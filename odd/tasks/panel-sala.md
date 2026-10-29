@@ -138,7 +138,7 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 | RP64 | S62 | pendiente | — |
 | RP65 | S62 | pendiente; verificación independiente | — |
 | RP66 | S62 | pendiente | — |
-| RP67 | S59 | pendiente; la persona la aprueba mirándola | — |
+| RP67 | S59 | worker `gentle-ai-worker` con encargo cerrado; RED 9 de 10 pruebas nuevas, GREEN 10 de 10; el padre leyó el diff, limpió el relleno sólido muerto de `button.merge` (RED y GREEN propios, y actualizó tres pruebas que lo fijaban), corrió la suite completa (1038 de 1039, 1 salteada) y la miró con Edge sobre los 15 repos: ninguna acción con relleno sólido y el botón deshabilitado queda gris neutro | pendiente de commit |
 
 Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a → RP11b → RP12a → RP12b → RP12 → RP13 → RP14. RP12 puede ir antes de RP11 si la persona lo prefiere.
 
