@@ -77,14 +77,14 @@ test('page: the status line names each running command and the buttons of a dirt
   }
 });
 
-test('page: the Merge, Re-run failed and Fix with pi buttons of a PR card are disabled while a command of the repo runs', () => {
+test('page: the Merge, Re-run failed and Fix CI buttons of a PR card are disabled while a command of the repo runs', () => {
   const page = loadPage();
   const prCard = page.get('prCard');
   const running = { state: 'running', reason: 'x', label: 'creating pull request…', cmd: 'flow-pr' };
   const html = prCard(R, prOf(), {}, running);
   assert.match(html, /<button class="merge" data-act="merge" [^>]*disabled\s*title="Running \/flow-pr \(creating pull request…\): wait for it to finish">|<button class="merge" data-act="merge"[^>]*disabled[^>]*title="Running \/flow-pr/);
   assert.match(html, /data-act="rerun"[^>]*disabled[^>]*title="Running \/flow-pr/);
-  assert.match(html, /data-cmd="fix-pr" data-pr="7" title="Running \/flow-pr \(creating pull request…\): wait for it to finish" disabled>Fix with pi<\/button>/);
+  assert.match(html, /data-cmd="fix-pr" data-pr="7" title="Running \/flow-pr \(creating pull request…\): wait for it to finish" disabled>Fix CI<\/button>/);
 });
 
 test('page: nothing running keeps the PR card and the enabled buttons exactly as before', () => {
@@ -92,7 +92,7 @@ test('page: nothing running keeps the PR card and the enabled buttons exactly as
   const html = page.get('prCard')(R, prOf(), {});
   assert.match(html, /<button class="merge" data-act="merge" data-id="abc" data-n="7"\s+title="Merge into main">Merge · /);
   assert.match(html, /<button data-act="rerun" data-id="abc" data-n="7"\s*>Re-run failed<\/button>/);
-  assert.ok(html.includes('<button data-act="pi" data-id="abc" data-cmd="fix-pr" data-pr="7" title="Ask the open pi session to find out why the checks failed and fix it (it will not commit or push)">Fix with pi</button>'));
+  assert.ok(html.includes('<button data-act="pi" data-id="abc" data-cmd="fix-pr" data-pr="7" title="Ask the open pi session to find out why the checks failed and fix it (it will not commit or push)">Fix CI</button>'));
   const page2 = loadPage();
   setup(page2, local({ files: [file] }));
   assert.ok(cardOf(page2).includes(btn('flow-commit', '/flow-commit', 'Send /flow-commit to the open pi session of this repo')));

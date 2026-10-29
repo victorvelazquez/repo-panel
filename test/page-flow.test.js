@@ -95,17 +95,17 @@ test('page: the "Show /flow-commit anyway" menu item is offered on a dirty card,
   assert.equal(open(local({ files: [file] }), { stale: { via: 'merged', pr: 7, reason: 'Merged: run /flow-base' } }).includes('show-commit'), false);
 });
 
-test('page: a failed PR shows "Fix with pi" (also with no run to re-run) and "Re-run failed" only when there are runs', () => {
+test('page: a failed PR shows "Fix CI" (also with no run to re-run) and "Re-run failed" only when there are runs', () => {
   const page = loadPage();
   const prCard = page.get('prCard');
-  const fix = '<button data-act="pi" data-id="abc" data-cmd="fix-pr" data-pr="7" title="Ask the open pi session to find out why the checks failed and fix it (it will not commit or push)">Fix with pi</button>';
+  const fix = '<button data-act="pi" data-id="abc" data-cmd="fix-pr" data-pr="7" title="Ask the open pi session to find out why the checks failed and fix it (it will not commit or push)">Fix CI</button>';
   const noRuns = prCard(R, prOf({ state: 'failed' }), {});
   assert.ok(noRuns.includes(fix), noRuns);
   assert.equal(noRuns.includes('Re-run failed'), false);
   const runs = prCard(R, prOf({ state: 'failed', failedRuns: ['123'] }), {});
   assert.ok(runs.includes(fix));
   assert.match(runs, /<button data-act="rerun" data-id="abc" data-n="7"\s*>Re-run failed<\/button>/);
-  for (const state of ['pending', 'success']) assert.equal(prCard(R, prOf({ state, failed: 0, failedRuns: [] }), {}).includes('Fix with pi'), false, state);
+  for (const state of ['pending', 'success']) assert.equal(prCard(R, prOf({ state, failed: 0, failedRuns: [] }), {}).includes('Fix CI'), false, state);
 });
 
 test('page: the pi buttons post the command, and only the fix-pr one carries its pr number', async () => {

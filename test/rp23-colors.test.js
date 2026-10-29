@@ -140,7 +140,9 @@ test('css: top border of the five columns follows GitHub', () => {
   assert.match(rule('.col-changes'), /border-top-color:\s*var\(--yellow\)/);
   assert.match(rule('.col-committed'), /border-top-color:\s*var\(--blue\)/);
   assert.match(rule('.col-prs'), /border-top-color:\s*#238636/); // RP28: Open PRs and Ready to merge became one column
-  assert.match(rule('button.merge'), /background:\s*#238636/);
+  // RP67: Merge is green through the soft palette (--h = green), not through a solid fill.
+  assert.match(read('style.css'), /button:is\(\[data-cmd="flow-pr"\], \.merge\) \{ --h: var\(--green\); \}/);
+  assert.doesNotMatch(read('style.css'), /button\.merge \{ background:\s*#238636/);
 });
 
 // RP23 left the Merged column out on purpose; RP25 adds it, purple, so this pin now says the opposite.
