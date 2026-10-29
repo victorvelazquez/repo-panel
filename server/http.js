@@ -19,6 +19,7 @@ const { requirementsFor, prerequisites } = require('./requirements.js');
 const { roomsState, createRoom, removeRoom, assignRoom } = require('./rooms.js');
 const { queueFor, conformityFor } = require('./queue.js');
 const { summaryFor } = require('./summary.js');
+const { sendChat, clearChat } = require('./chatsend.js');
 const { sessionsState, chatState, adoptSession, releaseSession, startSession } = require('./sessions.js');
 
 const ROOT = path.join(__dirname, '..');
@@ -66,6 +67,8 @@ const routes = {
   'POST /api/sessions/adopt': (q, b, d) => adoptSession(b.id, b.session, d.orca, d.sessionsDir),
   'POST /api/sessions/release': (q, b, d) => releaseSession(b.id, d.orca, d.sessionsDir),
   'POST /api/sessions/start': (q, b, d) => startSession(b.id, d.orca),
+  'POST /api/chat/send': (q, b, d) => sendChat(b && b.id, b, { orca: d.orca, wait: d.wait, sessionsDir: d.sessionsDir, now: d.now }),
+  'POST /api/chat/clear': (q, b, d) => clearChat(b && b.id, { orca: d.orca, wait: d.wait }),
   'POST /api/queue': (q, b) => queueFor(b),
   'POST /api/conformity': (q, b) => conformityFor(b),
   'POST /api/repos': (q, b) => addRepo(b.path, b.group),
