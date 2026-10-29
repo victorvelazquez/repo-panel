@@ -70,6 +70,8 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 - **S60. Tareas por tarjeta.** «un visualizador de tareas que muestre como una lista de las tareas completadas y pendientes de cada tarjeta.» Pestaña «Tareas» en el panel derecho con las filas del ROADMAP. Unidad RP63.
 - **S61. Uso de Claude por 5 horas y semanal.** «un visualizador de uso de tokens de cluade por 5 horas y semanal.»; «1. autorizo.» (editar `claude-usage.ts`, fuera del repo). El panel muestra los porcentajes y el reinicio de cada ventana que ya calcula la extensión. Unidad RP62.
 - **S62. Explorador de archivos y visor único.** «un explorador y lectura de archivos del repo resaltando los editados que están en diff y al seleccionar un archivo que muestre las líneas de códigos, tanto editado o no.»; «usar esa misma visualizador de leer códigos de archivos para visualizar también diffs.»; «poder verlos igual. es mi front visualiador. es seguro.» (los archivos con pinta de secreto se ven); «lo que pueda ser complicado podemos dejar para después.» Unidades RP64 (visor), RP65 (explorador) y RP66 (resaltado, después).
+- **S63. Textos sin «pi» ni «Gentle Shell».** «no estemos apuntando a la sesion de pi, lo que usamos es gentle shell.»; «podemos no mensionar pi o gentle shell.»; «los nombres de adentro del codigo puede seguir siendo pi, ya que gentle shell es una capa encima de pi nomas.»; «podes hacer en su propia pr.» Unidad RP69.
+- **S64. Chat con formato.** «los mensajes en el chat no se ven con formato, no se distingue titulos, lista, parrafos, enters y demas.» Unidad RP70.
 
 ## Tasks
 
@@ -140,6 +142,8 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 | RP66 | S62 | pendiente | — |
 | RP67 | S59 | worker `gentle-ai-worker` con encargo cerrado; RED 9 de 10 pruebas nuevas, GREEN 10 de 10; el padre leyó el diff, limpió el relleno sólido muerto de `button.merge` (RED y GREEN propios, y actualizó tres pruebas que lo fijaban), corrió la suite completa (1038 de 1039, 1 salteada) y la miró con Edge sobre los 15 repos: ninguna acción con relleno sólido y el botón deshabilitado queda gris neutro | pendiente de commit |
 | RP68 | S49, S54 | pruebas escritas primero (31, RED verificado por el padre); implementación por `gentle-ai-worker` con encargo cerrado en dos fases; el padre leyó el diff completo (166 líneas de producción) y miró 6 capturas con una sesión sintética; suite completa 1126 de 1127 | pendiente de commit |
+| RP69 | S63 | pendiente | — |
+| RP70 | S64 | pendiente; prueba del abuso (HTML y enlaces) y aprobación mirando | — |
 
 Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a → RP11b → RP12a → RP12b → RP12 → RP13 → RP14. RP12 puede ir antes de RP11 si la persona lo prefiere.
 
@@ -848,3 +852,15 @@ Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a →
 > 3. me sirve el orden.
 
 *Aplicado: S58 a S62 y las unidades RP61 a RP66. Orden acordado: RP59 → RP61 → RP54 → RP62 → RP63 → RP64 → RP65 → RP60 → RP66. Se autoriza editar `claude-usage.ts` (fuera del repo, con copia de respaldo). Los archivos con pinta de secreto se ven; el visor lee solo dentro del repo y no la carpeta `.git/`. «me parece bien» se tomó como aprobación de las dos observaciones de RP59 y de que el alcance de sala filtre también Work (maqueta 06). La persona pegó dos capturas del tablero y de las filas del Resumen, que no se copian acá.*
+
+
+**L75.**
+
+> esta sesion de repo-panel mismo podemos probar, te comento otro detalle, que no estemos apuntando a la sesion de pi, lo que usamos es gentle shell.
+>
+> - podemos no mensionar pi o gentle shell.
+> - (sobre la propuesta de renombrar:) los nombres de adentro del codigo puede seguir siendo pi, ya que gentle shell es una capa encima de pi nomas.
+> - podes hacer en su propia pr.
+> - otro detalle, los mensajes en el chat no se ven con formato, no se distingue titulos, lista, parrafos, enters y demas. no se si llegaste a notar esos defectos en el screen.
+
+*Aplicado: S63 y S64 y las unidades RP69 y RP70. Causa de RP70 vista en el código: `clean()` de `server/sessions.js` vuelve espacios los saltos de línea del historial. Orden propuesto: RP70 → RP69 → RP56.*
