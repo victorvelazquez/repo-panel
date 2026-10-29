@@ -117,11 +117,11 @@ async function scanSessions(folder, orca, listed, withPreview = false, askAware 
       const preview = ((await orca(['show', '--terminal', handle])).terminal || {}).preview;
       const ask = lib.piScreenAsk(preview);
       observe(folder, handle, ask ? 'asking' : lib.piScreenState(preview), preview);
-      if (ask) return askAware ? { handle, state: 'asking', ask: ask.text, preview } : { handle, state: 'busy', preview };
+      if (ask) return askAware ? { handle, state: 'asking', ask: ask.text, dialog: lib.piScreenDialog(preview), preview } : { handle, state: 'busy', preview };
       return { handle, state: lib.piScreenState(preview), preview };
     } catch { return { handle, state: null, failed: true }; }
   }));
-  const sessions = seen.filter((t) => t.state).map(({ handle, state, ask, preview }) => ({ handle, state, ...(ask ? { ask } : {}), ...(withPreview ? { preview } : {}) }));
+  const sessions = seen.filter((t) => t.state).map(({ handle, state, ask, dialog, preview }) => ({ handle, state, ...(ask ? { ask, dialog } : {}), ...(withPreview ? { preview } : {}) }));
   return { sessions, failed: seen.filter((t) => t.failed).length };
 }
 

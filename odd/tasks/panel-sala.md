@@ -74,6 +74,7 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 - **S64. Chat con formato.** «los mensajes en el chat no se ven con formato, no se distingue titulos, lista, parrafos, enters y demas.» Unidad RP70.
 - **S65. La pestaña Work no se ve debajo de Summary.** «cuando selecciono la pestaña work me carga el contenido debajo de la ventana de summary, o no llegamos todavia a esa ventana para corregir». Unidad RP71.
 - **S66. Estado de la sesión dentro de la caja.** «el chat cuando esta deshabilitado porque la sesion esta trabajando, deberia mostrar su estado encima del input del chat el estado»; «los estados podrian ser dentro del input mismo bien arriba a la izquierda, asi no ocupa un espacio del chat?»; «que tenga los colores de indicacion como ya estamos haciendo para cada estado, tambien que se anime cuando esta trabajando.»; «el estado que muestra arriba del chat que esta al lado del nombre del repo podemos eliminar? tambien el id de la sesion que aparece al lado del nombre de repo podriamos eliminar si no tiene tanta importancia para el usuario.» Unidad RP72.
+- **S67. Diálogos de la sesión: se cubre lo que se reconoce.** «ya leiste todo de la grabadora para saber de todos los casos? cubriremos todos los casos podibles?»; «recomendado». Se leyeron los 48 registros: 5 tipos de diálogo (A «Allow guarded…» Yes/No, B lista con descripción, C lista con «Type something.», D «Allow once / for this session / Deny», E revisión nativa) y 12 avisos que no son preguntas. No se pueden cubrir todos los casos posibles: mundo cerrado. Primero mostrar (RP56) y después contestar tipo por tipo (RP73); un clic para «No» y cancelar y un clic con el texto completo a la vista para «Yes»; en la primera versión solo listas de opciones. Unidades RP56 y RP73.
 
 ## Tasks
 
@@ -131,8 +132,9 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 | RP53 | S47 | worker `gentle-ai-worker` con encargo cerrado; RED (módulo inexistente), GREEN 16 de 16; el padre revisó el diff y corrió la suite completa (905 de 906, 1 salteada) | pendiente de commit |
 | RP54 | S48, S53, S56 | worker `gentle-ai-worker` con encargo cerrado; RED 28 de 29 pruebas nuevas, GREEN 29 de 29; el padre leyó el diff, encontró y corrigió con RED y GREEN propios una regex sin barra invertida en `isoOf`, corrió la suite completa y la miró con Edge usando una sesión sintética (la copia de la config y una carpeta temporal: no se leyó ninguna conversación real): burbujas, herramientas plegadas por nombre, `<img onerror>` mostrado como texto, divisor, estados sin sesión, 900 y 600 px, y ningún POST que no sea del tablero | pendiente de commit |
 | RP55 | S49 | worker `gentle-ai-worker` con encargo cerrado (escribió el módulo antes que las pruebas: RED flojo); verificación independiente de `gentle-ai-verify` por mutación de 28 guardas (24 muertas, 4 huecos de prueba y 1 equivalente) y 65 536 caracteres barridos sin fugas de control; el padre sondeó el Orca real con una terminal inexistente y encontró que un texto que empieza con `--` se leía como opción (ahora `--text=<valor>`), y atendió con RED y GREEN la identidad por pie de pantalla, la exclusión compartida con los botones, la normalización Unicode y la memoria acotada; suite completa | pendiente de commit |
-| RP56 | S50 | pendiente; verificación independiente | — |
+| RP56 | S50, S67 | pruebas escritas primero (20: 16 en RED verificadas por el padre y 4 que protegen lo existente); implementación por `gentle-ai-worker` en dos fases (~40 líneas); el padre leyó el diff completo, corrigió una prueba demasiado ancha (afirmaba que no había ningún POST, pero el tablero hace POST a sus propias consultas: ahora vigila solo las rutas que envían a una sesión); capturas en navegador real de los tipos A, D, E y un caso hostil (0 scripts o imágenes); suite completa 1210 de 1211 | pendiente de commit |
 | RP57 | S51 | pendiente | — |
+| RP73 | S50, S67 | pendiente; seguridad: verificación independiente y prueba del abuso | — |
 | RP58 | S46 | worker `gentle-ai-worker` con encargo cerrado; RED 7 fallos en lo del botón y 2 en lo de RP51; el padre corrió la suite completa, que encontró una prueba que fija la lista exacta de comandos y la actualizó | pendiente de commit |
 | RP59 | S52, S54, S55 | worker `gentle-ai-worker` con encargo cerrado; RED 36 de 49 pruebas nuevas, GREEN 49 de 49; el padre leyó el código, corrió la suite completa (1003 de 1004, 1 salteada) y la miró con Edge sobre los 15 repos reales | pendiente de commit |
 | RP60 | S57 | pendiente | — |
@@ -885,3 +887,12 @@ Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a →
 > perfecto, me gusta tu propuesta, y el estado que muestra arriba del chat que esta al lado del nombre del repo podemos eliminar? tambien el id de la sesion que aparece al lado del nombre de repo podriamos eliminar si no tiene tanta importancia para el usuario.
 
 *Aplicado: S65 y S66, la unidad RP71 (cerrada en este diff) y la unidad RP72. La duda sobre el HTML y el código de ejemplo se respondió dentro de RP70 (escapar primero; el código se ve literal).*
+
+
+**L77.**
+
+> ya leiste todo de la grabadora para saber de todos los casos? cubriremos todos los casos podibles?
+
+> recomendado
+
+*Aplicado: S67; RP56 pasa a ser solo mostrar y nace RP73 para contestar. Las tres decisiones de la propuesta (partir en dos, un clic para No y cancelar y un clic con el texto a la vista para Yes, solo listas de opciones al principio) y el principio de mundo cerrado quedan aprobados con «recomendado». Antes se había respondido «recomendado» a la propuesta de RP69 (cambiar lo visible y dejar en el README una sola mención técnica).*

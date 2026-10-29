@@ -176,6 +176,8 @@ async function liveOf(folder, orca) {
     const { sessions, failed } = await scanSessions(folder, orca, terminals, false, true);
     if (!sessions.length) return { state: failed ? 'unknown' : 'none', count: 0 };
     const state = sessions.map((s) => LIVE_OF[s.state] || 'free').reduce((a, b) => (RANK[b] > RANK[a] ? b : a));
+    // The question as it is on the screen, only when it is unambiguous whose it is (one session). Read-only.
+    if (state === 'waiting' && sessions.length === 1 && sessions[0].dialog) return { state, count: 1, dialog: sessions[0].dialog };
     return { state, count: sessions.length };
   } catch { return { state: 'unknown', count: 0 }; }
 }

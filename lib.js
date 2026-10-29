@@ -497,9 +497,29 @@ function piScreenState(preview) {
 function piScreenAsk(preview) {
   if (typeof preview !== 'string') return null;
   const lines = preview.split('\n').map((l) => l.replace(/[\x00-\x1f\x7f-\x9f\u2028\u2029]/g, ' ').trim()).filter(Boolean);
-  const footer = (l) => l.length <= 140 && /\b(enter|return)\b\W{0,4}(to\s+)?(confirm|select|submit|accept)\b/i.test(l) && /\b(esc|escape)\b|ctrl\+c/i.test(l) && /\bcancel\b/i.test(l);
-  if (!lines.slice(-14).some(footer)) return null;
+  if (!lines.slice(-14).some(isPiFooter)) return null;
   return { text: lines.slice(-12).map((l) => l.slice(0, 200)).join('\n').slice(0, 900) };
+}
+
+// The footer test shared by piScreenAsk and piScreenDialog.
+function isPiFooter(l) {
+  return l.length <= 140 && /\b(enter|return)\b\W{0,4}(to\s+)?(confirm|select|submit|accept)\b/i.test(l) && /\b(esc|escape)\b|ctrl\+c/i.test(l) && /\bcancel\b/i.test(l);
+}
+
+// The dialog as it is on the screen, for the chat card: null exactly when piScreenAsk is null. Otherwise { text, lines,
+// selected }: the last up to 40 non-empty lines up to AND INCLUDING the last footer line of the last 14 (what is below
+// it, the separator and the usage widget, is dropped), control characters replaced by a space, 200 characters per
+// line, the text at most 3000 characters cut from the start, and `selected` the index of the last line that starts
+// with an arrow marker (`→ ` or `> `) or null. Informational only.
+function piScreenDialog(preview) {
+  if (typeof preview !== 'string') return null;
+  const all = preview.split('\n').map((l) => l.replace(/[\x00-\x1f\x7f-\x9f\u2028\u2029]/g, ' ').trim()).filter(Boolean);
+  const tail = all.slice(-14);
+  const at = tail.map(isPiFooter).lastIndexOf(true);
+  if (at < 0) return null;
+  const lines = all.slice(0, all.length - tail.length + at + 1).slice(-40).map((l) => l.slice(0, 200));
+  const selected = lines.map((l) => /^(→|>) /.test(l)).lastIndexOf(true);
+  return { text: lines.join('\n').slice(-3000), lines, selected: selected < 0 ? null : selected };
 }
 
 // Whether the end of a screen LOOKS like a question for the user, however the panel classifies it (this is only
@@ -529,7 +549,7 @@ function piPromptState(preview) {
 }
 
 module.exports = {
-  PI_COMMANDS, normPath, terminalsOfWorktree, piScreenState, piScreenAsk, piScreenQuestionish, piPromptState,
+  PI_COMMANDS, normPath, terminalsOfWorktree, piScreenState, piScreenAsk, piScreenDialog, piScreenQuestionish, piPromptState,
   repoId, parseStatus, parseNumstat, parseGoneBranches, parseBaseBranch, staleBranch, statusLetter,
   summarizeChecks, blockedReason, enrichPr, encodeRef, parseRoadmap, safeRelPath, roadmapSummary,
   matchesUnitId, deriveUnitStates, nextUnit, workQueue, QUEUE_RANK, conformityReport, RM_REQUIRED,
