@@ -118,7 +118,7 @@ const clock = (start = Date.UTC(2026, 9, 25, 12, 0, 0)) => { const c = { t: star
 const rows = (file) => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []);
 const quiet = () => { const calls = []; const orig = { log: console.log, warn: console.warn, error: console.error }; console.log = console.warn = console.error = (...a) => calls.push(a.join(' ')); return { calls, restore: () => Object.assign(console, orig) }; };
 
-test('recorder: one JSON line with at, folder, handle, state, recognized, signals and lines; creates the folder', async () => {
+test('recorder: one JSON line with at, folder, handle, state, recognized, signals, lines and screen; creates the folder', async () => {
   const s = scratch();
   try {
     const c = clock();
@@ -127,7 +127,7 @@ test('recorder: one JSON line with at, folder, handle, state, recognized, signal
     await r.flush();
     const [row, ...more] = rows(s.file);
     assert.equal(more.length, 0);
-    assert.deepEqual(Object.keys(row), ['at', 'folder', 'handle', 'state', 'recognized', 'signals', 'lines']);
+    assert.deepEqual(Object.keys(row), ['at', 'folder', 'handle', 'state', 'recognized', 'signals', 'lines', 'screen']); // `screen`: the whole screen, RP74
     assert.equal(row.at, '2026-10-25T12:00:00.000Z');
     assert.equal(row.folder, 'C:/repo');
     assert.equal(row.handle, 'h1');
