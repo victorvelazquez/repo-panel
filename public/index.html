@@ -45,7 +45,15 @@
       <button id="alerts" class="alerts" data-act="toggle-problems" title="PRs that need a fix (failed checks, conflicts, outdated branch) — click to show only those" hidden></button>
     </div>
   </div>
-  <section id="summary" class="rs-panel" role="tabpanel" aria-labelledby="tab-summary"></section>
+  <div id="sumLayout" class="chatlayout">
+    <section id="summary" class="rs-panel" role="tabpanel" aria-labelledby="tab-summary"></section>
+    <div id="split" role="separator" aria-orientation="vertical" tabindex="0" aria-label="Adjust the chat width (left and right arrows; double click to reset)" hidden></div>
+    <aside id="chat" hidden aria-label="Chat">
+      <div id="chatHead" class="ch-head"></div>
+      <div id="chatBody" class="ch-body" role="log" aria-live="polite"></div>
+      <div class="ch-foot rs-sub">Read-only for now: sending messages comes in the next unit</div>
+    </aside>
+  </div>
   <div id="work" role="tabpanel" aria-labelledby="tab-work" hidden>
     <div id="queue" class="queue" hidden></div>
     <main id="app"></main>
