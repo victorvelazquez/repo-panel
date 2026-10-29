@@ -51,7 +51,17 @@
     <aside id="chat" hidden aria-label="Chat">
       <div id="chatHead" class="ch-head"></div>
       <div id="chatBody" class="ch-body" role="log" aria-live="polite"></div>
-      <div class="ch-foot rs-sub">Read-only for now: sending messages comes in the next unit</div>
+      <div id="composer" class="composer" role="group" aria-label="Message">
+        <textarea id="msgBox" rows="2" aria-label="Message to the pi session"></textarea>
+        <div class="c-bar">
+          <button type="button" data-act="chat-menu" aria-haspopup="true">/ Actions</button>
+          <div id="actionsPop" class="pop" role="menu" hidden></div>
+          <span class="hint">Enter sends · Shift+Enter new line</span>
+          <span class="spacer"></span>
+          <button id="msgSend" class="primary" type="button" data-act="chat-send">Send</button>
+        </div>
+        <div id="msgNote" class="rs-note" role="status"></div>
+      </div>
     </aside>
   </div>
   <div id="work" role="tabpanel" aria-labelledby="tab-work" hidden>

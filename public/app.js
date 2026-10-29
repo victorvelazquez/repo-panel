@@ -31,7 +31,7 @@ const S = {
   prefs: store('prefs', { method: 'squash', del: true }),
   lastRefresh: 0, lastAt: {}, scan: [],
   tab: 'summary', scope: { kind: 'all' }, summary: null, summaryKey: '', summaryFailed: false, sfilter: 'all', collapsed: {},
-  chat: { id: null, seq: 0 },
+  chat: { id: null, seq: 0 }, actionsOpen: false, drafts: {}, notes: {}, msgBusy: {},
 };
 S.tab = S.prefs.tab === 'work' ? 'work' : 'summary';
 
@@ -647,12 +647,17 @@ async function loadChat(id) {
 }
 function openChat(id) {
   if (!R || !id || S.chat.id === id) return;
+  saveDraft();
   S.chat = { id, seq: S.chat.seq + 1 };
+  S.actionsOpen = false;
+  $('#msgBox').value = S.drafts[id] || '';
   draw();
   loadChat(id);
 }
 function closeChat() {
   if (!S.chat.id) return;
+  saveDraft();
+  S.actionsOpen = false;
   S.chat = { id: null, seq: S.chat.seq + 1 };
   chatShown = null;
   draw();
@@ -695,6 +700,16 @@ function drawChat() {
   const atBottom = chatShown !== S.chat.id || !(body.scrollHeight > 0) || body.scrollHeight - body.scrollTop - body.clientHeight < 24;
   if (paint(body, R.chatBody(S.chat, { now: Date.now() })) && atBottom) body.scrollTop = body.scrollHeight;
   chatShown = S.chat.id;
+  const id = S.chat.id;
+  const cs = composerOf(id);
+  $('#msgSend').disabled = !cs.canSend;
+  $('#msgSend').title = cs.reason;
+  $('#msgBox').placeholder = cs.placeholder;
+  const row = S.summary && Array.isArray(S.summary.rows) ? S.summary.rows.find((r) => r.id === id) : null;
+  const live = (S.chat.info && S.chat.info.live && S.chat.info.live.state) || 'unknown';
+  paint($('#actionsPop'), R.actionMenuHtml(R.actionMenu(row, { live, changes: summaryChanges(id), flow: summaryFlow(id) }), id));
+  $('#actionsPop').hidden = !S.actionsOpen;
+  paint($('#msgNote'), R.composerNote(S.notes[id]));
 }
 
 const splitEl = $('#split');
@@ -716,6 +731,40 @@ if (splitEl) {
 }
 if (window.addEventListener) window.addEventListener('resize', applyChatWidth);
 // ---------- end chat ----------
+
+// ---------- composer (RP68): free text to the adopted session ----------
+// The composer nodes are static: the textarea value is written only when switching repo, after a sent message or by Clear, never by the poll.
+function saveDraft() {
+  const id = S.chat.id;
+  if (!id) return;
+  const v = $('#msgBox').value;
+  if (v) S.drafts[id] = v; else delete S.drafts[id];
+}
+const closeActions = () => { if (S.actionsOpen) { S.actionsOpen = false; draw(); } };
+const composerOf = (id) => R.composerState({ ...S.chat, sending: !!S.msgBusy[id] }, { name: nameOf(id) });
+const sayNote = (id, text, clear = false) => { S.notes[id] = { text, id, clear }; };
+
+async function sendChatMessage() {
+  const id = S.chat.id;
+  if (!R || !id || S.msgBusy[id]) return;
+  const text = $('#msgBox').value;
+  if (!text.trim()) return;
+  const cs = composerOf(id);
+  if (!cs.canSend) { sayNote(id, cs.reason); draw(); return; }
+  S.msgBusy[id] = true;
+  delete S.notes[id];
+  draw();
+  try {
+    const d = await api('/api/chat/send', { id, text });
+    if (!d.sent) throw new Error('The message was not sent');
+    if (S.drafts[id] === text) delete S.drafts[id];
+    if (S.chat.id === id) $('#msgBox').value = '';
+    if (d.leftInBox) sayNote(id, 'The text is still in the pi prompt box; the panel never resends it.', true);
+    else if (!d.delivered) sayNote(id, 'Sent, but it could not be confirmed: check the session.');
+  } catch (e) { sayNote(id, e.message); } finally { delete S.msgBusy[id]; }
+  if (S.chat.id === id) loadChat(id);
+  draw();
+}
 
 // ---------- board ----------
 let raf = 0;
@@ -1193,6 +1242,13 @@ const ACTIONS = {
   'focus-repo': (el) => { S.q = nameOf(el.dataset.id); $('#search').value = S.q; setTab('work'); },
   'chat-open': (el) => openChat(el.dataset.id),
   'chat-close': () => closeChat(),
+  'chat-send': () => sendChatMessage(),
+  'chat-menu': () => { S.actionsOpen = !S.actionsOpen; draw(); },
+  'chat-clear': async (el) => {
+    const { id } = el.dataset;
+    try { await api('/api/chat/clear', { id }); delete S.notes[id]; } catch (e) { sayNote(id, e.message, true); }
+    draw();
+  },
   'chat-adopt': async (el) => {
     const { id, session } = el.dataset;
     try { await api('/api/sessions/adopt', { id, session }); } catch (e) { toast(e.message, 'bad'); }
@@ -1213,6 +1269,7 @@ const ACTIONS = {
   'pi': async (el) => {
     const { id, cmd, pr } = el.dataset;
     if (S.sending[id]) return; // a second click while the first order is on its way never sends another
+    S.actionsOpen = false;
     S.sending[id] = cmd;
     el.disabled = true;
     draw();
@@ -1318,6 +1375,7 @@ const ACTIONS = {
 };
 
 document.addEventListener('click', (e) => {
+  if (S.actionsOpen && !e.target.closest('#composer')) closeActions();
   if (S.menu && !e.target.closest('.more')) { S.menu = null; draw(); }
   const el = e.target.closest('[data-act]');
   if (!el || el.disabled) return;
@@ -1335,12 +1393,21 @@ document.addEventListener('submit', (e) => {
 // Escape closes the card menu first; with nothing else open it closes the chat. A focused repo card opens the chat with Enter or
 // Space (the buttons inside it have no chat-open act, so they are untouched).
 document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && S.actionsOpen) { closeActions(); return; }
   if (e.key === 'Escape' && S.menu) { S.menu = null; draw(); return; }
   if (e.key === 'Escape') {
     const menu = $('#mergeMenu');
     if (S.chat.id && !(menu && menu.open) && !['#addDialog', '#roomDialog'].some((d) => $(d) && $(d).open)) closeChat();
   } else if ((e.key === 'Enter' || e.key === ' ') && e.target && e.target.dataset && e.target.dataset.act === 'chat-open') { e.preventDefault(); ACTIONS['chat-open'](e.target); }
 });
+
+// Enter in the message box sends it; Shift+Enter is a new line and an IME composition is left alone.
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' || !e.target || e.target.id !== 'msgBox' || e.shiftKey || e.isComposing || e.keyCode === 229) return;
+  e.preventDefault();
+  sendChatMessage();
+});
+document.addEventListener('input', (e) => { if (e.target && e.target.id === 'msgBox') saveDraft(); });
 
 // The passing list of a repo stays open (or closed) across redraws. `toggle` does not bubble, so capture it.
 document.addEventListener('toggle', (e) => {

@@ -132,13 +132,68 @@
     return Math.max(CHAT_MIN, Math.min(Math.round(total * r), total - CARDS_MIN));
   };
   const liveOf = (c) => (c.info && c.info.live && c.info.live.state) || 'unknown';
+  const CLOSED = '<span class="chip gray">○ session closed</span>';
   const BANNER = { working: '● The session is working', waiting: '◐ The session is asking you something. Answer it in its terminal: the panel does not answer yet.' };
 
   function chatHead(c, ctx = {}) {
     const adopted = c.info && c.info.adopted;
     const banner = adopted && BANNER[liveOf(c)] ? `<div class="ch-live" role="status">${BANNER[liveOf(c)]}</div>` : '';
-    return `<div class="ch-row"><b class="ch-name" title="${esc(ctx.name)}">${esc(ctx.name)}</b>${sessionChip(liveOf(c))}${adopted ? `<span class="mono ch-sess" title="${esc(adopted.id)}">${esc(adopted.name || adopted.id)}</span>` : ''}<button type="button" class="x" data-act="chat-close" aria-label="Close the chat" title="Close the chat (Esc)">✕</button></div>${banner}`;
+    return `<div class="ch-row"><b class="ch-name" title="${esc(ctx.name)}">${esc(ctx.name)}</b>${adopted && liveOf(c) === 'none' ? CLOSED : sessionChip(liveOf(c))}${adopted ? `<span class="mono ch-sess" title="${esc(adopted.id)}">${esc(adopted.name || adopted.id)}</span>` : ''}<button type="button" class="x" data-act="chat-close" aria-label="Close the chat" title="Close the chat (Esc)">✕</button></div>${banner}`;
   }
+
+  // The composer (RP68, S49): can the person send free text now, and if not, why. c = { id, info, sending }.
+  const REASON = {
+    working: 'The session is working: wait until it is free', waiting: 'The session is asking you something: answer it in its terminal',
+    none: 'No open pi session of this repo', unknown: 'The session state is unknown',
+  };
+  function composerState(c, ctx = {}) {
+    const info = c.info;
+    let reason = '';
+    if (!info) reason = 'Loading the chat…';
+    else if (!info.adopted) reason = 'Adopt or start a session first';
+    else if (!info.adoptedFound) reason = 'The session is loading';
+    else if (c.sending) reason = 'Sending…';
+    else if (liveOf(c) !== 'free') reason = REASON[liveOf(c)] || REASON.unknown;
+    return { canSend: !reason, reason, placeholder: reason || `Message the pi session of ${ctx.name ?? 'this repo'}` };
+  }
+
+  // The "/ Actions" menu: always the four flow commands in a fixed order, each available or not with the reason. A deliver or
+  // branch flow button (unstage, stash, disabled with a reason) takes the slot of its command. ctx = { live, changes, flow }.
+  const SLOTS = [['flow-next', '/flow-next'], ['flow-commit', '/flow-commit'], ['flow-pr', '/flow-pr'], ['flow-base', '/flow-base']];
+  function actionMenu(row, ctx = {}) {
+    const items = SLOTS.map(([cmd, label]) => ({ cmd, label, available: false, why: '' }));
+    const live = ctx.live || 'unknown';
+    if (live !== 'free') {
+      const why = composerState({ info: { adopted: true, adoptedFound: true, live: { state: live } } }).reason;
+      return { items: items.map((i) => ({ ...i, why })) };
+    }
+    if (!row || row.error) return { items: items.map((i) => ({ ...i, why: 'No data for this repo' })) };
+    const kind = row.action ? row.action.kind : '';
+    const ch = ctx.changes || {};
+    const dirty = num(ch.files) > 0 || num(ch.ahead) > 0;
+    items[0].available = kind === 'start' && !dirty;
+    items[0].why = items[0].available ? `${row.next.id} — ${row.next.entrega ?? ''}` : kind === 'deliver' || dirty ? 'Deliver the current changes first' : !row.next ? 'No next unit to take' : 'Finish what is in progress first';
+    items[1].why = 'No changes to commit';
+    items[2].why = num(ch.files) > 0 ? 'Commit the changes first' : 'Nothing committed yet';
+    items[3].why = 'The branch has not been merged yet';
+    const f = ctx.flow;
+    if (kind === 'branch' && !f) Object.assign(items[3], { available: true, why: 'Start a new cycle' });
+    else if ((kind === 'deliver' || kind === 'branch') && f) {
+      const slot = f.cmd.startsWith('flow-commit') ? 1 : f.cmd.startsWith('flow-pr') ? 2 : f.cmd.startsWith('flow-base') ? 3 : -1;
+      if (slot >= 0) items[slot] = { cmd: f.cmd, label: f.label, available: !f.disabled, why: f.disabled ? f.reason || 'Not available right now' : '' };
+    }
+    return { items };
+  }
+  function actionMenuHtml(menu, id) {
+    const item = (i) => (i.available
+      ? `<button type="button" class="opt" role="menuitem" data-act="pi" data-id="${esc(id)}" data-cmd="${esc(i.cmd)}"><code>${esc(i.label)}</code><span class="why">${esc(i.why)}</span></button>`
+      : `<button type="button" class="opt" role="menuitem" disabled data-cmd="${esc(i.cmd)}"><code>${esc(i.label)}</code><span class="why">${esc(i.why)}</span></button>`);
+    const yes = menu.items.filter((i) => i.available);
+    const no = menu.items.filter((i) => !i.available);
+    return `<h4>Available now</h4>${yes.map(item).join('') || '<div class="why">Nothing to run right now</div>'}${no.length ? `<h4>Not available</h4>${no.map(item).join('')}` : ''}`;
+  }
+  // The line under the box: a message, plus the Clear button when text stayed in the prompt box of pi.
+  const composerNote = (n) => (n && n.text ? `<span>${esc(n.text)}</span>${n.clear ? ` <button type="button" data-act="chat-clear" data-id="${esc(n.id)}">Clear the box</button>` : ''}` : '');
 
   const hhmm = (iso) => { const d = new Date(iso); return iso && !Number.isNaN(d.getTime()) ? `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}` : ''; };
   const toolsLine = (t) => (t.length ? `<div class="tools">▸ ${plural(t.length, 'tool')} · ${esc(t.slice(0, 3).join(', '))}${t.length > 3 ? ` (+${t.length - 3})` : ''}</div>` : '');
@@ -219,5 +274,5 @@
     return `${ctx.failed ? '<div class="rs-note" role="status">⚠ Summary unavailable: showing the last data we have.</div>' : ''}<div class="rs-list">${body}</div>${rows.length ? LEGEND : ''}`;
   }
 
-  return { esc, sessionChip, chatWidth, chatHead, chatBody, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
+  return { esc, sessionChip, chatWidth, composerState, actionMenu, actionMenuHtml, composerNote, chatHead, chatBody, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
 }));

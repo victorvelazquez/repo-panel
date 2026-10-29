@@ -95,8 +95,10 @@ function listSessions(folder, { base = baseDir(), limit = LIMIT } = {}) {
   return out;
 }
 
+// A session file is exactly '<timestamp>_<id>.jsonl' and the timestamp has no underscore, so another id that merely ends with '_<id>' never matches.
+const isSessionFile = (name, id) => name.endsWith(`_${id}.jsonl`) && name.length > id.length + 7 && !name.slice(0, name.length - id.length - 7).includes('_');
 const hasSession = (folder, id, base) => {
-  try { return fs.readdirSync(sessionsDirFor(folder, base)).some((n) => n.endsWith(`_${id}.jsonl`)); } catch { return false; }
+  try { return fs.readdirSync(sessionsDirFor(folder, base)).some((n) => isSessionFile(n, String(id))); } catch { return false; }
 };
 
 const isoOf = (t) => {
@@ -111,7 +113,7 @@ const blocksOf = (m, type) => (Array.isArray(m.content) ? m.content.filter((c) =
 function readChat(folder, sessionId, { base = baseDir(), limit = CHAT_DEFAULT, key = null } = {}) {
   const none = { key, sessionId, found: false, items: [], truncated: false, updatedAt: null };
   let file;
-  try { file = fs.readdirSync(sessionsDirFor(folder, base)).sort().find((n) => n.endsWith(`_${sessionId}.jsonl`)); } catch { return none; }
+  try { file = fs.readdirSync(sessionsDirFor(folder, base)).sort().find((n) => isSessionFile(n, String(sessionId))); } catch { return none; }
   if (!file) return none;
   const max = Math.min(CHAT_MAX, Math.floor(Number(limit)) > 0 ? Math.floor(Number(limit)) : CHAT_DEFAULT);
   let fd;
