@@ -62,7 +62,7 @@ test('readChat returns user and assistant text oldest first, with the tool NAMES
     JSON.stringify({ type: 'session_info', name: 'n' }),
   ]);
   const r = chatOf('c1', { key: 'k' });
-  assert.deepEqual(r.items.map((i) => [i.role, i.text, i.tools]), [['user', '/flow-next please', []], ['assistant', 'Taking B2b. It is one file.', ['read']]]);
+  assert.deepEqual(r.items.map((i) => [i.role, i.text, i.tools]), [['user', '/flow-next\n\nplease', []], ['assistant', 'Taking B2b.\n\nIt is one file.', ['read']]]);
   assert.equal(r.key, 'k');
   assert.equal(r.sessionId, 'c1');
   assert.equal(r.found, true);

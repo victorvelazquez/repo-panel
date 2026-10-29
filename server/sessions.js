@@ -14,6 +14,7 @@ const LIMIT = 20;
 const TEXT_MAX = 200;
 const CHAT_TEXT = 4000;
 const CHAT_DEFAULT = 30;
+const BLOCK_GAP = '\n\n';
 const CHAT_MAX = 100;
 const SESSION_ID = /^[A-Za-z0-9._-]{1,80}$/;
 const LIVE_OF = { idle: 'free', typed: 'free', busy: 'working', asking: 'waiting' };
@@ -28,6 +29,8 @@ const sessionsDirFor = (folder, base = baseDir()) => path.join(base, `--${String
 
 const normPath = (p) => String(p).replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
 const clean = (s) => String(s).replace(/[\x00-\x1f\x7f-\x9f\u2028\u2029]/g, ' ');
+// Chat message text keeps its line structure: CRLF and CR become LF, LF and TAB stay, every other control becomes one space.
+const cleanText = (s) => String(s).replace(/\r\n?/g, '\n').replace(/[\x00-\x08\x0b-\x1f\x7f-\x9f\u2028\u2029]/g, ' ');
 const parse = (line) => { try { return JSON.parse(line); } catch { return null; } };
 
 // Complete lines of a chunk: the first one is dropped when the chunk starts mid-file, the last when it ends mid-file.
@@ -105,7 +108,7 @@ const isoOf = (t) => {
   const d = new Date(typeof t === 'string' && /^\d+$/.test(t) ? Number(t) : t);
   return typeof t === 'number' || typeof t === 'string' ? (Number.isNaN(d.getTime()) ? null : d.toISOString()) : null;
 };
-const capped = (s) => { const t = clean(s).trim(); return t.length > CHAT_TEXT ? `${t.slice(0, CHAT_TEXT)}…` : t; };
+const capped = (s) => { const t = cleanText(s).trim(); return t.length > CHAT_TEXT ? `${t.slice(0, CHAT_TEXT)}…` : t; };
 const blocksOf = (m, type) => (Array.isArray(m.content) ? m.content.filter((c) => c && c.type === type) : []);
 
 // The history of one session for the chat panel: only the LAST 64 KB of its file is read (the first line of that window may be
@@ -127,7 +130,7 @@ function readChat(folder, sessionId, { base = baseDir(), limit = CHAT_DEFAULT, k
       const m = entry && entry.type === 'message' && entry.message;
       if (!m || typeof m !== 'object') continue;
       const at = isoOf(m.timestamp ?? entry.timestamp);
-      const body = capped(blocksOf(m, 'text').filter((c) => typeof c.text === 'string').map((c) => c.text).join(' '));
+      const body = capped(blocksOf(m, 'text').filter((c) => typeof c.text === 'string').map((c) => c.text).join(BLOCK_GAP));
       if (m.role === 'user') { pending = []; if (body) items.push({ role: 'user', text: body, at, tools: [] }); continue; }
       if (m.role !== 'assistant') continue;
       pending.push(...blocksOf(m, 'toolCall').filter((c) => typeof c.name === 'string').map((c) => clean(c.name).slice(0, 60)));
