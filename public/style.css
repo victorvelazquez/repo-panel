@@ -345,6 +345,18 @@ button:is([data-cmd], [data-kind], header .primary, .empty .primary, .merge):dis
 .m { max-width: 90%; padding: 8px 11px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel2); overflow-wrap: anywhere; }
 .m.me { align-self: flex-end; background: #12253d; border-color: #1d3a5f; border-radius: 12px 12px 3px 12px; }
 .m.working { color: var(--muted); font-style: italic; }
+.m p, .m ul, .m ol, .m pre, .m blockquote, .m h3, .m h4, .m h5 { margin: 6px 0; }
+.m > .who + *, .m > :first-child:not(.who) { margin-top: 0; }
+.m > :last-child { margin-bottom: 0; }
+.m h3 { font-size: 16px; } .m h4 { font-size: 15px; } .m h5 { font-size: 14px; }
+.m ul, .m ol { padding-left: 22px; }
+.m blockquote { padding-left: 10px; border-left: 3px solid var(--line); color: var(--muted); }
+.m pre { max-height: none; overflow-x: auto; padding: 8px 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; overflow-wrap: normal; }
+.m code { font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
+.m :not(pre) > code { padding: 1px 4px; border-radius: 4px; background: rgba(110, 118, 129, .2); }
+.m pre code { white-space: pre; }
+.m a { color: var(--blue); }
+.m strong { font-weight: 600; }
 .m .who { display: block; margin-bottom: 2px; font-size: 11px; color: var(--muted); }
 .tools { align-self: flex-start; font-size: 12px; color: var(--muted); border: 1px dashed var(--line); border-radius: 8px; padding: 3px 10px; overflow-wrap: anywhere; }
 .ch-state { display: grid; gap: 10px; justify-items: start; }

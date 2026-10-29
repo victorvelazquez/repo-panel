@@ -143,7 +143,7 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 | RP67 | S59 | worker `gentle-ai-worker` con encargo cerrado; RED 9 de 10 pruebas nuevas, GREEN 10 de 10; el padre leyó el diff, limpió el relleno sólido muerto de `button.merge` (RED y GREEN propios, y actualizó tres pruebas que lo fijaban), corrió la suite completa (1038 de 1039, 1 salteada) y la miró con Edge sobre los 15 repos: ninguna acción con relleno sólido y el botón deshabilitado queda gris neutro | pendiente de commit |
 | RP68 | S49, S54 | pruebas escritas primero (31, RED verificado por el padre); implementación por `gentle-ai-worker` con encargo cerrado en dos fases; el padre leyó el diff completo (166 líneas de producción) y miró 6 capturas con una sesión sintética; suite completa 1126 de 1127 | pendiente de commit |
 | RP69 | S63 | pendiente | — |
-| RP70 | S64 | pendiente; prueba del abuso (HTML y enlaces) y aprobación mirando | — |
+| RP70 | S64 | pruebas escritas primero (38: 31 en RED verificadas por el padre y 7 que protegen lo existente); implementación por `gentle-ai-worker` en dos fases; el padre leyó el parser completo, corrigió una prueba mal escrita (un espacio que la propia prueba borraba), lo sometió a 60 000 entradas al azar más 9 casos patológicos (0 fallas, peor caso 2,6 ms) y miró 3 capturas con una sesión sintética (0 scripts o imágenes en el chat, un solo enlace, el HTML de ejemplo literal); suite completa 1164 de 1165 | pendiente de commit |
 
 Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a → RP11b → RP12a → RP12b → RP12 → RP13 → RP14. RP12 puede ir antes de RP11 si la persona lo prefiere.
 

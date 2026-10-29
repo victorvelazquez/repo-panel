@@ -197,10 +197,92 @@
 
   const hhmm = (iso) => { const d = new Date(iso); return iso && !Number.isNaN(d.getTime()) ? `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}` : ''; };
   const toolsLine = (t) => (t.length ? `<div class="tools">▸ ${plural(t.length, 'tool')} · ${esc(t.slice(0, 3).join(', '))}${t.length > 3 ? ` (+${t.length - 3})` : ''}</div>` : '');
+  // One chat message as safe HTML: escape first, then a small Markdown subset. Only the tags built here reach the output,
+  // every scan is a single pass with indexOf (no backtracking regular expression), and unclosed markers stay plain text.
+  const MD_URL = /^https?:\/\/[^\s"'<>`]+$/i;
+  const MD_ITEM = /^(?:([-*])|\d+\.) (.*)$/;
+  function mdClose(s, i, c, n) {
+    const next = s[i + n];
+    if (next === undefined || /\s/.test(next) || (n === 1 && next === c) || (c === '_' && /\w/.test(s[i - 1] || ''))) return -1;
+    const m = c.repeat(n);
+    for (let j = s.indexOf(m, i + n + 1); j > 0; j = s.indexOf(m, j + 1)) {
+      if (/\s/.test(s[j - 1]) || (n === 1 && (s[j - 1] === c || s[j + 1] === c)) || (c === '_' && /\w/.test(s[j + 1] || ''))) continue;
+      return j;
+    }
+    return -1;
+  }
+  function mdInline(s, d) {
+    if (d > 3) return esc(s);
+    let out = '';
+    let i = 0;
+    while (i < s.length) {
+      const c = s[i];
+      if (c === '`') {
+        const j = s.indexOf('`', i + 1);
+        if (j > i + 1) { out += `<code>${esc(s.slice(i + 1, j))}</code>`; i = j + 1; continue; }
+      } else if (c === '*' || c === '_') {
+        const n = c === '*' && s[i + 1] === '*' ? 2 : 1;
+        const j = mdClose(s, i, c, n);
+        if (j > 0) {
+          const tag = n === 2 ? 'strong' : 'em';
+          out += `<${tag}>${mdInline(s.slice(i + n, j), d + 1)}</${tag}>`;
+          i = j + n;
+        } else { out += esc(c.repeat(n)); i += n; }
+        continue;
+      } else if (c === '[') {
+        const e = s.indexOf(']', i + 1);
+        const k = e > i + 1 && s[e + 1] === '(' ? s.indexOf(')', e + 2) : -1;
+        const url = k > 0 ? s.slice(e + 2, k) : '';
+        if (MD_URL.test(url)) { out += `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(s.slice(i + 1, e))}</a>`; i = k + 1; continue; }
+      }
+      out += esc(c);
+      i++;
+    }
+    return out;
+  }
+  const mdFence = (l) => /^\s*```/.test(l);
+  const mdQuote = (l, d) => d < 3 && (l === '>' || l.startsWith('> '));
+  const mdStarts = (l, d) => mdFence(l) || /^#{1,6} /.test(l) || mdQuote(l, d) || MD_ITEM.test(l);
+  function mdBlocks(text, d) {
+    const lines = text.split('\n');
+    const out = [];
+    let i = 0;
+    while (i < lines.length) {
+      const l = lines[i];
+      let m;
+      if (!l.trim()) { i++; continue; }
+      if (mdFence(l)) {
+        const code = [];
+        for (i++; i < lines.length && !mdFence(lines[i]); i++) code.push(lines[i]);
+        i++;
+        out.push(`<pre><code>${esc(code.join('\n'))}</code></pre>`);
+      } else if ((m = /^(#{1,6}) (.*)$/.exec(l))) {
+        const h = Math.min(m[1].length + 2, 5);
+        out.push(`<h${h}>${mdInline(m[2], 0)}</h${h}>`);
+        i++;
+      } else if (mdQuote(l, d)) {
+        const inner = [];
+        for (; i < lines.length && mdQuote(lines[i], d); i++) inner.push(lines[i].slice(2));
+        out.push(`<blockquote>${mdBlocks(inner.join('\n'), d + 1)}</blockquote>`);
+      } else if ((m = MD_ITEM.exec(l))) {
+        const tag = m[1] ? 'ul' : 'ol';
+        const items = [];
+        for (; i < lines.length && (m = MD_ITEM.exec(lines[i])) && (m[1] ? 'ul' : 'ol') === tag; i++) items.push(`<li>${mdInline(m[2], 0)}</li>`);
+        out.push(`<${tag}>${items.join('')}</${tag}>`);
+      } else {
+        const para = [l];
+        for (i++; i < lines.length && lines[i].trim() && !mdStarts(lines[i], d); i++) para.push(lines[i]);
+        out.push(`<p>${para.map((x) => mdInline(x, 0)).join('<br>')}</p>`);
+      }
+    }
+    return out.join('');
+  }
+  const mdHtml = (text) => (typeof text === 'string' ? mdBlocks(text.replace(/\r\n?/g, '\n'), 0) : '');
+
   const bubble = (it, who) => {
     const time = hhmm(it.at);
     if (it.role === 'assistant' && !it.text) return `${toolsLine(it.tools)}<div class="m working">working…</div>`;
-    return `${toolsLine(it.tools || [])}<div class="m${it.role === 'user' ? ' me' : ''}"><span class="who">${esc(it.role === 'user' ? 'You' : who)}${time ? ` · ${time}` : ''}</span>${esc(it.text)}</div>`;
+    return `${toolsLine(it.tools || [])}<div class="m${it.role === 'user' ? ' me' : ''}"><span class="who">${esc(it.role === 'user' ? 'You' : who)}${time ? ` · ${time}` : ''}</span>${mdHtml(it.text)}</div>`;
   };
 
   function chatBody(c, ctx = {}) {
@@ -274,5 +356,5 @@
     return `${ctx.failed ? '<div class="rs-note" role="status">⚠ Summary unavailable: showing the last data we have.</div>' : ''}<div class="rs-list">${body}</div>${rows.length ? LEGEND : ''}`;
   }
 
-  return { esc, sessionChip, chatWidth, composerState, actionMenu, actionMenuHtml, composerNote, chatHead, chatBody, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
+  return { esc, mdHtml, sessionChip, chatWidth, composerState, actionMenu, actionMenuHtml, composerNote, chatHead, chatBody, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
 }));
