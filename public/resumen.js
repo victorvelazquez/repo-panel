@@ -22,6 +22,12 @@
     return ALL;
   };
   const filterRows = (rows, scope) => rows.filter((r) => (scope.kind === 'room' ? r.room === scope.name : scope.kind === 'none' ? !r.room : true));
+  // The rows the Summary shows: the scope, then the shared text and group filters (empty or "all" is no filter).
+  const visibleRows = (rows, ctx) => {
+    const q = String(ctx.q || '').toLowerCase();
+    const group = ctx.group && ctx.group !== 'all' ? ctx.group : '';
+    return filterRows(rows, normalizeScope(ctx.scope, ctx.rooms)).filter((r) => (!group || r.group === group) && (!q || String(r.name).toLowerCase().includes(q)));
+  };
 
   function relativeTime(iso, now = Date.now()) {
     const t = Date.parse(iso);
@@ -136,23 +142,29 @@
 
   const LEGEND = '<div class="rs-legend" aria-label="Bar legend"><span><i class="rs-key rs-done"></i>Completed</span><span><i class="rs-key rs-pr"></i>In review</span><span><i class="rs-key rs-blk"></i>Blocked</span><span><i class="rs-key rs-pend"></i>Pending</span><span>The button on the right is the best next action</span></div>';
 
-  // ctx: { now, scope, rooms, roomData, filter, collapsed, failed, flowFor(id), changesFor(id), sending, busy }
+  // The view-specific part of the view bar: the one Needs attention toggle (the button sets the value it is NOT in) and the age.
+  function summaryTools(payload, ctx = {}) {
+    if (!payload || !Array.isArray(payload.rows)) return '';
+    const attention = ctx.filter === 'attention';
+    const n = visibleRows(payload.rows, ctx).filter((r) => r.needs).length;
+    return `<button type="button" data-act="sfilter" data-filter="${attention ? 'all' : 'attention'}" aria-pressed="${attention}">Needs attention · ${n}</button><span class="rs-sub">updated ${esc(relativeTime(payload.generatedAt, ctx.now))}</span>`;
+  }
+
+  // ctx: { now, scope, rooms, q, group, roomData, filter, collapsed, failed, flowFor(id), changesFor(id), sending, busy }
   function summaryView(payload, ctx = {}) {
     if (!payload || !Array.isArray(payload.rows)) {
       return `<div class="empty" role="status">${ctx.failed ? 'Summary unavailable. Is the panel server up to date? Try Refresh.' : 'Loading summary…'}</div>`;
     }
     const scope = normalizeScope(ctx.scope, ctx.rooms);
-    const rows = filterRows(payload.rows, scope);
+    const rows = visibleRows(payload.rows, ctx);
     const needing = rows.filter((r) => r.needs);
     const attention = ctx.filter === 'attention';
-    const fbtn = (f, label, n) => `<button type="button" data-act="sfilter" data-filter="${f}" aria-pressed="${attention === (f === 'attention')}">${label} · ${n}</button>`;
-    const head = `<div class="rs-filters" role="group" aria-label="Filter">${fbtn('all', 'All', rows.length)}${fbtn('attention', 'Needs attention', needing.length)}<span class="rs-sub">updated ${esc(relativeTime(payload.generatedAt, ctx.now))}</span></div>`;
     let body;
     if (attention) {
       // Most urgent first; Array#sort is stable, so ties keep the payload order.
       body = needing.length ? needing.slice().sort((x, y) => num(x.rank) - num(y.rank)).map((r) => cardHtml(r, ctx)).join('') : '<div class="empty">Nothing needs your attention right now.</div>';
     } else {
-      const rooms = ctx.roomData && Array.isArray(ctx.roomData.rooms) && scope.kind !== 'none' ? ctx.roomData.rooms.filter((m) => scope.kind === 'all' || m.name === scope.name) : [];
+      const rooms = ctx.roomData && Array.isArray(ctx.roomData.rooms) && scope.kind !== 'none' && !ctx.q && !(ctx.group && ctx.group !== 'all') ? ctx.roomData.rooms.filter((m) => scope.kind === 'all' || m.name === scope.name) : [];
       const groups = new Map();
       for (const r of rows) groups.set(r.group ?? '', (groups.get(r.group ?? '') || []).concat(r));
       const parts = rooms.map((m) => roomCard(m, payload.rows, ctx));
@@ -163,8 +175,8 @@
       }
       body = rows.length ? parts.join('') : '<div class="empty">No repositories in this scope.</div>';
     }
-    return `${ctx.failed ? '<div class="rs-note" role="status">⚠ Summary unavailable: showing the last data we have.</div>' : ''}${head}<div class="rs-list">${body}</div>${rows.length ? LEGEND : ''}`;
+    return `${ctx.failed ? '<div class="rs-note" role="status">⚠ Summary unavailable: showing the last data we have.</div>' : ''}<div class="rs-list">${body}</div>${rows.length ? LEGEND : ''}`;
   }
 
-  return { esc, normalizeScope, filterRows, relativeTime, scopeBar, summaryView };
+  return { esc, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
 }));

@@ -108,7 +108,8 @@ function analyse(f) {
   if (session.state === 'waiting') why.push('The pi session is waiting for an answer');
   const failingCi = (f.prs.prs || []).filter((p) => p.checks && p.checks.state === 'failed');
   for (const p of failingCi) why.push(`PR #${p.number} has failing checks`);
-  if (rm && rm.available === true && rm.rows.some((r) => r.estado === 'Bloqueada')) why.push(`Blocked: ${blocking.filter((b) => rm.rows.find((r) => r.id === b.unit && r.estado === 'Bloqueada')).map((b) => b.unit).join(', ')}`);
+  // A Blocked unit only needs attention when nothing else can be taken (S58); `blocking` and `rank` do not change.
+  if (!nx && rm && rm.available === true && rm.rows.some((r) => r.estado === 'Bloqueada')) why.push(`Blocked: ${blocking.filter((b) => rm.rows.find((r) => r.id === b.unit && r.estado === 'Bloqueada')).map((b) => b.unit).join(', ')}`);
   const action = actionOf(f, session, nx);
   const row = {
     id, name, group, room: room ?? null, branch: f.local.branch ?? null, progress: progressOf(rm), session, next, blocking,

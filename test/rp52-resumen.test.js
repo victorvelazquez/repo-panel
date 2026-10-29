@@ -155,10 +155,12 @@ const SCOPE_ROWS = [
 const attention = [{ id: 'b', name: 'also-room', why: 'asks' }, { id: 'c', name: 'loose-one', why: 'blocked' }];
 
 test('the filter counts are computed from the rows in the current scope (the KPI counters are gone)', () => {
-  const html = view(SCOPE_ROWS.map((r) => ({ ...r, needs: r.id === 'b' || r.id === 'c' })));
-  assert.match(html, /All · 5/);
-  assert.match(html, /Needs attention · 2/);
-  assert.doesNotMatch(html, /rs-kpi|waiting for you/);
+  const rows = SCOPE_ROWS.map((r) => ({ ...r, needs: r.id === 'b' || r.id === 'c' }));
+  const html = view(rows);
+  const tools = R.summaryTools(payload(rows), { now: NOW, scope: { kind: 'all' }, rooms: [] });
+  assert.doesNotMatch(tools, /All/, 'RP61: the All button is gone, the toggle is the only one');
+  assert.match(tools, /Needs attention · 2/);
+  assert.doesNotMatch(html, /rs-kpi|waiting for you|data-act="sfilter"/);
 });
 
 test('scope filters the cards and the filter counts', () => {
@@ -166,12 +168,13 @@ test('scope filters the cards and the filter counts', () => {
   const rows = SCOPE_ROWS.map((r) => ({ ...r, needs: r.id === 'b' || r.id === 'c' }));
   const upen = R.summaryView(payload(rows), { now: NOW, scope: { kind: 'room', name: 'UPEN' }, rooms: [{ name: 'UPEN', repos: ['a', 'b'] }] });
   assert.deepEqual(ids(upen), ['a', 'b']);
-  assert.match(upen, /Needs attention · 1</);
+  assert.match(R.summaryTools(payload(rows), { now: NOW, scope: { kind: 'room', name: 'UPEN' }, rooms: [{ name: 'UPEN', repos: ['a', 'b'] }] }), /Needs attention · 1</);
   const none = R.summaryView(payload(rows), { now: NOW, scope: { kind: 'none' }, rooms: [] });
   assert.deepEqual(ids(none), ['c', 'd', 'e']);
-  assert.match(none, /Needs attention · 1</);
+  assert.match(R.summaryTools(payload(rows), { now: NOW, scope: { kind: 'none' }, rooms: [] }), /Needs attention · 1</);
   const all = R.summaryView(payload(rows), { now: NOW, scope: { kind: 'all' }, rooms: [] });
-  assert.match(all, /Needs attention · 2</);
+  assert.match(R.summaryTools(payload(rows), { now: NOW, scope: { kind: 'all' }, rooms: [] }), /Needs attention · 2</);
+  assert.deepEqual(ids(all), ['a', 'b', 'c', 'd', 'e']);
   assert.deepEqual(R.filterRows(SCOPE_ROWS, { kind: 'room', name: 'UPEN' }).map((r) => r.id), ['a', 'b']);
   assert.deepEqual(R.filterRows(SCOPE_ROWS, { kind: 'none' }).map((r) => r.id), ['c', 'd', 'e']);
   assert.equal(R.filterRows(SCOPE_ROWS, { kind: 'all' }).length, 5);
@@ -425,9 +428,10 @@ test('index.html: tab bar, scope container, summary and work wrappers, no Activi
   assert.ok(html.indexOf('/view.js') < html.indexOf('/resumen.js') && html.indexOf('/resumen.js') < html.indexOf('/app.js'));
 });
 
-test('style: the board-only controls are hidden on the Summary tab and the tabs have a visible focus style', () => {
+test('style: only the view-specific zones hide by tab (RP61) and the tabs have a visible focus style', () => {
   const css = fs.readFileSync(path.join(PUBLIC, 'style.css'), 'utf8');
-  assert.match(css, /body\.tab-summary[^{]*#search/);
+  assert.match(css, /body\.tab-summary[^{]*#workTools/);
+  assert.match(css, /body\.tab-work[^{]*#summaryTools/);
   assert.match(css, /\.rs-tabs button:focus-visible|:focus-visible/);
   assert.match(css, /prefers-reduced-motion/);
 });
