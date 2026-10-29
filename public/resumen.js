@@ -320,7 +320,11 @@
     if (!info.adoptedFound) return `${note}<div class="ch-state" role="status"><p>The session is loading. The history appears with its first message.</p></div>`;
     const who = info.adopted.name || info.adopted.id;
     const items = (c.hist && c.hist.items) || [];
-    return `${note}${c.hist && c.hist.truncated ? '<div class="rs-sub ch-older">Older messages are not shown</div>' : ''}${items.map((it) => bubble(it, who)).join('') || '<div class="empty">No messages yet.</div>'}`;
+    // The question the session shows on its screen, pinned after the bubbles; read-only.
+    const d = info.live && info.live.state === 'waiting' ? info.live.dialog || {} : null;
+    const shown = d && Array.isArray(d.lines) ? d.lines.map((l, i) => (i === d.selected ? `<mark class="ask-sel">${esc(l)}</mark>` : esc(l))).join('\n') : '';
+    const card = d ? `<div class="ch-ask" role="alert"><div class="ch-ask-title">The session is asking</div>${shown ? `<pre class="ch-ask-text">${shown}</pre>` : ''}<div class="ch-ask-note">Answer it in the terminal of the session: the panel does not answer yet.</div></div>` : '';
+    return `${note}${c.hist && c.hist.truncated ? '<div class="rs-sub ch-older">Older messages are not shown</div>' : ''}${items.map((it) => bubble(it, who)).join('') || '<div class="empty">No messages yet.</div>'}${card}`;
   }
 
   // Pinned room card (not clickable yet): the aggregate of its member rows and the room session.
