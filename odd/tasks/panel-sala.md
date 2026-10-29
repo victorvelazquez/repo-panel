@@ -147,7 +147,7 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 | RP69 | S63 | pendiente | — |
 | RP70 | S64 | pruebas escritas primero (38: 31 en RED verificadas por el padre y 7 que protegen lo existente); implementación por `gentle-ai-worker` en dos fases; el padre leyó el parser completo, corrigió una prueba mal escrita (un espacio que la propia prueba borraba), lo sometió a 60 000 entradas al azar más 9 casos patológicos (0 fallas, peor caso 2,6 ms) y miró 3 capturas con una sesión sintética (0 scripts o imágenes en el chat, un solo enlace, el HTML de ejemplo literal); suite completa 1164 de 1165 | pendiente de commit |
 | RP71 | S65 | prueba primero (3, RED real: 2 fallaban); auditoría en navegador real antes del arreglo (solo `#sumLayout`; la guarda ve además `#queue`); GREEN; medida en navegador real (Work empieza en 139 px, antes 1528); suite completa | pendiente de commit |
-| RP72 | S66 | pendiente; la persona la aprueba mirándola | — |
+| RP72 | S66 | pruebas escritas primero (20: 18 en RED verificadas por el padre y 2 de protección); implementación por `gentle-ai-worker` en dos fases; el padre leyó el diff de `public/`, corrigió dos errores de la propia prueba (`aria-hidden` y una expresión que siempre coincidía), y miró capturas en navegador real de los estados libre, trabajando (animado), preguntando, cerrada y sin sesión; suite completa 1187 de 1188 | pendiente de commit |
 
 Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a → RP11b → RP12a → RP12b → RP12 → RP13 → RP14. RP12 puede ir antes de RP11 si la persona lo prefiere.
 

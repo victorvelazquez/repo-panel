@@ -696,6 +696,7 @@ function drawChat() {
   if (!on) return;
   applyChatWidth();
   paint($('#chatHead'), R.chatHead(S.chat, { name: nameOf(S.chat.id) }));
+  paint($('#sessState'), R.sessionLabelHtml(S.chat));
   const body = $('#chatBody');
   const atBottom = chatShown !== S.chat.id || !(body.scrollHeight > 0) || body.scrollHeight - body.scrollTop - body.clientHeight < 24;
   if (paint(body, R.chatBody(S.chat, { now: Date.now() })) && atBottom) body.scrollTop = body.scrollHeight;

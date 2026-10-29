@@ -259,19 +259,18 @@ const sess = (o = {}) => ({ id: 's1', name: 'panel:alpha', updatedAt: '2026-05-0
 const head = (c) => R.chatHead({ id: 'r1', ...c }, { name: 'alpha' });
 const body = (c) => R.chatBody({ id: 'r1', ...c }, { now: Date.parse('2026-05-01T12:00:00Z') });
 
-test('chat header: repo name, live chip with icon + word, adopted session name, close button, and a banner for working or waiting', () => {
-  assert.match(head({ info: null }), /alpha[\s\S]*\? unknown[\s\S]*data-act="chat-close"/);
+test('chat header: only the repo name (the session id is its tooltip) and the close button; the state lives in the composer label', () => {
   const adopted = { id: 's1', name: 'panel:alpha' };
   const w = head({ info: info({ adopted, adoptedFound: true, live: { state: 'working', count: 1 } }) });
-  assert.match(w, /● working/);
-  assert.match(w, /<span class="mono[^"]*"[^>]*>panel:alpha</);
-  assert.match(w, /The session is working/);
-  assert.match(head({ info: info({ adopted, live: { state: 'waiting', count: 1 } }) }), /◐ asking you[\s\S]*The session is asking you something\. Answer it in its terminal: the panel does not answer yet\./);
-  const free = head({ info: info({ adopted, adoptedFound: true, live: { state: 'free', count: 1 } }) });
-  assert.match(free, /○ free/);
-  assert.doesNotMatch(free, /ch-live/);
-  assert.doesNotMatch(head({ info: info({ adopted, live: { state: 'unknown', count: 0 } }) }), /ch-live/);
-  assert.match(head({ info: info() }), /○ no session/);
+  assert.match(w, /<b class="ch-name" title="alpha · s1">alpha<\/b>[\s\S]*data-act="chat-close"/);
+  assert.doesNotMatch(w, /chip|panel:alpha|working|role="status"/);
+  assert.match(head({ info: null }), /title="alpha">alpha<\/b>/);
+  const label = (i) => R.sessionLabelHtml({ id: 'r1', info: i });
+  assert.match(label(info({ adopted, adoptedFound: true, live: { state: 'working', count: 1 } })), /ss-working[\s\S]*●<\/i> working…/);
+  assert.match(label(info({ adopted, adoptedFound: true, live: { state: 'waiting', count: 1 } })), /ss-waiting[\s\S]*◐<\/i> asking you something/);
+  assert.match(label(info({ adopted, adoptedFound: true, live: { state: 'free', count: 1 } })), /○<\/i> free/);
+  assert.match(label(info()), /○<\/i> no session/);
+  assert.match(label(null), /loading…/);
 });
 
 test('no adopted session: up to 5 sessions with Adopt buttons, a Start button, all text escaped; Start is disabled while starting', () => {

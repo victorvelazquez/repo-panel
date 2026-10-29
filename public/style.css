@@ -338,8 +338,6 @@ button:is([data-cmd], [data-kind], header .primary, .empty .primary, .merge):dis
 .ch-head { border-bottom: 1px solid var(--line); }
 .ch-row { display: flex; align-items: center; gap: 8px; padding: 10px 14px; min-width: 0; }
 .ch-name { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ch-sess { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.ch-live { padding: 6px 14px; font-size: 12px; color: var(--text); background: #12253d; border-top: 1px solid var(--line); }
 .ch-body { flex: 1; min-height: 0; overflow: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
 .ch-body .empty { padding: 30px 0; }
 .ch-foot { padding: 8px 14px; border-top: 1px solid var(--line); }
@@ -377,6 +375,16 @@ button:is([data-cmd], [data-kind], header .primary, .empty .primary, .merge):dis
 /* RP68: the composer at the bottom of the chat and its "/ Actions" menu (opens upwards, anchored to the bar). */
 #chat .ch-body { flex: 1 1 0; }
 .composer { flex: none; margin: 0 12px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); padding: 8px 8px 6px; display: grid; gap: 6px; }
+.sess-state { min-height: 18px; padding: 0 6px; font-size: 12px; color: var(--muted); }
+.ss { display: inline-flex; align-items: center; gap: 5px; }
+.ss-dot { font-style: normal; display: inline-block; }
+.ss-green { color: var(--green); }
+.ss-yellow { color: var(--yellow); }
+.ss-gray { color: var(--muted); }
+.ss-anim .ss-dot { animation: pulse-dot 1.2s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .ss-anim .ss-dot { animation: none; }
+}
 .composer:focus-within { border-color: var(--blue); }
 .composer textarea { width: 100%; min-height: 42px; max-height: 150px; resize: none; border: 0; background: transparent; color: var(--text); font: inherit; padding: 4px 6px; }
 .composer textarea:focus-visible { outline: none; }
