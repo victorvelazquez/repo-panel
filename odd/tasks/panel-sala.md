@@ -72,6 +72,8 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 - **S62. Explorador de archivos y visor único.** «un explorador y lectura de archivos del repo resaltando los editados que están en diff y al seleccionar un archivo que muestre las líneas de códigos, tanto editado o no.»; «usar esa misma visualizador de leer códigos de archivos para visualizar también diffs.»; «poder verlos igual. es mi front visualiador. es seguro.» (los archivos con pinta de secreto se ven); «lo que pueda ser complicado podemos dejar para después.» Unidades RP64 (visor), RP65 (explorador) y RP66 (resaltado, después).
 - **S63. Textos sin «pi» ni «Gentle Shell».** «no estemos apuntando a la sesion de pi, lo que usamos es gentle shell.»; «podemos no mensionar pi o gentle shell.»; «los nombres de adentro del codigo puede seguir siendo pi, ya que gentle shell es una capa encima de pi nomas.»; «podes hacer en su propia pr.» Unidad RP69.
 - **S64. Chat con formato.** «los mensajes en el chat no se ven con formato, no se distingue titulos, lista, parrafos, enters y demas.» Unidad RP70.
+- **S65. La pestaña Work no se ve debajo de Summary.** «cuando selecciono la pestaña work me carga el contenido debajo de la ventana de summary, o no llegamos todavia a esa ventana para corregir». Unidad RP71.
+- **S66. Estado de la sesión dentro de la caja.** «el chat cuando esta deshabilitado porque la sesion esta trabajando, deberia mostrar su estado encima del input del chat el estado»; «los estados podrian ser dentro del input mismo bien arriba a la izquierda, asi no ocupa un espacio del chat?»; «que tenga los colores de indicacion como ya estamos haciendo para cada estado, tambien que se anime cuando esta trabajando.»; «el estado que muestra arriba del chat que esta al lado del nombre del repo podemos eliminar? tambien el id de la sesion que aparece al lado del nombre de repo podriamos eliminar si no tiene tanta importancia para el usuario.» Unidad RP72.
 
 ## Tasks
 
@@ -144,6 +146,8 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 | RP68 | S49, S54 | pruebas escritas primero (31, RED verificado por el padre); implementación por `gentle-ai-worker` con encargo cerrado en dos fases; el padre leyó el diff completo (166 líneas de producción) y miró 6 capturas con una sesión sintética; suite completa 1126 de 1127 | pendiente de commit |
 | RP69 | S63 | pendiente | — |
 | RP70 | S64 | pruebas escritas primero (38: 31 en RED verificadas por el padre y 7 que protegen lo existente); implementación por `gentle-ai-worker` en dos fases; el padre leyó el parser completo, corrigió una prueba mal escrita (un espacio que la propia prueba borraba), lo sometió a 60 000 entradas al azar más 9 casos patológicos (0 fallas, peor caso 2,6 ms) y miró 3 capturas con una sesión sintética (0 scripts o imágenes en el chat, un solo enlace, el HTML de ejemplo literal); suite completa 1164 de 1165 | pendiente de commit |
+| RP71 | S65 | prueba primero (3, RED real: 2 fallaban); auditoría en navegador real antes del arreglo (solo `#sumLayout`; la guarda ve además `#queue`); GREEN; medida en navegador real (Work empieza en 139 px, antes 1528); suite completa | pendiente de commit |
+| RP72 | S66 | pendiente; la persona la aprueba mirándola | — |
 
 Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a → RP11b → RP12a → RP12b → RP12 → RP13 → RP14. RP12 puede ir antes de RP11 si la persona lo prefiere.
 
@@ -864,3 +868,20 @@ Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a →
 > - otro detalle, los mensajes en el chat no se ven con formato, no se distingue titulos, lista, parrafos, enters y demas. no se si llegaste a notar esos defectos en el screen.
 
 *Aplicado: S63 y S64 y las unidades RP69 y RP70. Causa de RP70 vista en el código: `clean()` de `server/sessions.js` vuelve espacios los saltos de línea del historial. Orden propuesto: RP70 → RP69 → RP56.*
+
+
+**L76.**
+
+> - cuando decis no meter html me genera duda cuando el chat viene con ejemplos de codigo.?
+
+> hay un problema tambien, cuando selecciono la pestaña work me carga el contenido debajo de la ventana de summary, o no llegamos todavia a esa ventana para corregir
+
+> el chat cuando esta deshabilitado porque la sesion esta trabajando, deberia mostrar su estado encima del input del chat el estado: (captura)
+
+> perfecto, que tenga los colores de indicacion como ya estamos haciendo para cada estado, tambien que se anime cuando esta trabajando.
+
+> los estados podrian ser dentro del input mismo bien arriba a la izquierda, asi no ocupa un espacio del chat? (captura del prompt de Gentle Shell)
+
+> perfecto, me gusta tu propuesta, y el estado que muestra arriba del chat que esta al lado del nombre del repo podemos eliminar? tambien el id de la sesion que aparece al lado del nombre de repo podriamos eliminar si no tiene tanta importancia para el usuario.
+
+*Aplicado: S65 y S66, la unidad RP71 (cerrada en este diff) y la unidad RP72. La duda sobre el HTML y el código de ejemplo se respondió dentro de RP70 (escapar primero; el código se ve literal).*

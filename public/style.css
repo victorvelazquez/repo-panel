@@ -320,6 +320,8 @@ button:is([data-cmd], [data-kind], header .primary, .empty .primary, .merge):dis
 
 /* ---------- RP54: chat panel next to the Summary cards ---------- */
 .chatlayout { display: flex; align-items: stretch; }
+/* An author `display` beats the browser's `[hidden] { display: none }`: every block the page hides with the attribute and that gets a display rule needs this line (RP71). */
+.chatlayout[hidden], .queue[hidden] { display: none; }
 .chatlayout #summary { flex: 1 1 0; min-width: 0; }
 .chatlayout.chat-open { height: calc(100vh - 140px); min-height: 480px; }
 .chatlayout.chat-open #summary { max-width: none; margin: 0; min-width: 360px; overflow: auto; }
