@@ -132,13 +132,36 @@
     return Math.max(CHAT_MIN, Math.min(Math.round(total * r), total - CARDS_MIN));
   };
   const liveOf = (c) => (c.info && c.info.live && c.info.live.state) || 'unknown';
-  const CLOSED = '<span class="chip gray">○ session closed</span>';
-  const BANNER = { working: '● The session is working', waiting: '◐ The session is asking you something. Answer it in its terminal: the panel does not answer yet.' };
+  // The state of the adopted session, shown inside the composer frame (RP72). Icon + word, never colour alone.
+  const SESS_TITLE = {
+    loading: 'Loading the session', none: 'No session adopted for this repo', closed: 'The adopted session is not open any more',
+    free: 'The session is free: you can write to it', working: 'The session is working', waiting: 'Answer it in its terminal: the panel does not answer yet.',
+    unknown: 'The session state is unknown',
+  };
+  const SESS_VIEW = {
+    loading: ['gray', '○', 'loading…'], none: ['gray', '○', 'no session'], closed: ['gray', '○', 'session closed'], free: ['gray', '○', 'free'],
+    working: ['green', '●', 'working…'], waiting: ['yellow', '◐', 'asking you something'], unknown: ['gray', '?', 'unknown'],
+  };
+  function sessionState(c) {
+    const info = c.info;
+    let key;
+    if (!info) key = 'loading';
+    else if (!info.adopted) key = 'none';
+    else if (!info.adoptedFound) key = 'loading';
+    else key = { none: 'closed', free: 'free', working: 'working', waiting: 'waiting' }[liveOf(c)] || 'unknown';
+    const [tone, icon, word] = SESS_VIEW[key];
+    return { key, tone, icon, word: info && info.adopted && key === 'loading' ? `session ${word}` : word, title: SESS_TITLE[key], animate: key === 'working' };
+  }
+  const sessionLabelHtml = (c) => {
+    const s = sessionState(c);
+    return `<span class="ss ss-${s.tone} ss-${s.key}${s.animate ? ' ss-anim' : ''}" role="status" title="${esc(s.title)}"><i class="ss-dot" aria-hidden="true">${s.icon}</i> ${s.word}</span>`;
+  };
 
+  // The header: the repo name (the session id is only its tooltip) and the close button.
   function chatHead(c, ctx = {}) {
     const adopted = c.info && c.info.adopted;
-    const banner = adopted && BANNER[liveOf(c)] ? `<div class="ch-live" role="status">${BANNER[liveOf(c)]}</div>` : '';
-    return `<div class="ch-row"><b class="ch-name" title="${esc(ctx.name)}">${esc(ctx.name)}</b>${adopted && liveOf(c) === 'none' ? CLOSED : sessionChip(liveOf(c))}${adopted ? `<span class="mono ch-sess" title="${esc(adopted.id)}">${esc(adopted.name || adopted.id)}</span>` : ''}<button type="button" class="x" data-act="chat-close" aria-label="Close the chat" title="Close the chat (Esc)">✕</button></div>${banner}`;
+    const tip = adopted ? `${ctx.name} · ${adopted.id}` : ctx.name;
+    return `<div class="ch-row"><b class="ch-name" title="${esc(tip)}">${esc(ctx.name)}</b><button type="button" class="x" data-act="chat-close" aria-label="Close the chat" title="Close the chat (Esc)">✕</button></div>`;
   }
 
   // The composer (RP68, S49): can the person send free text now, and if not, why. c = { id, info, sending }.
@@ -356,5 +379,5 @@
     return `${ctx.failed ? '<div class="rs-note" role="status">⚠ Summary unavailable: showing the last data we have.</div>' : ''}<div class="rs-list">${body}</div>${rows.length ? LEGEND : ''}`;
   }
 
-  return { esc, mdHtml, sessionChip, chatWidth, composerState, actionMenu, actionMenuHtml, composerNote, chatHead, chatBody, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
+  return { esc, mdHtml, sessionChip, chatWidth, composerState, actionMenu, actionMenuHtml, composerNote, chatHead, sessionState, sessionLabelHtml, chatBody, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
 }));

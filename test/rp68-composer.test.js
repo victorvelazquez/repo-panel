@@ -269,13 +269,12 @@ test('composerNote: empty for null; escaped text in a span; the Clear button onl
   assert.match(withClear, /<button type="button" data-act="chat-clear" data-id="a&quot;c">Clear the box<\/button>/);
 });
 
-test('chatHead: an adopted session that is closed says "session closed"; with none adopted it still says "no session"', () => {
-  const head = (i) => R.chatHead({ id: 'r1', info: i }, { name: 'alpha' });
-  const closed = head(adoptedInfo('none'));
-  assert.match(closed, /○ session closed/);
-  assert.doesNotMatch(closed, /○ no session/);
-  assert.match(head(info()), /○ no session/);
-  assert.doesNotMatch(head(info()), /session closed/);
+test('sessionState: an adopted session that is closed says "session closed"; with none adopted it still says "no session"', () => {
+  const word = (i) => R.sessionState({ id: 'r1', info: i }).word;
+  assert.equal(word(adoptedInfo('none')), 'session closed');
+  assert.equal(word(info()), 'no session');
+  assert.doesNotMatch(R.sessionLabelHtml({ id: 'r1', info: info() }), /session closed/);
+  assert.doesNotMatch(R.chatHead({ id: 'r1', info: adoptedInfo('none') }, { name: 'alpha' }), /session closed|no session/);
 });
 
 // ---------- server: readChat file match ----------
