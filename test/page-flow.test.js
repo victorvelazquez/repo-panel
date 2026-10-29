@@ -52,7 +52,7 @@ const card = (page, l, p, verdict = null) => {
 };
 const prOf = (checks, o = {}) => ({ number: 7, title: 'T', url: 'https://github.com/o/demo/pull/7', head: 'task', base: 'main', ready: false, blockedReason: 'x', mergeStateStatus: 'BLOCKED', isDraft: false, reviewDecision: null, checks: { total: 1, passed: 0, failed: 1, pending: 0, failedRuns: [], items: [{ name: 'test', state: 'failed' }], ...checks }, ...o });
 
-const button = (cmd, label, title = `Send /${cmd} to the open pi session of this repo`) => `<button data-act="pi" data-id="abc" data-cmd="${cmd}" title="${title}">${label}</button>`;
+const button = (cmd, label, title = `Send /${cmd} to the open session of this repo`) => `<button data-act="pi" data-id="abc" data-cmd="${cmd}" title="${title}">${label}</button>`;
 
 test('page: the /flow-commit button on a Changes card keeps its markup', () => {
   const html = card(loadPage(), local({ files: [file] }), {});
@@ -98,7 +98,7 @@ test('page: the "Show /flow-commit anyway" menu item is offered on a dirty card,
 test('page: a failed PR shows "Fix CI" (also with no run to re-run) and "Re-run failed" only when there are runs', () => {
   const page = loadPage();
   const prCard = page.get('prCard');
-  const fix = '<button data-act="pi" data-id="abc" data-cmd="fix-pr" data-pr="7" title="Ask the open pi session to find out why the checks failed and fix it (it will not commit or push)">Fix CI</button>';
+  const fix = '<button data-act="pi" data-id="abc" data-cmd="fix-pr" data-pr="7" title="Ask the open session to find out why the checks failed and fix it (it will not commit or push)">Fix CI</button>';
   const noRuns = prCard(R, prOf({ state: 'failed' }), {});
   assert.ok(noRuns.includes(fix), noRuns);
   assert.equal(noRuns.includes('Re-run failed'), false);

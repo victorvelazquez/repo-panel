@@ -124,7 +124,7 @@ test('piSend: refuses a session that is asking with 409 and never sends a key or
   for (const preview of [DIALOG, DIALOG + IDLE_BAR, DIALOG + WORKING_BAR]) {
     for (const key of ['flow-commit', 'flow-pr', 'flow-base']) {
       const f = fakeOrca({ preview });
-      await assert.rejects(piSend(REPO, key, f.orca, noWait), (e) => e.status === 409 && e.message === 'The pi session is waiting for your answer to a question');
+      await assert.rejects(piSend(REPO, key, f.orca, noWait), (e) => e.status === 409 && e.message === 'The session is waiting for your answer to a question');
       assert.equal(f.sends().length, 0);
       assert.equal(f.calls.every((c) => c[0] === 'list' || c[0] === 'show'), true);
     }
@@ -182,7 +182,7 @@ test('flowVerdict: an asking session keeps the command running with a distinct l
 test('flowVerdict: the other session states keep their rows, with no asking flag', () => {
   const run = (cmd, l, session, now = NOW, o = {}) => view.flowVerdict(sentOf(cmd, o), l, session, { prs: [] }, now);
   const busy = run('flow-pr', lcl({ ahead: 1 }), 'busy');
-  assert.deepEqual([busy.state, busy.reason, busy.label, busy.asking], ['running', 'The pi session is working', 'creating pull request…', undefined]);
+  assert.deepEqual([busy.state, busy.reason, busy.label, busy.asking], ['running', 'The session is working', 'creating pull request…', undefined]);
   assert.equal(run('flow-commit', lcl({ files: [{ path: 'a', status: 'M' }] }), 'idle').state, 'attention');
   assert.equal(run('flow-pr', lcl({ ahead: 1 }), 'closed').state, 'attention');
   assert.equal(run('flow-base', lcl({ branch: 'main' }), undefined).asking, undefined);
@@ -191,9 +191,9 @@ test('flowVerdict: the other session states keep their rows, with no asking flag
 
 test('queueFlags: an asking verdict makes the repo wait for the user, and nothing else changes', () => {
   const asking = view.flowVerdict(sentOf('flow-commit'), lcl(), 'asking', { prs: [] }, NOW);
-  assert.deepEqual(view.queueFlags(lcl(), null, asking, { now: NOW }), { waiting: { state: 'needs-input', next: 'Answer the question in the pi session' } });
-  const queue = workQueue([{ id: 'a', name: 'demo', dirty: true, unpushed: false, waiting: { state: 'needs-input', next: 'Answer the question in the pi session' } }]);
-  assert.deepEqual(queue.map((a) => [a.kind, a.state, a.next]), [['waiting', 'needs-input', 'Answer the question in the pi session']]);
+  assert.deepEqual(view.queueFlags(lcl(), null, asking, { now: NOW }), { waiting: { state: 'needs-input', next: 'Answer the question in the session' } });
+  const queue = workQueue([{ id: 'a', name: 'demo', dirty: true, unpushed: false, waiting: { state: 'needs-input', next: 'Answer the question in the session' } }]);
+  assert.deepEqual(queue.map((a) => [a.kind, a.state, a.next]), [['waiting', 'needs-input', 'Answer the question in the session']]);
 });
 
 test('queueFlags: running without asking, attention, no verdict and a declared state behave as before', () => {

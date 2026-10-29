@@ -497,7 +497,7 @@ function reqBlock(r) {
   if (!e || e.state !== 'loaded') return `<div class="conf-item">${name}<div class="conf-line">${e ? 'Could not read the requirements' : 'Checking the requirements…'}</div></div>`;
   // The same action as the card's ⋯ menu (and its protection against a second click): offered while any requirement is open.
   const offered = V && V.cardMenu(e, false).some((i) => i.act === 'put-in-conditions');
-  const put = offered ? `<button class="conf-put" data-act="put-in-conditions" data-id="${esc(r.id)}"${S.sending[r.id] ? ' disabled' : ''} title="Asks the pi session of this repo to apply the requirements that are not passing">Put in conditions</button>` : '';
+  const put = offered ? `<button class="conf-put" data-act="put-in-conditions" data-id="${esc(r.id)}"${S.sending[r.id] ? ' disabled' : ''} title="Asks the session of this repo to apply the requirements that are not passing">Put in conditions</button>` : '';
   return `<div class="conf-item">${name}${put}${reqResults(r.id, e.data)}</div>`;
 }
 
@@ -760,7 +760,7 @@ async function sendChatMessage() {
     if (!d.sent) throw new Error('The message was not sent');
     if (S.drafts[id] === text) delete S.drafts[id];
     if (S.chat.id === id) $('#msgBox').value = '';
-    if (d.leftInBox) sayNote(id, 'The text is still in the pi prompt box; the panel never resends it.', true);
+    if (d.leftInBox) sayNote(id, 'The text is still in the prompt box; the panel never resends it.', true);
     else if (!d.delivered) sayNote(id, 'Sent, but it could not be confirmed: check the session.');
   } catch (e) { sayNote(id, e.message); } finally { delete S.msgBusy[id]; }
   if (S.chat.id === id) loadChat(id);
@@ -950,7 +950,7 @@ const repoName = (r, url) => (url
 const removeBtn = (r) => `<button class="x" data-act="remove" data-id="${r.id}" title="Remove from panel (deletes nothing)">✕</button>`;
 
 // Types the command into the repo's open pi session (through Orca); the server refuses when that is not safe.
-const piBtn = (r, cmd, label = `/${cmd}`, { title = `Send /${cmd} to the open pi session of this repo`, pr, disabled = false } = {}) => `<button data-act="pi" data-id="${r.id}" data-cmd="${cmd}"${pr ? ` data-pr="${pr}"` : ''} title="${esc(title)}"${disabled ? ' disabled' : ''}>${esc(label)}</button>`;
+const piBtn = (r, cmd, label = `/${cmd}`, { title = `Send /${cmd} to the open session of this repo`, pr, disabled = false } = {}) => `<button data-act="pi" data-id="${r.id}" data-cmd="${cmd}"${pr ? ` data-pr="${pr}"` : ''} title="${esc(title)}"${disabled ? ' disabled' : ''}>${esc(label)}</button>`;
 
 // "⋯" menu of a card. Its open state lives in S (the page redraws on every refresh); `slot` tells apart
 // the several cards of one repo. Empty while the requirements are not loaded or nothing is left to do.
@@ -1101,7 +1101,7 @@ function checksChip(c) {
   return `<span class="chip yellow chip-verify" title="${tip}"><span class="pulse-dot" aria-hidden="true" ${animStyle()}></span>verifying checks · ${c.pending} running · ${c.passed}/${c.total}</span>`;
 }
 
-const FIX_PR_HINT = 'Ask the open pi session to find out why the checks failed and fix it (it will not commit or push)';
+const FIX_PR_HINT = 'Ask the open session to find out why the checks failed and fix it (it will not commit or push)';
 
 // `running` is the verdict of a command running in this repo's session: it disables every button that would talk to it.
 function prCard(r, pr, meta, running = null) {
@@ -1284,7 +1284,7 @@ const ACTIONS = {
         startSent(id, { cmd, at: Date.now(), head: before.head ?? null, branch: before.branch ?? null, files: before.files.length, ahead: before.ahead || 0 });
       } else if (!judged && d.sent) startSent(id, { cmd, at: Date.now() });
       const what = cmd === 'fix-pr' ? `the fix order for #${pr}` : cmd === 'flow-base-stash' ? '/flow-base --stash' : `/${cmd}`;
-      toast(d.confirmed ? `Sent ${what} to pi` : `Sent ${what}, not confirmed: check the pi session`, d.confirmed ? 'ok' : '');
+      toast(d.confirmed ? `Sent ${what} to the session` : `Sent ${what}, not confirmed: check the session`, d.confirmed ? 'ok' : '');
     } catch (e) { toast(e.message, 'bad'); } finally {
       delete S.sending[id];
       el.disabled = false;
@@ -1332,7 +1332,7 @@ const ACTIONS = {
     try {
       const d = await api('/api/pi', { id, command: 'put-in-conditions' });
       if (d.sent) startSent(id, { cmd: 'put-in-conditions', at: Date.now() });
-      toast(d.confirmed ? 'Sent the put-in-conditions order to pi' : 'Sent the put-in-conditions order, not confirmed: check the pi session', d.confirmed ? 'ok' : '');
+      toast(d.confirmed ? 'Sent the put-in-conditions order to the session' : 'Sent the put-in-conditions order, not confirmed: check the session', d.confirmed ? 'ok' : '');
     } catch (e) { toast(e.message, 'bad'); } finally {
       delete S.sending[id];
       draw();

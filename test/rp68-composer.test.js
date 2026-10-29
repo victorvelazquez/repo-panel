@@ -155,7 +155,7 @@ test('composerState: one distinct, non-empty reason per blocked case and a non-e
   assert.equal(new Set(Object.values(cases).map((v) => v.reason)).size, 8);
   assert.equal(cases.notAdopted.reason, 'Adopt or start a session first');
   assert.equal(cases.loading.reason, 'The session is loading');
-  assert.equal(cases.none.reason, 'No open pi session of this repo');
+  assert.equal(cases.none.reason, 'No open session of this repo');
   assert.equal(cases.working.reason, WORKING);
   assert.equal(cases.waiting.reason, 'The session is asking you something: answer it in its terminal');
   assert.equal(cases.sending.reason, 'Sending…');
@@ -378,17 +378,17 @@ test('chat-send: text left in the prompt box clears the textarea, offers Clear t
 });
 
 test('chat-clear: an error shows its message', async () => {
-  const { page } = await ready({ '/api/chat/send': { sent: true, delivered: false, leftInBox: true }, '/api/chat/clear': () => fail(409, 'The pi session is working; wait until it is free') });
+  const { page } = await ready({ '/api/chat/send': { sent: true, delivered: false, leftInBox: true }, '/api/chat/clear': () => fail(409, 'The session is working; wait until it is free') });
   typeIn(page, 'stuck');
   await sendClick(page);
   await page.tick();
   await act(page, 'chat-clear', element({ dataset: { id: 'abc' } }));
   await page.tick();
-  assert.match(page.get('#msgNote').html, /The pi session is working; wait until it is free/);
+  assert.match(page.get('#msgNote').html, /The session is working; wait until it is free/);
 });
 
 test('chat-send: a server error keeps the text, shows the server message, and a later dispatch is allowed', async () => {
-  const msg = 'The pi session is working; wait until it is free';
+  const msg = 'The session is working; wait until it is free';
   const { page } = await ready({ '/api/chat/send': () => fail(409, msg) });
   typeIn(page, 'keep me');
   await sendClick(page);

@@ -91,7 +91,7 @@ test('sanitizeText refuses empty, huge, non-string and leading-! texts, never tr
   for (const v of [1, {}, [], null, undefined, true]) bad(v, /string/);
   bad('x'.repeat(4001), /longer than 4000/);
   assert.equal(sanitizeText('x'.repeat(4000)).length, 4000);
-  for (const v of ['!ls', '   !ls', '\x1b!ls', '\u200b!ls', '\n!ls']) bad(v, /^Messages that start with ! run a shell command in pi; type those in the terminal$/);
+  for (const v of ['!ls', '   !ls', '\x1b!ls', '\u200b!ls', '\n!ls']) bad(v, /^Messages that start with ! run a shell command; type those in the terminal$/);
   assert.equal(sanitizeText('hi !ok'), 'hi !ok');
 });
 
@@ -180,12 +180,12 @@ test('no adopted session sends nothing and does not even look at Orca', async ()
 test('no live session, two live sessions, busy, typed, asking, wrong name, failed list: 409/503 and zero sends', async () => {
   reset();
   const table = [
-    [{ terminals: [] }, 409, /^No open pi session found for this repo in Orca$/],
-    [{ terminals: [term(), term({ handle: 'h2' })], screens: { h1: IDLE(), h2: IDLE() } }, 409, /^Several pi sessions are open for this repo; close the extra ones$/],
-    [{ screens: { h1: BUSY() } }, 409, /^The pi session is working; wait until it is free$/],
-    [{ screens: { h1: TYPED() } }, 409, /^The pi session already has text typed in its prompt$/],
-    [{ screens: { h1: ASKING } }, 409, /^The pi session is waiting for your answer to a question$/],
-    [{ screens: { h1: IDLE('panel:other') } }, 409, /^The open pi session is not the adopted one$/],
+    [{ terminals: [] }, 409, /^No open session found for this repo in Orca$/],
+    [{ terminals: [term(), term({ handle: 'h2' })], screens: { h1: IDLE(), h2: IDLE() } }, 409, /^Several sessions are open for this repo; close the extra ones$/],
+    [{ screens: { h1: BUSY() } }, 409, /^The session is working; wait until it is free$/],
+    [{ screens: { h1: TYPED() } }, 409, /^The session already has text typed in its prompt$/],
+    [{ screens: { h1: ASKING } }, 409, /^The session is waiting for your answer to a question$/],
+    [{ screens: { h1: IDLE('panel:other') } }, 409, /^The open session is not the adopted one$/],
     [{ screens: { h1: IDLE(`${NAME}-2`) } }, 409, /not the adopted one/],
     [{ screens: { h1: `▎ ✿ waiting for input\n▎   type, or / for commands\n${NAME}\n` } }, 409, /not the adopted one/],
     [{ failList: true }, 503, /^Orca CLI is unavailable or Orca is not running$/],
@@ -253,8 +253,8 @@ test('clearChat refuses everything else with zero sends', async () => {
     [{ screens: { h1: IDLE() } }, 409, /^There is nothing typed to clear$/],
     [{ screens: { h1: BUSY() } }, 409, /^There is nothing typed to clear$/],
     [{ screens: { h1: ASKING } }, 409, /^There is nothing typed to clear$/],
-    [{ terminals: [] }, 409, /No open pi session/],
-    [{ terminals: [term(), term({ handle: 'h2' })], screens: { h1: TYPED(), h2: TYPED() } }, 409, /Several pi sessions/],
+    [{ terminals: [] }, 409, /No open session/],
+    [{ terminals: [term(), term({ handle: 'h2' })], screens: { h1: TYPED(), h2: TYPED() } }, 409, /Several sessions/],
     [{ screens: { h1: TYPED('panel:other') } }, 409, /not the adopted one/],
     [{ failList: true }, 503, /unavailable/],
   ]) {

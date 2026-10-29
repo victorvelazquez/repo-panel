@@ -138,12 +138,12 @@ async function piSend(repo, key, orca = orcaTerminal, wait = sleep, requirements
   try {
     const text = await orderText(repo, key, requirements, { pr, prs });
     const mine = await piSessions(repo, orca);
-    if (!mine.length) throw new HttpError(409, 'No open pi session found for this repo in Orca');
-    if (mine.length > 1) throw new HttpError(409, 'Several pi sessions are open for this repo; close the extra ones');
-    if (mine[0].state === 'asking') throw new HttpError(409, 'The pi session is waiting for your answer to a question');
+    if (!mine.length) throw new HttpError(409, 'No open session found for this repo in Orca');
+    if (mine.length > 1) throw new HttpError(409, 'Several sessions are open for this repo; close the extra ones');
+    if (mine[0].state === 'asking') throw new HttpError(409, 'The session is waiting for your answer to a question');
     const { handle } = mine[0];
     const state = async () => lib.piPromptState(((await orca(['show', '--terminal', handle])).terminal || {}).preview);
-    if (mine[0].state !== 'idle') throw new HttpError(409, 'The pi session is busy or has text typed in its prompt');
+    if (mine[0].state !== 'idle') throw new HttpError(409, 'The session is busy or has text typed in its prompt');
     if (guard) guard.check(repo, key);
     await orca(['send', '--terminal', handle, '--text', text, '--enter']);
     // Orca cannot report delivery, so look for the session to leave the idle prompt. `confirmed` only means the

@@ -115,7 +115,7 @@ test('fix-pr: a PR that does not exist, is not open, has no failing checks or ca
 });
 
 test('fix-pr: keeps the session safeguards (no session, busy prompt, several sessions) and sends nothing', async () => {
-  for (const [opts, re] of [[{ terminals: [] }, /No open pi session/], [{ previews: [BUSY_PI] }, /busy or has text/], [{ terminals: [piTerm(), piTerm({ handle: 'h2' })] }, /Several pi sessions/]]) {
+  for (const [opts, re] of [[{ terminals: [] }, /No open session/], [{ previews: [BUSY_PI] }, /busy or has text/], [{ terminals: [piTerm(), piTerm({ handle: 'h2' })] }, /Several sessions/]]) {
     const f = fakeOrca(opts);
     await refuses(piSend(REPO, 'fix-pr', f.orca, noWait, NEVER, { pr: 7, prs: provider(prOf()) }), 409, re);
     assert.equal(f.sends().length, 0);

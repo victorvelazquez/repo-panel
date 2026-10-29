@@ -64,7 +64,7 @@ test('page: a dirty repo with a busy session shows /flow-commit disabled with th
   await flush(); await flush();
   assert.deepEqual(page.calls, [URL_STATUS]);
   assert.equal(S.live[R.id], 'busy');
-  assert.match(commitBtn(card(page)), /title="the pi session is still working" disabled>/);
+  assert.match(commitBtn(card(page)), /title="the session is still working" disabled>/);
   page.answers[URL_STATUS] = { state: 'idle' };
   page.get('pollLive')();
   await flush(); await flush();

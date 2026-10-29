@@ -92,10 +92,10 @@ test('page: nothing running keeps the PR card and the enabled buttons exactly as
   const html = page.get('prCard')(R, prOf(), {});
   assert.match(html, /<button class="merge" data-act="merge" data-id="abc" data-n="7"\s+title="Merge into main">Merge · /);
   assert.match(html, /<button data-act="rerun" data-id="abc" data-n="7"\s*>Re-run failed<\/button>/);
-  assert.ok(html.includes('<button data-act="pi" data-id="abc" data-cmd="fix-pr" data-pr="7" title="Ask the open pi session to find out why the checks failed and fix it (it will not commit or push)">Fix CI</button>'));
+  assert.ok(html.includes('<button data-act="pi" data-id="abc" data-cmd="fix-pr" data-pr="7" title="Ask the open session to find out why the checks failed and fix it (it will not commit or push)">Fix CI</button>'));
   const page2 = loadPage();
   setup(page2, local({ files: [file] }));
-  assert.ok(cardOf(page2).includes(btn('flow-commit', '/flow-commit', 'Send /flow-commit to the open pi session of this repo')));
+  assert.ok(cardOf(page2).includes(btn('flow-commit', '/flow-commit', 'Send /flow-commit to the open session of this repo')));
 });
 
 // ---------- staged files ----------
@@ -148,7 +148,7 @@ test('page: a failed /flow-pr or /flow-base shows its reason and keeps its norma
   setup(page, local({ ahead: 1 }), { sent: { cmd: 'flow-pr', ahead: 1 }, session: 'idle' });
   const html = cardOf(page);
   assert.match(html, /Needs attention: No open pull request for task after \/flow-pr/);
-  assert.ok(html.includes(btn('flow-pr', '/flow-pr', 'Send /flow-pr to the open pi session of this repo')), html);
+  assert.ok(html.includes(btn('flow-pr', '/flow-pr', 'Send /flow-pr to the open session of this repo')), html);
 });
 
 // ---------- recording what was sent ----------

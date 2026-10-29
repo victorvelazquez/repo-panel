@@ -80,7 +80,7 @@ test('flowVerdict /flow-pr: attention names the branch after the grace period, a
   const l = local({ ahead: 1 });
   assert.equal(verdict(s, l, 'idle').reason, 'No open pull request for task after /flow-pr');
   assert.equal(verdict(s, l, 'closed').reason, 'No open pull request for task after /flow-pr');
-  assert.equal(verdict(sent('flow-pr', { at: NOW - 5000 }), l, 'closed').reason, 'The pi session closed while the command was running');
+  assert.equal(verdict(sent('flow-pr', { at: NOW - 5000 }), l, 'closed').reason, 'The session closed while the command was running');
 });
 
 test('flowVerdict /flow-pr: an unknown session gets 15 minutes, then it is attention', () => {
@@ -107,7 +107,7 @@ test('flowVerdict /flow-base: attention "Still on <branch>" after the grace peri
   assert.equal(verdict(s, local(), 'idle').reason, 'Still on task after /flow-base');
   assert.equal(verdict(sent('flow-base', { at: NOW - 5000 }), local(), 'idle').state, 'running');
   assert.equal(verdict(s, local(), 'closed').reason, 'Still on task after /flow-base');
-  assert.equal(verdict(sent('flow-base', { at: NOW - 5000 }), local(), 'closed').reason, 'The pi session closed while the command was running');
+  assert.equal(verdict(sent('flow-base', { at: NOW - 5000 }), local(), 'closed').reason, 'The session closed while the command was running');
   assert.equal(verdict(s, local({ branch: 'other' }), 'idle').state, 'attention'); // moved, but not onto a clean up-to-date base
   assert.equal(verdict(sent('flow-base', { at: NOW - 16 * 60_000 }), local(), 'unknown').state, 'attention');
 });
@@ -131,7 +131,7 @@ test('flowVerdict fix-pr and put-in-conditions: running while busy, no verdict o
     assert.equal(verdict(s, local(), 'idle'), null, `${cmd} idle`);
     assert.equal(verdict({ ...sent(cmd, { at: NOW - 5000 }), busySeen: true }, local(), 'idle'), null, `${cmd} idle after busy`);
     assert.equal(verdict(s, local({ files: [file] }), 'idle'), null, `${cmd} dirty or not, no verdict`);
-    assert.equal(verdict(sent(cmd, { at: NOW - 5000 }), local(), 'closed').reason, 'The pi session closed while the command was running');
+    assert.equal(verdict(sent(cmd, { at: NOW - 5000 }), local(), 'closed').reason, 'The session closed while the command was running');
     assert.equal(verdict(sent(cmd, { at: NOW - 16 * 60_000 }), local(), 'unknown').state, 'attention');
   }
 });

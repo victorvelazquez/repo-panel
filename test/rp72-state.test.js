@@ -216,7 +216,7 @@ test('chatHead: the id is escaped in the title and the name too; the close butto
 // ---------- composerState unchanged (PRESERVE) ----------
 test('composerState: unchanged by RP72 (working: cannot send, same reason, same placeholder)', () => {
   assert.deepEqual(R.composerState({ id: 'r1', sending: false, info: adoptedInfo('working') }, { name: 'alpha' }), { canSend: false, reason: WORKING, placeholder: WORKING });
-  assert.deepEqual(R.composerState({ id: 'r1', sending: false, info: adoptedInfo('free') }, { name: 'alpha' }), { canSend: true, reason: '', placeholder: 'Message the pi session of alpha' });
+  assert.deepEqual(R.composerState({ id: 'r1', sending: false, info: adoptedInfo('free') }, { name: 'alpha' }), { canSend: true, reason: '', placeholder: 'Message the session of alpha' });
 });
 
 // ---------- index.html ----------

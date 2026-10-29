@@ -43,8 +43,8 @@ test('flow-next is a fixed command: exactly /flow-next, no arguments', async () 
 
 test('flow-next goes through the same guards: no session, several sessions, busy, and the same-key refusal', async () => {
   for (const [opts, re] of [
-    [{ terminals: [] }, /No open pi session/],
-    [{ terminals: [piTerm(), piTerm({ handle: 'h2' })] }, /Several pi sessions/],
+    [{ terminals: [] }, /No open session/],
+    [{ terminals: [piTerm(), piTerm({ handle: 'h2' })] }, /Several sessions/],
     [{ previews: [BUSY_PI] }, /busy or has text typed/],
   ]) {
     const f = fakeOrca(opts);
@@ -79,7 +79,7 @@ const view = (rows, ctx = {}) => R.summaryView({ rows, attention: [], generatedA
 
 test('start action: a primary /flow-next button that sends the key through data-act="pi"', () => {
   const html = view([row()]);
-  assert.match(html, /<button class="primary" data-act="pi" data-id="r1" data-cmd="flow-next" title="Send \/flow-next to the open pi session of this repo \(starts T5\)">\/flow-next<\/button>/);
+  assert.match(html, /<button class="primary" data-act="pi" data-id="r1" data-cmd="flow-next" title="Send \/flow-next to the open session of this repo \(starts T5\)">\/flow-next<\/button>/);
   assert.doesNotMatch(html, /Start T5/);
 });
 
