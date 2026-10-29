@@ -31,6 +31,7 @@ const S = {
   prefs: store('prefs', { method: 'squash', del: true }),
   lastRefresh: 0, lastAt: {}, scan: [],
   tab: 'summary', scope: { kind: 'all' }, summary: null, summaryKey: '', summaryFailed: false, sfilter: 'all', collapsed: {},
+  chat: { id: null, seq: 0 },
 };
 S.tab = S.prefs.tab === 'work' ? 'work' : 'summary';
 
@@ -568,7 +569,7 @@ const summaryTick = () => { if (S.tab === 'summary' && !document.hidden) loadSum
 // Tabs only toggle `hidden` (the board keeps its own painting); the view-specific zone of the view bar hides through a body class.
 function applyTab() {
   const summary = S.tab === 'summary';
-  $('#summary').hidden = !summary;
+  $('#sumLayout').hidden = !summary; // the chat lives inside this wrapper: it exists only in Summary (S56)
   $('#work').hidden = summary;
   if (document.body && document.body.classList) { document.body.classList.toggle('tab-summary', summary); document.body.classList.toggle('tab-work', !summary); }
   for (const b of Array.from((document.querySelectorAll && document.querySelectorAll('[role=tab][data-tab]')) || [])) b.setAttribute('aria-selected', String(b.dataset.tab === S.tab));
@@ -577,7 +578,7 @@ function setTab(tab) {
   S.tab = tab;
   applyTab();
   setPref('tab', tab);
-  if (tab === 'summary') loadSummary();
+  if (tab === 'summary') { loadSummary(); if (S.chat.id) loadChat(S.chat.id); }
 }
 
 // The "deliver" button of a Summary row is the first button the board's own card would show for that repo.
@@ -608,7 +609,7 @@ function drawSummary() {
   const box = $('#summary');
   const ctx = {
     now: Date.now(), scope, rooms: S.rooms, q: S.q, group: S.group, roomData: S.roomData.data, filter: S.sfilter, collapsed: S.collapsed, failed: S.summaryFailed,
-    flowFor: summaryFlow, changesFor: summaryChanges, sending: S.sending, busy: S.busy,
+    flowFor: summaryFlow, changesFor: summaryChanges, sending: S.sending, busy: S.busy, chatId: S.chat.id,
   };
   if (paint($('#summaryTools'), R.summaryTools(S.summary, ctx)) && kept && kept.act === 'sfilter') { const on = $('#summaryTools [data-act="sfilter"]'); if (on && on.focus) on.focus(); }
   const changed = paint(box, R.summaryView(S.summary, ctx));
@@ -617,6 +618,104 @@ function drawSummary() {
     if (again && again.focus) again.focus();
   }
 }
+
+// ---------- chat (RP54) ----------
+// One chat for the whole Summary: the repo card that is open. It only READS (GET /api/sessions, GET /api/chat) and runs the
+// explicit Adopt and Start session buttons; the panel sends no text to any session from here.
+const CHAT_MS = 5000;
+const CHAT_KEY = 'repo-panel.chatRatio';
+const chatUrl = (path, id) => `${path}?id=${encodeURIComponent(id)}`;
+let chatShown = null;
+let chatRatio = null;
+try { const v = parseFloat(localStorage.getItem(CHAT_KEY)); if (v > 0.1 && v < 0.9) chatRatio = v; } catch { /* no storage: default width */ }
+
+async function loadChat(id) {
+  const seq = ++S.chat.seq;
+  try {
+    const info = await api(chatUrl('/api/sessions', id));
+    const hist = info.adopted ? await api(chatUrl('/api/chat', id)) : null;
+    if (seq !== S.chat.seq || S.chat.id !== id) return; // the user switched card or closed the chat meanwhile
+    const key = JSON.stringify([info, hist]);
+    const recovered = S.chat.failed;
+    S.chat.failed = false;
+    if (key === S.chat.key && !recovered) return;
+    Object.assign(S.chat, { info, hist, key });
+    draw();
+  } catch {
+    if (seq === S.chat.seq && S.chat.id === id && !S.chat.failed) { S.chat.failed = true; draw(); }
+  }
+}
+function openChat(id) {
+  if (!R || !id || S.chat.id === id) return;
+  S.chat = { id, seq: S.chat.seq + 1 };
+  draw();
+  loadChat(id);
+}
+function closeChat() {
+  if (!S.chat.id) return;
+  S.chat = { id: null, seq: S.chat.seq + 1 };
+  chatShown = null;
+  draw();
+}
+const chatTick = () => { if (S.chat.id && S.tab === 'summary' && !document.hidden) loadChat(S.chat.id); };
+
+function chatWidthNow() {
+  const layout = $('#sumLayout');
+  const total = (layout.clientWidth || 0) - ($('#split').offsetWidth || 0);
+  return total > 0 && R ? { total, width: R.chatWidth(total, chatRatio) } : null;
+}
+function applyChatWidth() {
+  const w = chatWidthNow();
+  if (!w) return;
+  if ($('#chat').style.setProperty) $('#chat').style.setProperty('--chat-w', `${w.width}px`);
+  $('#split').setAttribute('aria-valuenow', String(Math.round((w.width / w.total) * 100)));
+}
+function setChatWidth(px) {
+  const w = chatWidthNow();
+  if (!w) return;
+  chatRatio = R.chatWidth(w.total, px / w.total) / w.total;
+  try { localStorage.setItem(CHAT_KEY, String(chatRatio)); } catch { /* not persisted */ }
+  applyChatWidth();
+}
+function resetChatWidth() {
+  chatRatio = null;
+  try { localStorage.removeItem(CHAT_KEY); } catch { /* nothing stored */ }
+  applyChatWidth();
+}
+
+function drawChat() {
+  const on = !!S.chat.id && !!R;
+  $('#chat').hidden = !on;
+  $('#split').hidden = !on;
+  if (document.body && document.body.classList) $('#sumLayout').classList.toggle('chat-open', on);
+  if (!on) return;
+  applyChatWidth();
+  paint($('#chatHead'), R.chatHead(S.chat, { name: nameOf(S.chat.id) }));
+  const body = $('#chatBody');
+  const atBottom = chatShown !== S.chat.id || !(body.scrollHeight > 0) || body.scrollHeight - body.scrollTop - body.clientHeight < 24;
+  if (paint(body, R.chatBody(S.chat, { now: Date.now() })) && atBottom) body.scrollTop = body.scrollHeight;
+  chatShown = S.chat.id;
+}
+
+const splitEl = $('#split');
+if (splitEl) {
+  let dragging = false;
+  splitEl.addEventListener('pointerdown', (e) => { dragging = true; if (splitEl.setPointerCapture) splitEl.setPointerCapture(e.pointerId); });
+  splitEl.addEventListener('pointermove', (e) => {
+    if (dragging) setChatWidth($('#sumLayout').getBoundingClientRect().right - e.clientX - (splitEl.offsetWidth || 0) / 2);
+  });
+  const endDrag = (e) => { if (!dragging) return; dragging = false; if (splitEl.releasePointerCapture) splitEl.releasePointerCapture(e.pointerId); };
+  splitEl.addEventListener('pointerup', endDrag);
+  splitEl.addEventListener('pointercancel', endDrag);
+  splitEl.addEventListener('keydown', (e) => {
+    const w = chatWidthNow();
+    if (e.key === 'Enter') resetChatWidth();
+    else if (w && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) { e.preventDefault(); setChatWidth(w.width + (e.key === 'ArrowLeft' ? 24 : -24)); }
+  });
+  splitEl.addEventListener('dblclick', resetChatWidth);
+}
+if (window.addEventListener) window.addEventListener('resize', applyChatWidth);
+// ---------- end chat ----------
 
 // ---------- board ----------
 let raf = 0;
@@ -741,6 +840,7 @@ function render() {
   drawQueue();
   drawConformity();
   drawSummary();
+  drawChat();
   if (!allRepos().length) {
     paint($('#app'), '<div class="empty">No repositories yet.<br><br><button class="primary" data-act="add-dialog">+ Add your first repo</button></div>');
     return;
@@ -1091,6 +1191,25 @@ const ACTIONS = {
   'scope': (el) => { S.scope = el.dataset.kind === 'room' ? { kind: 'room', name: el.dataset.name } : { kind: el.dataset.kind === 'none' ? 'none' : 'all' }; draw(); },
   // "Open", "Start" and "⋯" of the Summary: show only this repo on the board.
   'focus-repo': (el) => { S.q = nameOf(el.dataset.id); $('#search').value = S.q; setTab('work'); },
+  'chat-open': (el) => openChat(el.dataset.id),
+  'chat-close': () => closeChat(),
+  'chat-adopt': async (el) => {
+    const { id, session } = el.dataset;
+    try { await api('/api/sessions/adopt', { id, session }); } catch (e) { toast(e.message, 'bad'); }
+    if (S.chat.id === id) loadChat(id);
+  },
+  'chat-start': async (el) => {
+    const { id } = el.dataset;
+    if (S.chat.starting) return;
+    S.chat.starting = true;
+    el.disabled = true;
+    draw();
+    try { await api('/api/sessions/start', { id }); } catch (e) { toast(e.message, 'bad'); }
+    S.chat.starting = false;
+    el.disabled = false;
+    if (S.chat.id === id) loadChat(id);
+    draw();
+  },
   'pi': async (el) => {
     const { id, cmd, pr } = el.dataset;
     if (S.sending[id]) return; // a second click while the first order is on its way never sends another
@@ -1213,8 +1332,14 @@ document.addEventListener('submit', (e) => {
   createRoom();
 });
 
+// Escape closes the card menu first; with nothing else open it closes the chat. A focused repo card opens the chat with Enter or
+// Space (the buttons inside it have no chat-open act, so they are untouched).
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && S.menu) { S.menu = null; draw(); }
+  if (e.key === 'Escape' && S.menu) { S.menu = null; draw(); return; }
+  if (e.key === 'Escape') {
+    const menu = $('#mergeMenu');
+    if (S.chat.id && !(menu && menu.open) && !['#addDialog', '#roomDialog'].some((d) => $(d) && $(d).open)) closeChat();
+  } else if ((e.key === 'Enter' || e.key === ' ') && e.target && e.target.dataset && e.target.dataset.act === 'chat-open') { e.preventDefault(); ACTIONS['chat-open'](e.target); }
 });
 
 // The passing list of a repo stays open (or closed) across redraws. `toggle` does not bubble, so capture it.
@@ -1248,6 +1373,7 @@ setInterval(() => {
 }, V ? V.FULL_REFRESH_MS : 60000);
 setInterval(() => refreshTick(), 2000);
 setInterval(summaryTick, 20000);
+setInterval(chatTick, CHAT_MS);
 setInterval(pollLive, 10000);
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) return;

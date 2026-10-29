@@ -12,6 +12,9 @@ const { orcaTerminal, scanSessions } = require('./pi.js');
 const CHUNK = 64 * 1024;
 const LIMIT = 20;
 const TEXT_MAX = 200;
+const CHAT_TEXT = 4000;
+const CHAT_DEFAULT = 30;
+const CHAT_MAX = 100;
 const SESSION_ID = /^[A-Za-z0-9._-]{1,80}$/;
 const LIVE_OF = { idle: 'free', typed: 'free', busy: 'working', asking: 'waiting' };
 const RANK = { free: 1, working: 2, waiting: 3 };
@@ -96,6 +99,58 @@ const hasSession = (folder, id, base) => {
   try { return fs.readdirSync(sessionsDirFor(folder, base)).some((n) => n.endsWith(`_${id}.jsonl`)); } catch { return false; }
 };
 
+const isoOf = (t) => {
+  const d = new Date(typeof t === 'string' && /^\d+$/.test(t) ? Number(t) : t);
+  return typeof t === 'number' || typeof t === 'string' ? (Number.isNaN(d.getTime()) ? null : d.toISOString()) : null;
+};
+const capped = (s) => { const t = clean(s).trim(); return t.length > CHAT_TEXT ? `${t.slice(0, CHAT_TEXT)}…` : t; };
+const blocksOf = (m, type) => (Array.isArray(m.content) ? m.content.filter((c) => c && c.type === type) : []);
+
+// The history of one session for the chat panel: only the LAST 64 KB of its file is read (the first line of that window may be
+// partial and is dropped). Only text reaches the output: no thinking, no tool arguments, no tool results; a tool is its NAME.
+function readChat(folder, sessionId, { base = baseDir(), limit = CHAT_DEFAULT, key = null } = {}) {
+  const none = { key, sessionId, found: false, items: [], truncated: false, updatedAt: null };
+  let file;
+  try { file = fs.readdirSync(sessionsDirFor(folder, base)).sort().find((n) => n.endsWith(`_${sessionId}.jsonl`)); } catch { return none; }
+  if (!file) return none;
+  const max = Math.min(CHAT_MAX, Math.floor(Number(limit)) > 0 ? Math.floor(Number(limit)) : CHAT_DEFAULT);
+  let fd;
+  try {
+    fd = fs.openSync(path.join(sessionsDirFor(folder, base), file), 'r');
+    const { size, mtimeMs } = fs.fstatSync(fd);
+    const start = Math.max(0, size - CHUNK);
+    const items = [];
+    let pending = [];
+    for (const entry of linesOf(readChunk(fd, start, size - start), start > 0, false).map(parse)) {
+      const m = entry && entry.type === 'message' && entry.message;
+      if (!m || typeof m !== 'object') continue;
+      const at = isoOf(m.timestamp ?? entry.timestamp);
+      const body = capped(blocksOf(m, 'text').filter((c) => typeof c.text === 'string').map((c) => c.text).join(' '));
+      if (m.role === 'user') { pending = []; if (body) items.push({ role: 'user', text: body, at, tools: [] }); continue; }
+      if (m.role !== 'assistant') continue;
+      pending.push(...blocksOf(m, 'toolCall').filter((c) => typeof c.name === 'string').map((c) => clean(c.name).slice(0, 60)));
+      if (body) { items.push({ role: 'assistant', text: body, at, tools: pending }); pending = []; }
+    }
+    if (pending.length) items.push({ role: 'assistant', text: '', at: null, tools: pending });
+    return { key, sessionId, found: true, items: items.slice(-max), truncated: start > 0 || items.length > max, updatedAt: new Date(mtimeMs).toISOString() };
+  } catch { return none; } finally { if (fd !== undefined) fs.closeSync(fd); }
+}
+
+// GET /api/chat: the adopted session of the key, or an explicit one that must be among the folder's listed sessions.
+function chatState(id, session, limit, base = baseDir()) {
+  const { key, folder } = sessionKeyFor(id);
+  let sid = null;
+  if (session) {
+    if (!SESSION_ID.test(session)) throw new HttpError(400, 'Invalid session id');
+    if (!listSessions(folder, { base }).some((s) => s.id === session)) throw new HttpError(400, 'That session is not one of the sessions listed for this folder');
+    sid = session;
+  } else {
+    const stored = (loadConfig().sessions || {})[key];
+    sid = stored ? stored.id : null;
+  }
+  return sid ? readChat(folder, sid, { base, limit, key }) : { key, sessionId: null, found: false, items: [], truncated: false, updatedAt: null };
+}
+
 // What an adopted-session key stands for: a repo id, or "room:<name>". Unknown keys are 404, as in the other routes.
 function sessionKeyFor(id) {
   if (typeof id === 'string' && id.startsWith('room:')) {
@@ -171,4 +226,4 @@ async function startSession(id, orca = orcaTerminal) {
   } finally { starting.delete(key); }
 }
 
-module.exports = { sessionsDirFor, listSessions, sessionKeyFor, sessionsState, adoptSession, releaseSession, startSession, SESSION_ID };
+module.exports = { sessionsDirFor, listSessions, readChat, chatState, sessionKeyFor, sessionsState, adoptSession, releaseSession, startSession, SESSION_ID };

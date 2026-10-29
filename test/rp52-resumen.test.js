@@ -275,7 +275,7 @@ test('the page opens on the Summary tab: summary visible, board hidden, summary 
   S.summary = payload([row({ id: 'abc', name: 'demo' })]);
   page.run('render()');
   assert.equal(S.tab, 'summary');
-  assert.equal(page.get('#summary').hidden, false);
+  assert.equal(page.get('#sumLayout').hidden, false);
   assert.equal(page.get('#work').hidden, true);
   assert.match(page.get('#summary').html, /demo/);
   assert.equal(page.tabEls.find((t) => t.dataset.tab === 'summary').attrs['aria-selected'], 'true');
@@ -293,7 +293,7 @@ test('switching tabs only toggles hidden: #app and #queue are not rewritten', ()
   page.flush();
   assert.equal(S.tab, 'work');
   assert.equal(page.get('#work').hidden, false);
-  assert.equal(page.get('#summary').hidden, true);
+  assert.equal(page.get('#sumLayout').hidden, true); // RP54: the tab toggles the wrapper that holds the Summary and the chat
   assert.equal(page.tabEls.find((t) => t.dataset.tab === 'work').attrs['aria-selected'], 'true');
   page.run("ACTIONS.tab({ dataset: { tab: 'summary' } })");
   page.flush();

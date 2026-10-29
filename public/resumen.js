@@ -117,10 +117,50 @@
     const a = r.error ? null : r.action;
     const cls = r.session && r.session.state === 'waiting' ? ' ask' : !r.error && !r.next && (r.blocking || []).length ? ' block' : '';
     const chips = r.error ? '' : changeChips(ctx.changesFor ? ctx.changesFor(r.id) : null, id) + (a && a.kind === 'manual' ? '<span class="chip red">▲ manual action</span>' : '');
-    return `<article class="rs-card${cls}" data-id="${id}" aria-label="${esc(r.name)}">
+    return `<article class="rs-card${cls}" data-id="${id}" data-act="chat-open" tabindex="0"${ctx.chatId === r.id ? ' aria-current="true"' : ''} aria-label="${esc(r.name)}">
       <div class="rs-l1"><b class="rs-name" title="${esc(r.name)}">${esc(r.name)}</b><span class="mono rs-branch" title="${esc(r.branch ?? '')}">${esc(r.branch ?? '')}</span>${chips}<span class="rs-spacer"></span><span class="rs-sub rs-when" title="${esc(lm.what ?? '')}">${esc(relativeTime(lm.at, ctx.now))}</span>${r.error ? '<span class="chip red">▲ error</span>' : sessionChip(r.session && r.session.state)}</div>
       <div class="rs-l2">${r.error ? noData : progressHtml(r.progress)}${nextHtml(r)}${actionButton(r, ctx)}</div>
     </article>`;
+  }
+
+  // The chat panel (RP54, S48/S53). Pure like the rest: the page passes S.chat ({ id, info, hist, failed, starting }).
+  const CHAT_MIN = 340;
+  const CARDS_MIN = 360;
+  // Width of the chat for a layout of `total` px: the stored ratio, or 40% (50% under 1100 px), never under 340 and never leaving the cards under 360.
+  const chatWidth = (total, ratio) => {
+    const r = ratio > 0 ? Math.min(0.9, Math.max(0.1, ratio)) : (total < 1100 ? 0.5 : 0.4);
+    return Math.max(CHAT_MIN, Math.min(Math.round(total * r), total - CARDS_MIN));
+  };
+  const liveOf = (c) => (c.info && c.info.live && c.info.live.state) || 'unknown';
+  const BANNER = { working: '● The session is working', waiting: '◐ The session is asking you something. Answer it in its terminal: the panel does not answer yet.' };
+
+  function chatHead(c, ctx = {}) {
+    const adopted = c.info && c.info.adopted;
+    const banner = adopted && BANNER[liveOf(c)] ? `<div class="ch-live" role="status">${BANNER[liveOf(c)]}</div>` : '';
+    return `<div class="ch-row"><b class="ch-name" title="${esc(ctx.name)}">${esc(ctx.name)}</b>${sessionChip(liveOf(c))}${adopted ? `<span class="mono ch-sess" title="${esc(adopted.id)}">${esc(adopted.name || adopted.id)}</span>` : ''}<button type="button" class="x" data-act="chat-close" aria-label="Close the chat" title="Close the chat (Esc)">✕</button></div>${banner}`;
+  }
+
+  const hhmm = (iso) => { const d = new Date(iso); return iso && !Number.isNaN(d.getTime()) ? `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}` : ''; };
+  const toolsLine = (t) => (t.length ? `<div class="tools">▸ ${plural(t.length, 'tool')} · ${esc(t.slice(0, 3).join(', '))}${t.length > 3 ? ` (+${t.length - 3})` : ''}</div>` : '');
+  const bubble = (it, who) => {
+    const time = hhmm(it.at);
+    if (it.role === 'assistant' && !it.text) return `${toolsLine(it.tools)}<div class="m working">working…</div>`;
+    return `${toolsLine(it.tools || [])}<div class="m${it.role === 'user' ? ' me' : ''}"><span class="who">${esc(it.role === 'user' ? 'You' : who)}${time ? ` · ${time}` : ''}</span>${esc(it.text)}</div>`;
+  };
+
+  function chatBody(c, ctx = {}) {
+    const info = c.info;
+    if (!info) return `<div class="empty" role="status">${c.failed ? 'Chat unavailable. Try again in a moment.' : 'Loading chat…'}</div>`;
+    const note = c.failed ? '<div class="rs-note" role="status">⚠ Chat unavailable: showing the last data we have.</div>' : '';
+    const id = esc(c.id);
+    if (!info.adopted) {
+      const rows = (info.sessions || []).slice(0, 5).map((s) => `<div class="ch-pick"><div class="ch-pick-l1"><span class="mono ch-sname" title="${esc(s.id)}">${esc(s.name || s.id)}</span><span class="rs-sub">${esc(relativeTime(s.updatedAt, ctx.now))}</span><button type="button" data-act="chat-adopt" data-id="${id}" data-session="${esc(s.id)}">Adopt</button></div>${s.lastMessage ? `<div class="rs-sub ch-last">${esc(clip(s.lastMessage.text, 90))}</div>` : ''}</div>`).join('');
+      return `${note}<div class="ch-state"><p>No session is adopted for this folder.${rows ? ' Adopt one, or start a new one.' : ''}</p>${rows}<button type="button" data-act="chat-start" data-id="${id}"${c.starting ? ' disabled' : ''}>Start panel session</button></div>`;
+    }
+    if (!info.adoptedFound) return `${note}<div class="ch-state" role="status"><p>The session is loading (Gentle Shell: skills, MCP, extensions). The history appears with its first message.</p></div>`;
+    const who = info.adopted.name || info.adopted.id;
+    const items = (c.hist && c.hist.items) || [];
+    return `${note}${c.hist && c.hist.truncated ? '<div class="rs-sub ch-older">Older messages are not shown</div>' : ''}${items.map((it) => bubble(it, who)).join('') || '<div class="empty">No messages yet.</div>'}`;
   }
 
   // Pinned room card (not clickable yet): the aggregate of its member rows and the room session.
@@ -179,5 +219,5 @@
     return `${ctx.failed ? '<div class="rs-note" role="status">⚠ Summary unavailable: showing the last data we have.</div>' : ''}<div class="rs-list">${body}</div>${rows.length ? LEGEND : ''}`;
   }
 
-  return { esc, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
+  return { esc, sessionChip, chatWidth, chatHead, chatBody, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
 }));
