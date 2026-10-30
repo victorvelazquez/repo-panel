@@ -373,7 +373,7 @@ function loadPage({ doc = {} } = {}) {
     document: { hidden: false, querySelector: get, querySelectorAll: () => [], addEventListener() {}, createElement: () => element(), body: element(), ...doc },
     localStorage: { getItem: () => null, setItem() {} }, location: { hash: '' },
     requestAnimationFrame: (cb) => { frames.push(cb); return frames.length; },
-    setInterval: () => 0, setTimeout: () => 0, confirm: () => true, fetch: () => new Promise(() => {}),
+    setInterval: () => 0, setTimeout: () => 0, clearTimeout: () => {}, AbortController, confirm: () => true, fetch: () => new Promise(() => {}),
   });
   ctx.window = ctx;
   ctx.addEventListener = () => {};
@@ -489,5 +489,5 @@ test('style: compact card rules, a container query below 520px, no table/KPI rul
 test('API_VERSION is still 15 and the page asks for no new route', () => {
   assert.equal(require('../public/view.js').API_VERSION, 15);
   const src = fs.readFileSync(path.join(PUBLIC, 'app.js'), 'utf8');
-  assert.deepEqual([...src.matchAll(/api\('\/api\/summary[^']*'\)/g)].length, 1);
+  assert.deepEqual([...src.matchAll(/api\('\/api\/summary[^']*'[,)]/g)].length, 1); // one request to the Summary (RP76 adds an options argument: a comma may follow the url)
 });

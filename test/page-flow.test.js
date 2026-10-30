@@ -24,7 +24,7 @@ function loadPage() {
     location: { hash: '' },
     requestAnimationFrame: () => 0,
     setInterval: () => 0,
-    setTimeout: () => 0,
+    setTimeout: () => 0, clearTimeout: () => {}, AbortController,
     confirm: () => true,
     fetch: async (url, opts) => {
       const body = opts && opts.body ? JSON.parse(opts.body) : null;

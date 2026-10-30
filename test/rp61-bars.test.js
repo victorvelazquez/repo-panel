@@ -186,7 +186,7 @@ function loadPage({ resumen = true } = {}) {
     location: { hash: '' },
     requestAnimationFrame: (cb) => { frames.push(cb); return frames.length; },
     setInterval: () => 0,
-    setTimeout: () => 0,
+    setTimeout: () => 0, clearTimeout: () => {}, AbortController,
     confirm: () => true,
     fetch: () => new Promise(() => {}),
   });

@@ -33,7 +33,7 @@ async function loadPage(stored = {}) {
     location: { hash: '' },
     requestAnimationFrame: () => 0,
     setInterval: () => 0,
-    setTimeout: () => 0,
+    setTimeout: () => 0, clearTimeout: () => {}, AbortController,
     confirm: () => true,
     fetch: async () => { throw new Error('offline'); },
   });

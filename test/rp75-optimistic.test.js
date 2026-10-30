@@ -48,7 +48,7 @@ function loadPage({ answers = {} } = {}) {
     console, document: doc, location: { hash: '' },
     localStorage: { getItem: (k) => (k in store ? store[k] : null), setItem(k, v) { store[k] = String(v); }, removeItem(k) { delete store[k]; } },
     requestAnimationFrame: (cb) => { frames.push(cb); return frames.length; },
-    setInterval: (fn, ms) => { intervals.push({ fn, ms }); return intervals.length; }, setTimeout: () => 0, confirm: () => true,
+    setInterval: (fn, ms) => { intervals.push({ fn, ms }); return intervals.length; }, setTimeout: () => 0, clearTimeout: () => {}, AbortController, confirm: () => true,
     fetch: (url, opts = {}) => {
       fetches.push({ url, method: opts.method || 'GET', body: opts.body });
       const a = Object.entries(answers).find(([k]) => url.startsWith(k));
