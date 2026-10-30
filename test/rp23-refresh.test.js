@@ -69,13 +69,17 @@ test('refreshPlan: a hot repo whose PR data is recent still gets its 10 s local 
 });
 
 test('refreshPlan: a command in flight (S.sent) makes the repo hot', () => {
-  assert.deepEqual(plan({ sent: { a: { cmd: 'flow-commit' } }, last: { a: { local: 99000, prs: 100000 - 20000 } } }), [{ id: 'a', kind: 'hot' }]);
+  // A repo with a command in flight is hot; its session state was asked a moment ago (pistatus), so the 3 s sent poll (RP75) is not due.
+  assert.deepEqual(plan({ sent: { a: { cmd: 'flow-commit' } }, last: { a: { local: 99000, prs: 100000 - 20000, pistatus: 99000 } } }), [{ id: 'a', kind: 'hot' }]);
 });
 
-test('refreshPlan: nothing while the tab is hidden or a merge is in progress', () => {
-  const old = { a: { local: 0, prs: 0 } };
+test('refreshPlan: nothing while the tab is hidden; a merge in flight pauses ONLY its own repo (RP75)', () => {
+  const old = { a: { local: 0, prs: 0 }, b: { local: 0, prs: 0 } };
   assert.deepEqual(plan({ hidden: true, last: old }), []);
-  assert.deepEqual(plan({ busy: { 'a#1': true }, last: old }), []);
+  const two = { ids: ['a', 'b'], local: { a: loc(), b: loc() }, prs: { a: { prs: [] }, b: { prs: [] } } };
+  assert.deepEqual(plan({ ...two, busy: { 'a:1': true }, last: old }).map((e) => e.id), ['b']);
+  assert.deepEqual(plan({ ...two, busy: { 'a:1': 'done' }, last: old }).map((e) => e.id), ['a', 'b']);
+  assert.deepEqual(plan({ busy: { 'a:1': true }, last: old }), []);
 });
 
 test('refreshPlan: a repo whose previous refresh is still in flight is skipped', () => {
