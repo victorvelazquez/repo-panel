@@ -20,6 +20,7 @@ const { requirementsFor, prerequisites } = require('./requirements.js');
 const { roomsState, createRoom, removeRoom, assignRoom } = require('./rooms.js');
 const { queueFor, conformityFor } = require('./queue.js');
 const { summaryFor } = require('./summary.js');
+const { createSummaryStore } = require('./summarystore.js');
 const { sendChat, clearChat } = require('./chatsend.js');
 const { answerDialog } = require('./dialoganswer.js');
 const { createEventHub } = require('./events.js');
@@ -117,10 +118,12 @@ function isPanelRunning(port) {
   });
 }
 
-// `deps` replaces what the pi routes talk to ({ orca, wait, requirements, prs, guard }); tests inject fakes, the real server passes none.
+// `deps` replaces what the pi routes talk to ({ orca, wait, requirements, prs, guard, summaryStore, noSummaryStore }); tests inject fakes, the real server passes none.
 function createServer(port, deps = {}) {
   // One duplicate-send guard per server (tests inject theirs with a fake clock).
   deps = { guard: sendGuard(), ...deps };
+  // RP78: the Summary comes from a store kept in memory (server.js starts it); injected by tests, or off with noSummaryStore.
+  if (!deps.summaryStore && !deps.noSummaryStore) deps.summaryStore = createSummaryStore({ deps, now: deps.now });
   const hostOk = new Set([`127.0.0.1:${port}`, `localhost:${port}`]);
   const perf = createPerf();
   const flights = new Map();
@@ -186,8 +189,9 @@ function createServer(port, deps = {}) {
     return send(res, 503, { error: 'Too many event streams open' });
   }
   const close = server.close.bind(server);
-  server.close = (cb) => { hub.closeAll(); return close(cb); };
+  server.close = (cb) => { hub.closeAll(); if (deps.summaryStore) deps.summaryStore.stop(); return close(cb); };
   server.hub = hub;
+  server.summaryStore = deps.summaryStore;
   return server;
 }
 

@@ -255,5 +255,5 @@ test('intervalMs as a number keeps working as before; after stop nothing is aske
 test('server.js wires the warmer to 1 s while someone listens and to the idle interval otherwise (S68)', () => {
   const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'server.js'), 'utf8');
   assert.match(src, /intervalMs: \(\) => \(server\.hub\.size\(\) > 0 \? 1000 : warm\)/);
-  assert.match(src, /publish: \(id, payload\) => server\.hub\.publish\(id, payload\)/);
+  assert.match(src, /publish: \(id, payload\) => \{[^}]*server\.hub\.publish\(id, payload\)/);
 });

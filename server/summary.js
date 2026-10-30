@@ -168,15 +168,8 @@ async function pool(items, size, fn) {
   return out;
 }
 
-async function build(deps) {
-  const cfg = loadConfig();
-  const orca = deps.orca || orcaTerminal;
-  const now = (deps.now || Date.now)();
-  let terminals = null;
-  try { const listed = (await orca(['list'])).terminals; if (Array.isArray(listed)) terminals = listed; } catch { /* unknown, not none */ }
-  const roomOf = new Map((cfg.rooms || []).flatMap((r) => r.repos.map((id) => [id, r.name])));
-  const repos = cfg.groups.flatMap((g) => g.repos.map((r) => ({ ...r, id: lib.repoId(r.path), group: g.name })));
-  const results = await pool(repos, POOL, async (repo) => safeAnalyse(await gather(repo, { deps, terminals, orca, cfg, roomOf, now })));
+// The summary of a list of { row, why }: counts classify each repo once (error rows are not counted); shared with the store snapshot.
+function tally(results, now) {
   const counts = { working: 0, waiting: 0, blocked: 0, idle: 0 };
   for (const { row } of results) {
     if (row.error) continue;
@@ -192,8 +185,28 @@ async function build(deps) {
   };
 }
 
-// `deps` replaces what the route talks to ({ orca, prs, local, roadmap, state, git, now }); the cache lives with `deps`.
+// RP78: the row of a repo whose facts have not all been read yet. It counts as idle, needs nothing and sorts after every real row.
+const loadingRow = ({ id, name, group, room }) => ({
+  id, name, group, room: room ?? null, loading: true, branch: null, progress: noProgress, session: { state: 'unknown' }, next: null,
+  blocking: [], lastMovement: { at: null, what: null }, action: null, error: null, needs: false, rank: WORKING + 3,
+});
+
+async function build(deps) {
+  const cfg = loadConfig();
+  const orca = deps.orca || orcaTerminal;
+  const now = (deps.now || Date.now)();
+  let terminals = null;
+  try { const listed = (await orca(['list'])).terminals; if (Array.isArray(listed)) terminals = listed; } catch { /* unknown, not none */ }
+  const roomOf = new Map((cfg.rooms || []).flatMap((r) => r.repos.map((id) => [id, r.name])));
+  const repos = cfg.groups.flatMap((g) => g.repos.map((r) => ({ ...r, id: lib.repoId(r.path), group: g.name })));
+  return tally(await pool(repos, POOL, async (repo) => safeAnalyse(await gather(repo, { deps, terminals, orca, cfg, roomOf, now }))), now);
+}
+
+// `deps` replaces what the route talks to ({ orca, prs, local, roadmap, state, git, now, summaryStore }); the cache lives with `deps`.
 function summaryFor(deps = {}, query = {}) {
+  // RP78: with a store the answer is its snapshot, at once; ?fresh=1 reads everything again first.
+  const store = deps.summaryStore;
+  if (store) return query.fresh === '1' ? store.refreshAll().then(() => store.snapshot()) : Promise.resolve(store.snapshot());
   const now = (deps.now || Date.now)();
   const hit = caches.get(deps);
   // t stays null while the build runs (that promise is shared) and is the time it FINISHED once it resolves.
@@ -205,4 +218,4 @@ function summaryFor(deps = {}, query = {}) {
   return p;
 }
 
-module.exports = { summarize, summaryFor };
+module.exports = { summarize, summaryFor, safeAnalyse, tally, loadingRow, lastMovementOf, pool };

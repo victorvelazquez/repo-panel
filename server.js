@@ -22,7 +22,8 @@ if (require.main === module) {
   const server = createServer(port);
   // The live warmer keeps the read-only screens cached (RP77) and feeds the event stream (RP77b): it warms every second while someone listens.
   const warm = warmInterval(process.env);
-  if (warm) createWarmer({ orca: orcaTerminal, intervalMs: () => (server.hub.size() > 0 ? 1000 : warm), publish: (id, payload) => server.hub.publish(id, payload) }).start();
+  // RP78: the Summary store learns each session state from the very payload the hub publishes.
+  if (warm) createWarmer({ orca: orcaTerminal, intervalMs: () => (server.hub.size() > 0 ? 1000 : warm), publish: (id, payload) => { server.summaryStore.setSession(id, payload.state); server.hub.publish(id, payload); } }).start();
   server.on('error', async (e) => {
     if (e.code !== 'EADDRINUSE') { console.error(e.message); process.exit(1); }
     // The URL must stay stable, so never fall back to another port.
@@ -36,6 +37,7 @@ if (require.main === module) {
   server.listen(port, '127.0.0.1', () => {
     const url = `http://127.0.0.1:${port}/`;
     console.log(`repo-panel running at ${url}`);
+    server.summaryStore.start(); // only once the port is ours: a second launch must not read anything
     if (process.argv.includes('--open')) spawn('cmd', ['/c', 'start', '', url], { detached: true, stdio: 'ignore', windowsHide: true }).unref();
   });
 }
