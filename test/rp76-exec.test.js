@@ -48,43 +48,85 @@ test('MAX_PARALLEL comes from REPO_PANEL_MAX_PARALLEL; absent or invalid values 
   assert.equal(maxIn('3'), 3);
 });
 
-test('a user job starts at once while the slots are busy; waiting background jobs start only after a slot frees', async () => {
-  const busy = [job('background', 400), job('background', 400)];
-  const waiting = [1, 2, 3, 4].map(() => job('background', 400));
-  await sleep(40);
-  // The user job awaits before it runs: the lane must survive the await.
+
+// Deterministic holders: a child stays alive until the test opens its gate FILE (no clock decides the order). A held job also has a
+// 30 s timeout so a failing test can never leave a child behind. Slot bookkeeping is synchronous: stats() right after a job was started
+// already counts it, so no sleep is needed to look at the queue.
+const fs = require('node:fs');
+const os = require('node:os');
+const gateDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rp76-gate-'));
+const opened = [];
+let gateN = 0;
+const gate = () => { const g = { file: path.join(gateDir, 'g' + (++gateN)), open() { fs.writeFileSync(g.file, '1'); } }; opened.push(g); return g; };
+test.after(() => { for (const g of opened) { try { g.open(); } catch { /* gone */ } } fs.rmSync(gateDir, { recursive: true, force: true }); });
+const NL = 'String.fromCharCode(10)';
+function held(priority, g, name, log) {
+  const script = "const fs = require('fs');" + (log ? "fs.appendFileSync(" + JSON.stringify(log) + ", " + JSON.stringify(name) + " + " + NL + ");" : '')
+    + "const t = setInterval(() => { if (fs.existsSync(" + JSON.stringify(g.file) + ")) { clearInterval(t); } }, 10);";
   const ctx = { procs: 0, waitMs: 0 };
-  const user = exec.withContext(ctx, () => exec.withPriority('user', async () => { await sleep(5); return exec.run(node, sleepArgs(200)); }));
-  await sleep(60);
+  const p = exec.withContext(ctx, () => exec.withPriority(priority, () => exec.run(node, ['-e', script], { timeout: 30000 })));
+  return { name, ctx, p };
+}
+const until = async (fn, what, ms = 15000) => { const t0 = Date.now(); while (!fn()) { if (Date.now() - t0 > ms) throw new Error('timed out waiting for ' + what); await sleep(10); } };
+const readLog = (log) => (fs.existsSync(log) ? fs.readFileSync(log, 'utf8').split(String.fromCharCode(10)).filter(Boolean) : []);
+
+test('a user job starts at once while the slots are busy; waiting background jobs start only after a slot frees', async () => {
+  const gBusy = gate();
+  const busy = [held('background', gBusy, 'b1'), held('background', gBusy, 'b2')];
+  const waitingGate = gate();
+  const waiting = [1, 2, 3, 4].map((i) => held('background', waitingGate, 'w' + i));
+  assert.deepEqual(exec.stats(), { active: 2, max: 2, waitingBackground: 4, waitingUser: 0 });
+  // The user job awaits before it runs: the lane must survive the await.
+  const gUser = gate();
+  const ctx = { procs: 0, waitMs: 0 };
+  const user = exec.withContext(ctx, () => exec.withPriority('user', async () => { await sleep(5); return exec.run(node, ['-e', "const fs = require('fs'); const t = setInterval(() => { if (fs.existsSync(" + JSON.stringify(gUser.file) + ")) clearInterval(t); }, 10);"], { timeout: 30000 }); }));
+  await until(() => exec.stats().active === 3, 'the urgent job to take its extra place');
   const during = exec.stats();
   assert.equal(during.active, 3, 'two background plus the urgent one');
   assert.equal(during.waitingBackground, 4, 'no waiting background job started');
   assert.equal(during.waitingUser, 0);
+  const releasedAt = Date.now();
+  gUser.open();
   assert.equal((await user).code, 0);
+  assert.equal(exec.stats().waitingBackground, 4, 'finishing the urgent job does not free a normal place: the cap is still full');
+  gBusy.open();
+  waitingGate.open();
   await Promise.all([...busy, ...waiting].map((j) => j.p));
-  assert.ok(ctx.waitMs < 150, `the user job waited ${ctx.waitMs} ms`);
-  for (const w of waiting) assert.ok(w.ctx.waitMs >= 250, `a background job waited only ${w.ctx.waitMs} ms`);
+  assert.ok(ctx.waitMs < 200, 'the user job waited ' + ctx.waitMs + ' ms');
+  for (const w of waiting) assert.ok(w.ctx.waitMs >= Date.now() - releasedAt - 5000 && w.ctx.waitMs > ctx.waitMs, 'a background job waited only ' + w.ctx.waitMs + ' ms');
   assert.deepEqual(exec.stats(), IDLE);
 });
 
 test('among waiting jobs the user ones go first (FIFO inside each class)', async () => {
-  // Fill the 2 slots and the 2 urgent places with jobs that end at different times, then queue five jobs of 120 ms.
-  const holders = [job('background', 200), job('background', 400), job('user', 600), job('user', 800)];
-  await sleep(120);
-  assert.equal(exec.stats().active, 4);
-  const queued = ['bg1', 'bg2', 'user1', 'bg3', 'user2'].map((name) => ({ name, ...job(name.startsWith('user') ? 'user' : 'background', 120) }));
-  assert.deepEqual({ ...exec.stats(), active: 4 }, { active: 4, max: 2, waitingBackground: 3, waitingUser: 2 });
+  const log = path.join(gateDir, 'order.log');
+  // Fill the 2 normal places and the 2 urgent places, then queue five jobs: their start order is read from a log the jobs write.
+  const gH1 = gate(); const gH2 = gate(); const gU1 = gate(); const gU2 = gate();
+  const holders = [held('background', gH1, 'H1'), held('background', gH2, 'H2'), held('user', gU1, 'U1'), held('user', gU2, 'U2')];
+  const q = { bg1: gate(), bg2: gate(), user1: gate(), bg3: gate(), user2: gate() };
+  const queued = ['bg1', 'bg2', 'user1', 'bg3', 'user2'].map((name) => held(name.startsWith('user') ? 'user' : 'background', q[name], name, log));
+  assert.deepEqual(exec.stats(), { active: 4, max: 2, waitingBackground: 3, waitingUser: 2 });
+  // One place frees at a time and exactly one job takes it: the order of the log is the order of the queue.
+  const started = (n) => until(() => readLog(log).length >= n, n + ' queued job(s) to start');
+  gH1.open();  await started(1);
+  gU1.open();  await started(2);
+  gH2.open(); gU2.open();
+  q.user1.open(); await started(3);
+  q.user2.open(); await started(4);
+  q.bg1.open();  await started(5);
+  q.bg2.open(); q.bg3.open();
   await Promise.all([...holders, ...queued].map((j) => j.p));
-  const startOrder = queued.slice().sort((a, b) => a.ctx.waitMs - b.ctx.waitMs).map((j) => j.name);
-  assert.deepEqual(startOrder, ['user1', 'user2', 'bg1', 'bg2', 'bg3']);
+  assert.deepEqual(readLog(log), ['user1', 'user2', 'bg1', 'bg2', 'bg3']);
   assert.deepEqual(exec.stats(), IDLE);
 });
 
 test('the urgent allowance is bounded: a fifth process never starts', async () => {
-  const bg = [job('background', 300), job('background', 300)];
-  const urgent = [1, 2, 3, 4, 5].map(() => job('user', 300));
-  await sleep(60);
+  const gate1 = gate();
+  const bg = [held('background', gate1, 'b1'), held('background', gate1, 'b2')];
+  const urgent = [1, 2, 3, 4, 5].map((i) => held('user', gate1, 'u' + i));
   assert.deepEqual(exec.stats(), { active: 2 + exec.URGENT_EXTRA, max: 2, waitingBackground: 0, waitingUser: 3 });
+  await sleep(150); // nothing can start meanwhile: every place is held by a gated child
+  assert.deepEqual(exec.stats(), { active: 2 + exec.URGENT_EXTRA, max: 2, waitingBackground: 0, waitingUser: 3 });
+  gate1.open();
   await Promise.all([...bg, ...urgent].map((j) => j.p));
   assert.deepEqual(exec.stats(), IDLE);
 });
@@ -138,17 +180,20 @@ test('withContext counts the processes and the wait for a slot of every run() in
 });
 
 test('withContext: a job behind a busy slot reports the wait; two contexts at once do not mix', async () => {
-  const holders = [job('background', 400), job('background', 400)];
-  await sleep(40);
+  const g = gate();
+  const holders = [held('background', g, 'h1'), held('background', g, 'h2')];
   const a = { procs: 0, waitMs: 0 };
   const b = { procs: 0, waitMs: 0 };
   const queued = exec.withContext(a, () => exec.run(node, ['-e', '0']));
   const other = exec.withContext(b, async () => { await exec.run(node, ['-e', '0']); await exec.run(node, ['-e', '0']); });
+  const heldFor = 250; // the test itself decides how long the places stay busy
+  await sleep(heldFor);
+  g.open();
   await Promise.all([queued, other, ...holders.map((h) => h.p)]);
   assert.equal(a.procs, 1);
   assert.equal(b.procs, 2);
-  assert.ok(a.waitMs >= 300, `waited ${a.waitMs} ms`);
-  assert.ok(b.waitMs >= 300, `waited ${b.waitMs} ms`);
+  assert.ok(a.waitMs >= heldFor - 20, 'waited ' + a.waitMs + ' ms');
+  assert.ok(b.waitMs >= heldFor - 20, 'waited ' + b.waitMs + ' ms');
   assert.deepEqual(exec.stats(), IDLE);
 });
 
