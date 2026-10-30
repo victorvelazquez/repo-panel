@@ -308,6 +308,14 @@
     return `${toolsLine(it.tools || [])}<div class="m${it.role === 'user' ? ' me' : ''}"><span class="who">${esc(it.role === 'user' ? 'You' : who)}${time ? ` · ${time}` : ''}</span>${mdHtml(it.text)}</div>`;
   };
 
+  // Pending messages of the composer (RP75): shown after the real ones until the history has them. `base` is how many user items
+  // had the same flattened text when it was sent; more of them now means the history holds it.
+  const flat = (t) => String(t).replace(/\s+/g, ' ').trim();
+  const userCount = (items, text) => items.filter((it) => it.role === 'user' && flat(it.text) === flat(text)).length;
+  const PENDING_WHO = { sending: 'sending…', ok: '<span class="ok">✓</span>', unconfirmed: '<span class="warn">⚠</span> not confirmed' };
+  const pendingHtml = (pending, items) => (pending || []).filter((p) => userCount(items, p.text) <= p.base)
+    .map((p) => `<div class="m me pending"><span class="who">You · ${PENDING_WHO[p.state] || PENDING_WHO.sending}</span>${mdHtml(p.text)}</div>`).join('');
+
   function chatBody(c, ctx = {}) {
     const info = c.info;
     if (!info) return `<div class="empty" role="status">${c.failed ? 'Chat unavailable. Try again in a moment.' : 'Loading chat…'}</div>`;
@@ -324,7 +332,8 @@
     const d = info.live && info.live.state === 'waiting' ? info.live.dialog || {} : null;
     const shown = d && Array.isArray(d.lines) ? d.lines.map((l, i) => (i === d.selected ? `<mark class="ask-sel">${esc(l)}</mark>` : esc(l))).join('\n') : '';
     const card = d ? `<div class="ch-ask" role="alert"><div class="ch-ask-title">The session is asking</div>${shown ? `<pre class="ch-ask-text">${shown}</pre>` : ''}<div class="ch-ask-note">Answer it in the terminal of the session: the panel does not answer yet.</div></div>` : '';
-    return `${note}${c.hist && c.hist.truncated ? '<div class="rs-sub ch-older">Older messages are not shown</div>' : ''}${items.map((it) => bubble(it, who)).join('') || '<div class="empty">No messages yet.</div>'}${card}`;
+    const pending = pendingHtml(c.pending, items);
+    return `${note}${c.hist && c.hist.truncated ? '<div class="rs-sub ch-older">Older messages are not shown</div>' : ''}${items.map((it) => bubble(it, who)).join('') || (pending ? '' : '<div class="empty">No messages yet.</div>')}${pending}${card}`;
   }
 
   // Pinned room card (not clickable yet): the aggregate of its member rows and the room session.
@@ -383,5 +392,5 @@
     return `${ctx.failed ? '<div class="rs-note" role="status">⚠ Summary unavailable: showing the last data we have.</div>' : ''}<div class="rs-list">${body}</div>${rows.length ? LEGEND : ''}`;
   }
 
-  return { esc, mdHtml, sessionChip, chatWidth, composerState, actionMenu, actionMenuHtml, composerNote, chatHead, sessionState, sessionLabelHtml, chatBody, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
+  return { esc, mdHtml, sessionChip, chatWidth, composerState, actionMenu, actionMenuHtml, composerNote, chatHead, sessionState, sessionLabelHtml, chatBody, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
 }));

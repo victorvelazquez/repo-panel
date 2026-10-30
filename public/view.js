@@ -208,16 +208,22 @@
     return !!branch && Array.isArray(prs && prs.prs) && prs.prs.some((p) => p.head === branch);
   }
 
-  // What the periodic tick refreshes now: [{ id, kind }], kind 'hot' (local + PRs) or 'local' (git only). `last[id]` is
-  // { local, prs }: when each kind of data was last asked for (a full refresh sets both). Nothing while the tab is hidden
-  // or a merge is in progress, and a repo with a request still in flight is skipped.
+  // How often a repo with a command of the panel in flight asks for the live session state, to notice the finish fast.
+  const SENT_POLL_MS = 3000;
+
+  // What the periodic tick refreshes now: [{ id, kind }], kind 'sent' (the session state of a command in flight), 'hot'
+  // (local + PRs) or 'local' (git only); one entry per repo, 'sent' first. `last[id]` is { local, prs, pistatus }: when each
+  // kind of data was last asked for (a full refresh sets local and prs). Nothing while the tab is hidden; a repo with a
+  // request in flight, or a busy key '<id>:<n>' with value true (a merge or re-run of that repo), is skipped.
   function refreshPlan({ now = Date.now(), ids = [], local = {}, prs = {}, sent = {}, last = {}, loading = {}, hidden = false, busy = {} } = {}) {
-    if (hidden || Object.keys(busy).length) return [];
+    if (hidden) return [];
+    const paused = new Set(Object.keys(busy).filter((k) => busy[k] === true).map((k) => k.slice(0, k.lastIndexOf(':'))));
     const out = [];
     for (const id of ids) {
-      if (loading[id] > 0) continue;
+      if (loading[id] > 0 || paused.has(id)) continue;
       const at = last[id] || {};
-      if (isHotRepo({ local: local[id], prs: prs[id], sent: sent[id] }) && now - (at.prs || 0) >= HOT_REFRESH_MS) out.push({ id, kind: 'hot' });
+      if (sent[id] && now - (at.pistatus || 0) >= SENT_POLL_MS) out.push({ id, kind: 'sent' });
+      else if (isHotRepo({ local: local[id], prs: prs[id], sent: sent[id] }) && now - (at.prs || 0) >= HOT_REFRESH_MS) out.push({ id, kind: 'hot' });
       else if (now - (at.local || 0) >= LOCAL_REFRESH_MS) out.push({ id, kind: 'local' });
     }
     return out;
@@ -514,5 +520,5 @@
     return attention(`No change 15 minutes after ${text} and the session state is unknown`);
   }
 
-  return { API_VERSION, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, piPollTargets, LIVE_CHECK_MS, liveSession, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, presenceLabel, presenceDot };
+  return { API_VERSION, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, piPollTargets, LIVE_CHECK_MS, liveSession, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, presenceLabel, presenceDot };
 }));

@@ -26,7 +26,7 @@ const S = {
   dismissed: new Set(), menu: null, reqPassOpen: {},
   group: '', q: '', queue: [], queueKey: '', queueSeq: 0,
   conf: { items: [], ok: 0, loaded: false, failed: false, key: '', seq: 0 }, confOpen: false,
-  req: {}, reqSeq: {}, state: {}, stateSeq: {}, sent: {}, pistatus: {}, pistatusSeq: {}, live: {}, liveBusy: {}, liveAnswered: {}, dirtyAt: {}, sending: {}, pitail: {}, piask: {}, tailFor: {}, finishing: {}, showCommit: new Set(), prereq: { state: 'loading', items: [], seq: 0 },
+  req: {}, reqSeq: {}, state: {}, stateSeq: {}, sent: {}, pistatus: {}, pistatusSeq: {}, live: {}, liveBusy: {}, liveAnswered: {}, dirtyAt: {}, sending: {}, merged: {}, pending: {}, pitail: {}, piask: {}, tailFor: {}, finishing: {}, showCommit: new Set(), prereq: { state: 'loading', items: [], seq: 0 },
   rooms: [], roomIssues: [], roomData: { state: 'loading', data: null }, roomSeq: 0,
   prefs: store('prefs', { method: 'squash', del: true }),
   lastRefresh: 0, lastAt: {}, scan: [],
@@ -113,7 +113,21 @@ function noteLocal(id) {
 
 // The session state the buttons of a repo see (S.sent has its own verdict): the live answer, or 'checking' until it comes.
 const sessionOf = (id) => (V ? V.liveSession({ sent: S.sent[id], live: S.live[id], answered: S.liveAnswered[id], dirtyAt: S.dirtyAt[id] }) : S.sent[id] ? undefined : S.live[id]);
-const loadPrs = (id) => track(id, pooled(() => api(`/api/prs?id=${id}`)).then((d) => { S.prs[id] = d; wakeReady(id, d); }, (e) => { S.prs[id] = { error: e.message }; }));
+const loadPrs = (id) => track(id, pooled(() => api(`/api/prs?id=${id}`)).then((d) => { S.prs[id] = d; wakeReady(id, d); releaseMerged(id, d); }, (e) => { S.prs[id] = { error: e.message }; }));
+
+// A merged PR keeps its Merge button disabled (S.merged: key -> time of the merge) until GitHub no longer lists it, or MERGE_HOLD_MS.
+const MERGE_HOLD_MS = 90000;
+const mergeHeld = (id, n) => {
+  const at = S.merged[`${id}:${n}`];
+  if (at !== undefined && Date.now() - at >= MERGE_HOLD_MS) delete S.merged[`${id}:${n}`];
+  return S.merged[`${id}:${n}`] !== undefined;
+};
+function releaseMerged(id, d) {
+  if (!Array.isArray(d && d.prs)) return;
+  for (const key of Object.keys(S.merged)) if (key.startsWith(`${id}:`) && !d.prs.some((p) => `${id}:${p.number}` === key)) delete S.merged[key];
+}
+// The busy map the Summary rows see: requests in flight plus the merges still held.
+const busyView = () => ({ ...Object.fromEntries(Object.keys(S.merged).filter((k) => mergeHeld(...k.split(/:(?=[^:]*$)/))).map((k) => [k, 'done'])), ...S.busy });
 
 // When each kind of data of a repo was last asked for: the periodic tick (refreshTick) plans from it.
 function markAsked(id, now, { prs = true } = {}) {
@@ -287,8 +301,18 @@ function refreshTick(now = Date.now()) {
   if (!V) return;
   const ids = allRepos().map((r) => r.id);
   for (const { id, kind } of V.refreshPlan({ now, ids, local: S.local, prs: S.prs, sent: S.sent, last: S.lastAt, loading: S.loading, hidden: document.hidden, busy: S.busy })) {
-    markAsked(id, now, { prs: kind === 'hot' });
-    if (kind === 'hot') Promise.all([loadLocal(id), loadPrs(id), loadState(id)]);
+    const at = S.lastAt[id] || {};
+    let hot = kind === 'hot';
+    let due = true;
+    if (kind === 'sent') { // the session state every 3 s, plus the hot or local work if it is due, so a PR still shows up fast
+      loadPiStatus(id);
+      (S.lastAt[id] || (S.lastAt[id] = {})).pistatus = now;
+      hot = V.isHotRepo({ local: S.local[id], prs: S.prs[id], sent: S.sent[id] }) && now - (at.prs || 0) >= V.HOT_REFRESH_MS;
+      due = hot || now - (at.local || 0) >= V.LOCAL_REFRESH_MS;
+    }
+    if (!due) continue;
+    markAsked(id, now, { prs: hot });
+    if (hot) Promise.all([loadLocal(id), loadPrs(id), loadState(id)]);
     else Promise.all([loadLocal(id), loadState(id)]);
   }
 }
@@ -597,6 +621,20 @@ function summaryChanges(id) {
   return { files: l.files.length, added: l.added || 0, deleted: l.deleted || 0, ahead: l.ahead || 0, behind: l.behind || 0, noUpstream: !!l.noUpstream };
 }
 
+// A repo whose command is running (being sent, or sent and not finished) shows the session as working at once; the server
+// state shows again when the verdict ends. Copies only: S.summary is never changed.
+const commandRunning = (id) => { const v = verdictOf({ id }); return !!v && v.state === 'running'; };
+const summaryShown = () => (S.summary && Array.isArray(S.summary.rows)
+  ? { ...S.summary, rows: S.summary.rows.map((r) => (r.session && r.session.state === 'free' && commandRunning(r.id) ? { ...r, session: { ...r.session, state: 'working' } } : r)) }
+  : S.summary);
+// The chat as the label and the body see it: the live state lifted the same way, and the pending messages of the open repo.
+function chatView() {
+  const id = S.chat.id;
+  const live = S.chat.info && S.chat.info.live;
+  const info = live && live.state === 'free' && commandRunning(id) ? { ...S.chat.info, live: { ...live, state: 'working' } } : S.chat.info;
+  return { ...S.chat, info, pending: S.pending[id] };
+}
+
 function drawSummary() {
   applyTab();
   if (!R) return;
@@ -609,10 +647,10 @@ function drawSummary() {
   const box = $('#summary');
   const ctx = {
     now: Date.now(), scope, rooms: S.rooms, q: S.q, group: S.group, roomData: S.roomData.data, filter: S.sfilter, collapsed: S.collapsed, failed: S.summaryFailed,
-    flowFor: summaryFlow, changesFor: summaryChanges, sending: S.sending, busy: S.busy, chatId: S.chat.id,
+    flowFor: summaryFlow, changesFor: summaryChanges, sending: S.sending, busy: busyView(), chatId: S.chat.id,
   };
   if (paint($('#summaryTools'), R.summaryTools(S.summary, ctx)) && kept && kept.act === 'sfilter') { const on = $('#summaryTools [data-act="sfilter"]'); if (on && on.focus) on.focus(); }
-  const changed = paint(box, R.summaryView(S.summary, ctx));
+  const changed = paint(box, R.summaryView(summaryShown(), ctx));
   if (changed && kept && kept.act === 'toggle-group' && box.querySelectorAll) {
     const again = Array.from(box.querySelectorAll('[data-act]')).find((b) => b.dataset && b.dataset.act === kept.act && b.dataset.filter === kept.filter && b.dataset.group === kept.group);
     if (again && again.focus) again.focus();
@@ -696,10 +734,12 @@ function drawChat() {
   if (!on) return;
   applyChatWidth();
   paint($('#chatHead'), R.chatHead(S.chat, { name: nameOf(S.chat.id) }));
-  paint($('#sessState'), R.sessionLabelHtml(S.chat));
+  prunePending(S.chat.id);
+  const shown = chatView();
+  paint($('#sessState'), R.sessionLabelHtml(shown));
   const body = $('#chatBody');
   const atBottom = chatShown !== S.chat.id || !(body.scrollHeight > 0) || body.scrollHeight - body.scrollTop - body.clientHeight < 24;
-  if (paint(body, R.chatBody(S.chat, { now: Date.now() })) && atBottom) body.scrollTop = body.scrollHeight;
+  if (paint(body, R.chatBody(shown, { now: Date.now() })) && atBottom) body.scrollTop = body.scrollHeight;
   chatShown = S.chat.id;
   const id = S.chat.id;
   const cs = composerOf(id);
@@ -741,6 +781,12 @@ function saveDraft() {
   const v = $('#msgBox').value;
   if (v) S.drafts[id] = v; else delete S.drafts[id];
 }
+// A delivered message the history already shows is dropped (the entries still sending stay until their answer).
+function prunePending(id) {
+  const items = (S.chat.hist && S.chat.hist.items) || [];
+  const keep = (S.pending[id] || []).filter((p) => p.state === 'sending' || R.userCount(items, p.text) <= p.base);
+  if (keep.length) S.pending[id] = keep; else delete S.pending[id];
+}
 const closeActions = () => { if (S.actionsOpen) { S.actionsOpen = false; draw(); } };
 const composerOf = (id) => R.composerState({ ...S.chat, sending: !!S.msgBusy[id] }, { name: nameOf(id) });
 const sayNote = (id, text, clear = false) => { S.notes[id] = { text, id, clear }; };
@@ -752,17 +798,28 @@ async function sendChatMessage() {
   if (!text.trim()) return;
   const cs = composerOf(id);
   if (!cs.canSend) { sayNote(id, cs.reason); draw(); return; }
+  // Optimistic: in this same tick the text leaves the box and shows as a pending bubble.
+  const entry = { text, state: 'sending', base: R.userCount((S.chat.hist && S.chat.hist.items) || [], text) };
   S.msgBusy[id] = true;
   delete S.notes[id];
+  $('#msgBox').value = '';
+  delete S.drafts[id];
+  (S.pending[id] || (S.pending[id] = [])).push(entry);
   draw();
   try {
     const d = await api('/api/chat/send', { id, text });
     if (!d.sent) throw new Error('The message was not sent');
-    if (S.drafts[id] === text) delete S.drafts[id];
-    if (S.chat.id === id) $('#msgBox').value = '';
+    entry.state = d.delivered ? 'ok' : 'unconfirmed';
     if (d.leftInBox) sayNote(id, 'The text is still in the prompt box; the panel never resends it.', true);
     else if (!d.delivered) sayNote(id, 'Sent, but it could not be confirmed: check the session.');
-  } catch (e) { sayNote(id, e.message); } finally { delete S.msgBusy[id]; }
+  } catch (e) {
+    S.pending[id] = (S.pending[id] || []).filter((p) => p !== entry);
+    const now = S.chat.id === id ? $('#msgBox').value : S.drafts[id] || '';
+    const back = now ? `${text}
+${now}` : text;
+    if (S.chat.id === id) $('#msgBox').value = back; else S.drafts[id] = back;
+    sayNote(id, e.message);
+  } finally { delete S.msgBusy[id]; }
   if (S.chat.id === id) loadChat(id);
   draw();
 }
@@ -1106,6 +1163,7 @@ const FIX_PR_HINT = 'Ask the open session to find out why the checks failed and 
 // `running` is the verdict of a command running in this repo's session: it disables every button that would talk to it.
 function prCard(r, pr, meta, running = null) {
   const busy = S.busy[`${r.id}:${pr.number}`];
+  const held = !busy && mergeHeld(r.id, pr.number);
   const hold = running && V ? V.runningReason({ cmd: running.cmd, label: running.label }) : '';
   const showReason = !pr.ready && pr.blockedReason && pr.checks.state !== 'pending' && pr.checks.state !== 'failed';
   const n = `data-id="${r.id}" data-n="${pr.number}"`;
@@ -1122,11 +1180,11 @@ function prCard(r, pr, meta, running = null) {
       ${showReason ? `<span class="chip ${pr.mergeStateStatus === 'DIRTY' || pr.mergeStateStatus === 'BEHIND' ? 'red' : 'gray'}">${esc(pr.blockedReason)}</span>` : ''}
     </div>
     <div class="merge-row">
-      <button class="merge" data-act="merge" ${n} ${pr.ready && !busy && !hold ? '' : 'disabled'}
-        title="${esc(hold || (pr.ready ? 'Merge into ' + pr.base : pr.blockedReason))}">${busy === 'done' ? 'Merged ✓' : busy ? 'Merging…' : `Merge · ${S.prefs.method}`}</button>
+      <button class="merge" data-act="merge" ${n} ${pr.ready && !busy && !held && !hold ? '' : 'disabled'}
+        title="${esc(hold || (pr.ready ? 'Merge into ' + pr.base : pr.blockedReason))}">${held || busy === 'done' ? 'Merged ✓' : busy ? 'Merging…' : `Merge · ${S.prefs.method}`}</button>
       <button data-act="snooze" ${n} title="Park this PR at the bottom of the column until it is ready to merge (stays parked if it is already ready)">💤</button>
     </div>
-    ${pr.checks.failedRuns.length ? `<button data-act="rerun" ${n} ${busy || hold ? 'disabled' : ''}${hold ? ` title="${esc(hold)}"` : ''}>Re-run failed</button>` : ''}
+    ${pr.checks.failedRuns.length ? `<button data-act="rerun" ${n} ${busy || held || hold ? 'disabled' : ''}${hold ? ` title="${esc(hold)}"` : ''}>Re-run failed</button>` : ''}
     ${V && V.fixPrAction(pr).show ? piBtn(r, 'fix-pr', 'Fix CI', { pr: pr.number, title: hold || FIX_PR_HINT, disabled: !!hold }) : ''}
   </div>`;
 }
@@ -1172,14 +1230,15 @@ async function doMerge(id, n) {
   S.busy[key] = true; draw();
   try {
     const r = await api('/api/merge', { id, number: n, method, deleteBranch: del });
-    // Merged: keep the button disabled ("done") through the refresh, so it never comes back to life before the card moves.
-    S.busy[key] = 'done'; draw();
+    // Merged: S.merged keeps the button disabled until GitHub stops listing the PR (or MERGE_HOLD_MS), so it never comes back to life early.
+    S.merged[key] = Date.now();
     toast(`#${n} merged${r.branch === 'deleted' ? ' · branch deleted' : r.branch === 'auto' ? ' · branch auto-deleted' : ''}`, 'ok');
   } catch (e) {
-    delete S.busy[key];
     toast(`#${n}: ${e.message}`, 'bad');
   }
-  try { await refreshRepo(id); } finally { delete S.busy[key]; draw(); }
+  delete S.busy[key];
+  draw();
+  try { await refreshRepo(id); } finally { draw(); }
 }
 
 async function doRerun(id, n) {
@@ -1434,10 +1493,10 @@ document.addEventListener('click', (e) => {
 $('#search').addEventListener('input', (e) => { S.q = e.target.value; draw(); });
 $('#groupFilter').addEventListener('change', (e) => { S.group = e.target.value; draw(); });
 
-// Auto-refresh while the tab is visible and nothing is being merged: everything every minute, plus the lighter
+// Auto-refresh while the tab is visible: everything every minute, plus the lighter
 // refreshes planned by refreshTick in between.
 setInterval(() => {
-  if (!document.hidden && !Object.keys(S.busy).length) refreshAll();
+  if (!document.hidden) refreshAll();
 }, V ? V.FULL_REFRESH_MS : 60000);
 setInterval(() => refreshTick(), 2000);
 setInterval(summaryTick, 20000);

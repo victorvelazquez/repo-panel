@@ -68,7 +68,7 @@ const drawnBtn = (page, n) => {
   return new RegExp(`<button class="merge" data-act="merge" data-id="abc" data-n="${n}"[^>]*>[^<]*</button>`).exec(page.app.innerHTML)[0];
 };
 
-test('page: after a good merge the button stays disabled and says Merged ✓ until the refresh ends, then the busy entry is gone', async () => {
+test('page: after a good merge the button stays disabled and says Merged ✓ while the PR is listed, then the hold ends with the PR (RP75: S.merged, not S.busy)', async () => {
   const merge = deferred();
   const prsAnswer = deferred();
   const page = await loadPage({
@@ -90,11 +90,13 @@ test('page: after a good merge the button stays disabled and says Merged ✓ unt
   assert.match(mid, /disabled/, 'between the merge answer and the end of the refresh the button is still disabled');
   assert.match(mid, />Merged ✓</, 'and says it is done');
   assert.doesNotMatch(mid, /Merging…/);
-  assert.ok(S.busy['abc:7'], 'the busy entry is kept through the refresh');
+  assert.ok(S.merged['abc:7'] !== undefined, 'the merged hold is kept through the refresh (S.busy only means a request in flight)');
+  assert.equal(S.busy['abc:7'], undefined);
 
   prsAnswer.resolve({ json: { prs: [], stale: null, repo: { url: 'https://github.com/o/demo' } } });
   await done;
   assert.deepEqual(Object.keys(S.busy), [], 'no busy entry is left behind');
+  assert.deepEqual(Object.keys(S.merged), [], 'the PR is no longer listed: the hold ended');
   page.get('render')();
   assert.doesNotMatch(page.app.innerHTML, /data-act="merge"/, 'the card moved away');
 });
