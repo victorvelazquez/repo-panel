@@ -114,14 +114,67 @@ async function readScreen(orca, handle) {
   } catch { return null; }
 }
 
+// Opt-in cache of the per-terminal read (RP77), for the read-only callers only. An entry is the whole result of one terminal, keyed
+// `${handle}|${withPreview}|${askAware}`, answered with no Orca call while the terminal's `lastOutputAt` (a finite number) is the same
+// and it was stored less than 30 s ago. A failed read and an 'asking' screen are never stored; a terminal missing in `listed` is dropped.
+const LIVE_MAX_AGE_MS = 30000;
+const liveCache = new Map();
+const liveCounts = { hits: 0, misses: 0, listHits: 0, listMisses: 0 };
+
+// The shared terminal list (RP77) for the read-only callers: callers that arrive while a `list` is in flight share it, and an answer is
+// reused for LIST_MAX_AGE_MS counted from when it RESOLVED (`opts.now`, default Date.now). A rejection or a non-array answer is never stored.
+// Answers are copies. listMisses = `list` calls made; listHits = callers answered with no call of their own. Writers and the warmer list fresh.
+// A list is only answered to callers of the SAME `orca` function (there is one in production), except one primed without it.
+const LIST_MAX_AGE_MS = 1000;
+let sharedList = null;
+let listFlight = null;
+let listEpoch = 0;
+function clearLiveCache() {
+  liveCache.clear();
+  sharedList = null;
+  listFlight = null;
+  listEpoch++;
+  liveCounts.hits = 0; liveCounts.misses = 0; liveCounts.listHits = 0; liveCounts.listMisses = 0;
+}
+const liveCacheStats = () => ({ hits: liveCounts.hits, misses: liveCounts.misses, size: liveCache.size, listHits: liveCounts.listHits, listMisses: liveCounts.listMisses });
+function primeList(terminals, opts = {}) {
+  if (!Array.isArray(terminals)) return;
+  const now = (opts && opts.now) || Date.now;
+  sharedList = { at: now(), terminals: structuredClone(terminals), orca: opts && opts.orca };
+}
+async function listTerminals(orca, opts = {}) {
+  const now = (opts && opts.now) || Date.now;
+  if (sharedList && (!sharedList.orca || sharedList.orca === orca) && now() - sharedList.at < LIST_MAX_AGE_MS) { liveCounts.listHits++; return structuredClone(sharedList.terminals); }
+  if (listFlight && listFlight.orca === orca) { liveCounts.listHits++; return structuredClone(await listFlight); }
+  liveCounts.listMisses++;
+  const epoch = listEpoch;
+  const flight = (async () => {
+    try {
+      const terminals = (await orca(['list'])).terminals;
+      if (Array.isArray(terminals) && epoch === listEpoch) sharedList = { at: now(), terminals: structuredClone(terminals), orca };
+      return terminals;
+    } finally { if (listFlight === flight) listFlight = null; }
+  })();
+  flight.orca = orca;
+  listFlight = flight;
+  return structuredClone(await flight);
+}
+
 // Looks at every terminal of the folder's worktree with a fresh `show` (the `list` preview is truncated), in
 // parallel. `sessions` are the ones whose screen is a pi screen; `failed` counts the terminals whose `show`
 // failed: those are unknown, not sessions. `listed` is an already fetched `list` result (rooms list once). A
 // terminal showing a selection dialog (lib.piScreenAsk) IS a session and that wins over idle/busy/typed: it is
 // reported as 'asking' (with its `ask` text) only when `askAware`; other callers (rooms) keep seeing 'busy'.
-async function scanSessions(folder, orca, listed, withPreview = false, askAware = false) {
+// `opts.cached` (with a `listed` array) turns the cache above on; `opts.now` is the clock.
+async function scanSessions(folder, orca, listed, withPreview = false, askAware = false, opts = {}) {
+  const useCache = !!(opts && opts.cached) && listed !== undefined;
+  const now = (opts && opts.now) || Date.now;
+  if (useCache) {
+    const handles = new Set((Array.isArray(listed) ? listed : []).filter((t) => t && typeof t.handle === 'string').map((t) => t.handle));
+    for (const [key, e] of [...liveCache]) if (!handles.has(e.item.handle)) liveCache.delete(key);
+  }
   const terminals = lib.terminalsOfWorktree(listed === undefined ? (await orca(['list'])).terminals : listed, folder);
-  const seen = await Promise.all(terminals.map(async ({ handle }) => {
+  const readOne = async ({ handle }) => {
     try {
       const preview = ((await orca(['show', '--terminal', handle])).terminal || {}).preview;
       const ask = lib.piScreenAsk(preview);
@@ -136,6 +189,18 @@ async function scanSessions(folder, orca, listed, withPreview = false, askAware 
       }
       return { handle, state: lib.piScreenState(preview), preview };
     } catch { return { handle, state: null, failed: true }; }
+  };
+  const seen = await Promise.all(terminals.map(async (t) => {
+    if (!useCache) return readOne(t);
+    const key = `${t.handle}|${withPreview}|${askAware}`;
+    const at = t.lastOutputAt;
+    const hit = liveCache.get(key);
+    if (hit && Number.isFinite(at) && hit.at === at && now() - hit.storedAt < LIVE_MAX_AGE_MS) { liveCounts.hits++; return structuredClone(hit.item); }
+    liveCounts.misses++;
+    const item = await readOne(t);
+    if (Number.isFinite(at) && !item.failed && item.state !== 'asking') liveCache.set(key, { at, storedAt: now(), item: structuredClone(item) });
+    else liveCache.delete(key);
+    return item;
   }));
   const sessions = seen.filter((t) => t.state).map(({ handle, state, ask, dialog, preview }) => ({ handle, state, ...(ask ? { ask, dialog } : {}), ...(withPreview ? { preview } : {}) }));
   return { sessions, failed: seen.filter((t) => t.failed).length };
@@ -201,9 +266,9 @@ function screenTail(preview) {
 async function piStatus(repo, orca = orcaTerminal, { tail = false } = {}) {
   const out = (state, screen = '', ask) => ({ state, ...(tail ? { tail: screen } : {}), ...(ask ? { ask } : {}) });
   try {
-    const listed = (await orca(['list'])).terminals;
+    const listed = await listTerminals(orca);
     if (!Array.isArray(listed)) return out('unknown');
-    const { sessions, failed } = await scanSessions(repo.path, orca, listed, tail, true);
+    const { sessions, failed } = await scanSessions(repo.path, orca, listed, tail, true, { cached: true });
     if (!sessions.length) return out(failed ? 'unknown' : 'closed');
     if (sessions.length > 1) return out('ambiguous');
     if (sessions[0].state === 'asking') return out('asking', screenTail(sessions[0].preview), sessions[0].ask);
@@ -211,4 +276,4 @@ async function piStatus(repo, orca = orcaTerminal, { tail = false } = {}) {
   } catch { return out('unknown'); }
 }
 
-module.exports = { piSend, piStatus, piSessions, scanSessions, conditionsOrder, fixPrOrder, orcaTerminal, readScreen, sendGuard, setCaseRecorder, caseRecorderInstalled, piBusy };
+module.exports = { piSend, piStatus, piSessions, scanSessions, clearLiveCache, liveCacheStats, listTerminals, primeList, conditionsOrder, fixPrOrder, orcaTerminal, readScreen, sendGuard, setCaseRecorder, caseRecorderInstalled, piBusy };

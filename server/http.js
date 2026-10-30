@@ -14,7 +14,7 @@ const { localState, diffText } = require('./local.js');
 const { prState, mergePr, rerunFailed } = require('./github.js');
 const { roadmapState } = require('./roadmap.js');
 const { addRepo, removeRepo, setSnoozed, setDismissed, scanFolder } = require('./repos.js');
-const { piSend, piStatus, sendGuard } = require('./pi.js');
+const { piSend, piStatus, sendGuard, liveCacheStats } = require('./pi.js');
 const { readState } = require('./state.js');
 const { requirementsFor, prerequisites } = require('./requirements.js');
 const { roomsState, createRoom, removeRoom, assignRoom } = require('./rooms.js');
@@ -159,7 +159,7 @@ function createServer(port, deps = {}) {
         const handler = routes[key];
         if (!handler && key !== 'GET /api/perf') throw new HttpError(404, 'Not found');
         if (req.headers['x-token'] !== TOKEN) throw new HttpError(401, 'Invalid token');
-        if (!handler) return reply(200, { routes: perf.summary(), queue: stats() });
+        if (!handler) return reply(200, { routes: perf.summary(), queue: stats(), liveCache: liveCacheStats() });
         const body = req.method === 'POST' ? await readBody(req) : {};
         const run = () => { executed = true; return handler(query(req.url), body, deps); };
         // Identical GETs in flight share one execution; POSTs never do.

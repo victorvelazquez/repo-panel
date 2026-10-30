@@ -147,7 +147,7 @@ test('GET /api/perf needs the token and answers routes and the queue', async () 
     assert.equal((await call('GET', '/api/perf')).status, 401);
     await call('GET', `/api/rooms?id=${REPO_ID}&secret=tok-123`, token);
     const body = await perf();
-    assert.deepEqual(Object.keys(body).sort(), ['queue', 'routes']);
+    assert.deepEqual(Object.keys(body).sort(), ['liveCache', 'queue', 'routes']);
     assert.deepEqual(body.queue, { active: 0, max: 2, waitingBackground: 0, waitingUser: 0 });
     assert.ok(body.routes['GET /api/rooms'].n >= 1, 'keyed by the route name, without the query');
     for (const key of Object.keys(body.routes)) assert.ok(!key.includes('?'), key);

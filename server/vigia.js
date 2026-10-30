@@ -101,4 +101,4 @@ function createWatcher({
   return { start, stop, tick };
 }
 
-module.exports = { createWatcher, watchInterval, foldersOf, defaultScan: scanSessions };
+module.exports = { createWatcher, watchInterval, foldersOf, configFolders, defaultScan: scanSessions };

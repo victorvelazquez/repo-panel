@@ -7,7 +7,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { HttpError } = require('./errors.js');
 const { loadConfig, saveConfig, findRepo } = require('./config.js');
-const { orcaTerminal, scanSessions } = require('./pi.js');
+const { orcaTerminal, scanSessions, listTerminals } = require('./pi.js');
 
 const CHUNK = 64 * 1024;
 const LIMIT = 20;
@@ -169,11 +169,12 @@ function sessionKeyFor(id) {
 }
 
 // Orca is listed ONCE; the folder's screens are then read with `scanSessions`. An Orca failure is unknown, never none.
-async function liveOf(folder, orca) {
+// A read-only caller shares the 1 s list and the cached screens (RP77); `fresh` (a caller that DECIDES, like startSession) lists and reads itself.
+async function liveOf(folder, orca, { fresh = false } = {}) {
   try {
-    const terminals = (await orca(['list'])).terminals;
+    const terminals = fresh ? (await orca(['list'])).terminals : await listTerminals(orca);
     if (!Array.isArray(terminals)) return { state: 'unknown', count: 0 };
-    const { sessions, failed } = await scanSessions(folder, orca, terminals, false, true);
+    const { sessions, failed } = await scanSessions(folder, orca, terminals, false, true, fresh ? {} : { cached: true });
     if (!sessions.length) return { state: failed ? 'unknown' : 'none', count: 0 };
     const state = sessions.map((s) => LIVE_OF[s.state] || 'free').reduce((a, b) => (RANK[b] > RANK[a] ? b : a));
     // The question as it is on the screen, only when it is unambiguous whose it is (one session). Read-only.
@@ -224,7 +225,7 @@ async function startSession(id, orca = orcaTerminal) {
   try {
     const sid = `${prefix}-${label.toLowerCase().replace(/[^a-z0-9.-]/g, '-')}`.slice(0, 80);
     const name = `${prefix === 'sala' ? 'sala' : 'panel'}:${label.replace(/[^A-Za-z0-9._-]/g, '-')}`.slice(0, 100);
-    const live = await liveOf(folder, orca);
+    const live = await liveOf(folder, orca, { fresh: true });
     if (live.state === 'unknown') throw new HttpError(409, 'Orca could not be read, so it is not known whether a session is already open; try again');
     if (live.state !== 'none') throw new HttpError(409, 'This folder already has a session open; adopt it instead of starting another');
     const created = await orca(['create', '--worktree', `path:${folder}`, '--title', name, '--command', `gentle-shell -n ${name} --session-id ${sid}`]);

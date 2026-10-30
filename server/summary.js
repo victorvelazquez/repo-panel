@@ -130,7 +130,7 @@ function safeAnalyse(f) {
 async function sessionState(repoPath, orca, terminals) {
   if (!terminals) return 'unknown';
   try {
-    const { sessions, failed } = await scanSessions(repoPath, orca, terminals, false, true);
+    const { sessions, failed } = await scanSessions(repoPath, orca, terminals, false, true, { cached: true });
     if (!sessions.length) return failed ? 'unknown' : 'closed';
     if (sessions.length > 1) return 'ambiguous';
     return sessions[0].state === 'idle' || sessions[0].state === 'typed' ? 'idle' : sessions[0].state;
