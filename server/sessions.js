@@ -170,16 +170,21 @@ function sessionKeyFor(id) {
 
 // Orca is listed ONCE; the folder's screens are then read with `scanSessions`. An Orca failure is unknown, never none.
 // A read-only caller shares the 1 s list and the cached screens (RP77); `fresh` (a caller that DECIDES, like startSession) lists and reads itself.
+// The pure part of liveOf (RP77b): the live state of one scan, shared with the warmer's event stream.
+function liveFromSessions(sessions, failed) {
+  if (!sessions.length) return { state: failed ? 'unknown' : 'none', count: 0 };
+  const state = sessions.map((s) => LIVE_OF[s.state] || 'free').reduce((a, b) => (RANK[b] > RANK[a] ? b : a));
+  // The question as it is on the screen, only when it is unambiguous whose it is (one session). Read-only.
+  if (state === 'waiting' && sessions.length === 1 && sessions[0].dialog) return { state, count: 1, dialog: sessions[0].dialog };
+  return { state, count: sessions.length };
+}
+
 async function liveOf(folder, orca, { fresh = false } = {}) {
   try {
     const terminals = fresh ? (await orca(['list'])).terminals : await listTerminals(orca);
     if (!Array.isArray(terminals)) return { state: 'unknown', count: 0 };
     const { sessions, failed } = await scanSessions(folder, orca, terminals, false, true, fresh ? {} : { cached: true });
-    if (!sessions.length) return { state: failed ? 'unknown' : 'none', count: 0 };
-    const state = sessions.map((s) => LIVE_OF[s.state] || 'free').reduce((a, b) => (RANK[b] > RANK[a] ? b : a));
-    // The question as it is on the screen, only when it is unambiguous whose it is (one session). Read-only.
-    if (state === 'waiting' && sessions.length === 1 && sessions[0].dialog) return { state, count: 1, dialog: sessions[0].dialog };
-    return { state, count: sessions.length };
+    return liveFromSessions(sessions, failed);
   } catch { return { state: 'unknown', count: 0 }; }
 }
 
@@ -234,4 +239,4 @@ async function startSession(id, orca = orcaTerminal) {
   } finally { starting.delete(key); }
 }
 
-module.exports = { sessionsDirFor, listSessions, readChat, chatState, sessionKeyFor, sessionsState, adoptSession, releaseSession, startSession, SESSION_ID };
+module.exports = { liveFromSessions, sessionsDirFor, listSessions, readChat, chatState, sessionKeyFor, sessionsState, adoptSession, releaseSession, startSession, SESSION_ID };

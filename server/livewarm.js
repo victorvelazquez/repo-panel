@@ -3,7 +3,8 @@
 // callers (status, summary, sessions) find the screens already read. Read-only (`list` and `show`); modelled on server/vigia.js.
 // server.js starts it, only when run as the program; no module and no test starts it by itself.
 const lib = require('../lib.js');
-const { scanSessions, primeList } = require('./pi.js');
+const { scanSessions, primeList, piStateOf } = require('./pi.js');
+const { liveFromSessions } = require('./sessions.js');
 const { foldersOf, configFolders } = require('./vigia.js');
 
 const DEFAULT_INTERVAL_MS = 3000;
@@ -23,7 +24,7 @@ function warmInterval(env) {
 
 function createWarmer({
   listRepoFolders = configFolders, orca, scan = scanSessions, intervalMs = DEFAULT_INTERVAL_MS,
-  setTimer = setTimeout, clearTimer = clearTimeout, log = console.warn, now = Date.now,
+  setTimer = setTimeout, clearTimer = clearTimeout, log = console.warn, now = Date.now, publish,
 } = {}) {
   let timer = null;
   let running = false;
@@ -50,7 +51,11 @@ function createWarmer({
       if (!Array.isArray(terminals)) throw new Error('Orca returned no terminal list');
       primeList(terminals, { now, orca });
       for (const folder of folders) {
-        try { await scan(folder, orca, terminals, false, true, { cached: true }); } catch (e) { warn(`scan of ${folder} failed: ${e && e.message}`); }
+        try {
+          const { sessions, failed } = await scan(folder, orca, terminals, false, true, { cached: true });
+          // RP77b: the same scan, as the event stream's payload (the publisher is the hub; it must never break the warmer).
+          if (publish) publish(lib.repoId(folder), { ...piStateOf(sessions, failed), live: liveFromSessions(sessions, failed) });
+        } catch (e) { warn(`scan of ${folder} failed: ${e && e.message}`); }
       }
     } catch (e) {
       warn(`skipped a tick: ${e && e.message}`);
@@ -61,7 +66,7 @@ function createWarmer({
     timer = setTimer(async () => {
       timer = null;
       await tick();
-      if (started) arm(intervalMs);
+      if (started) arm(typeof intervalMs === 'function' ? intervalMs() : intervalMs);
     }, ms);
     if (timer && typeof timer.unref === 'function') timer.unref();
   }

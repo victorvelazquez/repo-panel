@@ -22,6 +22,7 @@ const { queueFor, conformityFor } = require('./queue.js');
 const { summaryFor } = require('./summary.js');
 const { sendChat, clearChat } = require('./chatsend.js');
 const { answerDialog } = require('./dialoganswer.js');
+const { createEventHub } = require('./events.js');
 const { sessionsState, chatState, adoptSession, releaseSession, startSession } = require('./sessions.js');
 
 const ROOT = path.join(__dirname, '..');
@@ -123,7 +124,9 @@ function createServer(port, deps = {}) {
   const hostOk = new Set([`127.0.0.1:${port}`, `localhost:${port}`]);
   const perf = createPerf();
   const flights = new Map();
-  return http.createServer((req, res) => {
+  const hub = deps.hub || createEventHub();
+  const server = http.createServer((req, res) => {
+    if (req.method === 'GET' && req.url.split('?')[0] === '/api/events') return openStream(req, res);
     const t0 = Date.now();
     const ctx = { procs: 0, waitMs: 0 };
     // A URL the parser rejects (`//`, `http://[`) must answer an error, never throw outside the try below and take the panel down.
@@ -137,7 +140,8 @@ function createServer(port, deps = {}) {
     const reply = (status, body, type) => {
       const ms = Date.now() - t0;
       const json = !type;
-      if (key !== 'GET /api/perf') perf.record({ route: routes[key] ? key : `${req.method} (other)`, ms, waitMs: ctx.waitMs, procs: ctx.procs, priority, executed });
+      // The page, its assets and /health are not API calls; only API routes (and unknown /api/ paths) are timed.
+      if (key !== 'GET /api/perf' && pathname.startsWith('/api/')) perf.record({ route: routes[key] ? key : `${req.method} (other)`, ms, waitMs: ctx.waitMs, procs: ctx.procs, priority, executed });
       const timing = json ? { 'server-timing': `total;dur=${ms}${ctx.waitMs > 0 ? `, queue;dur=${ctx.waitMs}` : ''}` } : {};
       return send(res, status, body, type, timing);
     };
@@ -172,6 +176,19 @@ function createServer(port, deps = {}) {
       }
     }));
   });
+  // RP77b: GET /api/events is long-lived, so it skips perf and singleFlight; the token is read ONLY from the x-token header (never the URL).
+  function openStream(req, res) {
+    if (!hostOk.has(req.headers.host)) return send(res, 403, { error: 'Forbidden host' });
+    if (req.headers['x-token'] !== TOKEN) return send(res, 401, { error: 'Invalid token' });
+    for (const [k, v] of Object.entries({ 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' })) res.setHeader(k, v);
+    if (hub.add(res)) return undefined;
+    res.removeHeader('connection');
+    return send(res, 503, { error: 'Too many event streams open' });
+  }
+  const close = server.close.bind(server);
+  server.close = (cb) => { hub.closeAll(); return close(cb); };
+  server.hub = hub;
+  return server;
 }
 
 module.exports = { createServer, isPanelRunning };

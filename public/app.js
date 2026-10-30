@@ -210,6 +210,87 @@ function loadLive(id) {
   return pooled(() => api(`/api/pi-status?id=${id}`)).then((d) => set(d.state), () => set(undefined)).finally(() => { delete S.liveBusy[id]; });
 }
 
+// ---------- event stream (RP77b) ----------
+// GET /api/events pushes the warmer's live state of every repo. It feeds the same state the pollers feed (S.live, S.chat.info.live) and never
+// touches a repo with a command in flight (S.sent): that one has its own poller. While it is open the pollers only run as a slow safety net.
+const ev = { ctl: null, timer: null, attempt: 0, connected: false, lastByteAt: 0, last: {}, ran: { live: 0, chat: 0 } };
+
+function applyLive(entries) {
+  let changed = false;
+  const targets = new Set(V.piPollTargets({ ids: allRepos().map((r) => r.id), local: S.local, sent: S.sent, hidden: document.hidden }));
+  for (const e of entries) {
+    ev.last[e.id] = e;
+    if (S.sent[e.id]) continue;
+    if (targets.has(e.id)) {
+      const first = !S.liveAnswered[e.id];
+      S.liveAnswered[e.id] = true;
+      if (first || S.live[e.id] !== e.state) { S.live[e.id] = e.state; changed = true; }
+    }
+    const info = S.chat.id === e.id && S.chat.info;
+    if (info && JSON.stringify(info.live) !== JSON.stringify(e.live)) {
+      S.chat.info = { ...info, live: e.live };
+      S.chat.key = JSON.stringify([S.chat.info, S.chat.hist]);
+      const ch = e.live.dialog && e.live.dialog.choices;
+      if (S.answer[e.id] && S.answer[e.id].state !== 'sending' && (!ch || ch.fingerprint !== S.answer[e.id].fp)) delete S.answer[e.id]; // that question is over
+      changed = true;
+    }
+  }
+  if (changed) draw();
+}
+
+async function readEvents(ctl) {
+  const res = await fetch('/api/events', { headers: { 'x-token': TOKEN }, signal: ctl.signal });
+  if (!res.ok || !res.body) throw new Error('No event stream');
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let rest = '';
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) return;
+    ev.connected = true; // the preamble counts: the stream is open and talking
+    ev.lastByteAt = Date.now();
+    ev.attempt = 0;
+    const parsed = V.parseSse(rest + decoder.decode(value, { stream: true }));
+    rest = parsed.rest;
+    if (rest.length > 1e6) throw new Error('Event frame too large');
+    for (const frame of parsed.events) {
+      const out = V.liveEvent(frame);
+      if (out) applyLive(Array.isArray(out) ? out : [out]);
+    }
+  }
+}
+
+function stopEvents() {
+  clearTimeout(ev.timer);
+  ev.timer = null;
+  ev.connected = false;
+  ev.last = {};
+  const ctl = ev.ctl;
+  ev.ctl = null;
+  if (ctl) ctl.abort();
+}
+
+// Silent when the server has no stream (an old one, a 404, the 8-client cap): it retries slowly and the pollers keep working as before.
+function startEvents() {
+  if (!V || ev.ctl || ev.timer || document.hidden) return;
+  const ctl = new AbortController();
+  ev.ctl = ctl;
+  readEvents(ctl).catch(() => {}).then(() => {
+    if (ev.ctl !== ctl) return; // stopped on purpose
+    stopEvents();
+    ev.timer = setTimeout(() => { ev.timer = null; startEvents(); }, V.eventsRetryMs(ev.attempt++));
+  });
+}
+
+// True when the stream is open and this poller ran less than its safety-net interval ago; otherwise it runs and notes the time.
+function pollSkipped(which) {
+  const now = Date.now();
+  const plan = V.eventsPlan({ connected: ev.connected, lastEventAt: ev.ran[which], now });
+  if (ev.connected && now - ev.ran[which] < (which === 'live' ? plan.pollLiveMs : plan.chatMs)) return true;
+  ev.ran[which] = now;
+  return false;
+}
+
 // Every few seconds, while the tab is visible: polls the repos the view says need it and forgets the rest. It also
 // redraws when a repo is inside the quiet period, so the button enables itself once that ends.
 let quietNow = {}; // which polled repos were inside the quiet period at the last tick
@@ -217,7 +298,9 @@ function pollLive() {
   if (document.hidden) return; // a hidden tab keeps what it knew: forgetting it would reopen the window with the button enabled
   const ids = V ? V.piPollTargets({ ids: allRepos().map((r) => r.id), local: S.local, sent: S.sent, hidden: document.hidden }) : [];
   for (const id of Object.keys(S.live)) if (!ids.includes(id)) delete S.live[id];
-  ids.forEach(loadLive);
+  if (V && V.eventsStale({ connected: ev.connected, lastByteAt: ev.lastByteAt, now: Date.now() })) { stopEvents(); startEvents(); } // a silent stream is a dead one
+  if (V && !pollSkipped('live')) ids.forEach(loadLive);
+  else ids.filter((id) => !S.sent[id] && ev.last[id]).forEach((id) => applyLive([ev.last[id]])); // the stream's last word, no request
   // Redraw while a repo is inside the quiet period and once more on the tick that finds it over, or the disabled button stays.
   const quiet = {};
   for (const id of ids) quiet[id] = V.quietPeriod(S.local[id].lastChangeMs);
@@ -726,7 +809,7 @@ function closeChat() {
   chatShown = null;
   draw();
 }
-const chatTick = () => { if (S.chat.id && S.tab === 'summary' && !document.hidden) loadChat(S.chat.id); };
+const chatTick = () => { if (S.chat.id && S.tab === 'summary' && !document.hidden && !(V && pollSkipped('chat'))) loadChat(S.chat.id); };
 
 function chatWidthNow() {
   const layout = $('#sumLayout');
@@ -1544,7 +1627,9 @@ setInterval(summaryTick, 20000);
 setInterval(chatTick, CHAT_MS);
 setInterval(pollLive, 10000);
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) return;
+  if (document.hidden) { stopEvents(); return; }
+  ev.attempt = 0;
+  startEvents();
   pollLive();
   if (Date.now() - S.lastRefresh > 30000) refreshAll();
 });
@@ -1557,4 +1642,5 @@ document.addEventListener('visibilitychange', () => {
   draw();
   if (location.hash === '#conformity') openConformity(); // deep link
   refreshAll();
+  startEvents();
 })();

@@ -257,6 +257,15 @@ function screenTail(preview) {
   return above.slice(-TAIL_LINES).join('\n').slice(0, TAIL_MAX);
 }
 
+// The pure part of piStatus (RP77b): the state of one scan, shared with the warmer's event stream.
+function piStateOf(sessions, failed) {
+  if (!sessions.length) return { state: failed ? 'unknown' : 'closed' };
+  if (sessions.length > 1) return { state: 'ambiguous' };
+  const [one] = sessions;
+  if (one.state === 'asking') return { state: 'asking', ...(one.ask ? { ask: one.ask } : {}) };
+  return { state: one.state === 'busy' ? 'busy' : 'idle' };
+}
+
 // The state of the repo's pi session for the commit verdict: closed | idle | busy | ambiguous | unknown. Read-only
 // (`list` and a fresh `show` per terminal, never `send`), as the room presence does. An Orca failure is unknown,
 // never closed; a prompt with text typed in it is still a session waiting for input, so it counts as idle. If a
@@ -269,11 +278,9 @@ async function piStatus(repo, orca = orcaTerminal, { tail = false } = {}) {
     const listed = await listTerminals(orca);
     if (!Array.isArray(listed)) return out('unknown');
     const { sessions, failed } = await scanSessions(repo.path, orca, listed, tail, true, { cached: true });
-    if (!sessions.length) return out(failed ? 'unknown' : 'closed');
-    if (sessions.length > 1) return out('ambiguous');
-    if (sessions[0].state === 'asking') return out('asking', screenTail(sessions[0].preview), sessions[0].ask);
-    return out(sessions[0].state === 'busy' ? 'busy' : 'idle', screenTail(sessions[0].preview));
+    const { state, ask } = piStateOf(sessions, failed);
+    return out(state, ['idle', 'busy', 'asking'].includes(state) ? screenTail(sessions[0].preview) : '', ask);
   } catch { return out('unknown'); }
 }
 
-module.exports = { piSend, piStatus, piSessions, scanSessions, clearLiveCache, liveCacheStats, listTerminals, primeList, conditionsOrder, fixPrOrder, orcaTerminal, readScreen, sendGuard, setCaseRecorder, caseRecorderInstalled, piBusy };
+module.exports = { piSend, piStatus, piStateOf, piSessions, scanSessions, clearLiveCache, liveCacheStats, listTerminals, primeList, conditionsOrder, fixPrOrder, orcaTerminal, readScreen, sendGuard, setCaseRecorder, caseRecorderInstalled, piBusy };

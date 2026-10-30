@@ -181,7 +181,7 @@ test('A: when the tab becomes visible again the live state is asked for at once'
   page.state.hidden = false;
   for (const fn of page.listeners.visibilitychange || []) fn();
   await flush();
-  assert.deepEqual(page.urls(), [STATUS(R.id)]);
+  assert.deepEqual(page.urls().filter((u) => !String(u).startsWith('/api/events')), [STATUS(R.id)]); // RP77b: the stream also opens when the tab is visible
   assert.equal(S.live[R.id], 'idle');
 });
 
