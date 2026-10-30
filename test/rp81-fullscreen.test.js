@@ -47,8 +47,10 @@ const previewOf = (rows) => rows.filter((l) => l.trim()).slice(-6).join('\n');
 const ROWS = fullRows();
 const PREVIEW = previewOf(ROWS);
 const FULL = ROWS.join('\n');
-const FALLBACK = lib.piScreenDialog(PREVIEW);
-const EXPECTED = lib.piScreenDialog(FULL);
+// RP73: the dialog also carries `choices` (read from the full screen only; null when that read is missing or the layout is not a recognised list: here the
+// second option is not indented under the marker, so it is null).
+const FALLBACK = { ...lib.piScreenDialog(PREVIEW), choices: null };
+const EXPECTED = { ...lib.piScreenDialog(FULL), choices: lib.piDialogChoices(FULL) };
 
 const wt = (handle) => ({ handle, worktreePath: repoDir, connected: true, writable: true });
 
@@ -131,7 +133,7 @@ test('at most 40 dialog lines come back even when 200 rows of text precede the d
   assert.equal(s.dialog.lines.at(-1), NAV);
   assert.equal(s.dialog.lines[s.dialog.selected], '→ Yes');
   assert.ok(s.dialog.lines.includes(TITLE));
-  assert.deepEqual(s.dialog, lib.piScreenDialog(rows.join('\n')));
+  assert.deepEqual(s.dialog, { ...lib.piScreenDialog(rows.join('\n')), choices: lib.piDialogChoices(rows.join('\n')) });
 });
 
 test('terminals that are not asking get no read: a mixed scan reads only the asking one', async () => {

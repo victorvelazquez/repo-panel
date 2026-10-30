@@ -32,7 +32,7 @@ const S = {
   lastRefresh: 0, lastAt: {}, scan: [],
   tab: 'summary', scope: { kind: 'all' }, summary: null, summaryKey: '', summaryFailed: false, sfilter: 'all', collapsed: {},
   timeouts: { get: 25000, post: 70000 },
-  chat: { id: null, seq: 0 }, actionsOpen: false, drafts: {}, notes: {}, msgBusy: {},
+  chat: { id: null, seq: 0 }, actionsOpen: false, drafts: {}, notes: {}, msgBusy: {}, answer: {},
 };
 S.tab = S.prefs.tab === 'work' ? 'work' : 'summary';
 
@@ -649,7 +649,7 @@ function chatView() {
   const id = S.chat.id;
   const live = S.chat.info && S.chat.info.live;
   const info = live && live.state === 'free' && commandRunning(id) ? { ...S.chat.info, live: { ...live, state: 'working' } } : S.chat.info;
-  return { ...S.chat, info, pending: S.pending[id] };
+  return { ...S.chat, info, pending: S.pending[id], answer: S.answer[id] };
 }
 
 function drawSummary() {
@@ -698,6 +698,8 @@ async function loadChat(id, { user = false, signal } = {}) {
     S.chat.failed = false;
     if (key === S.chat.key && !recovered) return;
     Object.assign(S.chat, { info, hist, key });
+    const ch = info.live && info.live.dialog && info.live.dialog.choices;
+    if (S.answer[id] && S.answer[id].state !== 'sending' && (!ch || ch.fingerprint !== S.answer[id].fp)) delete S.answer[id]; // that question is over
     draw();
   } catch {
     if (signal && signal.aborted) return; // cancelled on purpose: neither a failure nor a toast
@@ -1327,6 +1329,21 @@ const ACTIONS = {
   'chat-open': (el) => openChat(el.dataset.id),
   'chat-close': () => closeChat(),
   'chat-send': () => sendChatMessage(),
+  // RP73: answer the question of the open chat. The server presses the keys; this only posts { id, fingerprint, index } and draws the
+  // outcome in the card. Optimistic like the composer: the buttons lock in the same tick, an error unlocks them with the server's message.
+  'dialog-answer': async (el) => {
+    const id = S.chat.id;
+    const { index, fp } = el.dataset;
+    const mine = id && S.answer[id];
+    if (!R || !id || !/^[0-7]$/.test(String(index)) || !/^[0-9a-f]{16}$/.test(String(fp)) || (mine && mine.state !== 'error')) return;
+    S.answer[id] = { fp, state: 'sending' };
+    draw();
+    try {
+      const d = await api('/api/dialog/answer', { id, fingerprint: fp, index: Number(index) });
+      S.answer[id] = { fp, state: 'ok', text: d.option };
+    } catch (e) { S.answer[id] = { fp, state: 'error', text: e.message }; }
+    draw();
+  },
   'chat-menu': () => { S.actionsOpen = !S.actionsOpen; draw(); },
   'chat-clear': async (el) => {
     const { id } = el.dataset;
