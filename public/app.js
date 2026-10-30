@@ -673,6 +673,7 @@ function openConformity() {
 // GET /api/summary on the 60 s cycle and every 20 s while the tab is shown. generatedAt changes on every answer, so it is left
 // out of the comparison: the page redraws only when the payload really changed. A failed read keeps the last data.
 const SUMMARY_TIMEOUT_MS = 90000;
+const SUMMARY_LOADING_MS = 2000;
 async function loadSummary() {
   try {
     // The whole-board build takes 20 to 30 s on a slow machine until RP78 serves it from memory: a 25 s limit would show a false failure.
@@ -680,10 +681,13 @@ async function loadSummary() {
     const key = JSON.stringify({ ...d, generatedAt: null });
     const recovered = S.summaryFailed;
     S.summaryFailed = false;
-    if (key === S.summaryKey && !recovered) return;
-    S.summary = d;
-    S.summaryKey = key;
-    draw();
+    if (key !== S.summaryKey || recovered) {
+      S.summary = d;
+      S.summaryKey = key;
+      draw();
+    }
+    // RP78: rows the store has not read yet are `loading`: ask again soon instead of waiting for the 20 s tick.
+    if (Array.isArray(d.rows) && d.rows.some((r) => r.loading)) setTimeout(summaryTick, SUMMARY_LOADING_MS);
   } catch {
     if (!S.summaryFailed) { S.summaryFailed = true; draw(); }
   }

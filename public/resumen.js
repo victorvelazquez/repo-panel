@@ -110,15 +110,24 @@
     return open(`Open · ${a.label ?? ''}`, 'primary', a.kind === 'answer' || a.kind === 'waiting' ? a.kind : '');
   }
 
+  // RP78: a repo whose facts are still being read is a calm placeholder: no button, no action, not clickable, never an error look.
+  const loadingCard = (r, id) => `<article class="rs-card rs-loading" data-id="${id}" aria-busy="true" aria-label="${esc(r.name)}">
+      <div class="rs-l1"><b class="rs-name" title="${esc(r.name)}">${esc(r.name)}</b><span class="rs-spacer"></span><span class="rs-sub" role="status">Loading…</span></div>
+    </article>`;
+  // The small marker of a row served from memory while a fact is being refreshed (RP78); the title names the facts.
+  const staleMark = (r) => (r.stale && Array.isArray(r.stale.facts) && r.stale.facts.length
+    ? `<span class="rs-sub rs-stale" title="Updating: ${r.stale.facts.map(esc).join(', ')}">Updating…</span>` : '');
+
   // Two lines: name, branch, change chips, time, session; then bar, next unit, the action.
   function cardHtml(r, ctx) {
     const id = esc(r.id);
+    if (r.loading) return loadingCard(r, id);
     const lm = r.lastMovement || {};
     const a = r.error ? null : r.action;
     const cls = r.session && r.session.state === 'waiting' ? ' ask' : !r.error && !r.next && (r.blocking || []).length ? ' block' : '';
     const chips = r.error ? '' : changeChips(ctx.changesFor ? ctx.changesFor(r.id) : null, id) + (a && a.kind === 'manual' ? '<span class="chip red">▲ manual action</span>' : '');
     return `<article class="rs-card${cls}" data-id="${id}" data-act="chat-open" tabindex="0"${ctx.chatId === r.id ? ' aria-current="true"' : ''} aria-label="${esc(r.name)}">
-      <div class="rs-l1"><b class="rs-name" title="${esc(r.name)}">${esc(r.name)}</b><span class="mono rs-branch" title="${esc(r.branch ?? '')}">${esc(r.branch ?? '')}</span>${chips}<span class="rs-spacer"></span><span class="rs-sub rs-when" title="${esc(lm.what ?? '')}">${esc(relativeTime(lm.at, ctx.now))}</span>${r.error ? '<span class="chip red">▲ error</span>' : sessionChip(r.session && r.session.state)}</div>
+      <div class="rs-l1"><b class="rs-name" title="${esc(r.name)}">${esc(r.name)}</b><span class="mono rs-branch" title="${esc(r.branch ?? '')}">${esc(r.branch ?? '')}</span>${chips}<span class="rs-spacer"></span><span class="rs-sub rs-when" title="${esc(lm.what ?? '')}">${esc(relativeTime(lm.at, ctx.now))}</span>${r.error ? '<span class="chip red">▲ error</span>' : sessionChip(r.session && r.session.state)}${r.error ? '' : staleMark(r)}</div>
       <div class="rs-l2">${r.error ? noData : progressHtml(r.progress)}${nextHtml(r)}${actionButton(r, ctx)}</div>
     </article>`;
   }
