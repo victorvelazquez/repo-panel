@@ -331,9 +331,27 @@
     // The question the session shows on its screen, pinned after the bubbles; read-only.
     const d = info.live && info.live.state === 'waiting' ? info.live.dialog || {} : null;
     const shown = d && Array.isArray(d.lines) ? d.lines.map((l, i) => (i === d.selected ? `<mark class="ask-sel">${esc(l)}</mark>` : esc(l))).join('\n') : '';
-    const card = d ? `<div class="ch-ask" role="alert"><div class="ch-ask-title">The session is asking</div>${shown ? `<pre class="ch-ask-text">${shown}</pre>` : ''}<div class="ch-ask-note">Answer it in the terminal of the session: the panel does not answer yet.</div></div>` : '';
+    const card = d ? `<div class="ch-ask" role="alert"><div class="ch-ask-title">The session is asking</div>${shown ? `<pre class="ch-ask-text">${shown}</pre>` : ''}${askAnswers(d.choices, c.answer)}</div>` : '';
     const pending = pendingHtml(c.pending, items);
     return `${note}${c.hist && c.hist.truncated ? '<div class="rs-sub ch-older">Older messages are not shown</div>' : ''}${items.map((it) => bubble(it, who)).join('') || (pending ? '' : '<div class="empty">No messages yet.</div>')}${pending}${card}`;
+  }
+
+  // The answer buttons of the pinned question (RP73): one per option the server could read (dialog.choices), or the old note when there
+  // is none. `answer` is what this page did with the question ({ fp, state: sending | ok | error, text }) and counts only for the same fingerprint.
+  // An affirmative option of a cut-off question is disabled; every label and the fingerprint go through esc.
+  function askAnswers(ch, answer) {
+    if (!ch || !Array.isArray(ch.options) || !ch.options.length) return '<div class="ch-ask-note">Answer it in the terminal of the session: the panel does not answer yet.</div>';
+    const mine = answer && answer.fp === ch.fingerprint ? answer : null;
+    const locked = !!mine && mine.state !== 'error';
+    const buttons = ch.options.map((o, i) => {
+      const cut = !ch.complete && o.tone !== 'negative';
+      const title = cut ? ' title="The question is cut off, so the panel will not approve it: use the terminal"' : '';
+      return `<button type="button" class="ask-btn ${o.tone === 'negative' ? 'ask-negative' : 'ask-affirmative'}" data-act="dialog-answer" data-index="${i}" data-fp="${esc(ch.fingerprint)}"${locked || cut ? ' disabled' : ''}${title}>${esc(o.label)}</button>`;
+    }).join('');
+    const status = !mine ? '' : mine.state === 'sending' ? '<div class="ch-ask-sending" role="status">Sending the answer…</div>'
+      : mine.state === 'ok' ? `<div class="ch-ask-done" role="status">Answered: ${esc(mine.text)}</div>` : `<div class="ch-ask-error" role="status">${esc(mine.text)}</div>`;
+    const warn = ch.options.some((o) => !ch.complete && o.tone !== 'negative') ? '<div class="ch-ask-warn" role="status">The question is cut off, so only the answers that refuse are offered. To approve it, use the terminal.</div>' : '';
+    return `<div class="ch-ask-btns">${buttons}</div>${warn}<div class="ch-ask-note">Pick an answer, or answer it in the terminal.</div>${status}`;
   }
 
   // Pinned room card (not clickable yet): the aggregate of its member rows and the room session.

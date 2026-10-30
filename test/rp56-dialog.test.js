@@ -61,8 +61,9 @@ const NOT_DIALOGS = [['compacting', NOT_COMPACT], ['overflow', NOT_OVERFLOW], ['
 const ALL = [...DIALOGS.map(([n, s]) => [n, s]), ['B without arrow', B_NO_ARROW], ...NOT_DIALOGS];
 
 const dialogOf = (lines, selected) => ({ text: lines.join(String.fromCharCode(10)), lines, selected });
-const A_DIALOG = dialogOf(['Allow guarded git command?', 'git -C C:\\proj fetch origin --prune && git log --oneline -3 | head -n 3', '→ Yes', 'No', NAV], 2);
-const D_DIALOG = dialogOf(['Run a guarded command?', '→ Allow once', 'Allow for this session', 'Deny', NAV], 1);
+// RP73: the scan now adds `choices` (null here: these sessions have no full-screen read, and these screens have unindented options).
+const A_DIALOG = { choices: null, ...dialogOf(['Allow guarded git command?', 'git -C C:\\proj fetch origin --prune && git log --oneline -3 | head -n 3', '→ Yes', 'No', NAV], 2) };
+const D_DIALOG = { choices: null, ...dialogOf(['Run a guarded command?', '→ Allow once', 'Allow for this session', 'Deny', NAV], 1) };
 
 // A fake Orca recording every call; `show` answers the screen by handle, anything else (send included) is unexpected.
 const wt = (handle) => ({ handle, worktreePath: repoDir, connected: true, writable: true });

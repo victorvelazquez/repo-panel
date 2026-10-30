@@ -522,6 +522,76 @@ function piScreenDialog(preview) {
   return { text: lines.join('\n').slice(-3000), lines, selected: selected < 0 ? null : selected };
 }
 
+// The options of a selection dialog the panel dares to answer, read from the WHOLE screen of an asking session (RP73). The footer is
+// the last footer row of the last 14 non-blank rows; the marker is the LAST arrow row (`→ ` or `> `) above it, reached through
+// non-blank rows only; the options are the marker row and the rows between it and the footer, each indented exactly two columns
+// past the marker (a description layout has deeper rows, so it is not recognised). Between 2 and 8 options (1 to 8 with
+// `allowSingle`, for reads after the marker moved), each 1 to 80 characters. Returns { fingerprint, options: [{ label, tone }],
+// complete, markerRow, questionRows } or null. `complete` is false when a question row or a label is cut (ends with an ellipsis,
+// or the row is over 200 characters) or there is no question row. The non-enumerable block, footerRow, blockStart and norm serve
+// piDialogMovedDown and never reach JSON. Pure.
+// A refusal is a plain, short one: a refusing word, optionally "this time", "once", "it" or "that". Anything else counts as an approval
+// and needs a question the panel can see whole ("No problem, go ahead" or "Skip all permission checks" must never pass as a refusal).
+const DIALOG_NEGATIVE = /^(no|deny|cancel|skip|decline|reject|never|stop)( this time| once| it| that)?[.!]?$/i;
+const dialogTone = (label) => (DIALOG_NEGATIVE.test(label) ? 'negative' : 'affirmative');
+// A row the terminal cut: an ellipsis character anywhere, or ASCII dots at either end, or a row longer than the 200 characters kept.
+const dialogCut = (r) => r.length > 200 || r.includes('…') || /^\.\.\.|\.\.\.$/.test(r);
+function piDialogChoices(screen, { allowSingle = false } = {}) {
+  if (typeof screen !== 'string') return null;
+  // Control characters become a space; invisible and bidirectional marks (zero width, RTL and LTR overrides) are dropped, so a label never
+  // reads differently from what is compared and fingerprinted.
+  const rows = screen.split('\n').map((l) => l.replace(/[\x00-\x1f\x7f-\x9f\u2028\u2029]/g, ' ').replace(/[\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g, '').trimEnd());
+  const footerRow = rows.map((r, i) => i).filter((i) => rows[i].trim()).slice(-14).filter((i) => isPiFooter(rows[i].trim())).pop();
+  if (footerRow === undefined) return null;
+  const isMarker = (r) => /^(→|>) /.test(r.trim());
+  let markerRow = footerRow - 1;
+  while (markerRow >= 0 && rows[markerRow].trim() && !isMarker(rows[markerRow])) markerRow--;
+  if (markerRow < 0 || !rows[markerRow].trim()) return null;
+  const indent = (r) => r.length - r.trimStart().length;
+  const labels = [rows[markerRow].trim().slice(2).trim()];
+  for (let i = markerRow + 1; i < footerRow; i++) {
+    if (indent(rows[i]) !== indent(rows[markerRow]) + 2) return null;
+    labels.push(rows[i].trim());
+  }
+  if (labels.length < (allowSingle ? 1 : 2) || labels.length > 8 || labels.some((l) => l.length < 1 || l.length > 80)) return null;
+  // `orca terminal read --screen` DROPS the blank rows, so the conversation, the title and the command can arrive as one run of rows: a
+  // blank row cannot tell where the question starts. It starts at the topmost row, within the 12 rows above the marker (and below a blank
+  // row when there is one), that ends with a question mark; with no such row the title is not visible and the question is not complete.
+  let top = markerRow;
+  while (top > 0 && rows[top - 1].trim()) top--;
+  const windowStart = Math.max(top, markerRow - 12);
+  // The title has to be close to the marker (8 rows): a question mark far above could belong to the conversation or to a long command.
+  let titleRow = -1;
+  for (let i = Math.max(windowStart, markerRow - 8); i < markerRow && titleRow < 0; i++) if (/\?\s*$/.test(rows[i])) titleRow = i;
+  const blockStart = titleRow >= 0 ? titleRow : windowStart;
+  const asked = rows.slice(blockStart, markerRow).map((r) => r.trim());
+  const norm = rows.map((r, i) => (i === markerRow ? r.replace(/\S/, ' ') : r));
+  const choices = {
+    fingerprint: crypto.createHash('sha256').update(JSON.stringify([asked.map((r) => r.slice(0, 200)), labels])).digest('hex').slice(0, 16),
+    options: labels.map((label) => ({ label, tone: dialogTone(label) })),
+    // Complete only when the whole question is on the screen: its title row is visible and no row or label is cut.
+    // A cut row anywhere in the 12 rows above the marker counts, also above the title: the screen may start in the middle of the dialog.
+    complete: titleRow >= 0 && ![...rows.slice(windowStart, markerRow).map((r) => r.trim()), ...labels].some(dialogCut),
+    markerRow,
+    questionRows: asked.map((r) => r.slice(0, 200)),
+  };
+  return Object.defineProperties(choices, {
+    block: { value: norm.slice(blockStart, footerRow + 1) }, footerRow: { value: footerRow }, blockStart: { value: blockStart }, norm: { value: norm },
+  });
+}
+
+// Whether `now` (a later piDialogChoices read of the same terminal) is `first` after `steps` down arrows: the footer on the same
+// row, the marker exactly `steps` rows lower, the labels from it down the first ones minus the first `steps`, and every row of the
+// dialog block of `first` (taken over the same rows of `now`) equal. Rows outside that range (a timer above, the usage widget
+// below) do not count. Pure.
+function piDialogMovedDown(first, now, steps = 1) {
+  if (!first || !now || !first.block || !now.norm || now.footerRow !== first.footerRow || now.markerRow !== first.markerRow + steps) return false;
+  const want = first.options.slice(steps);
+  if (want.length !== now.options.length || want.some((o, i) => o.label !== now.options[i].label)) return false;
+  const seen = now.norm.slice(first.blockStart, first.footerRow + 1);
+  return seen.length === first.block.length && seen.every((r, i) => r === first.block[i]);
+}
+
 // The last `n` non-empty lines of a screen (control characters replaced by a space, 200 characters per line). The Claude usage
 // widget under the screen (`5h 15% ↻lun 01:50 · 7d 37% ↻jue 11:00`) is not part of it: it says nothing about a question, it holds the
 // user's consumption, and it must not take one of the lines. Observation only; a non-string gives [].
@@ -555,7 +625,7 @@ function piPromptState(preview) {
 }
 
 module.exports = {
-  PI_COMMANDS, normPath, terminalsOfWorktree, piScreenState, piScreenAsk, piScreenDialog, piScreenTail, piScreenQuestionish, piPromptState,
+  PI_COMMANDS, normPath, terminalsOfWorktree, piScreenState, piScreenAsk, piScreenDialog, piDialogChoices, piDialogMovedDown, piScreenTail, piScreenQuestionish, piPromptState,
   repoId, parseStatus, parseNumstat, parseGoneBranches, parseBaseBranch, staleBranch, statusLetter,
   summarizeChecks, blockedReason, enrichPr, encodeRef, parseRoadmap, safeRelPath, roadmapSummary,
   matchesUnitId, deriveUnitStates, nextUnit, workQueue, QUEUE_RANK, conformityReport, RM_REQUIRED,

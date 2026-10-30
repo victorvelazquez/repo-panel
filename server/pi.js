@@ -130,7 +130,9 @@ async function scanSessions(folder, orca, listed, withPreview = false, askAware 
       else {
         const full = await readScreen(orca, handle);
         observe(folder, handle, 'asking', full ?? preview);
-        return { handle, state: 'asking', ask: ask.text, dialog: (full !== null && lib.piScreenDialog(full)) || lib.piScreenDialog(preview), preview };
+        // `choices` (RP73): the options the panel could press, null when the full screen is missing or is not a list it recognises.
+        const dialog = (full !== null && lib.piScreenDialog(full)) || lib.piScreenDialog(preview);
+        return { handle, state: 'asking', ask: ask.text, dialog: dialog && { ...dialog, choices: full === null ? null : lib.piDialogChoices(full) }, preview };
       }
       return { handle, state: lib.piScreenState(preview), preview };
     } catch { return { handle, state: null, failed: true }; }
@@ -209,4 +211,4 @@ async function piStatus(repo, orca = orcaTerminal, { tail = false } = {}) {
   } catch { return out('unknown'); }
 }
 
-module.exports = { piSend, piStatus, piSessions, scanSessions, conditionsOrder, fixPrOrder, orcaTerminal, sendGuard, setCaseRecorder, caseRecorderInstalled, piBusy };
+module.exports = { piSend, piStatus, piSessions, scanSessions, conditionsOrder, fixPrOrder, orcaTerminal, readScreen, sendGuard, setCaseRecorder, caseRecorderInstalled, piBusy };
