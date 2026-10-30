@@ -7,6 +7,7 @@ const { createServer, isPanelRunning } = require('./server/http.js');
 const { piSend, setCaseRecorder, orcaTerminal } = require('./server/pi.js');
 const { createRecorder, casesFile } = require('./server/casos.js');
 const { createWatcher, watchInterval } = require('./server/vigia.js');
+const { createWarmer, warmInterval } = require('./server/livewarm.js');
 
 if (require.main === module) {
   const { port } = loadConfig();
@@ -18,6 +19,9 @@ if (require.main === module) {
     const every = watchInterval(process.env);
     if (every) createWatcher({ orca: orcaTerminal, intervalMs: every }).start();
   }
+  // The live warmer keeps the read-only screens cached (RP77); it does not depend on the recorder.
+  const warm = warmInterval(process.env);
+  if (warm) createWarmer({ orca: orcaTerminal, intervalMs: warm }).start();
   const server = createServer(port);
   server.on('error', async (e) => {
     if (e.code !== 'EADDRINUSE') { console.error(e.message); process.exit(1); }
