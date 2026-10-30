@@ -113,7 +113,7 @@ async function loadPage() {
     location: { hash: '' },
     requestAnimationFrame: () => 0,
     setInterval: (fn, ms) => { intervals.push(ms); return 0; },
-    setTimeout: () => 0,
+    setTimeout: () => 0, clearTimeout: () => {}, AbortController,
     confirm: () => true,
     fetch: async (url) => { calls.push(url); throw new Error('offline'); },
   });

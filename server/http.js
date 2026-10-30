@@ -7,7 +7,8 @@ const crypto = require('node:crypto');
 const lib = require('../lib.js');
 const view = require('../public/view.js');
 const { HttpError } = require('./errors.js');
-const { git, firstLine } = require('./exec.js');
+const { git, firstLine, withContext, withPriority, singleFlight, stats } = require('./exec.js');
+const { createPerf } = require('./perf.js');
 const { loadConfig, findRepo, roomIssues } = require('./config.js');
 const { localState, diffText } = require('./local.js');
 const { prState, mergePr, rerunFailed } = require('./github.js');
@@ -25,6 +26,8 @@ const { sessionsState, chatState, adoptSession, releaseSession, startSession } =
 const ROOT = path.join(__dirname, '..');
 const TOKEN = crypto.randomBytes(24).toString('hex');
 
+// RP76: these POSTs only calculate; every other POST is an action of the person and goes through the interactive lane.
+const READ_ONLY_POSTS = new Set(['POST /api/queue', 'POST /api/conformity']);
 const query = (u) => Object.fromEntries(new URL(u, 'http://x').searchParams);
 
 const routes = {
@@ -94,8 +97,8 @@ function readBody(req) {
   });
 }
 
-const send = (res, status, body, type = 'application/json; charset=utf-8') => {
-  res.writeHead(status, { 'content-type': type, 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' });
+const send = (res, status, body, type = 'application/json; charset=utf-8', extra = {}) => {
+  res.writeHead(status, { 'content-type': type, 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', ...extra });
   res.end(typeof body === 'string' ? body : JSON.stringify(body));
 };
 
@@ -116,29 +119,51 @@ function createServer(port, deps = {}) {
   // One duplicate-send guard per server (tests inject theirs with a fake clock).
   deps = { guard: sendGuard(), ...deps };
   const hostOk = new Set([`127.0.0.1:${port}`, `localhost:${port}`]);
-  return http.createServer(async (req, res) => {
-    try {
-      // Blocks DNS-rebinding: only our own host names are served.
-      if (!hostOk.has(req.headers.host)) throw new HttpError(403, 'Forbidden host');
-      const pathname = new URL(req.url, 'http://x').pathname;
-      if (req.method === 'GET' && (pathname === '/' || pathname === '/index.html')) {
-        const html = fs.readFileSync(path.join(ROOT, 'public', 'index.html'), 'utf8').replace('__TOKEN__', TOKEN);
-        return send(res, 200, html, 'text/html; charset=utf-8');
+  const perf = createPerf();
+  const flights = new Map();
+  return http.createServer((req, res) => {
+    const t0 = Date.now();
+    const ctx = { procs: 0, waitMs: 0 };
+    const pathname = new URL(req.url, 'http://x').pathname;
+    const key = `${req.method} ${pathname}`;
+    const priority = (req.method === 'POST' && !READ_ONLY_POSTS.has(key)) || (req.method === 'GET' && req.headers['x-priority'] === 'user') ? 'user' : 'background';
+    let executed = true;
+    // Every JSON answer is timed (errors too); GET /api/perf does not record itself.
+    const reply = (status, body, type) => {
+      const ms = Date.now() - t0;
+      const json = !type;
+      if (key !== 'GET /api/perf') perf.record({ route: routes[key] ? key : `${req.method} (other)`, ms, waitMs: ctx.waitMs, procs: ctx.procs, priority, executed });
+      const timing = json ? { 'server-timing': `total;dur=${ms}${ctx.waitMs > 0 ? `, queue;dur=${ctx.waitMs}` : ''}` } : {};
+      return send(res, status, body, type, timing);
+    };
+    return withContext(ctx, () => withPriority(priority, async () => {
+      try {
+        // Blocks DNS-rebinding: only our own host names are served.
+        if (!hostOk.has(req.headers.host)) throw new HttpError(403, 'Forbidden host');
+        if (req.method === 'GET' && (pathname === '/' || pathname === '/index.html')) {
+          const html = fs.readFileSync(path.join(ROOT, 'public', 'index.html'), 'utf8').replace('__TOKEN__', TOKEN);
+          return reply(200, html, 'text/html; charset=utf-8');
+        }
+        if (req.method === 'GET' && STATIC[pathname]) {
+          const [file, type] = STATIC[pathname];
+          return reply(200, fs.readFileSync(path.join(ROOT, 'public', file), 'utf8'), type);
+        }
+        // Lets a second launch tell "my own panel is already here" from "another project owns the port".
+        if (req.method === 'GET' && pathname === '/health') return reply(200, { app: 'repo-panel', api: view.API_VERSION });
+        const handler = routes[key];
+        if (!handler && key !== 'GET /api/perf') throw new HttpError(404, 'Not found');
+        if (req.headers['x-token'] !== TOKEN) throw new HttpError(401, 'Invalid token');
+        if (!handler) return reply(200, { routes: perf.summary(), queue: stats() });
+        const body = req.method === 'POST' ? await readBody(req) : {};
+        const run = () => { executed = true; return handler(query(req.url), body, deps); };
+        // Identical GETs in flight share one execution; POSTs never do.
+        if (req.method !== 'GET') return reply(200, await run());
+        executed = false;
+        return reply(200, await singleFlight(flights, req.url, run));
+      } catch (e) {
+        return reply(e.status || 500, { error: e.message || 'Internal error' });
       }
-      if (req.method === 'GET' && STATIC[pathname]) {
-        const [file, type] = STATIC[pathname];
-        return send(res, 200, fs.readFileSync(path.join(ROOT, 'public', file), 'utf8'), type);
-      }
-      // Lets a second launch tell "my own panel is already here" from "another project owns the port".
-      if (req.method === 'GET' && pathname === '/health') return send(res, 200, { app: 'repo-panel', api: view.API_VERSION });
-      const handler = routes[`${req.method} ${pathname}`];
-      if (!handler) throw new HttpError(404, 'Not found');
-      if (req.headers['x-token'] !== TOKEN) throw new HttpError(401, 'Invalid token');
-      const body = req.method === 'POST' ? await readBody(req) : {};
-      return send(res, 200, await handler(query(req.url), body, deps));
-    } catch (e) {
-      return send(res, e.status || 500, { error: e.message || 'Internal error' });
-    }
+    }));
   });
 }
 

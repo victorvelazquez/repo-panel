@@ -36,7 +36,7 @@ function loadPage() {
     location: { hash: '' },
     requestAnimationFrame: (cb) => { frames.push(cb); return frames.length; },
     setInterval: () => 0,
-    setTimeout: () => 0,
+    setTimeout: () => 0, clearTimeout: () => {}, AbortController,
     confirm: () => true,
     fetch: () => new Promise(() => {}), // never answers: the page's own start-up reads stay pending and cannot fire after the test
   });

@@ -27,7 +27,7 @@ async function loadPage(routes) {
     location: { hash: '' },
     requestAnimationFrame: () => 1,
     setInterval: () => 0,
-    setTimeout: () => 0,
+    setTimeout: () => 0, clearTimeout: () => {}, AbortController,
     confirm: () => true,
     fetch: async (url, opts) => {
       calls.push(url);

@@ -31,20 +31,35 @@ const S = {
   prefs: store('prefs', { method: 'squash', del: true }),
   lastRefresh: 0, lastAt: {}, scan: [],
   tab: 'summary', scope: { kind: 'all' }, summary: null, summaryKey: '', summaryFailed: false, sfilter: 'all', collapsed: {},
+  timeouts: { get: 25000, post: 70000 },
   chat: { id: null, seq: 0 }, actionsOpen: false, drafts: {}, notes: {}, msgBusy: {},
 };
 S.tab = S.prefs.tab === 'work' ? 'work' : 'summary';
 
 // ---------- api + request pool ----------
-async function api(url, body) {
-  const res = await fetch(url, {
-    method: body ? 'POST' : 'GET',
-    headers: { 'x-token': TOKEN, 'content-type': 'application/json' },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  const data = await res.json().catch(() => ({ error: 'Invalid server response' }));
-  if (!res.ok) throw new Error(data.error || res.statusText);
-  return data;
+// RP76: every request has a time limit (S.timeouts) and sends x-priority: user when a click caused it (every POST, or opts.priority).
+// opts.signal links an outer AbortSignal: when it aborts, so does the request (the rejection is an AbortError callers can ignore).
+async function api(url, body, opts = {}) {
+  const ctl = new AbortController();
+  let timedOut = false;
+  const timer = setTimeout(() => { timedOut = true; ctl.abort(); }, opts.timeoutMs || (body ? S.timeouts.post : S.timeouts.get));
+  const outer = opts.signal;
+  const onOuter = () => ctl.abort();
+  if (outer) { if (outer.aborted) ctl.abort(); else outer.addEventListener('abort', onOuter); }
+  const headers = { 'x-token': TOKEN, 'content-type': 'application/json' };
+  if (body || opts.priority === 'user') headers['x-priority'] = 'user';
+  try {
+    const res = await fetch(url, { method: body ? 'POST' : 'GET', headers, body: body ? JSON.stringify(body) : undefined, signal: ctl.signal });
+    const data = await res.json().catch(() => ({ error: 'Invalid server response' }));
+    if (!res.ok) throw new Error(data.error || res.statusText);
+    return data;
+  } catch (e) {
+    if (timedOut) throw new Error('Request timed out');
+    throw e;
+  } finally {
+    clearTimeout(timer);
+    if (outer) outer.removeEventListener('abort', onOuter);
+  }
 }
 
 const queue = [];
@@ -574,9 +589,11 @@ function openConformity() {
 // ---------- summary ----------
 // GET /api/summary on the 60 s cycle and every 20 s while the tab is shown. generatedAt changes on every answer, so it is left
 // out of the comparison: the page redraws only when the payload really changed. A failed read keeps the last data.
+const SUMMARY_TIMEOUT_MS = 90000;
 async function loadSummary() {
   try {
-    const d = await api('/api/summary');
+    // The whole-board build takes 20 to 30 s on a slow machine until RP78 serves it from memory: a 25 s limit would show a false failure.
+    const d = await api('/api/summary', undefined, { timeoutMs: SUMMARY_TIMEOUT_MS });
     const key = JSON.stringify({ ...d, generatedAt: null });
     const recovered = S.summaryFailed;
     S.summaryFailed = false;
@@ -667,11 +684,14 @@ let chatShown = null;
 let chatRatio = null;
 try { const v = parseFloat(localStorage.getItem(CHAT_KEY)); if (v > 0.1 && v < 0.9) chatRatio = v; } catch { /* no storage: default width */ }
 
-async function loadChat(id) {
+// Opening a card reads with priority user and a signal that the next open or close aborts; the periodic poll does neither.
+let chatCtl = null;
+async function loadChat(id, { user = false, signal } = {}) {
   const seq = ++S.chat.seq;
+  const opts = user ? { priority: 'user', signal } : {};
   try {
-    const info = await api(chatUrl('/api/sessions', id));
-    const hist = info.adopted ? await api(chatUrl('/api/chat', id)) : null;
+    const info = await api(chatUrl('/api/sessions', id), undefined, opts);
+    const hist = info.adopted ? await api(chatUrl('/api/chat', id), undefined, opts) : null;
     if (seq !== S.chat.seq || S.chat.id !== id) return; // the user switched card or closed the chat meanwhile
     const key = JSON.stringify([info, hist]);
     const recovered = S.chat.failed;
@@ -680,6 +700,7 @@ async function loadChat(id) {
     Object.assign(S.chat, { info, hist, key });
     draw();
   } catch {
+    if (signal && signal.aborted) return; // cancelled on purpose: neither a failure nor a toast
     if (seq === S.chat.seq && S.chat.id === id && !S.chat.failed) { S.chat.failed = true; draw(); }
   }
 }
@@ -690,12 +711,15 @@ function openChat(id) {
   S.actionsOpen = false;
   $('#msgBox').value = S.drafts[id] || '';
   draw();
-  loadChat(id);
+  if (chatCtl) chatCtl.abort();
+  chatCtl = new AbortController();
+  loadChat(id, { user: true, signal: chatCtl.signal });
 }
 function closeChat() {
   if (!S.chat.id) return;
   saveDraft();
   S.actionsOpen = false;
+  if (chatCtl) { chatCtl.abort(); chatCtl = null; }
   S.chat = { id: null, seq: S.chat.seq + 1 };
   chatShown = null;
   draw();
