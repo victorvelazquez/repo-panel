@@ -124,7 +124,10 @@ function createServer(port, deps = {}) {
   return http.createServer((req, res) => {
     const t0 = Date.now();
     const ctx = { procs: 0, waitMs: 0 };
-    const pathname = new URL(req.url, 'http://x').pathname;
+    // A URL the parser rejects (`//`, `http://[`) must answer an error, never throw outside the try below and take the panel down.
+    let pathname = '/';
+    let badUrl = false;
+    try { pathname = new URL(req.url, 'http://x').pathname; } catch { badUrl = true; }
     const key = `${req.method} ${pathname}`;
     const priority = (req.method === 'POST' && !READ_ONLY_POSTS.has(key)) || (req.method === 'GET' && req.headers['x-priority'] === 'user') ? 'user' : 'background';
     let executed = true;
@@ -140,6 +143,7 @@ function createServer(port, deps = {}) {
       try {
         // Blocks DNS-rebinding: only our own host names are served.
         if (!hostOk.has(req.headers.host)) throw new HttpError(403, 'Forbidden host');
+        if (badUrl) throw new HttpError(400, 'Bad request');
         if (req.method === 'GET' && (pathname === '/' || pathname === '/index.html')) {
           const html = fs.readFileSync(path.join(ROOT, 'public', 'index.html'), 'utf8').replace('__TOKEN__', TOKEN);
           return reply(200, html, 'text/html; charset=utf-8');
@@ -159,7 +163,8 @@ function createServer(port, deps = {}) {
         // Identical GETs in flight share one execution; POSTs never do.
         if (req.method !== 'GET') return reply(200, await run());
         executed = false;
-        return reply(200, await singleFlight(flights, req.url, run));
+        // The lane is part of the key: an interactive request never joins a background one that may have waited in the queue.
+        return reply(200, await singleFlight(flights, `${priority}|${req.url}`, run));
       } catch (e) {
         return reply(e.status || 500, { error: e.message || 'Internal error' });
       }

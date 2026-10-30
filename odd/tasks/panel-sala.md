@@ -76,6 +76,7 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 - **S66. Estado de la sesión dentro de la caja.** «el chat cuando esta deshabilitado porque la sesion esta trabajando, deberia mostrar su estado encima del input del chat el estado»; «los estados podrian ser dentro del input mismo bien arriba a la izquierda, asi no ocupa un espacio del chat?»; «que tenga los colores de indicacion como ya estamos haciendo para cada estado, tambien que se anime cuando esta trabajando.»; «el estado que muestra arriba del chat que esta al lado del nombre del repo podemos eliminar? tambien el id de la sesion que aparece al lado del nombre de repo podriamos eliminar si no tiene tanta importancia para el usuario.» Unidad RP72.
 - **S67. Diálogos de la sesión: se cubre lo que se reconoce.** «ya leiste todo de la grabadora para saber de todos los casos? cubriremos todos los casos podibles?»; «recomendado». Se leyeron los 48 registros: 5 tipos de diálogo (A «Allow guarded…» Yes/No, B lista con descripción, C lista con «Type something.», D «Allow once / for this session / Deny», E revisión nativa) y 12 avisos que no son preguntas. No se pueden cubrir todos los casos posibles: mundo cerrado. Primero mostrar (RP56) y después contestar tipo por tipo (RP73); un clic para «No» y cancelar y un clic con el texto completo a la vista para «Yes»; en la primera versión solo listas de opciones. Unidades RP56, RP73 y RP74 (la grabadora guarda la pantalla completa para juntar casos reales antes de contestar).
 - **S68. El panel debe acelerar el trabajo: rendimiento.** «cuando la sesión esta trabajando debe mostrar enseguida el estado, porque hay veces que pasaron muchos segundos que la sesión esta en trabajo pero en la tarjeta se muestra free o el ultimo estado.»; «al presionar /flow-commit debe mostrar ya en que esta trabajando, porque se queda en 'free'»; «cuando presiono el botón de merge se envia la orden y enseguida se ve habilitado devuelta el botón mientras debería permanecer desactivado y mostrar que esta trabajando.»; «cuando cambio de tarjeta o repo, tarda muchísimo en cargar el chat correspondiente a la tarjeta»; «creo que debería limpiarse en el mismo segundo el imput del chat y mostrar ya en el chat que se esta enviando, si de ahí sucede un error en el envió que rebote ese texto en el input y si todo sucede bien con el envió que se muestre un visto bueno o algo discreto»; «el boton ↻ Refresh si le presiono tarda mucho en cargar todo»; «esta muy dificil y contraproduccente trabajar con las demoras de cargas, envios y respuestas. asi no sera factible trabajar en el panel, el panel debe acelerar el trabajo y no atrasar con las demoras.»; «no se si conviene analisar la alternativa de socket u otro tipo de tecnologia, tambien cachear las sesiones para los chats de las distintas tarjetas». Medido en el análisis: Summary en frío 18,3 s y 19 s en cada tick, Refresh de 75 pedidos 9 s aislado y 31 s en el panel real, Orca 0,35 a 2 s por llamada, una sola cola global de 8 procesos. Unidades RP75 a RP80 (orden «recomendado»: interfaz optimista, cola con prioridades y medición, estado vivo y SSE, Summary en memoria, chat con caché, carga inicial); RP62 y RP73 quedan en pausa.
+- **S69. Contestar los diálogos desde el panel, primero.** «y se cambiaba con la flecha arriba abajo ni seleccionaba con click» (la terminal de Orca no deja elegir con el clic); «vamos con tu propuesta» (subir RP73 antes del resto del rendimiento). El diálogo real de una captura mostró que el título de la pregunta no está en la pantalla y que el comando puede venir cortado con «…»: el panel no ofrece «Yes» en ese caso. Unidad RP73.
 
 ## Tasks
 
@@ -138,7 +139,7 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 | RP73 | S50, S67 | pendiente; seguridad: verificación independiente y prueba del abuso | — |
 | RP74 | S67 | prueba primero (6; RED real: 5 fallaban); implementación del padre (`lib.piScreenTail`, `server/casos.js`), un pin de rp29 actualizado (las claves exactas del registro); suite completa | pendiente de commit |
 | RP75 | S68 | pruebas escritas primero (49: 35 en RED verificadas por el padre y 14 que protegen lo existente); implementación por `gentle-ai-worker` en dos fases (~130 líneas); el padre leyó el diff completo, corrigió dos pruebas viejas de `rp23` que fijaban el comportamiento reemplazado (un merge pausaba a todos los repos) y su propia primera versión de una de ellas; suite completa 1265 de 1266; medido en navegador real con los envíos interceptados: clic a «working» 10 ms en la tarjeta y 5,5 ms en la etiqueta, Enter a caja vacía y burbuja «sending…» 5,9 ms | pendiente de commit |
-| RP76 | S68 | pendiente; medir antes y después | — |
+| RP76 | S68 | pruebas escritas primero (35 del escritor, RED verificado por el padre, más 6 del padre); implementación por `gentle-ai-worker` en dos fases; el padre leyó el diff del servidor, encontró que el tope de 25 s habría cortado el Summary (arreglado con prueba primero), y corrigió 3 errores de las propias pruebas; verificación independiente: FALLÓ con un bloqueante (una URL malformada tiraba el panel, reproducido y reverificado con el servidor real) y 4 mutantes vivos (1 equivalente, 1 hueco menor, 2 huecos de prueba, ya cubiertos); medido con `scripts/measure-panel.js` antes y después; suite completa | pendiente de commit (parte 1 en `a74a513`) |
 | RP77 | S68 | pendiente; estado vivo y SSE | — |
 | RP78 | S68 | pendiente | — |
 | RP79 | S68 | pendiente | — |
@@ -944,3 +945,18 @@ Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a →
 > recomendado
 
 *Aplicado: S68 y las unidades RP75 a RP80 en el orden recomendado (interfaz optimista, cola con prioridades y medición, estado vivo y SSE, Summary en memoria, chat con caché, carga inicial y Refresh). RP62 y RP73 quedan en pausa. Antes se midió: Summary en frío 18,3 s y 19 s en cada tick, Refresh de 75 pedidos 9 s aislado y 31 s en el panel real, Orca 0,35 a 2 s por llamada, una sola cola global de 8 procesos.*
+
+
+**L80.**
+
+> me gusta
+
+> podemos prbar otra vez?
+
+> confirme sin querer en orca y no en el panel
+
+> asi aparecio: (captura de un diálogo real de la sesión) y se cambiaba con la flecha arriba abajo ni seleccionaba con click
+
+> vamos con tu propuesta
+
+*Aplicado: S69; RP76 queda cerrada con sus números (medidos antes y después) y RP73 (contestar los diálogos) pasa al frente de lo que sigue, antes de RP77 a RP80. «me gusta» fue la aprobación de RP75.*
