@@ -244,7 +244,10 @@ The panel keeps ONE adopted session per repo and per room (`sessions` in `config
 - **`GET /api/perf`** (needs the token, does not record itself). Answers `{ routes, queue }`. Per route, over its last 200 requests: `n`, `p50`, `p95` and `max` in ms, `waitP50` (median wait for a process slot), `procsAvg` (processes per request), `executions` (handler runs; identical concurrent GETs share one) and `priorities` (counts of `user` and `background`). `queue` is `{ active, max, waitingBackground, waitingUser }`.
 - **Server-Timing.** Every JSON answer carries `Server-Timing: total;dur=<ms>` and, when the request waited for a slot, `queue;dur=<ms>`.
 - **Slow log.** A request of 1500 ms or more prints one console line (route, ms, queue wait, process count) at most once per route every 10 s. Nothing else of the request is logged.
-- **Request timeouts.** The page gives up on a GET after 25 s and on a POST after 70 s ("Request timed out"). Switching or closing the chat card cancels its pending reads.
+- **Request timeouts.** The page gives up on a GET after 25 s and on a POST after 70 s ("Request timed out"); the Summary, which builds the whole board, has its own 90 s limit until RP78. Switching or closing the chat card cancels its pending reads.
+- **Identical reads are shared.** Two identical GETs in flight run once, per lane: an interactive request never joins a background one that may have waited in the queue.
+- **A malformed URL answers 400** (and a wrong Host 403) and never takes the server down.
+- **Known limits.** The background lane has no aging: an endless chain of interactive requests would delay it (human clicks never do). With the default limit of 8 the wait of an interactive request for a process slot is about 0 ms, but the Orca program it runs still takes 0.5 to 2 s while a full refresh is running (RP77 reads Orca less).
 - **`scripts/measure-panel.js`.** `node scripts/measure-panel.js [--port 4398] [--json]` starts its own temporary panel on its own port (a copy of your config, no browser polling it) and times the Summary, each per-repo route, a full refresh and the wait of an interactive read during it. It only sends GET requests: it never runs an action or sends anything to a session.
 
 ## Merge behaviour

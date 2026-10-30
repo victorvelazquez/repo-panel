@@ -242,3 +242,76 @@ test('the error path is timed too, and a failing request leaves no queue leak', 
     assert.deepEqual(after.queue, { active: 0, max: 2, waitingBackground: 0, waitingUser: 0 });
   });
 });
+
+// ---------- found by the independent verification of RP76 ----------
+// Raw request line: the URL is NOT valid for the URL parser, so it cannot go through http.request.
+const raw = (port, line, hostHeader) => new Promise((resolve) => {
+  const s = net.connect(port, '127.0.0.1', () => s.write(`${line} HTTP/1.1\r\nHost: ${hostHeader || `127.0.0.1:${port}`}\r\nConnection: close\r\n\r\n`));
+  let d = '';
+  s.on('data', (c) => { d += c; });
+  s.on('close', () => resolve(d));
+  s.on('error', () => resolve(d));
+  setTimeout(() => { s.destroy(); resolve(d || 'TIMEOUT'); }, 2000);
+});
+
+test('a malformed URL never takes the panel down: it answers an error and the next request works', async () => {
+  const port = await freePort();
+  const server = createServer(port, {});
+  const crashes = [];
+  const onCrash = (e) => crashes.push(String(e && e.message));
+  process.on('uncaughtException', onCrash);
+  await new Promise((r) => server.listen(port, '127.0.0.1', r));
+  try {
+    for (const line of ['GET //', 'GET http://[', 'GET /%zz', 'GET //?x=1']) {
+      const answer = await raw(port, line);
+      assert.notEqual(answer, 'TIMEOUT', `${line}: the request hung`);
+      assert.match(answer, /^HTTP\/1\.1 (400|404|500)/, `${line}: an error status is answered, got ${answer.slice(0, 40)}`);
+    }
+    assert.deepEqual(crashes, [], 'no uncaught exception');
+    const health = await raw(port, 'GET /health');
+    assert.match(health, /^HTTP\/1\.1 200/);
+    assert.match(health, /repo-panel/);
+  } finally {
+    process.off('uncaughtException', onCrash);
+    server.close(); server.closeAllConnections();
+  }
+});
+
+test('POST /api/queue and POST /api/conformity only calculate: they stay in the background lane', async () => {
+  await withServer(async ({ call, token, perf }) => {
+    const before = await perf();
+    await call('POST', '/api/queue', token, { items: [] });
+    await call('POST', '/api/conformity', token, { entries: [] });
+    const after = await perf();
+    for (const route of ['POST /api/queue', 'POST /api/conformity']) {
+      const p = after.routes[route].priorities;
+      assert.equal(p.user || 0, 0, `${route} is not an interactive request`);
+      assert.ok((p.background || 0) >= 1);
+    }
+    assert.equal((before.routes['POST /api/queue'] || {}).n || 0, 0);
+  });
+});
+
+test('GET /api/perf never records itself', async () => {
+  await withServer(async ({ call, token, perf }) => {
+    await perf();
+    const body = await perf();
+    assert.ok(!('GET /api/perf' in body.routes), Object.keys(body.routes).join(', '));
+  });
+});
+
+test('single flight does not mix lanes: a background GET in flight is not joined by an identical interactive GET', async () => {
+  await withServer(async ({ call, token, perf }) => {
+    const url = `/api/local?id=${REPO_ID}`;
+    const before = await perf();
+    const holders = hold(500);
+    await new Promise((r) => setTimeout(r, 60));
+    const [bg, user] = await Promise.all([call('GET', url, token), call('GET', url, token, undefined, { 'x-priority': 'user' })]);
+    await Promise.all(holders);
+    assert.equal(bg.status, 200);
+    assert.equal(user.status, 200);
+    const after = await perf();
+    assert.equal(delta(after, before, 'GET /api/local', 'n'), 2);
+    assert.equal(delta(after, before, 'GET /api/local', 'executions'), 2, 'each lane runs its own request: an interactive one never inherits the wait of a background one');
+  });
+});
