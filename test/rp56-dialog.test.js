@@ -165,7 +165,7 @@ test('sessionsState: dialog only when the state is waiting AND exactly one sessi
   const st = await S.sessionsState(REPO_ID, one.orca, sessionsBase);
   assert.deepEqual(st.live, { state: 'waiting', count: 1, dialog: D_DIALOG });
   assert.deepEqual(Object.keys(st).sort(), ['adopted', 'adoptedFound', 'key', 'live', 'sessions']);
-  assert.deepEqual(one.calls.map((c) => c[0]).sort(), ['list', 'show']);
+  assert.deepEqual(one.calls.map((c) => c[0]).sort(), ['list', 'read', 'show']);
   assert.deepEqual(one.sends(), []);
 });
 

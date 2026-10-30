@@ -126,7 +126,7 @@ test('piSend: refuses a session that is asking with 409 and never sends a key or
       const f = fakeOrca({ preview });
       await assert.rejects(piSend(REPO, key, f.orca, noWait), (e) => e.status === 409 && e.message === 'The session is waiting for your answer to a question');
       assert.equal(f.sends().length, 0);
-      assert.equal(f.calls.every((c) => c[0] === 'list' || c[0] === 'show'), true);
+      assert.equal(f.calls.every((c) => ['list', 'show', 'read'].includes(c[0])), true); // read-only calls only (RP81 adds the full-screen read)
     }
   }
 });

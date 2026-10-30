@@ -105,6 +105,15 @@ function observe(folder, handle, state, preview) {
   try { const r = caseRecorder({ folder, handle, state, preview }); if (r && typeof r.catch === 'function') r.catch(() => {}); } catch { /* observing never changes a scan */ }
 }
 
+// The whole rendered screen of a terminal (`orca terminal read --screen`) as text, or null when the read fails or its rows
+// are unusable. Read-only; a failure only means the caller falls back to the preview of `show`.
+async function readScreen(orca, handle) {
+  try {
+    const tail = ((await orca(['read', '--terminal', handle, '--screen', '--limit', '80'])).terminal || {}).tail;
+    return Array.isArray(tail) && tail.length && tail.every((r) => typeof r === 'string') ? tail.join('\n') : null;
+  } catch { return null; }
+}
+
 // Looks at every terminal of the folder's worktree with a fresh `show` (the `list` preview is truncated), in
 // parallel. `sessions` are the ones whose screen is a pi screen; `failed` counts the terminals whose `show`
 // failed: those are unknown, not sessions. `listed` is an already fetched `list` result (rooms list once). A
@@ -116,8 +125,13 @@ async function scanSessions(folder, orca, listed, withPreview = false, askAware 
     try {
       const preview = ((await orca(['show', '--terminal', handle])).terminal || {}).preview;
       const ask = lib.piScreenAsk(preview);
-      observe(folder, handle, ask ? 'asking' : lib.piScreenState(preview), preview);
-      if (ask) return askAware ? { handle, state: 'asking', ask: ask.text, dialog: lib.piScreenDialog(preview), preview } : { handle, state: 'busy', preview };
+      if (!ask) observe(folder, handle, lib.piScreenState(preview), preview);
+      else if (!askAware) { observe(folder, handle, 'asking', preview); return { handle, state: 'busy', preview }; }
+      else {
+        const full = await readScreen(orca, handle);
+        observe(folder, handle, 'asking', full ?? preview);
+        return { handle, state: 'asking', ask: ask.text, dialog: (full !== null && lib.piScreenDialog(full)) || lib.piScreenDialog(preview), preview };
+      }
       return { handle, state: lib.piScreenState(preview), preview };
     } catch { return { handle, state: null, failed: true }; }
   }));
