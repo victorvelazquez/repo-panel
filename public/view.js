@@ -520,5 +520,51 @@
     return attention(`No change 15 minutes after ${text} and the session state is unknown`);
   }
 
-  return { API_VERSION, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, piPollTargets, LIVE_CHECK_MS, liveSession, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, presenceLabel, presenceDot };
+  // ---------- event stream (RP77b) ----------
+  // The text of a stream, frame by frame: the complete frames as { event, data } and the unfinished tail as `rest` (feed it back with the next chunk).
+  // Comments (heartbeat) and fields other than event and data are ignored; a frame without data is no event.
+  function parseSse(buffer) {
+    const events = [];
+    let rest = String(buffer);
+    for (let m = /\r?\n\r?\n/.exec(rest); m; m = /\r?\n\r?\n/.exec(rest)) {
+      const lines = rest.slice(0, m.index).split(/\r?\n/);
+      rest = rest.slice(m.index + m[0].length);
+      let event = 'message';
+      const data = [];
+      for (const line of lines) {
+        if (line.startsWith(':')) continue;
+        const at = line.indexOf(':');
+        const field = at < 0 ? line : line.slice(0, at);
+        const value = at < 0 ? '' : line.slice(at + 1).replace(/^ /, '');
+        if (field === 'event') event = value; else if (field === 'data') data.push(value);
+      }
+      if (data.length) events.push({ event, data: data.join('\n') });
+    }
+    return { events, rest };
+  }
+
+  const EVENT_MAX = 64 * 1024;
+  const EVENT_PI = ['closed', 'idle', 'busy', 'asking', 'ambiguous', 'unknown'];
+  const EVENT_LIVE = ['none', 'free', 'working', 'waiting', 'unknown'];
+  const isObject = (x) => !!x && typeof x === 'object' && !Array.isArray(x);
+  function liveEntry(x) {
+    if (!isObject(x) || typeof x.id !== 'string' || !/^[0-9a-f]{10}$/.test(x.id)) return null;
+    if (!EVENT_PI.includes(x.state) || !isObject(x.live) || !EVENT_LIVE.includes(x.live.state)) return null;
+    return { id: x.id, state: x.state, ask: typeof x.ask === 'string' ? x.ask : undefined, live: x.live };
+  }
+  // A `live` frame as { id, state, ask, live }; a `snapshot` frame as an array of those (bad entries dropped); anything else, null.
+  function liveEvent(frame) {
+    if (!frame || (frame.event !== 'live' && frame.event !== 'snapshot') || typeof frame.data !== 'string' || frame.data.length > EVENT_MAX) return null;
+    let body;
+    try { body = JSON.parse(frame.data); } catch { return null; }
+    if (frame.event === 'live') return liveEntry(body);
+    return Array.isArray(body) ? body.map(liveEntry).filter(Boolean) : null;
+  }
+  // With the stream open the polls are only a safety net; without it they keep today's 10 s and 5 s.
+  const eventsPlan = ({ connected }) => (connected ? { pollLiveMs: 60000, chatMs: 30000 } : { pollLiveMs: 10000, chatMs: 5000 });
+  const eventsRetryMs = (attempt) => Math.min(30000, 1000 * 2 ** attempt);
+  // The server sends a heartbeat every 15 s: three missed beats mean the stream is dead (a server that vanished without closing it).
+  const eventsStale = ({ connected, lastByteAt, now }) => connected === true && Number.isFinite(lastByteAt) && Number.isFinite(now) && now - lastByteAt >= 45000;
+
+  return { API_VERSION, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, piPollTargets, LIVE_CHECK_MS, liveSession, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, presenceLabel, presenceDot, parseSse, liveEvent, eventsPlan, eventsRetryMs, eventsStale };
 }));

@@ -19,10 +19,10 @@ if (require.main === module) {
     const every = watchInterval(process.env);
     if (every) createWatcher({ orca: orcaTerminal, intervalMs: every }).start();
   }
-  // The live warmer keeps the read-only screens cached (RP77); it does not depend on the recorder.
-  const warm = warmInterval(process.env);
-  if (warm) createWarmer({ orca: orcaTerminal, intervalMs: warm }).start();
   const server = createServer(port);
+  // The live warmer keeps the read-only screens cached (RP77) and feeds the event stream (RP77b): it warms every second while someone listens.
+  const warm = warmInterval(process.env);
+  if (warm) createWarmer({ orca: orcaTerminal, intervalMs: () => (server.hub.size() > 0 ? 1000 : warm), publish: (id, payload) => server.hub.publish(id, payload) }).start();
   server.on('error', async (e) => {
     if (e.code !== 'EADDRINUSE') { console.error(e.message); process.exit(1); }
     // The URL must stay stable, so never fall back to another port.
