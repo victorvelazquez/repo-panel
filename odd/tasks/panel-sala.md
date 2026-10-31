@@ -160,7 +160,7 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 | RP60 | S57 | pendiente | — |
 | RP61 | S58 | worker `gentle-ai-worker` con encargo cerrado; RED 18 de 25 pruebas nuevas, GREEN 25 de 25; el padre leyó el diff, corrió la suite completa (1028 de 1029, 1 salteada) y la miró con Edge sobre los 15 repos reales: los controles compartidos quedan en las mismas coordenadas en ambas pestañas y «Needs attention» pasa de 5 repos a 1 | pendiente de commit |
 | RP62 | S61, S77 | respaldo de la extensión creado y verificado ANTES de tocarla; pruebas del repo escritas primero por el escritor (24; RED verificado por el padre: 24 de 24); implementación del repo por `gentle-ai-worker` (unas 105 líneas); el padre leyó el diff, ajustó la prueba vieja de `rp32` y editó la extensión con la autorización de la sesión, y la verificó con un arnés en carpeta temporal (13 chequeos, el JSON real nunca se creó); 18 mutaciones propias mueren; Edge real con un archivo temporal; suite completa corrida DESPUÉS de cerrar los documentos y ROADMAP comprobado con `severity error` y 9 celdas por fila | pendiente de commit (la extensión queda fuera del PR) |
-| RP63 | S60 | pendiente | — |
+| RP63 | S60, S77 | cerrada: pruebas escritas primero por el padre (el escritor delegado fue rechazado por la herramienta porque no había un documento de función con `T<n>`; se hizo en línea, 49 pruebas, RED verificado: 27 de las 30 puras fallaban por falta de la función y las 3 que pasaban eran guías del comportamiento previo); implementación en `public/resumen.js` (`tasksView`, pestañas de `chatHead`, la barra de la tarjeta), `public/app.js` (`tasks-open`, `chat-tab`, `tasks-done`, `tasks-filter`, una lectura de `/api/roadmap` por apertura del chat) y `public/style.css`; la suite completa encontró tres pruebas viejas (dos actualizadas a propósito, una era un fallo real del composer oculto); 24 mutaciones propias muertas (cuatro sobrevivientes cubiertos con pruebas, dos de esas pruebas estaban mal armadas por no forzar el redibujo); Edge real 13 de 13, que encontró un fallo que las pruebas no veían: el marcado de las pestañas de vista pisaba `aria-selected` de Chat y Tasks; sin verificación independiente (solo lectura de datos que el panel ya expone, sin API ni escritura) | — |
 | RP64 | S62, S55 | pendiente | — |
 | RP65 | S62 | pendiente; verificación independiente | — |
 | RP66 | S62 | pendiente | — |
@@ -1046,3 +1046,9 @@ Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a →
 > Dejar la extensión como está
 
 *Aplicado: S77. RP62 queda como se construyó; las alternativas quedan anotadas.*
+
+**L93.**
+
+> start_task
+
+*Aplicado: S60, S77. Tras ver el resumen de RP63 (por tabla tocaban RP7, diferida, y RP57, pospuesta; se propuso RP63) la persona confirmó el arranque.*

@@ -186,7 +186,8 @@ test('chatHead: only the repo name and the close button; no chip, no state word,
     assert.doesNotMatch(html, /role="status"/, `${name}: no status banner`);
     assert.doesNotMatch(html, /panel:alpha/, `${name}: the session name is not in the head`);
     assert.doesNotMatch(html, /session closed|no session|free|working|asking you|unknown|The session is/, `${name}: no state word`);
-    assert.equal(text(html).trim(), 'alpha✕', `${name}: visible text is exactly the name plus the close glyph`);
+    // RP63 adds the Chat / Tasks tabs under the name row: they are not state, session or chip text.
+    assert.equal(text(html).trim(), 'alpha✕ChatTasks', `${name}: visible text is exactly the name, the close glyph and the two tab names`);
     assert.ok(!text(html).includes('s1'), `${name}: the id is never visible text`);
   }
 });

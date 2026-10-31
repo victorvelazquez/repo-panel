@@ -33,6 +33,7 @@ const S = {
   boardRev: 0, boardRefreshing: [], factAt: {},
   tab: 'summary', scope: { kind: 'all' }, summary: null, summaryKey: '', summaryFailed: false, sfilter: 'all', collapsed: {},
   timeouts: { get: 25000, post: 70000 },
+  tasks: {}, tasksFilter: '', tasksOpenDone: false,
   chat: { id: null, seq: 0 }, chatCache: {}, actionsOpen: false, drafts: {}, notes: {}, msgBusy: {}, answer: {},
 };
 S.tab = S.prefs.tab === 'work' ? 'work' : 'summary';
@@ -770,7 +771,7 @@ function applyTab() {
   $('#sumLayout').hidden = !summary; // the chat lives inside this wrapper: it exists only in Summary (S56)
   $('#work').hidden = summary;
   if (document.body && document.body.classList) { document.body.classList.toggle('tab-summary', summary); document.body.classList.toggle('tab-work', !summary); }
-  for (const b of Array.from((document.querySelectorAll && document.querySelectorAll('[role=tab][data-tab]')) || [])) b.setAttribute('aria-selected', String(b.dataset.tab === S.tab));
+  for (const b of Array.from((document.querySelectorAll && document.querySelectorAll('.rs-tabs [role=tab][data-tab]')) || [])) b.setAttribute('aria-selected', String(b.dataset.tab === S.tab));
 }
 function setTab(tab) {
   S.tab = tab;
@@ -866,10 +867,10 @@ async function loadChat(id, { user = false, signal } = {}) {
     if (seq === S.chat.seq && S.chat.id === id && !S.chat.failed) { S.chat.failed = true; draw(); }
   }
 }
-function openChat(id) {
+function openChat(id, tab) {
   if (!R || !id || S.chat.id === id) return;
   saveDraft();
-  S.chat = { id, seq: S.chat.seq + 1, ...(V && V.chatFromCache(S.chatCache[id])) }; // RP79: cached messages at once, state unknown (no get: opening must not reorder the cache)
+  S.chat = { id, seq: S.chat.seq + 1, ...(V && V.chatFromCache(S.chatCache[id])), ...(tab === 'tasks' ? { tab } : {}) }; // RP79: cached messages at once, state unknown (no get: opening must not reorder the cache)
   S.actionsOpen = false;
   $('#msgBox').value = S.drafts[id] || '';
   draw();
@@ -886,7 +887,28 @@ function closeChat() {
   chatShown = null;
   draw();
 }
-const chatTick = () => { if (S.chat.id && S.tab === 'summary' && !document.hidden && !(V && pollSkipped('chat'))) loadChat(S.chat.id); };
+const chatTick = () => { if (S.chat.id && S.chat.tab !== 'tasks' && S.tab === 'summary' && !document.hidden && !(V && pollSkipped('chat'))) loadChat(S.chat.id); };
+
+// RP63 (S60): the Tasks tab reads /api/roadmap once per chat opening, when the tab is first shown. The last good answer of a repo
+// is kept; a failure only shows when there is none. An answer for a repo the person left is stored but never painted for another.
+async function loadTasks() {
+  const { id, seq } = S.chat;
+  if (!id || S.chat.tasksAsked) return;
+  S.chat.tasksAsked = true;
+  S.chat.tasksLoading = true;
+  S.chat.tasksFailed = false;
+  try {
+    S.tasks[id] = await api(`/api/roadmap?id=${id}`);
+  } catch {
+    if (S.chat.seq === seq) S.chat.tasksFailed = true;
+  }
+  if (S.chat.seq === seq) { S.chat.tasksLoading = false; draw(); }
+}
+function setChatTab(tab) {
+  S.chat.tab = tab === 'tasks' ? 'tasks' : 'chat';
+  if (S.chat.tab === 'tasks') loadTasks();
+  draw();
+}
 
 function chatWidthNow() {
   const layout = $('#sumLayout');
@@ -920,6 +942,16 @@ function drawChat() {
   if (!on) return;
   applyChatWidth();
   paint($('#chatHead'), R.chatHead(S.chat, { name: nameOf(S.chat.id) }));
+  const tasksTab = S.chat.tab === 'tasks';
+  $('#composer').hidden = tasksTab;
+  if (tasksTab) {
+    const hadFocus = document.activeElement && document.activeElement.id === 'tasksFilter';
+    paint($('#chatBody'), R.tasksView(S.tasks[S.chat.id] || null, { filter: S.tasksFilter, openDone: S.tasksOpenDone, loading: !!S.chat.tasksLoading, failed: !!S.chat.tasksFailed }));
+    chatShown = null;
+    const box = hadFocus ? $('#tasksFilter') : null;
+    if (box && box.focus && document.activeElement !== box) { box.focus(); if (box.setSelectionRange) box.setSelectionRange(box.value.length, box.value.length); }
+    return;
+  }
   prunePending(S.chat.id);
   const shown = chatView();
   paint($('#sessState'), R.sessionLabelHtml(shown));
@@ -1487,6 +1519,10 @@ const ACTIONS = {
   // "Open", "Start" and "⋯" of the Summary: show only this repo on the board.
   'focus-repo': (el) => { S.q = nameOf(el.dataset.id); $('#search').value = S.q; setTab('work'); },
   'chat-open': (el) => openChat(el.dataset.id),
+  'tasks-open': (el) => { openChat(el.dataset.id, 'tasks'); if (S.chat.id === el.dataset.id) setChatTab('tasks'); },
+  'chat-tab': (el) => setChatTab(el.dataset.tab),
+  'tasks-done': () => { S.tasksOpenDone = !S.tasksOpenDone; draw(); },
+  'tasks-filter': (el) => { S.tasksFilter = String((el && el.value) || ''); draw(); },
   'chat-close': () => closeChat(),
   'chat-send': () => sendChatMessage(),
   // RP73: answer the question of the open chat. The server presses the keys; this only posts { id, fingerprint, index } and draws the
@@ -1660,6 +1696,7 @@ document.addEventListener('keydown', (e) => {
     const menu = $('#mergeMenu');
     if (S.chat.id && !(menu && menu.open) && !['#addDialog', '#roomDialog'].some((d) => $(d) && $(d).open)) closeChat();
   } else if ((e.key === 'Enter' || e.key === ' ') && e.target && e.target.dataset && e.target.dataset.act === 'chat-open') { e.preventDefault(); ACTIONS['chat-open'](e.target); }
+  else if ((e.key === 'Enter' || e.key === ' ') && e.target && e.target.dataset && e.target.dataset.act === 'tasks-open') { e.preventDefault(); e.stopPropagation(); ACTIONS['tasks-open'](e.target); }
 });
 
 // Enter in the message box sends it; Shift+Enter is a new line and an IME composition is left alone.
@@ -1668,7 +1705,7 @@ document.addEventListener('keydown', (e) => {
   e.preventDefault();
   sendChatMessage();
 });
-document.addEventListener('input', (e) => { if (e.target && e.target.id === 'msgBox') saveDraft(); });
+document.addEventListener('input', (e) => { if (e.target && e.target.id === 'msgBox') saveDraft(); else if (e.target && e.target.id === 'tasksFilter') ACTIONS['tasks-filter'](e.target); });
 
 // The passing list of a repo stays open (or closed) across redraws. `toggle` does not bubble, so capture it.
 document.addEventListener('toggle', (e) => {

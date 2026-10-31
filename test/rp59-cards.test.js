@@ -110,9 +110,9 @@ test('card variants: yellow left border when asking, red when blocked with no ne
 test('the bar has a short count; the full breakdown goes in the title and the aria-label of the bar', () => {
   const html = view([row({ progress: progress({ total: 74, completada: 30, enRevision: 1, bloqueada: 3, pendiente: 40 }) })]);
   assert.match(html, /30\/74/);
-  assert.match(html, /title="30 of 74 completed · 1 in review · 3 blocked"/);
+  assert.match(html, /title="30 of 74 completed · 1 in review · 3 blocked · Click to see the tasks"/);
   assert.match(html, /role="img" aria-label="30 of 74 completed · 1 in review · 3 blocked"/);
-  assert.match(view([row({ progress: progress({ total: 5, completada: 5, enRevision: 0, bloqueada: 0, pendiente: 0 }) })]), /title="5 of 5 completed"/);
+  assert.match(view([row({ progress: progress({ total: 5, completada: 5, enRevision: 0, bloqueada: 0, pendiente: 0 }) })]), /title="5 of 5 completed · Click to see the tasks"/);
 });
 
 test('bar widths never exceed 100 for awkward totals', () => {
