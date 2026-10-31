@@ -61,17 +61,6 @@ button.loading .ico { animation: spin 1s linear infinite; }
 #drawer[hidden] { display: none; }
 .drawer-head { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: var(--panel); border-bottom: 1px solid var(--line); }
 #drawerBody { overflow: auto; padding: 12px 14px 40px; }
-.filelist { margin-bottom: 14px; font-size: 13px; }
-.filelist div { display: flex; gap: 10px; padding: 2px 0; }
-.filelist .st { width: 16px; font-family: ui-monospace, Consolas, monospace; color: var(--yellow); }
-.file { border: 1px solid var(--line); border-radius: 6px; margin-bottom: 10px; overflow: hidden; }
-.file summary { cursor: pointer; padding: 6px 10px; background: var(--panel); font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
-.diff { margin: 0; overflow-x: auto; font: 12px/1.45 ui-monospace, Consolas, monospace; }
-.diff div { padding: 0 10px; white-space: pre; min-height: 1.45em; }
-.diff .a { background: #12261a; color: #7ee787; }
-.diff .d { background: #2a1517; color: #ffa198; }
-.diff .h { background: #101d2e; color: var(--blue); }
-.diff .m { color: var(--muted); }
 
 dialog { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 10px; width: min(560px, 92vw); }
 dialog::backdrop { background: #000a; }
@@ -356,6 +345,27 @@ button:is([data-cmd], [data-kind], header .primary, .empty .primary, .merge):dis
 .task-text { flex: 1 1 160px; overflow-wrap: anywhere; }
 .task-bit { display: flex; gap: 6px; color: var(--muted); font-size: 12px; }
 .task-more { text-align: center; }
+/* RP64: the single code viewer (the Changes tab): the file list and the numbered code. */
+.cv-list { flex: none; display: flex; flex-direction: column; gap: 2px; margin-bottom: 12px; font-size: 13px; }
+.cv-item, .cv-all { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; border: 1px solid transparent; background: transparent; padding: 3px 6px; border-radius: 6px; }
+.cv-item.cv-on { border-color: var(--blue); background: #12253d; }
+.cv-all { color: var(--blue); }
+.cv-st { width: 16px; font-family: ui-monospace, Consolas, monospace; color: var(--yellow); }
+.cv-path { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
+.cv-item:focus-visible, .cv-all:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+/* #chatBody is a column flexbox: without flex: none the sections (overflow hidden) shrink and clip their code. */
+.cv-file { flex: none; border: 1px solid var(--line); border-radius: 6px; margin-bottom: 10px; overflow: hidden; }
+.cv-title { margin: 0; padding: 6px 10px; background: var(--panel); font: 12px/1.4 ui-monospace, Consolas, monospace; overflow-wrap: anywhere; }
+.cv-note { padding: 6px 10px; }
+.cv-code { overflow-x: auto; font: 12px/1.45 ui-monospace, Consolas, monospace; }
+.cv-l { display: flex; min-height: 1.45em; white-space: pre; }
+.cv-n { flex: none; box-sizing: content-box; min-width: 4ch; padding: 0 6px; text-align: right; color: var(--muted); user-select: none; border-right: 1px solid var(--line); }
+.cv-t { padding: 0 10px; }
+.cv-l.a { background: #12261a; color: #7ee787; }
+.cv-l.d { background: #2a1517; color: #ffa198; }
+.cv-l.h { background: #101d2e; color: var(--blue); }
+.cv-l.m { color: var(--muted); }
+.cv-more { text-align: center; padding: 8px 0; }
 .ch-name { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ch-body { flex: 1; min-height: 0; overflow: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
 .ch-body .empty { padding: 30px 0; }
