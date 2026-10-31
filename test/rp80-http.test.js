@@ -41,7 +41,7 @@ function fakeStore() {
     snapshot: () => ({ rows: [], counts: {}, attention: [], generatedAt: 'x' }),
     setSession() {}, touch() {}, start() {}, stop() {}, tick: async () => {},
   };
-  for (const m of ['refreshAll', 'refreshRepo']) {
+  for (const m of ['refreshAll', 'refreshRepo', 'catchUp']) {
     s[m] = async (...args) => {
       s.log.push([m, ...args]);
       s.lanes.push(lane.getStore());
@@ -191,14 +191,14 @@ test('POST without id answers { started: true } BEFORE the reads end and starts 
   });
 });
 
-test('POST with a known id starts refreshRepo(id) only, and answers at once', async () => {
+test('POST with a known id starts catchUp(id) only (RP80b: now and once more later), and answers at once', async () => {
   const store = fakeStore();
   store.held = gate();
   await withServer({ ...fakeDeps(), summaryStore: store }, async ({ post }) => {
     const r = await post('/api/board/refresh', { id: ID });
     assert.equal(r.status, 200);
     assert.deepEqual(r.json(), { started: true });
-    assert.deepEqual(store.log, [['refreshRepo', ID]]);
+    assert.deepEqual(store.log, [['catchUp', ID]]);
     store.held.open();
     await flush();
   });
@@ -234,7 +234,7 @@ test('a background read that fails (an HttpError, any error) is swallowed: still
           assert.deepEqual(r.json(), { started: true });
         }
         await flush();
-        assert.deepEqual(store.log, [['refreshAll'], ['refreshRepo', ID]]);
+        assert.deepEqual(store.log, [['refreshAll'], ['catchUp', ID]]);
       });
     }
     await flush();

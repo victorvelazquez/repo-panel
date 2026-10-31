@@ -31,6 +31,10 @@ const TOKEN = crypto.randomBytes(24).toString('hex');
 
 // RP76: these POSTs only calculate; every other POST is an action of the person and goes through the interactive lane.
 const READ_ONLY_POSTS = new Set(['POST /api/queue', 'POST /api/conformity']);
+// RP80b: after these actions end (success or failure) the store catches up that repo, fire-and-forget.
+const CATCH_UP_POSTS = new Set(['POST /api/merge', 'POST /api/rerun', 'POST /api/fetch', 'POST /api/pi', 'POST /api/chat/send']);
+// No client, no work: a store that has never been asked (awake() false) is left alone; a store without awake() is always called.
+const catchUp = (store, id) => { if (store && (typeof store.awake !== 'function' || store.awake())) Promise.resolve().then(() => store.catchUp(id)).catch(() => {}); };
 const query = (u) => Object.fromEntries(new URL(u, 'http://x').searchParams);
 
 const routes = {
@@ -66,7 +70,7 @@ const routes = {
     if (!store) throw new HttpError(404, 'No board');
     if (b.id !== undefined && typeof b.id !== 'string') throw new HttpError(400, 'id must be a string');
     if (b.id !== undefined) findRepo(b.id); // an unknown repo is a 404 before anything starts
-    Promise.resolve().then(() => (b.id === undefined ? store.refreshAll() : store.refreshRepo(b.id))).catch(() => {});
+    Promise.resolve().then(() => (b.id === undefined ? store.refreshAll() : store.catchUp(b.id))).catch(() => {});
     return { started: true };
   },
   'GET /api/sessions': (q, b, d) => sessionsState(q.id, d.orca, d.sessionsDir),
@@ -182,7 +186,10 @@ function createServer(port, deps = {}) {
         if (req.headers['x-token'] !== TOKEN) throw new HttpError(401, 'Invalid token');
         if (!handler) return reply(200, { routes: perf.summary(), queue: stats(), liveCache: liveCacheStats() });
         const body = req.method === 'POST' ? await readBody(req) : {};
-        const run = () => { executed = true; return handler(query(req.url), body, deps); };
+        const run = async () => {
+          executed = true;
+          try { return await handler(query(req.url), body, deps); } finally { if (CATCH_UP_POSTS.has(key)) catchUp(deps.summaryStore, body && body.id); }
+        };
         // Identical GETs in flight share one execution; POSTs never do.
         if (req.method !== 'GET') return reply(200, await run());
         executed = false;
