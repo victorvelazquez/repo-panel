@@ -15,6 +15,7 @@ const { prState } = require('./github.js');
 const { roadmapState } = require('./roadmap.js');
 const { readState } = require('./state.js');
 const { requirementsFor } = require('./requirements.js');
+const view = require('../public/view.js');
 const { safeAnalyse, tally, loadingRow, lastMovementOf, pool } = require('./summary.js');
 
 const KINDS = ['local', 'prs', 'roadmap', 'state', 'last', 'req'];
@@ -23,7 +24,9 @@ const VALUES = ['local', 'prs', 'roadmap', 'state', 'req']; // the facts board()
 const NEEDED = ['local', 'prs', 'roadmap', 'state']; // a row is real once each of these was read, even in error
 const FAST = new Set(['local', 'state']);
 // local and state cost about eight Git calls per repo: 15 s keeps a page with 15 repos near the load of the old 20 s rebuild.
-const INTERVALS = { fast: 15000, slow: 60000, idleFast: 30000, idleSlow: 300000 };
+const INTERVALS = { fast: 15000, slow: 60000, idleFast: 30000, idleSlow: 300000, hotPrs: 15000, hotLocal: 10000 };
+const HOT_KEY = { prs: 'hotPrs', local: 'hotLocal' }; // RP80b: a hot repo (V.isHotRepo) reads these two faster while a client is active
+const CATCH_UP_DELAY_MS = 5000;
 const READ_TIMEOUT_MS = 90000; // a reader that hangs outside exec must not pin its repo for ever
 const SESSION_TTL_MS = 30000; // the warmer publishes every 3 s: a state older than this is no longer being fed (it stopped, or Orca is down)
 const STALE_FACTOR = 3;
@@ -49,7 +52,7 @@ function withTimeout(promise, ms) {
 }
 
 function createSummaryStore({
-  deps = {}, now = Date.now, loadCfg = loadConfig, setTimer = setTimeout, clearTimer = clearTimeout, intervals, idleAfterMs = IDLE_AFTER_MS, pool: poolSize = POOL, waitForClient = true, timeout = withTimeout,
+  deps = {}, now = Date.now, loadCfg = loadConfig, setTimer = setTimeout, clearTimer = clearTimeout, intervals, idleAfterMs = IDLE_AFTER_MS, pool: poolSize = POOL, waitForClient = true, timeout = withTimeout, catchUpDelayMs = CATCH_UP_DELAY_MS,
 } = {}) {
   const iv = { ...INTERVALS, ...intervals };
   const facts = new Map(); // repo id -> { [kind]: { value, at (last success), tried (last attempt), failed, error } }
@@ -61,10 +64,16 @@ function createSummaryStore({
   let ticking = null;
   let timer = null;
   let started = false;
+  const catching = new Map(); // repo id -> the one pending delayed read of catchUp
 
-  const interval = (kind, idle) => (idle ? (FAST.has(kind) ? iv.idleFast : iv.idleSlow) : (FAST.has(kind) ? iv.fast : iv.slow));
+  const interval = (kind, idle, hot = false) => (idle ? (FAST.has(kind) ? iv.idleFast : iv.idleSlow) : hot && HOT_KEY[kind] ? iv[HOT_KEY[kind]] : (FAST.has(kind) ? iv.fast : iv.slow));
+  // The rule is the page's own, looked up at call time, on the facts held now.
+  const isHot = (f) => !!view.isHotRepo({ local: f.local.value, prs: f.prs.value });
   const isIdle = () => now() - lastTouch >= idleAfterMs;
   const touch = () => { lastTouch = now(); };
+  // Has any client (a snapshot, a board read or a touch) ever asked? Explicit reads and the loop do not count. The action hooks of the server
+  // use it: no client, no work (a server nobody asked must not start reads after an action).
+  const awake = () => lastTouch !== -Infinity;
 
   // The repos of the config at call time, in config order; what belongs to a repo that is gone is dropped.
   function reposOf(cfg = loadCfg()) {
@@ -105,7 +114,8 @@ const outcome = (fact) => JSON.stringify([fact.failed, fact.error, fact.value ==
     if (flights.has(repo.id)) return flights.get(repo.id);
     const f = factsOf(repo.id);
     const idle = isIdle();
-    const kinds = KINDS.filter((k) => force || f[k].tried === null || now() - f[k].tried >= interval(k, idle && !f[k].failed));
+    const hot = !idle && isHot(f);
+    const kinds = KINDS.filter((k) => force || f[k].tried === null || now() - f[k].tried >= interval(k, idle && !f[k].failed, hot));
     if (!kinds.length) return Promise.resolve();
     const flight = exec.withPriority('background', () => Promise.all(kinds.map((k) => read(repo, f[k], k)))).finally(() => flights.delete(repo.id));
     flights.set(repo.id, flight);
@@ -125,6 +135,23 @@ const outcome = (fact) => JSON.stringify([fact.failed, fact.error, fact.value ==
     if (!repo) throw new HttpError(404, 'Unknown repo');
     await cycle(repo, true);
   }
+  // RP80b: after an action of the person, read ALL facts of that repo now and once more catchUpDelayMs later (one pending timer per repo).
+  // Not a client (no touch); never rejects; an id that is not a repo is ignored.
+  async function catchUp(id) {
+    try {
+      const repo = reposOf().find((r) => r.id === id);
+      if (!repo) return;
+      if (!catching.has(id)) {
+        const t = setTimer(async () => {
+          catching.delete(id);
+          try { const again = reposOf().find((r) => r.id === id); if (again) await cycle(again, true); } catch { /* the delayed read is best effort */ }
+        }, catchUpDelayMs);
+        if (t && typeof t.unref === 'function') t.unref();
+        catching.set(id, t);
+      }
+      await cycle(repo, true);
+    } catch { /* never rejects */ }
+  }
   // No client, no work: until a page has asked (the first snapshot) the loop reads nothing. A real server started by a test or a second
   // launch stays passive; refreshRepo and refreshAll are explicit and always read.
   function tick() {
@@ -136,7 +163,10 @@ const outcome = (fact) => JSON.stringify([fact.failed, fact.error, fact.value ==
   function setSession(id, state) { sessions.set(id, { state, at: now() }); }
 
   // Facts that failed their last read, or whose last success is older than 3 times their (active) interval.
-  const staleOf = (f, t, kinds = SUMMARY_KINDS) => kinds.filter((k) => f[k].failed || (f[k].at !== null && t - f[k].at > STALE_FACTOR * interval(k, false)));
+  const staleOf = (f, t, kinds = SUMMARY_KINDS) => {
+    const hot = isHot(f);
+    return kinds.filter((k) => f[k].failed || (f[k].at !== null && t - f[k].at > STALE_FACTOR * interval(k, false, hot)));
+  };
 
   // A page asking is activity; the first one starts the work at once, without waiting for the next beat.
   function wake() {
@@ -196,9 +226,9 @@ const outcome = (fact) => JSON.stringify([fact.failed, fact.error, fact.value ==
     if (timer && typeof timer.unref === 'function') timer.unref();
   }
   function start() { if (started) return; started = true; arm(FIRST_DELAY_MS); }
-  function stop() { started = false; if (timer) { clearTimer(timer); timer = null; } }
+  function stop() { started = false; if (timer) { clearTimer(timer); timer = null; } for (const t of catching.values()) clearTimer(t); catching.clear(); }
 
-  return { snapshot, board, refreshRepo, refreshAll, setSession, touch, start, stop, tick };
+  return { snapshot, board, refreshRepo, catchUp, refreshAll, setSession, touch, awake, start, stop, tick };
 }
 
 module.exports = { createSummaryStore };

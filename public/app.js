@@ -1432,7 +1432,7 @@ async function doRerun(id, n) {
   try { const r = await api('/api/rerun', { id, number: n }); toast(`Re-running ${r.rerun} workflow run(s)`, 'ok'); }
   catch (e) { toast(e.message, 'bad'); }
   delete S.busy[`${id}:${n}`];
-  setTimeout(() => refreshRepo(id), 2500);
+  setTimeout(() => refreshRepo(id, { catchUp: true }), 2500);
 }
 
 async function addRepos(paths) {
