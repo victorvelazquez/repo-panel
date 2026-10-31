@@ -588,5 +588,27 @@
   // The server sends a heartbeat every 15 s: three missed beats mean the stream is dead (a server that vanished without closing it).
   const eventsStale = ({ connected, lastByteAt, now }) => connected === true && Number.isFinite(lastByteAt) && Number.isFinite(now) && now - lastByteAt >= 45000;
 
-  return { chatCachePut, chatCacheGet, chatFromCache, API_VERSION, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, piPollTargets, LIVE_CHECK_MS, liveSession, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, presenceLabel, presenceDot, parseSse, liveEvent, eventsPlan, eventsRetryMs, eventsStale };
+  // RP80: what the page takes from a /api/board answer. A fact is dropped when the page read it directly at the same time or later
+  // (lastAt[id][kind]; an unknown page time never blocks), and so is its error. `missing` lists, in board order, the repos that came
+  // without a good local, prs, roadmap or state (req does not count; a fact the page guard dropped still came).
+  const BOARD_KINDS = ['local', 'prs', 'roadmap', 'state', 'req'];
+  function boardApply(board, { lastAt = {} } = {}) {
+    const set = {};
+    const missing = [];
+    for (const [id, e] of Object.entries(board.repos || {})) {
+      const page = lastAt[id] || {};
+      const stale = (k) => Number.isFinite(page[k]) && Number.isFinite((e.at || {})[k]) && page[k] >= e.at[k];
+      const out = {};
+      for (const k of BOARD_KINDS) if (e[k] != null && !stale(k)) out[k] = e[k];
+      const errors = Object.fromEntries(Object.entries(e.errors || {}).filter(([k]) => !stale(k)));
+      if (Object.keys(errors).length) out.errors = errors;
+      set[id] = out;
+      if (BOARD_KINDS.slice(0, 4).some((k) => e[k] == null)) missing.push(id);
+    }
+    return { set, rev: board.rev, refreshing: board.refreshing || [], missing };
+  }
+  // The wait before the next board request: 3 s while it works, then doubling per failure up to 30 s.
+  const boardWait = ({ ok, failures }) => (ok ? 3000 : Math.min(30000, 3000 * 2 ** failures));
+
+  return { boardApply, boardWait, chatCachePut, chatCacheGet, chatFromCache, API_VERSION, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, piPollTargets, LIVE_CHECK_MS, liveSession, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, presenceLabel, presenceDot, parseSse, liveEvent, eventsPlan, eventsRetryMs, eventsStale };
 }));

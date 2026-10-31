@@ -388,7 +388,7 @@ test('the 20 s tick asks only while the Summary tab is shown and the document is
 
 test('refreshAll loads the summary too (source check of the 60 s cycle)', () => {
   const src = fs.readFileSync(path.join(PUBLIC, 'app.js'), 'utf8');
-  assert.match(src, /async function refreshAll\(\)[\s\S]*?loadSummary\(\)/);
+  assert.match(src, /async function refreshAll\([^)]*\)[\s\S]*?loadSummary\(\)/); // RP80: refreshAll({ force }) takes an option now
   assert.match(src, /setInterval\([^)]*summaryTick/);
 });
 

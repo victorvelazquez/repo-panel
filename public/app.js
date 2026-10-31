@@ -30,6 +30,7 @@ const S = {
   rooms: [], roomIssues: [], roomData: { state: 'loading', data: null }, roomSeq: 0,
   prefs: store('prefs', { method: 'squash', del: true }),
   lastRefresh: 0, lastAt: {}, scan: [],
+  boardRev: 0, boardRefreshing: [], factAt: {},
   tab: 'summary', scope: { kind: 'all' }, summary: null, summaryKey: '', summaryFailed: false, sfilter: 'all', collapsed: {},
   timeouts: { get: 25000, post: 70000 },
   chat: { id: null, seq: 0 }, chatCache: {}, actionsOpen: false, drafts: {}, notes: {}, msgBusy: {}, answer: {},
@@ -51,7 +52,7 @@ async function api(url, body, opts = {}) {
   try {
     const res = await fetch(url, { method: body ? 'POST' : 'GET', headers, body: body ? JSON.stringify(body) : undefined, signal: ctl.signal });
     const data = await res.json().catch(() => ({ error: 'Invalid server response' }));
-    if (!res.ok) throw new Error(data.error || res.statusText);
+    if (!res.ok) throw Object.assign(new Error(data.error || res.statusText), { status: res.status });
     return data;
   } catch (e) {
     if (timedOut) throw new Error('Request timed out');
@@ -111,7 +112,7 @@ function track(id, p) {
 }
 
 // `poll: false` leaves the pi session status alone (the status poll itself refreshes the repo when a session finishes).
-const loadLocal = (id) => track(id, pooled(() => api(`/api/local?id=${id}`)).then((d) => { S.local[id] = d; noteLocal(id); }, (e) => { S.local[id] = { error: e.message }; }));
+const loadLocal = (id) => track(id, pooled(() => api(`/api/local?id=${id}`)).then((d) => { S.local[id] = d; stamp(id, 'local'); noteLocal(id); }, (e) => { S.local[id] = { error: e.message }; }));
 
 // A repo seen dirty for the first time starts the checking of its pi session (view.js liveSession) and asks for the live
 // state at once, so the commit button is never enabled while the answer is still due. A repo that turns clean forgets
@@ -128,7 +129,7 @@ function noteLocal(id) {
 
 // The session state the buttons of a repo see (S.sent has its own verdict): the live answer, or 'checking' until it comes.
 const sessionOf = (id) => (V ? V.liveSession({ sent: S.sent[id], live: S.live[id], answered: S.liveAnswered[id], dirtyAt: S.dirtyAt[id] }) : S.sent[id] ? undefined : S.live[id]);
-const loadPrs = (id) => track(id, pooled(() => api(`/api/prs?id=${id}`)).then((d) => { S.prs[id] = d; wakeReady(id, d); releaseMerged(id, d); }, (e) => { S.prs[id] = { error: e.message }; }));
+const loadPrs = (id) => track(id, pooled(() => api(`/api/prs?id=${id}`)).then((d) => { S.prs[id] = d; stamp(id, 'prs'); wakeReady(id, d); releaseMerged(id, d); }, (e) => { S.prs[id] = { error: e.message }; }));
 
 // A merged PR keeps its Merge button disabled (S.merged: key -> time of the merge) until GitHub no longer lists it, or MERGE_HOLD_MS.
 const MERGE_HOLD_MS = 90000;
@@ -151,13 +152,18 @@ function markAsked(id, now, { prs = true } = {}) {
   if (prs) at.prs = now;
 }
 
-function refreshRepo(id, { poll = true } = {}) {
+// RP80: when the page read a fact of a repo directly (only successes), so a board fact that is not newer never overwrites it.
+function stamp(id, kind) { (S.factAt[id] ||= {})[kind] = Date.now(); }
+
+// `catchUp`: the person's own action just ended, so the server's memory is asked to re-read that repo too (the board follows).
+function refreshRepo(id, { poll = true, catchUp = false } = {}) {
   markAsked(id, Date.now());
+  if (catchUp && boardWorks()) api('/api/board/refresh', { id }).catch(() => {});
   return Promise.all([
     loadLocal(id),
     loadPrs(id),
     // The roadmap is optional: a repo without one, or a failed request, simply shows nothing extra.
-    track(id, pooled(() => api(`/api/roadmap?id=${id}`)).then((d) => { S.roadmap[id] = d; }, () => { S.roadmap[id] = null; })),
+    track(id, pooled(() => api(`/api/roadmap?id=${id}`)).then((d) => { S.roadmap[id] = d; stamp(id, 'roadmap'); }, () => { S.roadmap[id] = null; })),
     loadRequirements(id),
     loadState(id),
     poll ? loadPiStatus(id) : Promise.resolve(),
@@ -168,7 +174,7 @@ function refreshRepo(id, { poll = true } = {}) {
 function loadRequirements(id) {
   const seq = S.reqSeq[id] = (S.reqSeq[id] || 0) + 1;
   return track(id, pooled(() => api(`/api/requirements?id=${id}`)).then(
-    (d) => { if (seq === S.reqSeq[id]) S.req[id] = { state: 'loaded', data: d }; },
+    (d) => { if (seq === S.reqSeq[id]) { S.req[id] = { state: 'loaded', data: d }; stamp(id, 'req'); } },
     () => { if (seq === S.reqSeq[id]) S.req[id] = { state: 'failed' }; },
   ));
 }
@@ -178,7 +184,7 @@ function loadRequirements(id) {
 function loadState(id) {
   const seq = S.stateSeq[id] = (S.stateSeq[id] || 0) + 1;
   return track(id, pooled(() => api(`/api/state?id=${id}`)).then(
-    (d) => { if (seq === S.stateSeq[id]) S.state[id] = d; },
+    (d) => { if (seq === S.stateSeq[id]) { S.state[id] = d; stamp(id, 'state'); } },
     () => { if (seq === S.stateSeq[id]) S.state[id] = null; },
   ));
 }
@@ -319,7 +325,7 @@ async function applyPiState(id, state, ask) {
   if (state === 'busy' || state === 'asking') sent.busySeen = true; // a dialog means the session is working on it
   if (S.pistatus[id] === 'busy' && state !== 'busy' && !S.finishing[id]) {
     S.finishing[id] = true;
-    try { await refreshRepo(id, { poll: false }); } finally { delete S.finishing[id]; }
+    try { await refreshRepo(id, { poll: false, catchUp: true }); } finally { delete S.finishing[id]; }
   }
   if (S.sent[id] !== sent) return; // dismissed or sent again meanwhile
   S.pistatus[id] = state;
@@ -385,11 +391,71 @@ async function checkHealth() {
   $('#outdated').hidden = V ? !V.isOutdated(health) : false; // no view.js: the server cannot be current
 }
 
-async function refreshAll() {
+// ---------- board (RP80) ----------
+// GET /api/board answers from the server's memory what changed after S.boardRev. While it answers, the page paints from it and makes no
+// per-repo request; a 404 (an old server) or three failures in a row send the page back to the old routes, and it keeps trying slowly.
+const BOARD_DOWN_AFTER = 3;
+const board = { failures: 0, seq: 0, applied: 0 };
+const boardWorks = () => !!V && board.failures < BOARD_DOWN_AFTER;
+// The old polling only stands down once the board has answered at least once: a page that never heard from it keeps reading as before.
+const boardLeads = () => boardWorks() && board.applied > 0;
+
+// An error with no value never replaces what the page already holds (a direct read may be good); the same failure values as the old loaders otherwise.
+// A fact that keeps failing keeps its old value for 2 minutes; after that the error shows, as the old route did (a folder that went away).
+const AGED_MS = 120000;
+// `at` is the raw board entry's per-fact success times (boardApply keeps its own output shape without them).
+function applyBoardRepo(id, f, at = {}) {
+  const err = f.errors || {};
+  const aged = (k) => !!err[k] && Number.isFinite(at[k]) && Date.now() - at[k] >= AGED_MS;
+  if (f.local && !aged('local')) { S.local[id] = f.local; noteLocal(id); } else if (err.local && (aged('local') || !S.local[id] || S.local[id].error)) S.local[id] = { error: err.local };
+  if (f.prs && !aged('prs')) { S.prs[id] = f.prs; wakeReady(id, f.prs); releaseMerged(id, f.prs); } else if (err.prs && (aged('prs') || !S.prs[id] || S.prs[id].error)) S.prs[id] = { error: err.prs };
+  if (f.roadmap && !aged('roadmap')) S.roadmap[id] = f.roadmap; else if (err.roadmap && (aged('roadmap') || !S.roadmap[id])) S.roadmap[id] = null;
+  if (f.state && !aged('state')) S.state[id] = f.state; else if (err.state && (aged('state') || !S.state[id])) S.state[id] = null;
+  if (f.req && !aged('req')) S.req[id] = { state: 'loaded', data: f.req }; else if (err.req && (aged('req') || !(S.req[id] && S.req[id].state === 'loaded'))) S.req[id] = { state: 'failed' };
+}
+
+// Resolves to the ids that came without their facts (to read with the old loaders), or null when the board did not answer.
+async function loadBoard() {
+  if (!V) return null;
+  const seq = ++board.seq;
+  let b;
+  try { b = await api(`/api/board?since=${S.boardRev}`); } catch (e) {
+    board.failures = e.status === 404 ? BOARD_DOWN_AFTER : board.failures + 1;
+    if (!boardWorks() && S.boardRefreshing.length) { S.boardRefreshing = []; draw(); }
+    return null;
+  }
+  if (seq < board.applied) return []; // a newer answer was applied while this one travelled
+  board.applied = seq;
+  board.failures = 0;
+  const out = V.boardApply(b, { lastAt: S.factAt });
+  for (const [id, f] of Object.entries(out.set)) applyBoardRepo(id, f, (b.repos && b.repos[id] && b.repos[id].at) || {});
+  const changed = Object.values(out.set).some((f) => Object.keys(f).length) || out.refreshing.join() !== S.boardRefreshing.join();
+  S.boardRev = out.rev; // a LOWER rev is a restarted server: its repos were all applied above and its numbering is the one to follow now
+  S.boardRefreshing = out.refreshing;
+  if (changed) draw();
+  return out.missing;
+}
+
+const boardTick = () => loadBoard();
+function scheduleBoard() {
+  setTimeout(async () => {
+    // One answer that throws while it is applied must not end the chain: the old polling has stood down and the page would freeze.
+    try { if (!document.hidden) await boardTick(); } catch { /* the next beat tries again */ } finally { scheduleBoard(); }
+  }, V.boardWait({ ok: board.failures === 0, failures: board.failures }));
+}
+
+// `force` (the Refresh button): paints from memory first, then asks the server to re-read everything in the background.
+async function refreshAll({ force = false } = {}) {
   checkHealth();
   if (S.conf.failed) S.conf.key = ''; // ask again once per refresh, never on every redraw
   S.lastRefresh = Date.now();
-  await Promise.all([loadPrerequisites(), loadRooms(), loadSummary(), ...allRepos().map((r) => refreshRepo(r.id))]);
+  const others = [loadPrerequisites(), loadRooms(), loadSummary()];
+  const missing = await loadBoard();
+  if (force && missing) api('/api/board/refresh', {}).catch(() => {});
+  // A repo whose card holds a failed read (a direct read that timed out, say) is read again here: the board does not resend a fact that did not change.
+  const broken = (id) => [S.local[id], S.prs[id]].some((x) => x && x.error);
+  const ask = missing ? [...new Set([...missing, ...allRepos().map((r) => r.id).filter(broken)])] : allRepos().map((r) => r.id);
+  await Promise.all([...others, ...ask.map((id) => refreshRepo(id))]);
   pollLive();
 }
 
@@ -399,13 +465,16 @@ async function refreshAll() {
 function refreshTick(now = Date.now()) {
   if (!V) return;
   const ids = allRepos().map((r) => r.id);
+  const fromBoard = boardLeads(); // the board brings local, prs and state: only the session state of a sent command is still polled here
   for (const { id, kind } of V.refreshPlan({ now, ids, local: S.local, prs: S.prs, sent: S.sent, last: S.lastAt, loading: S.loading, hidden: document.hidden, busy: S.busy })) {
     const at = S.lastAt[id] || {};
     let hot = kind === 'hot';
     let due = true;
+    if (fromBoard && kind !== 'sent') continue;
     if (kind === 'sent') { // the session state every 3 s, plus the hot or local work if it is due, so a PR still shows up fast
       loadPiStatus(id);
       (S.lastAt[id] || (S.lastAt[id] = {})).pistatus = now;
+      if (fromBoard) continue;
       hot = V.isHotRepo({ local: S.local[id], prs: S.prs[id], sent: S.sent[id] }) && now - (at.prs || 0) >= V.HOT_REFRESH_MS;
       due = hot || now - (at.local || 0) >= V.LOCAL_REFRESH_MS;
     }
@@ -418,7 +487,7 @@ function refreshTick(now = Date.now()) {
 
 async function fetchRepo(id) {
   try { await track(id, pooled(() => api('/api/fetch', { id }))); } catch (e) { toast(`${nameOf(id)}: ${e.message}`, 'bad'); }
-  await refreshRepo(id);
+  await refreshRepo(id, { catchUp: true });
 }
 
 const snoozeKey = (id, n) => `${id}:${n}`;
@@ -1112,7 +1181,7 @@ function groupTag(name) {
 
 // The only refresh signal: the icon of the top Refresh button spins while any repo is refreshing. Cards show nothing.
 function syncRefreshIcon() {
-  const on = V ? V.isRefreshing(S.loading) : Object.values(S.loading).some((n) => n > 0);
+  const on = (V ? V.isRefreshing(S.loading) : Object.values(S.loading).some((n) => n > 0)) || S.boardRefreshing.length > 0;
   $('[data-act="refresh-all"]').classList.toggle('loading', on);
 }
 
@@ -1268,7 +1337,7 @@ function repoCard(r, attn = false, verdict = null) {
 }
 
 function checksChip(c) {
-  if (c.state === 'none') return '<span class="chip gray">no checks</span>';
+  if (!c || c.state === 'none') return '<span class="chip gray">no checks</span>';
   const tip = esc(c.items.map((i) => `${i.state === 'success' ? '✔' : i.state === 'failed' ? '✘' : '…'} ${i.name}`).join('\n'));
   if (c.state === 'success') return `<span class="chip green" title="${tip}">✔ ${c.passed}/${c.total} checks</span>`;
   if (c.state === 'failed') return `<span class="chip red" title="${tip}">✘ ${c.failed} failed · ${c.passed}/${c.total}</span>`;
@@ -1301,7 +1370,7 @@ function prCard(r, pr, meta, running = null) {
         title="${esc(hold || (pr.ready ? 'Merge into ' + pr.base : pr.blockedReason))}">${held || busy === 'done' ? 'Merged ✓' : busy ? 'Merging…' : `Merge · ${S.prefs.method}`}</button>
       <button data-act="snooze" ${n} title="Park this PR at the bottom of the column until it is ready to merge (stays parked if it is already ready)">💤</button>
     </div>
-    ${pr.checks.failedRuns.length ? `<button data-act="rerun" ${n} ${busy || held || hold ? 'disabled' : ''}${hold ? ` title="${esc(hold)}"` : ''}>Re-run failed</button>` : ''}
+    ${(pr.checks && pr.checks.failedRuns || []).length ? `<button data-act="rerun" ${n} ${busy || held || hold ? 'disabled' : ''}${hold ? ` title="${esc(hold)}"` : ''}>Re-run failed</button>` : ''}
     ${V && V.fixPrAction(pr).show ? piBtn(r, 'fix-pr', 'Fix CI', { pr: pr.number, title: hold || FIX_PR_HINT, disabled: !!hold }) : ''}
   </div>`;
 }
@@ -1355,7 +1424,7 @@ async function doMerge(id, n) {
   }
   delete S.busy[key];
   draw();
-  try { await refreshRepo(id); } finally { draw(); }
+  try { await refreshRepo(id, { catchUp: true }); } finally { draw(); }
 }
 
 async function doRerun(id, n) {
@@ -1405,7 +1474,7 @@ async function createRoom() {
 const JUDGED_CMDS = ['flow-commit', 'flow-commit-unstage', 'flow-pr', 'flow-base', 'flow-base-stash'];
 
 const ACTIONS = {
-  'refresh-all': () => refreshAll(),
+  'refresh-all': () => refreshAll({ force: true }),
   'fetch-all': async () => { toast('Fetching all repos…'); await Promise.all(allRepos().map((r) => fetchRepo(r.id))); toast('Fetch done', 'ok'); },
   'diff': (el) => openDiff(el.dataset.id),
   'close-drawer': () => { S.confOpen = false; $('#drawer').hidden = true; },
@@ -1639,7 +1708,8 @@ document.addEventListener('visibilitychange', () => {
   ev.attempt = 0;
   startEvents();
   pollLive();
-  if (Date.now() - S.lastRefresh > 30000) refreshAll();
+  if (boardLeads()) loadBoard(); // one request from memory instead of a burst of reads
+  else if (Date.now() - S.lastRefresh > 30000) refreshAll();
 });
 
 (async () => {
@@ -1651,4 +1721,5 @@ document.addEventListener('visibilitychange', () => {
   if (location.hash === '#conformity') openConformity(); // deep link
   refreshAll();
   startEvents();
+  if (V) scheduleBoard();
 })();
