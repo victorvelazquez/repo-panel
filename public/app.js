@@ -1703,8 +1703,26 @@ setInterval(() => refreshTick(), 2000);
 setInterval(summaryTick, 20000);
 setInterval(chatTick, CHAT_MS);
 setInterval(pollLive, 10000);
+// RP62 (S61, S77): the Claude usage bar. A request that fails, or an answer without a boolean `available` (api() turns a broken body into
+// { error }), changes nothing: the last painted value stays, with no toast; before the first good answer the bar stays hidden.
+async function loadUsage() {
+  let u;
+  try { u = await api('/api/usage'); } catch { return; }
+  if (!V || !u || typeof u.available !== 'boolean') return;
+  const view = V.usageView(u, { now: Date.now() });
+  const tone = (w) => (w.tone ? ` class="usage-${w.tone}"` : '');
+  const html = view.state === 'none' ? esc(view.label)
+    : `<span${tone(view.five)}>${esc(view.five.text)}</span> · <span${tone(view.seven)}>${esc(view.seven.text)}</span>${esc(view.label.slice(`${view.five.text} · ${view.seven.text}`.length))}`;
+  const el = $('#usage');
+  paint(el, html);
+  el.title = view.title;
+  el.hidden = false;
+}
+setInterval(() => { if (!document.hidden) loadUsage(); }, 30000);
+loadUsage();
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) { stopEvents(); return; }
+  loadUsage();
   ev.attempt = 0;
   startEvents();
   pollLive();
