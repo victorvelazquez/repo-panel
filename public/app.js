@@ -32,7 +32,7 @@ const S = {
   lastRefresh: 0, lastAt: {}, scan: [],
   tab: 'summary', scope: { kind: 'all' }, summary: null, summaryKey: '', summaryFailed: false, sfilter: 'all', collapsed: {},
   timeouts: { get: 25000, post: 70000 },
-  chat: { id: null, seq: 0 }, actionsOpen: false, drafts: {}, notes: {}, msgBusy: {}, answer: {},
+  chat: { id: null, seq: 0 }, chatCache: {}, actionsOpen: false, drafts: {}, notes: {}, msgBusy: {}, answer: {},
 };
 S.tab = S.prefs.tab === 'work' ? 'work' : 'summary';
 
@@ -230,6 +230,7 @@ function applyLive(entries) {
     if (info && JSON.stringify(info.live) !== JSON.stringify(e.live)) {
       S.chat.info = { ...info, live: e.live };
       S.chat.key = JSON.stringify([S.chat.info, S.chat.hist]);
+      if (V) V.chatCachePut(S.chatCache, e.id, S.chat); // RP79
       const ch = e.live.dialog && e.live.dialog.choices;
       if (S.answer[e.id] && S.answer[e.id].state !== 'sending' && (!ch || ch.fingerprint !== S.answer[e.id].fp)) delete S.answer[e.id]; // that question is over
       changed = true;
@@ -777,12 +778,15 @@ async function loadChat(id, { user = false, signal } = {}) {
   const seq = ++S.chat.seq;
   const opts = user ? { priority: 'user', signal } : {};
   try {
-    const info = await api(chatUrl('/api/sessions', id), undefined, opts);
-    const hist = info.adopted ? await api(chatUrl('/api/chat', id), undefined, opts) : null;
-    if (seq !== S.chat.seq || S.chat.id !== id) return; // the user switched card or closed the chat meanwhile
+    // RP79: both reads start at once (the chat answer is dropped when no session is adopted); either failing fails the whole read.
+    const [info, chat] = await Promise.all([api(chatUrl('/api/sessions', id), undefined, opts), api(chatUrl('/api/chat', id), undefined, opts)]);
+    const hist = info.adopted ? chat : null;
     const key = JSON.stringify([info, hist]);
-    const recovered = S.chat.failed;
+    if (V) V.chatCachePut(S.chatCache, id, { info, hist, key }); // a good read feeds the cache even when the card was switched meanwhile
+    if (seq !== S.chat.seq || S.chat.id !== id) return; // the user switched card or closed the chat meanwhile
+    const recovered = S.chat.failed || S.chat.cached; // a fresh answer equal to the cached one must still end the cached state
     S.chat.failed = false;
+    S.chat.cached = false;
     if (key === S.chat.key && !recovered) return;
     Object.assign(S.chat, { info, hist, key });
     const ch = info.live && info.live.dialog && info.live.dialog.choices;
@@ -796,7 +800,7 @@ async function loadChat(id, { user = false, signal } = {}) {
 function openChat(id) {
   if (!R || !id || S.chat.id === id) return;
   saveDraft();
-  S.chat = { id, seq: S.chat.seq + 1 };
+  S.chat = { id, seq: S.chat.seq + 1, ...(V && V.chatFromCache(S.chatCache[id])) }; // RP79: cached messages at once, state unknown (no get: opening must not reorder the cache)
   S.actionsOpen = false;
   $('#msgBox').value = S.drafts[id] || '';
   draw();

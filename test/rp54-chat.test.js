@@ -541,6 +541,7 @@ test('Adopt posts to /api/sessions/adopt and reloads; Start posts to /api/sessio
   const page = loadPage({ answers: {
     '/api/sessions/adopt': { ok: true }, '/api/sessions/start': () => Promise.resolve(startOk ? { ok: true, json: async () => ({ started: true }) } : { ok: false, status: 409, statusText: 'Conflict', json: async () => ({ error: 'This folder already has a session open; adopt it instead of starting another' }) }),
     '/api/sessions?': noSession,
+    '/api/chat?': { key: 'abc', sessionId: null, found: false, items: [], truncated: false, updatedAt: null }, // RP79: both reads go out together, so the chat read is always asked
   } });
   seed(page);
   const toasts = [];
