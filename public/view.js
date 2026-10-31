@@ -560,11 +560,33 @@
     if (frame.event === 'live') return liveEntry(body);
     return Array.isArray(body) ? body.map(liveEntry).filter(Boolean) : null;
   }
+  // RP79 (S68, S74): the page keeps the last chats it read, per repo, and paints them at once when the card is opened again. The use order
+  // is a counter, never a clock. A cached live state is never reused: chatFromCache replaces it with 'unknown' (no question, no answer buttons).
+  let cacheTick = 0;
+  const plainCopy = (x) => (x === undefined ? null : JSON.parse(JSON.stringify(x)));
+  const validCacheId = (id) => typeof id === 'string' && id !== '';
+  function chatCachePut(cache, id, entry, max = 8) {
+    if (!validCacheId(id) || !entry || typeof entry !== 'object' || !entry.info || typeof entry.info !== 'object') return false;
+    if (!Object.hasOwn(cache, id) && Object.keys(cache).length >= max) {
+      const oldest = Object.keys(cache).reduce((a, b) => (cache[b].at < cache[a].at ? b : a));
+      delete cache[oldest];
+    }
+    cache[id] = { info: plainCopy(entry.info), hist: plainCopy(entry.hist), key: entry.key, at: cacheTick++ };
+    return true;
+  }
+  function chatCacheGet(cache, id) {
+    if (!validCacheId(id) || !Object.hasOwn(cache, id)) return null;
+    cache[id].at = cacheTick++;
+    const { info, hist, key } = cache[id];
+    return { info: plainCopy(info), hist: plainCopy(hist), key };
+  }
+  const chatFromCache = (entry) => (entry ? { info: { ...plainCopy(entry.info), live: { state: 'unknown', count: 0 } }, hist: plainCopy(entry.hist), key: entry.key, cached: true } : null);
+
   // With the stream open the polls are only a safety net; without it they keep today's 10 s and 5 s.
   const eventsPlan = ({ connected }) => (connected ? { pollLiveMs: 60000, chatMs: 30000 } : { pollLiveMs: 10000, chatMs: 5000 });
   const eventsRetryMs = (attempt) => Math.min(30000, 1000 * 2 ** attempt);
   // The server sends a heartbeat every 15 s: three missed beats mean the stream is dead (a server that vanished without closing it).
   const eventsStale = ({ connected, lastByteAt, now }) => connected === true && Number.isFinite(lastByteAt) && Number.isFinite(now) && now - lastByteAt >= 45000;
 
-  return { API_VERSION, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, piPollTargets, LIVE_CHECK_MS, liveSession, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, presenceLabel, presenceDot, parseSse, liveEvent, eventsPlan, eventsRetryMs, eventsStale };
+  return { chatCachePut, chatCacheGet, chatFromCache, API_VERSION, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, piPollTargets, LIVE_CHECK_MS, liveSession, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, presenceLabel, presenceDot, parseSse, liveEvent, eventsPlan, eventsRetryMs, eventsStale };
 }));
