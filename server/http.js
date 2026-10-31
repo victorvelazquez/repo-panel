@@ -55,6 +55,20 @@ const routes = {
   'GET /api/pi-status': (q, b, d) => piStatus(findRepo(q.id), d.orca, { tail: q.tail === '1' }),
   'GET /api/rooms': () => roomsState(),
   'GET /api/summary': (q, b, d) => summaryFor(d, q),
+  // RP80: the board is answered from the store's memory (reads nothing); the refresh answers at once and reads in the background.
+  'GET /api/board': (q, b, d) => {
+    if (!d.summaryStore) throw new HttpError(404, 'No board');
+    if (q.since !== undefined && !/^\d+$/.test(q.since)) throw new HttpError(400, 'since must be an integer >= 0');
+    return d.summaryStore.board(q.since === undefined ? 0 : Number(q.since));
+  },
+  'POST /api/board/refresh': (q, b, d) => {
+    const store = d.summaryStore;
+    if (!store) throw new HttpError(404, 'No board');
+    if (b.id !== undefined && typeof b.id !== 'string') throw new HttpError(400, 'id must be a string');
+    if (b.id !== undefined) findRepo(b.id); // an unknown repo is a 404 before anything starts
+    Promise.resolve().then(() => (b.id === undefined ? store.refreshAll() : store.refreshRepo(b.id))).catch(() => {});
+    return { started: true };
+  },
   'GET /api/sessions': (q, b, d) => sessionsState(q.id, d.orca, d.sessionsDir),
   'GET /api/chat': (q, b, d) => chatState(q.id, q.session, q.limit, d.sessionsDir),
   'GET /api/prerequisites': () => prerequisites(),

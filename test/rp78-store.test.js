@@ -73,7 +73,7 @@ const LOADING = (name, room = null) => ({
 // ---------- points 1-2: facts and snapshot ----------
 test('creating a store reads nothing and arms nothing; it exposes exactly the pinned API', () => {
   const e = setup();
-  assert.deepEqual(Object.keys(e.store).sort(), ['refreshAll', 'refreshRepo', 'setSession', 'snapshot', 'start', 'stop', 'tick', 'touch']);
+  assert.deepEqual(Object.keys(e.store).sort(), ['board', 'refreshAll', 'refreshRepo', 'setSession', 'snapshot', 'start', 'stop', 'tick', 'touch']); // RP80 added `board`
   assert.deepEqual(e.totals(), total(0));
   assert.equal(e.timers.length, 0);
 });
