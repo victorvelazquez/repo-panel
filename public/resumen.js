@@ -56,13 +56,15 @@
   const sessionChip = (state) => { const [color, text] = SESSION[state] || SESSION.unknown; return `<span class="chip ${color}">${text}</span>`; };
 
   // Segmented bar plus a SHORT count; the full breakdown is the title and the aria-label. `p` is a row's progress or a sum of them.
-  function progressHtml(p) {
+  // With `id` (a repo card, never a room sum) the whole bar is a button that opens the tasks of that repo (RP63).
+  function progressHtml(p, id) {
     if (!p || p.total === null || p.total === undefined) return noData;
     if (!p.total) return '<span class="rs-sub">no units</span>';
     const pending = num(p.pendiente) + num(p.enCurso);
     const seg = (cls, n) => `<i class="rs-seg ${cls}" style="width:${pct(num(n), num(p.total))}%"></i>`;
     const text = `${num(p.completada)} of ${num(p.total)} completed${p.enRevision ? ` · ${num(p.enRevision)} in review` : ''}${p.bloqueada ? ` · ${num(p.bloqueada)} blocked` : ''}`;
-    return `<div class="rs-prog" title="${text}"><div class="rs-bar" role="img" aria-label="${text}">${seg('rs-done', p.completada)}${seg('rs-pr', p.enRevision)}${seg('rs-blk', p.bloqueada)}${seg('rs-pend', pending)}</div><span class="rs-sub rs-count">${num(p.completada)}/${num(p.total)}</span></div>`;
+    const open = id ? ` data-act="tasks-open" data-id="${esc(id)}" role="button" tabindex="0"` : '';
+    return `<div class="rs-prog"${open} title="${text}${id ? ' · Click to see the tasks' : ''}"><div class="rs-bar" role="img" aria-label="${text}">${seg('rs-done', p.completada)}${seg('rs-pr', p.enRevision)}${seg('rs-blk', p.bloqueada)}${seg('rs-pend', pending)}</div><span class="rs-sub rs-count">${num(p.completada)}/${num(p.total)}</span></div>`;
   }
 
   // The change chips of the board card (S55): `c` is { files, added, deleted, ahead, behind, noUpstream } or null (not loaded).
@@ -128,7 +130,7 @@
     const chips = r.error ? '' : changeChips(ctx.changesFor ? ctx.changesFor(r.id) : null, id) + (a && a.kind === 'manual' ? '<span class="chip red">▲ manual action</span>' : '');
     return `<article class="rs-card${cls}" data-id="${id}" data-act="chat-open" tabindex="0"${ctx.chatId === r.id ? ' aria-current="true"' : ''} aria-label="${esc(r.name)}">
       <div class="rs-l1"><b class="rs-name" title="${esc(r.name)}">${esc(r.name)}</b><span class="mono rs-branch" title="${esc(r.branch ?? '')}">${esc(r.branch ?? '')}</span>${chips}<span class="rs-spacer"></span><span class="rs-sub rs-when" title="${esc(lm.what ?? '')}">${esc(relativeTime(lm.at, ctx.now))}</span>${r.error ? '<span class="chip red">▲ error</span>' : sessionChip(r.session && r.session.state)}${r.error ? '' : staleMark(r)}</div>
-      <div class="rs-l2">${r.error ? noData : progressHtml(r.progress)}${nextHtml(r)}${actionButton(r, ctx)}</div>
+      <div class="rs-l2">${r.error ? noData : progressHtml(r.progress, r.id)}${nextHtml(r)}${actionButton(r, ctx)}</div>
     </article>`;
   }
 
@@ -170,7 +172,62 @@
   function chatHead(c, ctx = {}) {
     const adopted = c.info && c.info.adopted;
     const tip = adopted ? `${ctx.name} · ${adopted.id}` : ctx.name;
-    return `<div class="ch-row"><b class="ch-name" title="${esc(tip)}">${esc(ctx.name)}</b><button type="button" class="x" data-act="chat-close" aria-label="Close the chat" title="Close the chat (Esc)">✕</button></div>`;
+    const tabs = [['chat', 'Chat'], ['tasks', 'Tasks']].map(([t, label]) => `<button type="button" role="tab" class="ch-tab" data-act="chat-tab" data-tab="${t}" aria-selected="${(c.tab === 'tasks' ? 'tasks' : 'chat') === t}">${label}</button>`).join('');
+    return `<div class="ch-row"><b class="ch-name" title="${esc(tip)}">${esc(ctx.name)}</b><button type="button" class="x" data-act="chat-close" aria-label="Close the chat" title="Close the chat (Esc)">✕</button></div><div class="ch-tabs" role="tablist" aria-label="Panel">${tabs}</div>`;
+  }
+
+  // The Tasks tab (RP63, S60): the rows of the repo's ROADMAP (the /api/roadmap answer) grouped by state, the completed ones folded.
+  // Pure and total: any shape of answer gives a string. ctx = { filter, openDone, loading, failed }.
+  const TASK_MAX = 200;
+  const TASK_GROUPS = [['review', 'In review'], ['ready', 'Ready'], ['progress', 'In progress'], ['next', 'Next'], ['pending', 'Pending'], ['blocked', 'Blocked'], ['done', 'Completed']];
+  const TASK_OF = { 'En revisión': 'review', Lista: 'ready', 'En curso': 'progress', Pendiente: 'pending', Bloqueada: 'blocked', Completada: 'done' };
+  function tasksView(rp, ctx = {}) {
+    const note = (t) => `<div class="empty" role="status">${t}</div>`;
+    if (!rp) return note(ctx.failed ? 'Roadmap unavailable' : 'Loading tasks…');
+    if (!rp.available) return note(rp.reason === 'missing' ? 'No docs/ROADMAP.md in this repo' : 'Roadmap unavailable');
+    const all = (Array.isArray(rp.rows) ? rp.rows : []).filter((r) => r && typeof r.id === 'string' && r.id && TASK_OF[r.estado]);
+    const derived = rp.derived && typeof rp.derived === 'object' ? rp.derived : {};
+    const byId = new Map(all.map((r) => [r.id, r]));
+    const nextId = rp.next && typeof rp.next.id === 'string' ? rp.next.id : null;
+    const q = String(ctx.filter ?? '').trim().toLowerCase();
+    const box = `<input id="tasksFilter" type="search" class="task-filter" aria-label="Filter tasks" placeholder="Filter tasks…" value="${esc(ctx.filter ?? '')}">`;
+    if (!all.length) return note('No tasks in the roadmap');
+    const groups = new Map(TASK_GROUPS.map(([k]) => [k, []]));
+    for (const r of all) {
+      if (q && !`${r.id} ${r.entrega ?? ''}`.toLowerCase().includes(q)) continue;
+      const d = derived[r.id];
+      let key = TASK_OF[d && TASK_OF[d.state] ? d.state : r.estado];
+      if (key === 'pending' && r.id === nextId) key = 'next';
+      groups.get(key).push(r);
+    }
+    if (![...groups.values()].some((g) => g.length)) return `${box}${note('No task matches')}`;
+    let left = TASK_MAX;
+    let cut = 0;
+    const rowHtml = (r, key) => {
+      const d = derived[r.id] || {};
+      const waits = (Array.isArray(r.dependsOn) ? r.dependsOn : []).filter((x) => byId.has(x) && byId.get(x).estado !== 'Completada');
+      const bits = [];
+      if (key === 'review' && Number.isFinite(d.pr)) bits.push(`PR #${d.pr}`);
+      if (key === 'ready' && d.branch) bits.push(esc(d.branch));
+      if (key === 'pending' && waits.length) bits.push(`waiting: ${waits.map(esc).join(', ')}`);
+      if (key === 'blocked' && r.notas) bits.push(esc(String(r.notas).slice(0, 140)));
+      const next = key === 'next';
+      return `<div class="task-row${next ? ' task-next' : ''}"${next ? ' aria-current="true"' : ''}><span class="task-id mono">${esc(r.id)}</span><span class="task-text">${esc(r.entrega ?? '')}</span>${bits.length ? `<span class="task-bit">${bits.map((b) => `<span>${b}</span>`).join('')}</span>` : ''}</div>`;
+    };
+    const parts = [];
+    for (const [key, title] of TASK_GROUPS) {
+      const list = groups.get(key);
+      if (!list.length) continue;
+      if (key === 'done') {
+        const open = !!ctx.openDone || !!q;
+        parts.push(`<section class="task-group task-done"><button type="button" class="task-head" data-act="tasks-done" aria-expanded="${open}">${title} (${list.length})<span aria-hidden="true"> ${open ? '▾' : '▸'}</span></button>`);
+        if (!open) { parts.push('</section>'); continue; }
+      } else parts.push(`<section class="task-group"><h3 class="task-head">${title} (${list.length})</h3>`);
+      for (const r of list) { if (left > 0) { parts.push(rowHtml(r, key)); left--; } else cut++; }
+      parts.push('</section>');
+    }
+    if (cut) parts.push(`<div class="task-more rs-sub">+${cut} more</div>`);
+    return `${box}${parts.join('')}`;
   }
 
   // The composer (RP68, S49): can the person send free text now, and if not, why. c = { id, info, sending }.
@@ -419,5 +476,5 @@
     return `${ctx.failed ? '<div class="rs-note" role="status">⚠ Summary unavailable: showing the last data we have.</div>' : ''}<div class="rs-list">${body}</div>${rows.length ? LEGEND : ''}`;
   }
 
-  return { esc, mdHtml, sessionChip, chatWidth, composerState, actionMenu, actionMenuHtml, composerNote, chatHead, sessionState, sessionLabelHtml, chatBody, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
+  return { esc, mdHtml, sessionChip, chatWidth, composerState, actionMenu, actionMenuHtml, composerNote, chatHead, tasksView, sessionState, sessionLabelHtml, chatBody, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
 }));
