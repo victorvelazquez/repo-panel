@@ -84,6 +84,7 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 - **S74. RP79: el chat se muestra al instante desde la caché de la página.** Tras el resumen de RP79 (chat con caché por repo), la persona confirmó el arranque («start_task»). Decisiones del resumen: solo la página, sin tocar el servidor (con RP77 `/api/sessions` tarda 12 ms y `/api/chat` 3 ms; lo que queda es que `openChat` tira lo leído y espera dos pedidos en serie); caché por repo en la página con tope de 8; `openChat` pinta desde la caché y refresca por detrás con el mismo `loadChat`; los dos pedidos en paralelo; la tarjeta de pregunta y los botones de RP73 se pintan solo con datos frescos y mientras tanto el estado dice «checking»; la lectura incremental pedida en la fila queda fuera porque `readChat` ya solo lee los últimos 64 KB; sin verificación independiente (solo página, sin seguridad ni datos).
 - **S75. RP80: el tablero se lee de memoria; Refresh no puede ser menos de 3 s si relee todo.** Tras el resumen de RP80 (carga inicial y Refresh sin tormenta), la persona confirmó el arranque («start_task») con las dos decisiones que se le pidieron: (1) «Refresh en menos de 3 s» es imposible si significa releer los 15 repos de verdad (unos 40 s medidos en RP78), así que Refresh pinta de memoria al instante (menos de 0,2 s) y la relectura forzada corre por detrás con el progreso a la vista; (2) se parte en RP80 (P8: `GET /api/board`, F5, Refresh, sin ráfaga al volver a la pestaña) y RP80b (P10: PR al día de forma adaptativa y relectura en el acto tras una acción). Contrato nuevo y aditivo: las rutas viejas quedan iguales y la página cae a ellas si el tablero falla; `requirements` pasa a ser el sexto dato del store; verificación independiente de RP80 por concurrencia y estado compartido.
 - **S76. RP80b: los PR al día, relectura en el servidor tras una acción.** Tras el resumen de RP80b (los PR al día y el botón Merge a tiempo), la persona confirmó el arranque («start_task») con la pregunta de los 5 s: queda en 5 s la segunda lectura. Decisiones del resumen: un repo caliente (la rama actual con un PR abierto, la regla de `isHotRepo`) relee los PR cada 15 s y lo local cada 10 s (lo de antes o mejor) y los demás quedan en 15 s y 60 s, solo con una página activa; `store.catchUp(id)` relee ese repo ya y una vez más a los 5 s, se une con una lectura en curso y no apila temporizadores; lo llaman en el servidor `/api/merge`, `/api/rerun`, `/api/fetch`, `/api/pi` y `/api/chat/send` (también si la acción vino de otra pestaña) y `POST /api/board/refresh {id}`; la página pide el catch-up tras `doRerun`; no cambia el contrato de `/api/board` ni las rutas viejas; verificación independiente liviana sobre temporizadores y tormentas de relecturas.
+- **S77. RP57 pospuesta; se avanza con el resto del panel; RP62 con su autorización de esta sesión.** Terminado el plan de rendimiento (RP73 a RP80b), la persona decidió: «dejemos rp57 para despues y todo lo que dependa de el, avancemos con todo el resto que no dependan de sala. avancemos principalmente con las correcciondes, mejoras y nuevas funcionalidades del panel». Ninguna fila depende de RP57. Se retoma el orden acordado en S58 a S62 sin RP57: RP62, RP63, RP64, RP65, RP60, RP66 y el padrón 1.5 (RP7 sigue diferida). RP62 (uso de Claude): tras ver el resumen la persona confirmó el arranque («start_task») y autorizó en esta sesión editar `C:\Users\victor\.gentle-shell\agent\extensions\claude-usage.ts` (fuera del repo, con la copia de respaldo `claude-usage.ts.bak-rp62` creada antes de tocarlo) y que el panel lea `C:\Users\victor\.gentle-shell\agent\claude-usage.json`; el panel no lee `claude-usage.trace.log`. Decisiones del resumen: la extensión escribe un JSON chico con mezcla por ventana; `GET /api/usage` con ruta fija; dato viejo a los 15 minutos; ventana reiniciada como guion; archivo ausente o roto es «sin datos»; barra de arriba con el formato del pie de Gentle Shell; sin verificación independiente; la extensión se prueba con un arnés en una carpeta temporal porque vive fuera del repo. Alternativas consideradas para la fuente del uso, a pedido de la persona («no me gusta tanto que dependamos de herramientas externas»): (1) leer el porcentaje del pie de las pantallas que el panel ya lee, sin tocar la extensión, descartada por la persona porque depende de un adorno que podría desaparecer; (2) estimación propia con los tokens de los últimos 5 h y 7 d desde los archivos de sesión, sin credenciales ni red, que no da el porcentaje del plan y cuyo formato de los archivos de `pi` no se llegó a confirmar; (3) el endpoint no documentado `GET api.anthropic.com/api/oauth/usage` con el token de Claude Code, exacto pero lee una credencial, usa una API no oficial y hace llamadas de red; no existe una API oficial para los límites de la suscripción. Decisión de la persona: dejar la extensión como está (RP62 queda como se construyó, con la dependencia del archivo que escribe la extensión). La estimación propia con tokens queda como posible unidad futura si la persona la pide; no es una fila del ROADMAP.
 
 ## Tasks
 
@@ -158,7 +159,7 @@ Las citas son textuales de la persona (ver `## Log`). No se resumen ni se agrega
 | RP59 | S52, S54, S55 | worker `gentle-ai-worker` con encargo cerrado; RED 36 de 49 pruebas nuevas, GREEN 49 de 49; el padre leyó el código, corrió la suite completa (1003 de 1004, 1 salteada) y la miró con Edge sobre los 15 repos reales | pendiente de commit |
 | RP60 | S57 | pendiente | — |
 | RP61 | S58 | worker `gentle-ai-worker` con encargo cerrado; RED 18 de 25 pruebas nuevas, GREEN 25 de 25; el padre leyó el diff, corrió la suite completa (1028 de 1029, 1 salteada) y la miró con Edge sobre los 15 repos reales: los controles compartidos quedan en las mismas coordenadas en ambas pestañas y «Needs attention» pasa de 5 repos a 1 | pendiente de commit |
-| RP62 | S61 | pendiente | — |
+| RP62 | S61, S77 | respaldo de la extensión creado y verificado ANTES de tocarla; pruebas del repo escritas primero por el escritor (24; RED verificado por el padre: 24 de 24); implementación del repo por `gentle-ai-worker` (unas 105 líneas); el padre leyó el diff, ajustó la prueba vieja de `rp32` y editó la extensión con la autorización de la sesión, y la verificó con un arnés en carpeta temporal (13 chequeos, el JSON real nunca se creó); 18 mutaciones propias mueren; Edge real con un archivo temporal; suite completa corrida DESPUÉS de cerrar los documentos y ROADMAP comprobado con `severity error` y 9 celdas por fila | pendiente de commit (la extensión queda fuera del PR) |
 | RP63 | S60 | pendiente | — |
 | RP64 | S62, S55 | pendiente | — |
 | RP65 | S62 | pendiente; verificación independiente | — |
@@ -1015,3 +1016,33 @@ Orden: RP8 → RP9 → RP10a → RP10b → prueba con sesión real → RP11a →
 > start_task
 
 *Aplicado: S76. La persona pidió avanzar con la siguiente tarea; se tomó RP80b (RP7 sigue diferida y RP57 es otro tema) porque corrige el empeoramiento temporal que dejó RP80, y confirmó el arranque tras ver el resumen, con los 5 s de la segunda lectura.*
+
+**L88.**
+
+> dejemos rp57 para despues y todo lo que dependa de el, avancemos con todo el resto que no dependan de sala. avancemos principalmente con las correcciondes, mejoras y nuevas funcionalidades del panel
+
+*Aplicado: S77. La fila RP57 queda Pendiente con su nota de pospuesta; ninguna fila depende de ella.*
+
+**L89.**
+
+> start_task
+
+*Aplicado: S77. Tras ver el resumen de RP62 la persona confirmó el arranque y autorizó, en esta sesión, editar claude-usage.ts (con respaldo) y leer claude-usage.json, ambos nombrados con su ruta absoluta.*
+
+**L90.**
+
+> no me gusta tanto que dependamos de herramientas externas. esto no podriamos impleentar sin uso de algo externo?
+
+*Aplicado: S77. Se investigó y se explicaron las fuentes posibles del uso (no hay API oficial para los límites de la suscripción).*
+
+**L91.**
+
+> no me gusta esa opcion, queria algo que sea propio del panel que no dependa de si ese widgets eliminamos el dia de mañana
+
+*Aplicado: S77. Se descartó leer el pie de la pantalla y se ofrecieron la estimación propia con tokens y el endpoint de Anthropic.*
+
+**L92.**
+
+> Dejar la extensión como está
+
+*Aplicado: S77. RP62 queda como se construyó; las alternativas quedan anotadas.*

@@ -610,5 +610,43 @@
   // The wait before the next board request: 3 s while it works, then doubling per failure up to 30 s.
   const boardWait = ({ ok, failures }) => (ok ? 3000 : Math.min(30000, 3000 * 2 ** failures));
 
-  return { boardApply, boardWait, chatCachePut, chatCacheGet, chatFromCache, API_VERSION, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, piPollTargets, LIVE_CHECK_MS, liveSession, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, presenceLabel, presenceDot, parseSse, liveEvent, eventsPlan, eventsRetryMs, eventsStale };
+  // RP62 (S61, S77): the Claude usage bar. `usage` is the answer of /api/usage; opts { now, timeZone } are for tests (default: the clock and the local zone).
+  // Result { state: 'ok' | 'old' | 'none', five, seven: { text, tone: '' | 'warn' | 'error' | 'dim' }, label, title }. 'none' (no file, or no window at all) wins over 'old'.
+  const USAGE_WARN = 70;
+  const USAGE_ERROR = 90;
+  const USAGE_NONE_TITLE = 'Claude usage: the usage file has not been written yet, or the usage is not reported by the session. Sessions already open must be restarted to report it.';
+  const USAGE_TITLE = 'Claude usage: share of the 5-hour and 7-day limits used, and when each resets (↻). A dash means the window has reset or is not reported.';
+
+  function usageParts(ms, timeZone) {
+    const f = new Intl.DateTimeFormat('en-US', { timeZone, hourCycle: 'h23', weekday: 'short', year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const p = Object.fromEntries(f.formatToParts(new Date(ms)).map((x) => [x.type, x.value]));
+    return { day: `${p.year}-${p.month}-${p.day}`, weekday: p.weekday, time: `${p.hour}:${p.minute}` };
+  }
+
+  function usageWindow(name, w, { now, timeZone, old }) {
+    if (!w || w.expired || typeof w.percent !== 'number') return { text: `${name} –`, tone: 'dim' };
+    const at = usageParts(w.resetAt, timeZone);
+    const reset = at.day === usageParts(now, timeZone).day ? at.time : `${at.weekday} ${at.time}`;
+    const tone = old ? 'dim' : w.percent >= USAGE_ERROR ? 'error' : w.percent >= USAGE_WARN ? 'warn' : '';
+    return { text: `${name} ${w.percent}% ↻${reset}`, tone };
+  }
+
+  function usageAge(ms) {
+    const min = Math.max(0, Math.floor(ms / 60000));
+    return min < 60 ? `${min} min ago` : `${Math.floor(min / 60)} h ago`;
+  }
+
+  function usageView(usage, { now = Date.now(), timeZone } = {}) {
+    const u = isObject(usage) ? usage : {};
+    const old = u.available === true && u.stale === true;
+    const ctx = { now, timeZone, old };
+    const five = usageWindow('5h', u.five, ctx);
+    const seven = usageWindow('7d', u.seven, ctx);
+    const windows = `${five.text} · ${seven.text}`;
+    if (u.available !== true || (!u.five && !u.seven)) return { state: 'none', five, seven, label: 'Claude usage: no data', title: USAGE_NONE_TITLE };
+    if (!old) return { state: 'ok', five, seven, label: windows, title: USAGE_TITLE };
+    return { state: 'old', five, seven, label: `${windows} · ${usageAge(now - u.updatedAt)}`, title: `${USAGE_TITLE} The usage file is old: the numbers may have changed.` };
+  }
+
+  return { usageView, boardApply, boardWait, chatCachePut, chatCacheGet, chatFromCache, API_VERSION, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, piPollTargets, LIVE_CHECK_MS, liveSession, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, presenceLabel, presenceDot, parseSse, liveEvent, eventsPlan, eventsRetryMs, eventsStale };
 }));

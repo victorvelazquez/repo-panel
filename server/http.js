@@ -24,6 +24,7 @@ const { createSummaryStore } = require('./summarystore.js');
 const { sendChat, clearChat } = require('./chatsend.js');
 const { answerDialog } = require('./dialoganswer.js');
 const { createEventHub } = require('./events.js');
+const { readUsage, usageFile } = require('./usage.js');
 const { sessionsState, chatState, adoptSession, releaseSession, startSession } = require('./sessions.js');
 
 const ROOT = path.join(__dirname, '..');
@@ -75,6 +76,8 @@ const routes = {
   },
   'GET /api/sessions': (q, b, d) => sessionsState(q.id, d.orca, d.sessionsDir),
   'GET /api/chat': (q, b, d) => chatState(q.id, q.session, q.limit, d.sessionsDir),
+  // RP62: the Claude usage file, read on every request (no cache); a missing or broken file is a normal 200 with available false.
+  'GET /api/usage': (q, b, d) => readUsage({ file: d.usageFile || usageFile() }),
   'GET /api/prerequisites': () => prerequisites(),
   'GET /api/diff': (q) => diffText(findRepo(q.id)),
   'POST /api/fetch': async (q, b) => {
