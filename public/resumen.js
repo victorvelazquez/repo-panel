@@ -172,7 +172,8 @@
   function chatHead(c, ctx = {}) {
     const adopted = c.info && c.info.adopted;
     const tip = adopted ? `${ctx.name} · ${adopted.id}` : ctx.name;
-    const tabs = [['chat', 'Chat'], ['tasks', 'Tasks']].map(([t, label]) => `<button type="button" role="tab" class="ch-tab" data-act="chat-tab" data-tab="${t}" aria-selected="${(c.tab === 'tasks' ? 'tasks' : 'chat') === t}">${label}</button>`).join('');
+    const cur = c.tab === 'tasks' || c.tab === 'changes' ? c.tab : 'chat';
+    const tabs = [['chat', 'Chat'], ['tasks', 'Tasks'], ['changes', 'Changes']].map(([t, label]) => `<button type="button" role="tab" class="ch-tab" data-act="chat-tab" data-tab="${t}" aria-selected="${cur === t}">${label}</button>`).join('');
     return `<div class="ch-row"><b class="ch-name" title="${esc(tip)}">${esc(ctx.name)}</b><button type="button" class="x" data-act="chat-close" aria-label="Close the chat" title="Close the chat (Esc)">✕</button></div><div class="ch-tabs" role="tablist" aria-label="Panel">${tabs}</div>`;
   }
 
@@ -228,6 +229,70 @@
     }
     if (cut) parts.push(`<div class="task-more rs-sub">+${cut} more</div>`);
     return `${box}${parts.join('')}`;
+  }
+
+  // The single code viewer (RP64, S62): the text of GET /api/diff as files with numbered lines. Pure and total: any input gives a list.
+  // A row is { kind: 'c' context | 'a' added | 'd' deleted | 'h' hunk header | 'm' marker, old, new, text } (old and new are line numbers or null).
+  function parseDiff(text) {
+    if (typeof text !== 'string' || !text.trim()) return [];
+    const files = [];
+    let f = null;
+    let inHunk = false;
+    let o = 0;
+    let n = 0;
+    for (const ln of text.split('\n')) {
+      if (ln.startsWith('diff --git ')) {
+        const rest = ln.slice(11);
+        const half = Math.floor((rest.length - 4) / 2);
+        const same = rest.startsWith('a/') && rest.slice(2, 2 + half) === rest.slice(2 + half + 3) && rest.slice(2 + half, 2 + half + 3) === ' b/';
+        const m = /^a\/(.+) b\/(.+)$/.exec(rest);
+        f = { path: same ? rest.slice(2, 2 + half) : (m ? m[2] : rest), status: 'M', added: 0, deleted: 0, binary: false, note: '', lines: [] };
+        files.push(f);
+        inHunk = false;
+        continue;
+      }
+      if (!f) continue;
+      const h = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(ln);
+      if (h && (!inHunk || ln.startsWith('@@ '))) { inHunk = true; o = Number(h[1]); n = Number(h[2]); f.lines.push({ kind: 'h', old: null, new: null, text: ln }); continue; }
+      if (!inHunk) {
+        if (ln.startsWith('new file')) f.status = 'A';
+        else if (ln.startsWith('deleted file')) f.status = 'D';
+        else if (/^Binary/.test(ln) || ln.startsWith('Binary or large')) { f.binary = true; f.note = ln; }
+        continue;
+      }
+      const c = ln[0];
+      if (c === ' ') f.lines.push({ kind: 'c', old: o++, new: n++, text: ln.slice(1) });
+      else if (c === '-') { f.deleted++; f.lines.push({ kind: 'd', old: o++, new: null, text: ln.slice(1) }); }
+      else if (c === '+') { f.added++; f.lines.push({ kind: 'a', old: null, new: n++, text: ln.slice(1) }); }
+      else if (c === '\\') f.lines.push({ kind: 'm', old: null, new: null, text: ln });
+    }
+    return files;
+  }
+
+  // The Changes tab: the file list (a button per file) and the code with two number gutters. ctx = { selected, loading, failed }.
+  const CODE_MAX = 2000;
+  function changesView(data, ctx = {}) {
+    const note = (t) => `<div class="empty" role="status">${t}</div>`;
+    if (!data) return note(ctx.failed ? 'Changes unavailable' : 'Loading changes…');
+    const files = parseDiff(data.diff);
+    if (!files.length) return note('No uncommitted changes');
+    const one = ctx.selected ? files.find((x) => x.path === ctx.selected) : null;
+    const shown = one ? [one] : files;
+    const item = (x) => `<button type="button" class="cv-item${x === one ? ' cv-on' : ''}" data-act="changes-file" data-path="${esc(x.path)}" aria-pressed="${x === one}" title="${esc(x.path)}"><span class="cv-st">${x.status}</span><span class="cv-path">${esc(x.path)}</span>${x.binary ? '<span class="add">bin</span>' : `<span class="add">+${x.added}</span><span class="del">−${x.deleted}</span>`}</button>`;
+    const list = `<div class="cv-list" role="group" aria-label="Changed files">${one ? '<button type="button" class="cv-all" data-act="changes-file" data-path="">All files</button>' : ''}${files.map(item).join('')}</div>`;
+    let left = CODE_MAX;
+    let cut = 0;
+    const SIGN = { c: ' ', a: '+', d: '-', h: '', m: '' };
+    const sections = shown.map((x) => {
+      const rows = [];
+      for (const r of x.lines) {
+        if (left <= 0) { if (r.kind !== 'h') cut++; continue; }
+        if (r.kind !== 'h') left--;
+        rows.push(`<div class="cv-l ${r.kind}"><span class="cv-n">${r.old ?? ''}</span><span class="cv-n">${r.new ?? ''}</span><span class="cv-t">${SIGN[r.kind]}${esc(r.text)}</span></div>`);
+      }
+      return `<section class="cv-file"><h3 class="cv-title" title="${esc(x.path)}">${esc(x.path)}</h3>${x.note ? `<div class="cv-note rs-sub">${esc(x.note)}</div>` : ''}${rows.length ? `<div class="cv-code">${rows.join('')}</div>` : ''}</section>`;
+    }).join('');
+    return `${list}${data.truncated ? '<div class="err">Diff truncated (too large).</div>' : ''}${sections}${cut ? `<div class="cv-more rs-sub">+${cut} more lines</div>` : ''}`;
   }
 
   // The composer (RP68, S49): can the person send free text now, and if not, why. c = { id, info, sending }.
@@ -476,5 +541,5 @@
     return `${ctx.failed ? '<div class="rs-note" role="status">⚠ Summary unavailable: showing the last data we have.</div>' : ''}<div class="rs-list">${body}</div>${rows.length ? LEGEND : ''}`;
   }
 
-  return { esc, mdHtml, sessionChip, chatWidth, composerState, actionMenu, actionMenuHtml, composerNote, chatHead, tasksView, sessionState, sessionLabelHtml, chatBody, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
+  return { esc, mdHtml, sessionChip, chatWidth, composerState, actionMenu, actionMenuHtml, composerNote, chatHead, tasksView, parseDiff, changesView, sessionState, sessionLabelHtml, chatBody, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
 }));

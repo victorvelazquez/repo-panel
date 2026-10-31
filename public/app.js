@@ -33,7 +33,7 @@ const S = {
   boardRev: 0, boardRefreshing: [], factAt: {},
   tab: 'summary', scope: { kind: 'all' }, summary: null, summaryKey: '', summaryFailed: false, sfilter: 'all', collapsed: {},
   timeouts: { get: 25000, post: 70000 },
-  tasks: {}, tasksFilter: '', tasksOpenDone: false,
+  tasks: {}, tasksFilter: '', tasksOpenDone: false, changes: {},
   chat: { id: null, seq: 0 }, chatCache: {}, actionsOpen: false, drafts: {}, notes: {}, msgBusy: {}, answer: {},
 };
 S.tab = S.prefs.tab === 'work' ? 'work' : 'summary';
@@ -887,7 +887,7 @@ function closeChat() {
   chatShown = null;
   draw();
 }
-const chatTick = () => { if (S.chat.id && S.chat.tab !== 'tasks' && S.tab === 'summary' && !document.hidden && !(V && pollSkipped('chat'))) loadChat(S.chat.id); };
+const chatTick = () => { if (S.chat.id && (!S.chat.tab || S.chat.tab === 'chat') && S.tab === 'summary' && !document.hidden && !(V && pollSkipped('chat'))) loadChat(S.chat.id); };
 
 // RP63 (S60): the Tasks tab reads /api/roadmap once per chat opening, when the tab is first shown. The last good answer of a repo
 // is kept; a failure only shows when there is none. An answer for a repo the person left is stored but never painted for another.
@@ -904,9 +904,28 @@ async function loadTasks() {
   }
   if (S.chat.seq === seq) { S.chat.tasksLoading = false; draw(); }
 }
+// RP64 (S62): the Changes tab reads /api/diff each time the person SWITCHES to it (the files change), keeps the last good answer of a repo,
+// and only the latest read of a chat opening counts. A read of a repo the person left is stored for that repo and never paints another.
+async function loadChanges() {
+  const chat = S.chat;
+  const { id, seq } = chat;
+  if (!id) return;
+  const req = (chat.changesReq = (chat.changesReq || 0) + 1);
+  chat.changesLoading = true;
+  chat.changesFailed = false;
+  try {
+    const d = await api(`/api/diff?id=${id}`);
+    if (chat.changesReq === req) S.changes[id] = d;
+  } catch {
+    if (chat.changesReq === req && S.chat.seq === seq) chat.changesFailed = true;
+  }
+  if (chat.changesReq === req && S.chat.seq === seq) { chat.changesLoading = false; draw(); }
+}
 function setChatTab(tab) {
-  S.chat.tab = tab === 'tasks' ? 'tasks' : 'chat';
+  const was = S.chat.tab;
+  S.chat.tab = tab === 'tasks' || tab === 'changes' ? tab : 'chat';
   if (S.chat.tab === 'tasks') loadTasks();
+  else if (S.chat.tab === 'changes' && was !== 'changes') loadChanges();
   draw();
 }
 
@@ -943,7 +962,13 @@ function drawChat() {
   applyChatWidth();
   paint($('#chatHead'), R.chatHead(S.chat, { name: nameOf(S.chat.id) }));
   const tasksTab = S.chat.tab === 'tasks';
-  $('#composer').hidden = tasksTab;
+  const changesTab = S.chat.tab === 'changes';
+  $('#composer').hidden = tasksTab || changesTab;
+  if (changesTab) {
+    paint($('#chatBody'), R.changesView(S.changes[S.chat.id] || null, { selected: S.chat.file || '', loading: !!S.chat.changesLoading, failed: !!S.chat.changesFailed }));
+    chatShown = null;
+    return;
+  }
   if (tasksTab) {
     const hadFocus = document.activeElement && document.activeElement.id === 'tasksFilter';
     paint($('#chatBody'), R.tasksView(S.tasks[S.chat.id] || null, { filter: S.tasksFilter, openDone: S.tasksOpenDone, loading: !!S.chat.tasksLoading, failed: !!S.chat.tasksFailed }));
@@ -1407,38 +1432,6 @@ function prCard(r, pr, meta, running = null) {
   </div>`;
 }
 
-// ---------- diff drawer ----------
-function renderDiff(text) {
-  const parts = text.split(/^diff --git /m).filter((x) => x.trim());
-  if (!parts.length) return '<div class="empty">No diff available.</div>';
-  return parts.map((part, i) => {
-    const lines = part.split('\n');
-    const m = /^a\/(.+?) b\/(.+)$/.exec(lines[0]);
-    const title = m ? m[2] : lines[0];
-    const body = lines.slice(1).map((ln) => {
-      const cls = ln.startsWith('@@') ? 'h' : ln.startsWith('+') && !ln.startsWith('+++') ? 'a'
-        : ln.startsWith('-') && !ln.startsWith('---') ? 'd'
-          : /^(index |new file|deleted file|similarity|rename|old mode|new mode|\+\+\+|---|Binary)/.test(ln) ? 'm' : '';
-      return `<div class="${cls}">${esc(ln) || ' '}</div>`;
-    }).join('');
-    return `<details class="file" ${parts.length <= 15 || i === 0 ? 'open' : ''}><summary>${esc(title)}</summary><div class="diff">${body}</div></details>`;
-  }).join('');
-}
-
-async function openDiff(id) {
-  S.confOpen = false;
-  const l = S.local[id] || {};
-  $('#drawerTitle').textContent = `${nameOf(id)} · ${l.branch || ''}`;
-  paint($('#drawerBody'), '<div class="empty">Loading diff…</div>');
-  $('#drawer').hidden = false;
-  try {
-    const d = await api(`/api/diff?id=${id}`);
-    const list = (l.files || []).map((f) => `<div><span class="st">${esc(f.status)}</span><span>${esc(f.path)}</span>
-      <span class="add">${f.binary ? 'bin' : '+' + f.added}</span><span class="del">${f.binary ? '' : '−' + f.deleted}</span></div>`).join('');
-    paint($('#drawerBody'), `<div class="filelist">${list}</div>${d.truncated ? '<div class="err">Diff truncated (too large).</div>' : ''}${renderDiff(d.diff)}`);
-  } catch (e) { paint($('#drawerBody'), `<div class="err">${esc(e.message)}</div>`); }
-}
-
 // ---------- actions ----------
 async function doMerge(id, n) {
   const pr = (S.prs[id]?.prs || []).find((x) => x.number === n);
@@ -1508,7 +1501,9 @@ const JUDGED_CMDS = ['flow-commit', 'flow-commit-unstage', 'flow-pr', 'flow-base
 const ACTIONS = {
   'refresh-all': () => refreshAll({ force: true }),
   'fetch-all': async () => { toast('Fetching all repos…'); await Promise.all(allRepos().map((r) => fetchRepo(r.id))); toast('Fetch done', 'ok'); },
-  'diff': (el) => openDiff(el.dataset.id),
+  // RP64: the chip opens the single viewer, the Changes tab of the right panel; from the Work tab the page goes to the Summary first.
+  'diff': (el) => { const id = el.dataset.id; if (S.tab !== 'summary') setTab('summary'); if (S.chat.id !== id) openChat(id); setChatTab('changes'); },
+  'changes-file': (el) => { S.chat.file = el.dataset.path || ''; draw(); },
   'close-drawer': () => { S.confOpen = false; $('#drawer').hidden = true; },
   'conformity': () => openConformity(),
   // Conformity is a drawer, not a view: it opens over the current tab.
