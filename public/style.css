@@ -2,8 +2,19 @@
   --bg: #0f1216; --panel: #171b21; --panel2: #1e242c; --line: #2a323c; --text: #d7dde5; --muted: #8b96a3;
   --green: #3fb950; --red: #f85149; --yellow: #d29922; --blue: #58a6ff; --gray: #6e7681;
   --purple: #a371f7; --orange: #db6d28;
+  --scroll-thumb: #333c48; --scroll-thumb-hover: #46515f;
 }
 * { box-sizing: border-box; }
+/* RP84: thin, dark scrollbars for every scroller of the page (board, chat, file tree, code). The standard properties cover current Chrome, Edge and
+   Firefox; the WebKit rules are only for browsers that do not know them (under @supports not, because Chrome ignores them when the standard is set). */
+* { scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) transparent; }
+@supports not (scrollbar-color: auto) {
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--scroll-thumb); border-radius: 8px; border: 2px solid transparent; background-clip: content-box; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--scroll-thumb-hover); background-clip: content-box; }
+  ::-webkit-scrollbar-corner { background: transparent; }
+}
 body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, "Segoe UI", sans-serif; }
 a { color: var(--blue); text-decoration: none; }
 a:hover { text-decoration: underline; }
