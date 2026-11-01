@@ -57,10 +57,6 @@ button.loading .ico { animation: spin 1s linear infinite; }
 .pr:first-child { border-top: 0; }
 .pr-title { font-weight: 500; }
 
-#drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(900px, 92vw); background: var(--bg); border-left: 1px solid var(--line); z-index: 10; display: flex; flex-direction: column; box-shadow: -10px 0 30px #0008; }
-#drawer[hidden] { display: none; }
-.drawer-head { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: var(--panel); border-bottom: 1px solid var(--line); }
-#drawerBody { overflow: auto; padding: 12px 14px 40px; }
 
 dialog { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 10px; width: min(560px, 92vw); }
 dialog::backdrop { background: #000a; }
@@ -167,7 +163,7 @@ a.repo-name:hover { text-decoration: none; color: var(--blue); }
 .rm-header { margin-top: 4px; white-space: normal; }
 .rm-header b { color: var(--text); font-weight: 600; }
 
-#conformity .badge { margin-left: 4px; padding: 0 6px; border-radius: 10px; background: var(--yellow); color: #000; font-size: 12px; font-weight: 600; }
+.rs-tabs .badge { margin-left: 4px; padding: 0 6px; border-radius: 10px; background: var(--yellow); color: #000; font-size: 12px; font-weight: 600; }
 .conf-sum { color: var(--muted); margin-bottom: 12px; }
 .conf-item { border: 1px solid var(--line); border-radius: 6px; padding: 8px 12px; margin-bottom: 8px; background: var(--panel); }
 .conf-item .repo-name { background: none; border: 0; padding: 0; cursor: pointer; }
@@ -315,6 +311,9 @@ button:is([data-cmd], [data-kind], header .primary, .empty .primary, .merge):dis
 .chatlayout { display: flex; align-items: stretch; }
 /* An author `display` beats the browser's `[hidden] { display: none }`: every block the page hides with the attribute and that gets a display rule needs this line (RP71). */
 .chatlayout[hidden], .queue[hidden], .composer[hidden] { display: none; }
+#conformityView[hidden] { display: none; }
+/* RP60: the audit covers every repo, so the shared filters of the view bar do not apply to it. */
+body.tab-conformity #viewbar { display: none; }
 .chatlayout #summary { flex: 1 1 0; min-width: 0; }
 .chatlayout.chat-open { height: calc(100vh - 140px); min-height: 480px; }
 .chatlayout.chat-open #summary { max-width: none; margin: 0; min-width: 360px; overflow: auto; }

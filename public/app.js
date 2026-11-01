@@ -25,7 +25,7 @@ const S = {
   snoozed: new Set(), keepSnoozed: new Set(), snoozedOpen: {}, onlyProblems: false,
   dismissed: new Set(), menu: null, reqPassOpen: {},
   group: '', q: '', queue: [], queueKey: '', queueSeq: 0,
-  conf: { items: [], ok: 0, loaded: false, failed: false, key: '', seq: 0 }, confOpen: false,
+  conf: { items: [], ok: 0, loaded: false, failed: false, key: '', seq: 0 },
   req: {}, reqSeq: {}, state: {}, stateSeq: {}, sent: {}, pistatus: {}, pistatusSeq: {}, live: {}, liveBusy: {}, liveAnswered: {}, dirtyAt: {}, sending: {}, merged: {}, pending: {}, pitail: {}, piask: {}, tailFor: {}, finishing: {}, showCommit: new Set(), prereq: { state: 'loading', items: [], seq: 0 },
   rooms: [], roomIssues: [], roomData: { state: 'loading', data: null }, roomSeq: 0,
   prefs: store('prefs', { method: 'squash', del: true }),
@@ -37,6 +37,7 @@ const S = {
   chat: { id: null, seq: 0 }, chatCache: {}, actionsOpen: false, drafts: {}, notes: {}, msgBusy: {}, answer: {},
 };
 S.tab = S.prefs.tab === 'work' ? 'work' : 'summary';
+S.backTab = S.tab; // the tab Conformity returns to (it is never saved as the preference)
 
 // ---------- api + request pool ----------
 // RP76: every request has a time limit (S.timeouts) and sends x-priority: user when a click caused it (every POST, or opts.priority).
@@ -726,19 +727,14 @@ function drawConformity() {
   const n = v.count;
   $('#confBadge').hidden = !n;
   $('#confBadge').textContent = n;
-  if (!S.confOpen) return;
+  if (S.tab !== 'conformity') return;
   const sum = v.summary ? `<div class="conf-sum">${esc(v.summary)}</div>` : '';
   const body = v.state === 'issues' ? S.conf.items.map(confBlock).join('') : `<div class="${v.state === 'error' ? 'conf-error' : 'empty'}">${esc(v.message)}</div>`;
   const reqs = V ? `<div class="conf-heading">Requirements</div>${allRepos().map(reqBlock).join('')}${roomsBlock()}` : '';
-  paint($('#drawerBody'), sum + prereqBlock() + body + reqs);
+  paint($('#conformityView'), sum + prereqBlock() + body + reqs);
 }
 
-function openConformity() {
-  S.confOpen = true;
-  $('#drawerTitle').textContent = 'Roadmap conformity';
-  $('#drawer').hidden = false;
-  drawConformity();
-}
+function openConformity() { setTab('conformity'); }
 
 // ---------- summary ----------
 // GET /api/summary on the 60 s cycle and every 20 s while the tab is shown. generatedAt changes on every answer, so it is left
@@ -767,16 +763,18 @@ const summaryTick = () => { if (S.tab === 'summary' && !document.hidden) loadSum
 
 // Tabs only toggle `hidden` (the board keeps its own painting); the view-specific zone of the view bar hides through a body class.
 function applyTab() {
-  const summary = S.tab === 'summary';
-  $('#sumLayout').hidden = !summary; // the chat lives inside this wrapper: it exists only in Summary (S56)
-  $('#work').hidden = summary;
-  if (document.body && document.body.classList) { document.body.classList.toggle('tab-summary', summary); document.body.classList.toggle('tab-work', !summary); }
+  $('#sumLayout').hidden = S.tab !== 'summary'; // the chat lives inside this wrapper: it exists only in Summary (S56)
+  $('#work').hidden = S.tab !== 'work';
+  $('#conformityView').hidden = S.tab !== 'conformity';
+  if (document.body && document.body.classList) for (const t of ['summary', 'work', 'conformity']) document.body.classList.toggle(`tab-${t}`, S.tab === t);
   for (const b of Array.from((document.querySelectorAll && document.querySelectorAll('.rs-tabs [role=tab][data-tab]')) || [])) b.setAttribute('aria-selected', String(b.dataset.tab === S.tab));
 }
+// Conformity is a tab like the others but never the saved one: a reload comes back to Summary or Work, and a repo picked in it returns there.
 function setTab(tab) {
+  if (tab === 'conformity' && S.tab !== 'conformity') S.backTab = S.tab;
   S.tab = tab;
   applyTab();
-  setPref('tab', tab);
+  if (tab === 'conformity') draw(); else setPref('tab', tab);
   if (tab === 'summary') { loadSummary(); if (S.chat.id) loadChat(S.chat.id); }
 }
 
@@ -1267,7 +1265,7 @@ function moreMenu(r, slot, extra = []) {
   return `<span class="more"><button data-act="toggle-menu" data-menu="${esc(key)}" title="More options" aria-haspopup="true" aria-expanded="${open}">⋯</button>${open ? `<div class="more-menu" role="menu">${list}</div>` : ''}</span>`;
 }
 
-// Compact warning for a repo that lacks a required requirement; the drawer lists the rest.
+// Compact warning for a repo that lacks a required requirement; the Conformity tab lists the rest.
 function reqWarn(r) {
   const w = V ? V.cardWarning(S.req[r.id], S.dismissed.has(r.id)) : null;
   if (!w) return '';
@@ -1474,7 +1472,7 @@ async function addRepos(paths) {
   refreshAll();
 }
 
-// Re-reads the rooms after the server changed them; the board and the drawer follow.
+// Re-reads the rooms after the server changed them; the board and the Conformity tab follow.
 async function reloadRooms() {
   await loadConfig();
   draw();
@@ -1504,10 +1502,7 @@ const ACTIONS = {
   // RP64: the chip opens the single viewer, the Changes tab of the right panel; from the Work tab the page goes to the Summary first.
   'diff': (el) => { const id = el.dataset.id; if (S.tab !== 'summary') setTab('summary'); if (S.chat.id !== id) openChat(id); setChatTab('changes'); },
   'changes-file': (el) => { S.chat.file = el.dataset.path || ''; draw(); },
-  'close-drawer': () => { S.confOpen = false; $('#drawer').hidden = true; },
-  'conformity': () => openConformity(),
-  // Conformity is a drawer, not a view: it opens over the current tab.
-  'tab': (el) => { if (el.dataset.tab === 'conformity') openConformity(); else if (el.dataset.tab === 'summary' || el.dataset.tab === 'work') setTab(el.dataset.tab); },
+  'tab': (el) => { if (['summary', 'work', 'conformity'].includes(el.dataset.tab)) setTab(el.dataset.tab); },
   'sfilter': (el) => { S.sfilter = el.dataset.filter === 'attention' ? 'attention' : 'all'; draw(); },
   'toggle-group': (el) => { S.collapsed[el.dataset.group] = !S.collapsed[el.dataset.group]; draw(); },
   'scope': (el) => { S.scope = el.dataset.kind === 'room' ? { kind: 'room', name: el.dataset.name } : { kind: el.dataset.kind === 'none' ? 'none' : 'all' }; draw(); },
@@ -1631,7 +1626,7 @@ const ACTIONS = {
   },
   'merge': (el) => doMerge(el.dataset.id, Number(el.dataset.n)),
   'queue-pick': (el) => {
-    if (el.dataset.close) ACTIONS['close-drawer']();
+    if (el.dataset.close) setTab(S.backTab);
     S.q = el.dataset.name; $('#search').value = S.q; draw();
   },
   'toggle-problems': () => { S.onlyProblems = !S.onlyProblems; draw(); },

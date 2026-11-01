@@ -46,7 +46,7 @@ function loadPage() {
   vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8'), ctx);
   const fire = (type) => { for (const l of listeners.filter((x) => x.type === type)) l.fn({ type, target: element() }); };
   const flush = () => { while (frames.length) frames.shift()(); };
-  return { ctx, els, listeners, get, fire, flush, run: (code) => vm.runInContext(code, ctx), app: () => get('#app'), queue: () => get('#queue'), drawerBody: () => get('#drawerBody') };
+  return { ctx, els, listeners, get, fire, flush, run: (code) => vm.runInContext(code, ctx), app: () => get('#app'), queue: () => get('#queue'), conformityView: () => get('#conformityView') };
 }
 
 const local = (o = {}) => ({ branch: 'task', detached: false, upstream: 'origin/task', noUpstream: false, ahead: 0, behind: 0, files: [], added: 0, deleted: 0, head: 'h1', inProgress: null, base: 'main', stagedCount: 0, stagedPaths: [], ...o });
@@ -83,19 +83,22 @@ test('a redraw after a real change paints again, and only then', () => {
   assert.equal(page.app().writes, 2);
 });
 
-test('the Go work on strip and the drawer body are not rewritten when their HTML did not change', () => {
+test('the Go work on strip and the Conformity view are not rewritten when their HTML did not change', () => {
   const page = loadPage();
   const S = withRepo(page);
   S.queue = [{ id: 'abc', name: 'demo', kind: 'branch' }];
   page.run('render()');
+  S.tab = 'conformity';
+  page.run('render()');
   const q = page.queue().writes;
+  assert.ok(page.conformityView().writes >= 1, 'the Conformity view was painted');
   assert.ok(q >= 1, 'the strip was painted');
   assert.match(page.queue().html, /queue-pick/);
-  const d = page.drawerBody().writes;
+  const d = page.conformityView().writes;
   page.run('render()');
   page.run('render()');
   assert.equal(page.queue().writes, q, 'the strip keeps its buttons');
-  assert.equal(page.drawerBody().writes, d, 'the drawer keeps its buttons');
+  assert.equal(page.conformityView().writes, d, 'the Conformity view keeps its buttons');
 });
 
 test('the reads that finish without changing anything (loading counter up and down) do not replace the board', () => {

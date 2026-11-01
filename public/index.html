@@ -12,7 +12,6 @@
   <div id="outdated" class="outdated" hidden>The panel server is out of date or out of sync with this page. Restart the panel, then reload the page.</div>
   <header>
     <h1>Repo Panel</h1>
-    <button id="conformity" data-act="conformity" title="Repositories without a usable docs/ROADMAP.md or whose file has problems">Conformity <span id="confBadge" class="badge" hidden></span></button>
     <span class="spacer"></span>
     <span id="usage" class="usage" role="status" hidden></span>
     <button data-act="refresh-all" title="Refresh everything"><span class="ico">↻</span> Refresh</button>
@@ -30,7 +29,7 @@
   <nav class="rs-tabs" role="tablist" aria-label="Views">
     <button type="button" role="tab" id="tab-summary" data-act="tab" data-tab="summary" aria-selected="true" aria-controls="summary">Summary</button>
     <button type="button" role="tab" id="tab-work" data-act="tab" data-tab="work" aria-selected="false" aria-controls="work">Work</button>
-    <button type="button" role="tab" id="tab-conformity" data-act="tab" data-tab="conformity" aria-selected="false" aria-controls="drawer">Conformity</button>
+    <button type="button" role="tab" id="tab-conformity" data-act="tab" data-tab="conformity" aria-selected="false" aria-controls="conformityView">Conformity <span id="confBadge" class="badge" hidden></span></button>
   </nav>
   <div class="viewbar" id="viewbar">
     <div class="shared" role="group" aria-label="Shared filters">
@@ -71,13 +70,7 @@
     <main id="app"></main>
   </div>
 
-  <aside id="drawer" hidden>
-    <div class="drawer-head">
-      <strong id="drawerTitle"></strong>
-      <button data-act="close-drawer">✕</button>
-    </div>
-    <div id="drawerBody"></div>
-  </aside>
+  <section id="conformityView" class="rs-panel" role="tabpanel" aria-labelledby="tab-conformity" hidden></section>
 
   <dialog id="addDialog">
     <form method="dialog" id="addForm">
