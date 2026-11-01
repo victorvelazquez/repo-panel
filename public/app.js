@@ -1345,9 +1345,13 @@ function roomTag(r) {
   return t ? `<span class="tag room-tag" title="${esc(t.title)}"><span class="dot dot-${t.dot}"></span>${esc(t.name)}</span>` : '';
 }
 
+// RP87: who a card is about (group tag, room tag and the repo name), shared by the board card and the clean row; and its branch text.
+const identityHtml = (r, url) => `${groupTag(r.group)}${roomTag(r)}${repoName(r, url)}`;
+const branchLabel = (l) => l.branch || (l.detached ? '(detached)' : '');
+
 // Repo name + group on the left, more options and remove (with confirmation) pinned to the right.
 function cardTop(r, url, slot, extra = []) {
-  return `<div class="card-top">${groupTag(r.group)}${roomTag(r)}${repoName(r, url)}${moreMenu(r, slot, extra)}${removeBtn(r)}</div>`;
+  return `<div class="card-top">${identityHtml(r, url)}${moreMenu(r, slot, extra)}${removeBtn(r)}</div>`;
 }
 
 // What the project is working on, from the remote roadmap. Empty when the repo has no usable one.
@@ -1376,8 +1380,8 @@ function cleanRow(r) {
   const behind = l.behind ? `<span class="behind" title="${l.behind} commit${l.behind === 1 ? '' : 's'} behind the remote — time to pull">↓${l.behind}</span>` : '';
   const warn = p.error ? `<span class="warn" title="${esc('GitHub: ' + p.error)}">⚠</span>` : '';
   return `<div class="clean-row">
-    ${groupTag(r.group)}${roomTag(r)}${repoName(r, p.repo?.url)}
-    <span class="branch" title="${esc(l.branch || '')}">${esc(l.branch || (l.detached ? '(detached)' : ''))}</span>${behind}${warn}
+    ${identityHtml(r, p.repo?.url)}
+    <span class="branch" title="${esc(l.branch || '')}">${esc(branchLabel(l))}</span>${behind}${warn}
     <span class="row-actions">${moreMenu(r, 'row')}${removeBtn(r)}</span>
     ${reqWarn(r)}
     ${roadmapBlock(r)}
@@ -1422,15 +1426,14 @@ function flowFor(r, l, p, verdict) {
 }
 
 function repoCard(r, attn = false, verdict = null) {
-  const { l, p, dirty, unpushed } = info(r);
+  const { l, p, dirty } = info(r);
   const manual = V ? V.manualAction(l, l.base) : null;
   const override = S.showCommit.has(r.id);
   const flow = flowFor(r, l, p, verdict);
   const overrideItem = !manual && dirty && V ? V.commitOverrideItem(S.state[r.id], { override, stale: !!p.stale, session: sessionOf(r.id) }) : null;
   const chips = [];
-  if (dirty) chips.push(`<button class="chip yellow chip-btn" data-act="diff" data-id="${r.id}" title="View diff">● ${l.files.length} file${l.files.length === 1 ? '' : 's'} <span class="add">+${l.added}</span> <span class="del">−${l.deleted}</span></button>`);
-  if (unpushed) chips.push(`<span class="chip blue">↑ ${l.ahead} unpushed${l.noUpstream ? ' · no upstream' : ''}</span>`);
-  if (l.behind) chips.push(`<span class="chip gray">↓ ${l.behind} behind</span>`);
+  const shared = V ? V.changeChips(modelOf(r.id).changes, r.id) : ''; // RP87: the same chips as the Summary card
+  if (shared) chips.push(shared);
   if (p.stale) chips.push(`<span class="chip red" title="${esc(V ? V.staleChipTitle(p.stale, dirty) : p.stale.reason)}">${esc(p.stale.reason)}</span>`);
   else if (l.currentGone) chips.push('<span class="chip gray" title="The remote branch was deleted (merged PR?)">remote branch deleted</span>');
   if (p.noRemote) chips.push('<span class="chip gray">no GitHub remote</span>');
@@ -1440,7 +1443,7 @@ function repoCard(r, attn = false, verdict = null) {
     ${verdictRow(r, verdict)}
     ${flow.some((b) => b.cmd === 'flow-commit-unstage') ? stagedBar(l) : ''}
     ${reqWarn(r)}
-    <div class="branch one-line" title="${esc(l.branch || '')}">${esc(l.branch || (l.detached ? '(detached)' : ''))}</div>
+    <div class="branch one-line" title="${esc(l.branch || '')}">${esc(branchLabel(l))}</div>
     ${stateRow(r)}
     ${roadmapBlock(r)}
     ${chips.length ? `<div class="chips">${chips.join('')}</div>` : ''}

@@ -607,6 +607,19 @@
     }
     return { set, rev: board.rev, refreshing: board.refreshing || [], missing };
   }
+  const htmlEsc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  // RP87 (S9): the change chips of a repo card, shared by the board card (Work) and the Summary card, which used to build them twice. `c` is the model's
+  // `changes` ({ files, added, deleted, ahead, behind, noUpstream }) or null (not loaded). Pure; anything that is not a count reads as 0; the id is escaped.
+  function changeChips(c, id) {
+    if (!isObject(c)) return '';
+    const n = (v) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? Math.floor(v) : 0);
+    const files = n(c.files);
+    return (files ? `<button class="chip yellow chip-btn" data-act="diff" data-id="${htmlEsc(id)}" title="View diff">● ${files} file${files === 1 ? '' : 's'} <span class="add">+${n(c.added)}</span> <span class="del">−${n(c.deleted)}</span></button>` : '')
+      + (n(c.ahead) ? `<span class="chip blue">↑ ${n(c.ahead)} unpushed${c.noUpstream ? ' · no upstream' : ''}</span>` : '')
+      + (n(c.behind) ? `<span class="chip gray">↓ ${n(c.behind)} behind</span>` : '');
+  }
+
   // RP86 (S9): ONE read model per repo. The page keeps each fact of a repo in its own map (local, prs, roadmap, state, req) and the Summary row in another; the
   // board cards, the Summary cards, the "go work on" strip and the Files tab used to read those maps each its own way. This joins them, pure: `loaded` is what
   // the Summary button needed (a good local state with its file list AND a good PR answer), `changes` the Summary chips (null until the local state loads), and
@@ -693,7 +706,7 @@
   // RP96 (S12, S13): the header element as HTML, from a usageView result. Pure and total; every text goes through usageEsc and the only numbers that reach a
   // style attribute are integers clamped to 0..100. A message (no data) is just its text; otherwise one compact meter per window (name, bar with fill and pace
   // mark, percent, time left) and, hidden until hover, click or focus, the popover with the detail.
-  const usageEsc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const usageEsc = htmlEsc;
   const usagePct = (v) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(100, Math.max(0, Math.round(v))) : null);
   const USAGE_WINDOWS = [['five', '5h', 'Session (5 h)'], ['seven', '7d', 'Weekly (7 d)']];
   function usageHtml(view) {
@@ -724,5 +737,5 @@
     return `${meters.join('')}${age}<div class="usage-pop" role="group" aria-label="Claude usage details">${details.join('')}${note}${foot}</div>`;
   }
 
-  return { repoModel, usageView, usageHtml, usageRemaining, boardApply, boardWait, chatCachePut, chatCacheGet, chatFromCache, API_VERSION, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, piPollTargets, LIVE_CHECK_MS, liveSession, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, presenceLabel, presenceDot, parseSse, liveEvent, eventsPlan, eventsRetryMs, eventsStale };
+  return { repoModel, changeChips, usageView, usageHtml, usageRemaining, boardApply, boardWait, chatCachePut, chatCacheGet, chatFromCache, API_VERSION, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, piPollTargets, LIVE_CHECK_MS, liveSession, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, presenceLabel, presenceDot, parseSse, liveEvent, eventsPlan, eventsRetryMs, eventsStale };
 }));
