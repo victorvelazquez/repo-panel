@@ -573,12 +573,12 @@
 
   const LEGEND = '<div class="rs-legend" aria-label="Bar legend"><span><i class="rs-key rs-done"></i>Completed</span><span><i class="rs-key rs-pr"></i>In review</span><span><i class="rs-key rs-blk"></i>Blocked</span><span><i class="rs-key rs-pend"></i>Pending</span><span>The button on the right is the best next action</span></div>';
 
-  // The view-specific part of the view bar: the one Needs attention toggle (the button sets the value it is NOT in) and the age.
+  // The view-specific part of the view bar: the one Needs attention toggle (the button sets the value it is NOT in); it sits next to the scope buttons (RP82).
   function summaryTools(payload, ctx = {}) {
     if (!payload || !Array.isArray(payload.rows)) return '';
     const attention = ctx.filter === 'attention';
     const n = visibleRows(payload.rows, ctx).filter((r) => r.needs).length;
-    return `<button type="button" data-act="sfilter" data-filter="${attention ? 'all' : 'attention'}" aria-pressed="${attention}">Needs attention · ${n}</button><span class="rs-sub">updated ${esc(relativeTime(payload.generatedAt, ctx.now))}</span>`;
+    return `<button type="button" data-act="sfilter" data-filter="${attention ? 'all' : 'attention'}" aria-pressed="${attention}">Needs attention · ${n}</button>`;
   }
 
   // ctx: { now, scope, rooms, q, group, roomData, filter, collapsed, failed, flowFor(id), changesFor(id), sending, busy }

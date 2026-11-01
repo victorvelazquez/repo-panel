@@ -106,11 +106,12 @@ test('room cards are not pinned while a text or group filter is active', () => {
 });
 
 // ---------- pure: the view-bar tools of the Summary ----------
-test('summaryTools: ONE toggle with aria-pressed, the count of the filtered rows, and the updated text', () => {
+test('summaryTools: ONE toggle with aria-pressed and the count of the filtered rows, and no "updated" text (RP82)', () => {
   const off = R.summaryTools(payload(ROWS), ctxOf());
   assert.match(off, /<button type="button" data-act="sfilter" data-filter="attention" aria-pressed="false">Needs attention · 2<\/button>/);
   assert.doesNotMatch(off, /All|data-filter="all"/);
-  assert.match(off, /updated just now/);
+  assert.doesNotMatch(off, /updated|just now| ago/, 'RP82: the age of the data is gone from the bar');
+  assert.doesNotMatch(R.summaryTools({ ...payload(ROWS), generatedAt: '2026-05-01T11:57:00Z' }, ctxOf()), /updated|min ago/);
   const on = R.summaryTools(payload(ROWS), ctxOf({ filter: 'attention' }));
   assert.match(on, /data-filter="all" aria-pressed="true">Needs attention · 2</);
   assert.equal((on.match(/<button/g) || []).length, 1);
@@ -129,6 +130,17 @@ test('summaryView no longer paints the filter head inside #summary', () => {
 });
 
 // ---------- index.html: three levels ----------
+test('index.html (RP82): Needs attention sits right after the scope buttons, before the spacer that pushes the Work tools right', () => {
+  const html = read('public/index.html');
+  const bar = html.slice(html.indexOf('id="viewbar"'), html.indexOf('<section id="summary"'));
+  const at = (s) => bar.indexOf(s);
+  assert.ok(at('id="search"') < at('id="groupFilter"') && at('id="groupFilter"') < at('id="scope"'));
+  assert.ok(at('id="scope"') < at('id="summaryTools"'), 'the toggle comes after the scope buttons');
+  assert.ok(at('id="summaryTools"') < at('class="spacer"'), 'and before the spacer, so it stays next to them');
+  assert.ok(at('class="spacer"') < at('id="workTools"'), 'the Work tools stay at the right end');
+  assert.equal((bar.match(/class="spacer"/g) || []).length, 1);
+});
+
 test('index.html: header, tabs and view bar in that order; shared controls in the view bar, Merge menu in the header', () => {
   const html = read('public/index.html');
   const at = (s) => html.indexOf(s);

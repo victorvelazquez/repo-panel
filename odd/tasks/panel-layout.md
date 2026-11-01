@@ -26,7 +26,7 @@ Las citas son textuales de la persona (ver `- [ ] **RP96** · S12, S13 · inline
 
 Una línea por unidad: ID, `S#`, ruta, commit. Todas van inline; RP86 y RP93 llevan verificación independiente (`gentle-ai-verify`) y una prueba que reproduzca el abuso. Commit: `—` hasta que `/flow-commit` lo cree.
 
-- [ ] **RP82** · S1 · inline · —. Mover «Needs attention · N» junto a los botones de alcance (`#scope`) y quitar el texto «updated …». El aviso «Summary unavailable» se conserva.
+- [x] **RP82** · S1 · inline · `feat(summary): put Needs attention next to the scope buttons (RP82)` (lo crea `/flow-commit`). Pruebas primero (RED visto en las 2 nuevas); sin worker ni verificación independiente (sin riesgo alto). Mover «Needs attention · N» junto a los botones de alcance (`#scope`) y quitar el texto «updated …». El aviso «Summary unavailable» se conserva.
 - [ ] **RP83** · S3 · inline · —. ↑ carga el mensaje enviado anterior, otra vez ↑ el anterior a ese; ↓ vuelve hacia adelante y al pasar el más nuevo se restaura lo que se estaba escribiendo. Solo actúa con el cursor en la primera línea (↓ en la última), para no romper la edición de varias líneas. El historial sale de los mensajes `role: user` del chat (`hist.items`) más los pendientes.
 - [ ] **RP84** · S7 · inline · —. Scroll fino y oscuro con las variables del tema (`scrollbar-width`, `scrollbar-color` y `::-webkit-scrollbar`).
 - [ ] **RP85** · S2 · inline · —. El botón de «/ Actions» deja de ser un menú: se muestra directo el botón del comando disponible, con la misma lógica de la tarjeta (`flowFor`). Si no hay ninguno disponible no se muestra nada; el motivo queda en la línea de estado de la sesión.
@@ -60,3 +60,4 @@ Una línea por unidad: ID, `S#`, ruta, commit. Todas van inline; RP86 y RP93 lle
 barra de consumo arriba o abajo del porcentaje de consumo y horas faltantes de semanal y mensual? ejemplos de idea: [tres capturas] pero quiero que propongas lo que a vos te parezca mejor y mas presentable»
 - **L10.** «lo de mensual me equivoque nomas»
 - **L11.** «el marcador de ritmo me gusta, apruebo el diseño general»
+- **L12.** Tras `/flow-next` sin argumento tocaba RP66; la persona eligió «Ajustar: tomar RP82» y después «Arrancar RP82» (`adjust_task`, `start_task`).
