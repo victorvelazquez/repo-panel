@@ -31,10 +31,10 @@ const deepFreeze = (o) => { if (o && typeof o === 'object') { Object.values(o).f
 // ---------- point 4: usageView ----------
 test('usageView: an ok state is { state, five, seven, label, title } with the window texts, tones and label', () => {
   const v = V.usageView(usage(win(5, SOON), win(40, NEXT)), UTC);
-  assert.deepEqual(Object.keys(v), ['state', 'five', 'seven', 'label', 'title']);
+  assert.deepEqual(Object.keys(v), ['state', 'five', 'seven', 'label', 'title', 'age', 'updated']); // age and updated are RP96
   assert.equal(v.state, 'ok');
-  assert.deepEqual(v.five, { text: '5h 5% ↻17:50', tone: '' });
-  assert.deepEqual(v.seven, { text: '7d 40% ↻Thu 11:00', tone: '' });
+  assert.deepEqual(core(v.five), { text: '5h 5% ↻17:50', tone: '' });
+  assert.deepEqual(core(v.seven), { text: '7d 40% ↻Thu 11:00', tone: '' });
   assert.equal(v.label, '5h 5% ↻17:50 · 7d 40% ↻Thu 11:00');
   assert.equal(typeof v.title, 'string');
   assert.ok(v.title.length > 0);
@@ -56,7 +56,7 @@ test('usageView: no data when usage is falsy, unavailable, or both windows are n
 
 test('usageView: both windows null with available true is "none" and the windows read "–" in dim', () => {
   const v = V.usageView(usage(null, null), UTC);
-  assert.deepEqual([v.five, v.seven], [{ text: '5h –', tone: 'dim' }, { text: '7d –', tone: 'dim' }]);
+  assert.deepEqual([core(v.five), core(v.seven)], [{ text: '5h –', tone: 'dim' }, { text: '7d –', tone: 'dim' }]);
 });
 
 test('usageView: "none" wins over "old" (an unavailable file never says how old it is)', () => {
@@ -82,17 +82,17 @@ test('usageView: tone is "" below 70, warn from 70, error from 90 (0, 69, 70, 89
 test('usageView: a null window and an expired window read "–" with no reset and the dim tone; the other one is untouched', () => {
   const a = V.usageView(usage(null, win(40, NEXT)), UTC);
   assert.equal(a.state, 'ok');
-  assert.deepEqual(a.five, { text: '5h –', tone: 'dim' });
-  assert.deepEqual(a.seven, { text: '7d 40% ↻Thu 11:00', tone: '' });
+  assert.deepEqual(core(a.five), { text: '5h –', tone: 'dim' });
+  assert.deepEqual(core(a.seven), { text: '7d 40% ↻Thu 11:00', tone: '' });
   assert.equal(a.label, '5h – · 7d 40% ↻Thu 11:00');
   const b = V.usageView(usage(win(88, SOON), win(null, NOW - 1, true)), UTC);
   assert.equal(b.state, 'ok');
-  assert.deepEqual(b.five, { text: '5h 88% ↻17:50', tone: 'warn' });
-  assert.deepEqual(b.seven, { text: '7d –', tone: 'dim' });
+  assert.deepEqual(core(b.five), { text: '5h 88% ↻17:50', tone: 'warn' });
+  assert.deepEqual(core(b.seven), { text: '7d –', tone: 'dim' });
   assert.equal(b.label, '5h 88% ↻17:50 · 7d –');
   const c = V.usageView(usage(win(80, NOW - 5, true), win(null, NOW - 9, true)), UTC);
   assert.equal(c.state, 'ok', 'an expired window is still a window: only two null windows are "no data"');
-  assert.deepEqual([c.five, c.seven], [{ text: '5h –', tone: 'dim' }, { text: '7d –', tone: 'dim' }]);
+  assert.deepEqual([core(c.five), core(c.seven)], [{ text: '5h –', tone: 'dim' }, { text: '7d –', tone: 'dim' }]);
   assert.equal(c.label, '5h – · 7d –');
 });
 
@@ -130,8 +130,8 @@ test('usageView: stale is "old": every tone is dim, the texts stay, and the labe
   const u = (age, over = {}) => usage(win(95, SOON), win(75, NEXT), { stale: true, updatedAt: NOW - age, ...over });
   const v = V.usageView(u(20 * MIN), UTC);
   assert.equal(v.state, 'old');
-  assert.deepEqual(v.five, { text: '5h 95% ↻17:50', tone: 'dim' });
-  assert.deepEqual(v.seven, { text: '7d 75% ↻Thu 11:00', tone: 'dim' });
+  assert.deepEqual(core(v.five), { text: '5h 95% ↻17:50', tone: 'dim' });
+  assert.deepEqual(core(v.seven), { text: '7d 75% ↻Thu 11:00', tone: 'dim' });
   assert.equal(v.label, '5h 95% ↻17:50 · 7d 75% ↻Thu 11:00 · 20 min ago');
   const age = (ms) => V.usageView(u(ms), UTC).label.split(' · ').slice(2).join(' · ');
   assert.equal(age(15 * MIN), '15 min ago');
@@ -234,28 +234,23 @@ async function loadPage(routes = {}) {
   await page.tick();
   return page;
 }
-// What the page painted: the spans (class, text), and the visible text without tags.
-const spans = (html) => [...html.matchAll(/<span([^>]*)>([^<]*)<\/span>/g)].map((m) => ({ cls: ((/class="([^"]*)"/.exec(m[1]) || [])[1] || '').split(/\s+/).filter(Boolean), text: m[2] }));
+// RP96 added keys to each window (percent, left, elapsed, reset, ahead); what RP62 pinned is its text and tone.
+const core = (w) => ({ text: w.text, tone: w.tone });
 const plain = (html) => html.replace(/<[^>]*>/g, '');
-const toneClass = { error: 'usage-error', warn: 'usage-warn', dim: 'usage-dim' };
-// The painted element must show exactly view = usageView(answer, { now }) (local time zone, like the page).
+// RP96: the tone of each painted meter, in order ('' when it has none).
+const meterTones = (html) => [...html.matchAll(/<span class="um(?: usage-([a-z]+))?" data-win=/g)].map((m) => m[1] || '');
+// The painted element must show exactly view = usageView(answer, { now }) as usageHtml draws it (local time zone, like the page).
 function assertPainted(page, answer) {
   const el = page.el('#usage');
   const view = V.usageView(answer, { now: page.clock.now });
   assert.equal(el.hidden, false, 'shown');
-  assert.equal(plain(el.html), view.label);
-  assert.equal(el.title, view.title);
+  assert.equal(el.html, V.usageHtml(view));
+  assert.equal(el.title, view.state === 'none' ? view.title : '', 'the popover replaces the tooltip; a message keeps its title');
   if (view.state === 'none') {
-    assert.ok(!/usage-(warn|error|dim)/.test(el.html), 'no tone on a message');
+    assert.ok(!/usage-(warn|error|dim)|um-/.test(el.html), 'no tone on a message');
     return view;
   }
-  const s = spans(el.html);
-  const windows = s.filter((x) => x.text.startsWith('5h') || x.text.startsWith('7d'));
-  assert.deepEqual(windows.map((x) => x.text), [view.five.text, view.seven.text]);
-  [view.five, view.seven].forEach((w, i) => {
-    const tones = windows[i].cls.filter((c) => /^usage-/.test(c));
-    assert.deepEqual(tones, w.tone ? [toneClass[w.tone]] : [], `${w.text}: tone class`);
-  });
+  assert.deepEqual(meterTones(el.html), [view.five.tone, view.seven.tone], 'one tone class per window');
   assert.ok(!FORBIDDEN.test(el.html), el.html);
   return view;
 }
@@ -282,21 +277,21 @@ test('the first answer shows the element: label, one span per window with its to
   const view = assertPainted(page, A_OK);
   assert.equal(view.state, 'ok');
   assert.deepEqual([view.five.tone, view.seven.tone], ['error', '']);
-  assert.match(plain(page.el('#usage').html), /^5h 95% ↻/);
+  assert.match(page.el('#usage').html, /data-win="5h"[^]*95%/);
 });
 
 test('every tone has its class: error from 90, warn from 70, none below, dim when expired or old', async () => {
   const none = await loadPage({ '/api/usage': () => ok(usage(win(69, NOW + 3600000), win(0, NOW + 3600000))) });
-  assert.deepEqual(spans(none.el('#usage').html).flatMap((s) => s.cls).filter((c) => /^usage-/.test(c)), []);
+  assert.doesNotMatch(none.el('#usage').html, /usage-(warn|error|dim)/);
   for (const answer of [A_WARN, A_OK, A_EXPIRED, A_OLD]) {
     const page = await loadPage({ '/api/usage': () => ok(answer) });
     assertPainted(page, answer);
   }
   const warn = await loadPage({ '/api/usage': () => ok(A_WARN) });
-  assert.deepEqual(spans(warn.el('#usage').html).map((s) => s.cls.filter((c) => /^usage-/.test(c))), [['usage-warn'], []]);
+  assert.deepEqual(meterTones(warn.el('#usage').html), ['warn', '']);
   const old = await loadPage({ '/api/usage': () => ok(A_OLD) });
-  assert.match(plain(old.el('#usage').html), / · 20 min ago$/);
-  assert.deepEqual(spans(old.el('#usage').html).map((s) => s.cls.filter((c) => /^usage-/.test(c))), [['usage-dim'], ['usage-dim']]);
+  assert.ok(old.el('#usage').html.includes('<span class="um-age">20 min ago</span>'));
+  assert.deepEqual(meterTones(old.el('#usage').html), ['dim', 'dim']);
 });
 
 test('an unavailable answer (200) shows "Claude usage: no data" with its title, not hidden and without tones', async () => {

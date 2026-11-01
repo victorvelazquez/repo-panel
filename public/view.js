@@ -623,12 +623,26 @@
     return { day: `${p.year}-${p.month}-${p.day}`, weekday: p.weekday, time: `${p.hour}:${p.minute}` };
   }
 
-  function usageWindow(name, w, { now, timeZone, old }) {
-    if (!w || w.expired || typeof w.percent !== 'number') return { text: `${name} –`, tone: 'dim' };
+  // RP96: the time left, as "<1m", "59m", "2h 29m" (under a day) or "4d 14h". Total: anything that is not a positive finite number reads "<1m".
+  function usageRemaining(ms) {
+    const m = Number.isFinite(ms) && ms > 0 ? Math.floor(ms / 60000) : 0;
+    if (m < 1) return '<1m';
+    if (m < 60) return `${m}m`;
+    const h = Math.floor(m / 60);
+    return h < 24 ? `${h}h ${m % 60}m` : `${Math.floor(h / 24)}d ${h % 24}h`;
+  }
+  const USAGE_PACE_MARGIN = 5; // points over the share of the window already run before it counts as "ahead of the clock"
+  const NO_WINDOW = { percent: null, left: null, elapsed: null, reset: null, ahead: false };
+
+  // `span` is the length of the window in ms. Besides the RP62 text and tone it carries what the meters draw: the percent, the time left, the share of the
+  // window already run (0 to 1), the reset text and whether the use runs ahead of the clock (never for an old file).
+  function usageWindow(name, w, { now, timeZone, old, span }) {
+    if (!w || w.expired || typeof w.percent !== 'number') return { text: `${name} –`, tone: 'dim', ...NO_WINDOW };
     const at = usageParts(w.resetAt, timeZone);
     const reset = at.day === usageParts(now, timeZone).day ? at.time : `${at.weekday} ${at.time}`;
     const tone = old ? 'dim' : w.percent >= USAGE_ERROR ? 'error' : w.percent >= USAGE_WARN ? 'warn' : '';
-    return { text: `${name} ${w.percent}% ↻${reset}`, tone };
+    const run = Math.min(100, Math.max(0, Math.round((1 - (w.resetAt - now) / span) * 100)));
+    return { text: `${name} ${w.percent}% ↻${reset}`, tone, percent: w.percent, left: usageRemaining(w.resetAt - now), elapsed: run / 100, reset, ahead: !old && w.percent - run > USAGE_PACE_MARGIN };
   }
 
   function usageAge(ms) {
@@ -639,14 +653,48 @@
   function usageView(usage, { now = Date.now(), timeZone } = {}) {
     const u = isObject(usage) ? usage : {};
     const old = u.available === true && u.stale === true;
-    const ctx = { now, timeZone, old };
-    const five = usageWindow('5h', u.five, ctx);
-    const seven = usageWindow('7d', u.seven, ctx);
+    const five = usageWindow('5h', u.five, { now, timeZone, old, span: 5 * 3600000 });
+    const seven = usageWindow('7d', u.seven, { now, timeZone, old, span: 7 * 86400000 });
     const windows = `${five.text} · ${seven.text}`;
     if (u.available !== true || (!u.five && !u.seven)) return { state: 'none', five, seven, label: 'Claude usage: no data', title: USAGE_NONE_TITLE };
-    if (!old) return { state: 'ok', five, seven, label: windows, title: USAGE_TITLE };
-    return { state: 'old', five, seven, label: `${windows} · ${usageAge(now - u.updatedAt)}`, title: `${USAGE_TITLE} The usage file is old: the numbers may have changed.` };
+    const updated = Number.isFinite(u.updatedAt) ? usageAge(now - u.updatedAt) : null; // RP96: how old the data is, always known for the popover
+    if (!old) return { state: 'ok', five, seven, label: windows, title: USAGE_TITLE, age: null, updated };
+    return { state: 'old', five, seven, label: `${windows} · ${usageAge(now - u.updatedAt)}`, title: `${USAGE_TITLE} The usage file is old: the numbers may have changed.`, age: updated, updated };
   }
 
-  return { usageView, boardApply, boardWait, chatCachePut, chatCacheGet, chatFromCache, API_VERSION, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, piPollTargets, LIVE_CHECK_MS, liveSession, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, presenceLabel, presenceDot, parseSse, liveEvent, eventsPlan, eventsRetryMs, eventsStale };
+  // RP96 (S12, S13): the header element as HTML, from a usageView result. Pure and total; every text goes through usageEsc and the only numbers that reach a
+  // style attribute are integers clamped to 0..100. A message (no data) is just its text; otherwise one compact meter per window (name, bar with fill and pace
+  // mark, percent, time left) and, hidden until hover, click or focus, the popover with the detail.
+  const usageEsc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const usagePct = (v) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(100, Math.max(0, Math.round(v))) : null);
+  const USAGE_WINDOWS = [['five', '5h', 'Session (5 h)'], ['seven', '7d', 'Weekly (7 d)']];
+  function usageHtml(view) {
+    const v = isObject(view) ? view : {};
+    if (v.state !== 'ok' && v.state !== 'old') return usageEsc(v.label);
+    const meters = [];
+    const details = [];
+    for (const [key, name, title] of USAGE_WINDOWS) {
+      const w = isObject(v[key]) ? v[key] : {};
+      const tone = ['warn', 'error', 'dim'].includes(w.tone) ? w.tone : '';
+      const pct = usagePct(w.percent);
+      const cls = tone ? ` usage-${tone}` : '';
+      if (pct === null) {
+        meters.push(`<span class="um usage-dim" data-win="${name}"><span class="um-name">${name}</span><span class="um-pct">–</span></span>`);
+        details.push(`<div class="up-win usage-dim"><div class="up-title">${title}</div><div class="up-line"><span>No data: the window reset or is not reported</span></div></div>`);
+        continue;
+      }
+      const run = usagePct(typeof w.elapsed === 'number' ? w.elapsed * 100 : null) ?? 0;
+      const said = `${name}: ${pct}% used, ${run}% of the window gone${w.ahead === true ? ', more than the clock' : ''}`;
+      const bar = (c) => `<span class="${c}" role="img" aria-label="${usageEsc(said)}"><i class="um-fill" style="width:${pct}%"></i><i class="um-pace" style="left:${run}%"></i></span>`;
+      const flag = tone === 'warn' || tone === 'error' ? '<b class="um-flag" aria-hidden="true">⚠</b>' : '';
+      meters.push(`<span class="um${cls}" data-win="${name}"><span class="um-name">${name}</span>${bar('um-bar')}<span class="um-pct">${flag}${pct}%</span><span class="um-left">${usageEsc(w.left)}</span></span>`);
+      details.push(`<div class="up-win${cls}"><div class="up-title">${title}</div>${bar('um-bar up-bar')}<div class="up-line"><span>${pct}% used</span><span>Resets in ${usageEsc(w.left)}</span></div><div class="up-sub">Resets at ${usageEsc(w.reset)} · ${run}% of the window gone</div>${w.ahead === true ? '<div class="up-warn">⚠ Using it faster than the clock</div>' : ''}</div>`);
+    }
+    const age = v.state === 'old' && v.age ? `<span class="um-age">${usageEsc(v.age)}</span>` : '';
+    const note = v.state === 'old' ? '<div class="up-note">The usage file is old: the numbers may have changed.</div>' : '';
+    const foot = v.updated ? `<div class="up-foot">Updated ${usageEsc(v.updated)}</div>` : '';
+    return `${meters.join('')}${age}<div class="usage-pop" role="group" aria-label="Claude usage details">${details.join('')}${note}${foot}</div>`;
+  }
+
+  return { usageView, usageHtml, usageRemaining, boardApply, boardWait, chatCachePut, chatCacheGet, chatFromCache, API_VERSION, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, piPollTargets, LIVE_CHECK_MS, liveSession, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, presenceLabel, presenceDot, parseSse, liveEvent, eventsPlan, eventsRetryMs, eventsStale };
 }));

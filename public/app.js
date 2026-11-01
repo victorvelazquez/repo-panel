@@ -1727,7 +1727,7 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && S.menu) { S.menu = null; draw(); return; }
   if (e.key === 'Escape') {
     const menu = $('#mergeMenu');
-    if (S.chat.id && !(menu && menu.open) && !['#addDialog', '#roomDialog'].some((d) => $(d) && $(d).open)) closeChat();
+    if (S.chat.id && !(menu && menu.open) && document.activeElement !== $('#usage') && !['#addDialog', '#roomDialog'].some((d) => $(d) && $(d).open)) closeChat();
   } else if ((e.key === 'Enter' || e.key === ' ') && e.target && e.target.dataset && e.target.dataset.act === 'chat-open') { e.preventDefault(); ACTIONS['chat-open'](e.target); }
   else if ((e.key === 'Enter' || e.key === ' ') && e.target && e.target.dataset && e.target.dataset.act === 'tasks-open') { e.preventDefault(); e.stopPropagation(); ACTIONS['tasks-open'](e.target); }
 });
@@ -1796,15 +1796,14 @@ async function loadUsage() {
   try { u = await api('/api/usage'); } catch { return; }
   if (!V || !u || typeof u.available !== 'boolean') return;
   const view = V.usageView(u, { now: Date.now() });
-  const tone = (w) => (w.tone ? ` class="usage-${w.tone}"` : '');
-  const html = view.state === 'none' ? esc(view.label)
-    : `<span${tone(view.five)}>${esc(view.five.text)}</span> · <span${tone(view.seven)}>${esc(view.seven.text)}</span>${esc(view.label.slice(`${view.five.text} · ${view.seven.text}`.length))}`;
   const el = $('#usage');
-  paint(el, html);
-  el.title = view.title;
+  paint(el, V.usageHtml(view)); // RP96: meters and popover; a plain message when there is no data
+  el.title = view.state === 'none' ? view.title : ''; // the popover replaces the tooltip
   el.hidden = false;
 }
 setInterval(() => { if (!document.hidden) loadUsage(); }, 30000);
+// RP96: Escape on the focused usage element closes its popover (the focus leaves it).
+document.addEventListener('keydown', (e) => { const el = $('#usage'); if (e.key === 'Escape' && el && document.activeElement === el && el.blur) el.blur(); });
 loadUsage();
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) { stopEvents(); return; }
