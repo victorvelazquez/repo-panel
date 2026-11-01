@@ -434,13 +434,11 @@
     }
     return { items };
   }
-  function actionMenuHtml(menu, id) {
-    const item = (i) => (i.available
-      ? `<button type="button" class="opt" role="menuitem" data-act="pi" data-id="${esc(id)}" data-cmd="${esc(i.cmd)}"><code>${esc(i.label)}</code><span class="why">${esc(i.why)}</span></button>`
-      : `<button type="button" class="opt" role="menuitem" disabled data-cmd="${esc(i.cmd)}"><code>${esc(i.label)}</code><span class="why">${esc(i.why)}</span></button>`);
-    const yes = menu.items.filter((i) => i.available);
-    const no = menu.items.filter((i) => !i.available);
-    return `<h4>Available now</h4>${yes.map(item).join('') || '<div class="why">Nothing to run right now</div>'}${no.length ? `<h4>Not available</h4>${no.map(item).join('')}` : ''}`;
+  // RP85: the chat shows the commands that are available right now as direct buttons (the list the "/ Actions" menu used to hold, from
+  // actionMenu). Nothing available draws nothing: the session state above the box already says why. `ctx.sending` disables them while an order is on its way.
+  function actionButtonsHtml(menu, id, ctx = {}) {
+    const items = menu && Array.isArray(menu.items) ? menu.items : [];
+    return items.filter((i) => i && i.available).map((i) => `<button type="button" class="c-act" data-act="pi" data-id="${esc(id)}" data-cmd="${esc(i.cmd)}" title="${esc(i.why || `Send ${i.label} to the open session of this repo`)}"${ctx.sending ? ' disabled' : ''}>${esc(i.label)}</button>`).join('');
   }
   // The line under the box: a message, plus the Clear button when text stayed in the prompt box of pi.
   const composerNote = (n) => (n && n.text ? `<span>${esc(n.text)}</span>${n.clear ? ` <button type="button" data-act="chat-clear" data-id="${esc(n.id)}">Clear the box</button>` : ''}` : '');
@@ -637,5 +635,5 @@
     return `${ctx.failed ? '<div class="rs-note" role="status">⚠ Summary unavailable: showing the last data we have.</div>' : ''}<div class="rs-list">${body}</div>${rows.length ? LEGEND : ''}`;
   }
 
-  return { esc, mdHtml, sessionChip, chatWidth, composerState, actionMenu, actionMenuHtml, composerNote, chatHead, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, chatBody, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
+  return { esc, mdHtml, sessionChip, chatWidth, composerState, actionMenu, actionButtonsHtml, composerNote, chatHead, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, chatBody, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
 }));

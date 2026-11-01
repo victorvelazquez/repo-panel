@@ -438,6 +438,7 @@ body.tab-conformity #viewbar { display: none; }
 .composer textarea { width: 100%; min-height: 42px; max-height: 150px; resize: none; border: 0; background: transparent; color: var(--text); font: inherit; padding: 4px 6px; }
 .composer textarea:focus-visible { outline: none; }
 .c-bar { position: relative; display: flex; align-items: center; gap: 6px; }
+.c-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .hint { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .composer .rs-note { margin: 0; }
 .composer .rs-note:empty { display: none; }

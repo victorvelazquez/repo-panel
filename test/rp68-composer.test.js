@@ -1,6 +1,6 @@
 'use strict';
-// RP68 (S49, S54): the composer of the chat (free text to the adopted pi session) and the "/ Actions" menu. Pure helpers
-// (composerState, actionMenu, actionMenuHtml, composerNote, chatHead), the page wiring in app.js (vm harness, fake fetch,
+// RP68 (S49, S54): the composer of the chat (free text to the adopted pi session) and (until RP85) the "/ Actions" menu, now direct buttons. Pure helpers
+// (composerState, actionMenu, actionButtonsHtml, composerNote, chatHead), the page wiring in app.js (vm harness, fake fetch,
 // no real timers, no network, no Orca) and the readChat file-name match. Temp dirs only.
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -125,8 +125,7 @@ test('index.html: the composer replaces the read-only footer inside aside#chat',
   assert.match(send, /^<button/);
   assert.match(send, /data-act="chat-send"/);
   assert.match(send, /type="button"/);
-  assert.match(aside[0], /<button[^>]*data-act="chat-menu"[^>]*type="button"[^>]*>\s*\/ Actions\s*<\/button>|<button[^>]*type="button"[^>]*data-act="chat-menu"[^>]*>\s*\/ Actions\s*<\/button>/);
-  assert.match(tag('actionsPop'), /\bhidden\b/);
+  assert.ok(aside[0].includes('id="chatActions"') && aside[0].indexOf('class="c-bar"') < aside[0].indexOf('id="chatActions"'), 'RP85: the bar holds the container of the action buttons');
   assert.match(tag('msgNote'), /role="status"/);
 });
 
@@ -224,7 +223,7 @@ test('actionMenu: when the session is not free all four are unavailable with the
   }
 });
 
-// ---------- actionMenuHtml ----------
+// ---------- actionButtonsHtml (RP85: the menu became direct buttons) ----------
 const MENU = {
   items: [
     { cmd: 'flow-next', label: '/flow-next', available: true, why: 'RP9 — <i>x</i>' },
@@ -234,29 +233,31 @@ const MENU = {
   ],
 };
 
-test('actionMenuHtml: Available now has the pi buttons, Not available has disabled buttons with a visible reason, everything escaped', () => {
-  const html = R.actionMenuHtml(MENU, 'abc');
-  const at = html.indexOf('Available now');
-  const nt = html.indexOf('Not available');
-  assert.ok(at >= 0 && nt > at, 'two groups in order');
-  const first = html.slice(at, nt);
-  const second = html.slice(nt);
-  assert.match(first, /<button[^>]*data-act="pi" data-id="abc" data-cmd="flow-next"/);
-  assert.doesNotMatch(first.match(/<button[^>]*data-cmd="flow-next"[^>]*>/)[0], /disabled/);
-  assert.match(first, /<code>\/flow-next<\/code>/);
-  assert.equal((first.match(/data-act="pi"/g) || []).length, 1);
-  assert.equal((second.match(/<button[^>]*\bdisabled\b/g) || []).length, 3);
-  assert.equal((second.match(/class="[^"]*\bwhy\b[^"]*"/g) || []).length, 3);
-  assert.match(second, /No &lt;b&gt;changes&lt;\/b&gt;/);
-  assert.match(first, /RP9 — &lt;i&gt;x&lt;\/i&gt;/);
-  assert.doesNotMatch(html, /<b>changes|<i>x/);
-  assert.match(R.actionMenuHtml(MENU, 'a"b'), /data-id="a&quot;b"/);
+test('actionButtonsHtml: only the available command is drawn, as a pi button with its reason as title, everything escaped', () => {
+  const html = R.actionButtonsHtml(MENU, 'abc');
+  assert.equal((html.match(/<button/g) || []).length, 1);
+  assert.match(html, /<button type="button" class="c-act" data-act="pi" data-id="abc" data-cmd="flow-next" title="RP9 — &lt;i&gt;x&lt;\/i&gt;">\/flow-next<\/button>/);
+  assert.doesNotMatch(html, /disabled/);
+  assert.doesNotMatch(html, /flow-commit|flow-pr|flow-base|Not available|Available now|No &lt;b&gt;|<i>x|<b>/, 'the unavailable ones leave no trace');
+  assert.match(R.actionButtonsHtml(MENU, 'a"b'), /data-id="a&quot;b"/);
 });
 
-test('actionMenuHtml: with nothing available the first group says so', () => {
-  const none = { items: MENU.items.map((i) => ({ ...i, available: false })) };
-  assert.match(R.actionMenuHtml(none, 'abc'), /Available now[\s\S]*Nothing to run right now[\s\S]*Not available/);
-  assert.doesNotMatch(R.actionMenuHtml(MENU, 'abc'), /Nothing to run right now/);
+test('actionButtonsHtml: two available commands are two buttons in the fixed order; none gives an empty string', () => {
+  const two = { items: MENU.items.map((i) => (i.cmd === 'flow-pr' ? { ...i, available: true, why: '' } : i)) };
+  const html = R.actionButtonsHtml(two, 'abc');
+  assert.deepEqual([...html.matchAll(/data-cmd="([a-z-]+)"/g)].map((m) => m[1]), ['flow-next', 'flow-pr']);
+  assert.match(html, /data-cmd="flow-pr" title="Send \/flow-pr to the open session of this repo"/, 'no reason: a plain title');
+  assert.equal(R.actionButtonsHtml({ items: MENU.items.map((i) => ({ ...i, available: false })) }, 'abc'), '');
+  for (const bad of [null, undefined, {}, { items: 'x' }, { items: [null, 5, {}] }]) assert.equal(R.actionButtonsHtml(bad, 'abc'), '');
+});
+
+test('actionButtonsHtml: while an order of the repo is on its way the buttons are disabled', () => {
+  assert.match(R.actionButtonsHtml(MENU, 'abc', { sending: true }), /data-cmd="flow-next" title="[^"]*" disabled>/);
+  assert.doesNotMatch(R.actionButtonsHtml(MENU, 'abc', { sending: false }), /disabled/);
+});
+
+test('the menu helpers are gone: no actionMenuHtml export', () => {
+  assert.equal(R.actionMenuHtml, undefined);
 });
 
 // ---------- composerNote + chatHead ----------
@@ -437,7 +438,7 @@ test('drafts: the text typed for one repo survives opening another repo, coming 
   assert.equal(page.get('#msgBox').value, 'draft for demo');
 });
 
-test('the 5 s poll never rewrites #msgBox.value, even when the answer changed; the menu and the note are what it paints', async () => {
+test('the 5 s poll never rewrites #msgBox.value, even when the answer changed; the action buttons and the note are what it paints', async () => {
   let text = 'hello there';
   const { page } = await ready({ '/api/chat': () => okJson({ ...HIST, items: [{ role: 'user', text, at: null, tools: [] }] }) });
   const box = page.get('#msgBox');
@@ -450,10 +451,9 @@ test('the 5 s poll never rewrites #msgBox.value, even when the answer changed; t
   assert.match(page.get('#chatBody').html, /something new from the session/);
   assert.equal(writes, 0);
   assert.equal(val, 'half-typed message');
-  assert.notEqual(page.get('#actionsPop').html, '');
 });
 
-// ---------- page: the menu ----------
+// ---------- page: the action buttons (RP85) ----------
 const composerTarget = (page, { act: name = null, inside = false, dataset = {} } = {}) => {
   const composer = page.get('#composer');
   const node = element({ dataset: name ? { act: name, ...dataset } : {}, tagName: 'BUTTON' });
@@ -462,70 +462,20 @@ const composerTarget = (page, { act: name = null, inside = false, dataset = {} }
   return node;
 };
 
-test('menu: hidden by default, chat-menu toggles it, and opening or closing the chat closes it', async () => {
-  const { page, S } = await ready();
-  assert.strictEqual(S.actionsOpen, false);
-  assert.equal(page.get('#actionsPop').hidden, true);
-  await act(page, 'chat-menu', page.get('#composer'));
-  page.flush();
-  assert.strictEqual(S.actionsOpen, true);
-  assert.equal(page.get('#actionsPop').hidden, false);
-  await act(page, 'chat-menu', page.get('#composer'));
-  page.flush();
-  assert.equal(page.get('#actionsPop').hidden, true);
-  await act(page, 'chat-menu', page.get('#composer'));
-  page.run("ACTIONS['chat-open']({ dataset: { id: 'xyz' } })");
-  await page.tick();
-  assert.strictEqual(S.actionsOpen, false, 'switching repo closes it');
-  assert.equal(page.get('#actionsPop').hidden, true);
-  await act(page, 'chat-menu', page.get('#composer'));
-  page.run("ACTIONS['chat-close']()");
-  await page.tick();
-  assert.strictEqual(S.actionsOpen, false, 'closing the chat closes it');
-  assert.equal(page.get('#actionsPop').hidden, true);
+test('actions: no trace of the old menu is left in the page (no / Actions button, chat-menu act, actionsOpen state or #actionsPop)', () => {
+  const app = fs.readFileSync(path.join(PUBLIC, 'app.js'), 'utf8');
+  assert.doesNotMatch(app, /chat-menu|actionsOpen|closeActions|actionsPop/);
+  assert.doesNotMatch(fs.readFileSync(path.join(PUBLIC, 'index.html'), 'utf8'), /chat-menu|actionsPop|\/ Actions/);
+  assert.doesNotMatch(fs.readFileSync(path.join(PUBLIC, 'style.css'), 'utf8'), /#actionsPop/);
 });
 
-test('menu: Escape closes the menu first and keeps the chat; a second Escape closes the chat', async () => {
+test('actions: one Escape closes the chat now that no menu is in between', async () => {
   const { page, S } = await ready();
-  await act(page, 'chat-menu', page.get('#composer'));
-  page.fire('keydown', { key: 'Escape' });
-  page.flush();
-  assert.strictEqual(S.actionsOpen, false);
-  assert.equal(page.get('#actionsPop').hidden, true);
-  assert.equal(S.chat.id, 'abc');
   page.fire('keydown', { key: 'Escape' });
   assert.equal(S.chat.id, null);
 });
 
-test('menu: a click outside #composer closes it; a click inside keeps it; the / Actions button toggles it once per click', async () => {
-  const { page, S } = await ready();
-  await act(page, 'chat-menu', page.get('#composer'));
-  assert.strictEqual(S.actionsOpen, true);
-  page.fire('click', { target: composerTarget(page, { inside: true }) });
-  assert.strictEqual(S.actionsOpen, true, 'inside click');
-  page.fire('click', { target: composerTarget(page, { inside: false }) });
-  assert.strictEqual(S.actionsOpen, false, 'outside click');
-  const btn = composerTarget(page, { act: 'chat-menu', inside: true });
-  page.fire('click', { target: btn });
-  assert.strictEqual(S.actionsOpen, true, 'the button opens it');
-  page.fire('click', { target: btn });
-  assert.strictEqual(S.actionsOpen, false, 'and closes it');
-});
-
-test('menu: an item goes through ACTIONS.pi (POST /api/pi) and closes the menu', async () => {
-  const { page, S } = await ready();
-  await act(page, 'chat-menu', page.get('#composer'));
-  const item = composerTarget(page, { act: 'pi', inside: true, dataset: { id: 'abc', cmd: 'flow-next' } });
-  page.fire('click', { target: item });
-  await page.tick();
-  const sent = posts(page, '/api/pi');
-  assert.equal(sent.length, 1);
-  assert.deepEqual(JSON.parse(sent[0].body), { id: 'abc', command: 'flow-next' });
-  assert.strictEqual(S.actionsOpen, false);
-  assert.equal(page.get('#actionsPop').hidden, true);
-});
-
-test('menu: #actionsPop is painted from the open row, the live state, summaryChanges and summaryFlow', async () => {
+test('actions: #chatActions is painted from the open row, the live state, summaryChanges and summaryFlow, and only with what is available', async () => {
   const page = loadPage({ answers: answersFor() });
   const S = seed(page);
   Object.assign(S.summary.rows[0], { action: { kind: 'deliver' }, next: NEXT });
@@ -533,11 +483,51 @@ test('menu: #actionsPop is painted from the open row, the live state, summaryCha
   page.run("summaryFlow = () => ({ cmd: 'flow-commit', label: '/flow-commit' })");
   page.run("ACTIONS['chat-open']({ dataset: { id: 'abc' } })");
   await page.tick();
-  const html = page.get('#actionsPop').html;
-  const [now, not] = html.split('Not available');
-  assert.match(now, /Available now[\s\S]*data-act="pi" data-id="abc" data-cmd="flow-commit"/);
-  assert.match(not, /Commit the changes first/);
-  assert.match(not, /Deliver the current changes first/);
+  const html = page.get('#chatActions').html;
+  assert.match(html, /<button[^>]*data-act="pi" data-id="abc" data-cmd="flow-commit"[^>]*>\/flow-commit<\/button>/);
+  assert.equal((html.match(/<button/g) || []).length, 1, 'only the command that conviene ahora');
+  assert.doesNotMatch(html, /Commit the changes first|Deliver the current changes first|flow-next|flow-pr|flow-base/);
+});
+
+test('actions: with the session working nothing is drawn, and it comes back when the session is free', async () => {
+  const page = loadPage({ answers: answersFor() });
+  const S = seed(page);
+  Object.assign(S.summary.rows[0], { action: { kind: 'deliver' }, next: NEXT });
+  S.local = { abc: { files: [{}], added: 1, deleted: 0, ahead: 0, behind: 0 } };
+  page.run("summaryFlow = () => ({ cmd: 'flow-commit', label: '/flow-commit' })");
+  page.run("ACTIONS['chat-open']({ dataset: { id: 'abc' } })");
+  await page.tick();
+  assert.match(page.get('#chatActions').html, /data-cmd="flow-commit"/);
+  page.run("S.chat.info = { ...S.chat.info, live: { state: 'working', count: 1 } }; draw();");
+  await page.tick();
+  assert.equal(page.get('#chatActions').html, '');
+  page.run("S.chat.info = { ...S.chat.info, live: { state: 'free', count: 1 } }; draw();");
+  await page.tick();
+  assert.match(page.get('#chatActions').html, /data-cmd="flow-commit"/);
+});
+
+test('actions: the button goes through ACTIONS.pi (POST /api/pi) exactly once', async () => {
+  const { page } = await ready();
+  const item = composerTarget(page, { act: 'pi', inside: true, dataset: { id: 'abc', cmd: 'flow-next' } });
+  page.fire('click', { target: item });
+  await page.tick();
+  const sent = posts(page, '/api/pi');
+  assert.equal(sent.length, 1);
+  assert.deepEqual(JSON.parse(sent[0].body), { id: 'abc', command: 'flow-next' });
+});
+
+test('actions: while an order of the repo is on its way the painted buttons are disabled', async () => {
+  const page = loadPage({ answers: answersFor() });
+  const S = seed(page);
+  Object.assign(S.summary.rows[0], { action: { kind: 'deliver' }, next: NEXT });
+  S.local = { abc: { files: [{}], added: 1, deleted: 0, ahead: 0, behind: 0 } };
+  page.run("summaryFlow = () => ({ cmd: 'flow-commit', label: '/flow-commit' })");
+  page.run("ACTIONS['chat-open']({ dataset: { id: 'abc' } })");
+  await page.tick();
+  assert.doesNotMatch(page.get('#chatActions').html, /disabled/);
+  page.run("S.sending.abc = 'flow-commit'; draw();");
+  await page.tick();
+  assert.match(page.get('#chatActions').html, /data-cmd="flow-commit"[^>]*disabled/);
 });
 
 // ---------- page: the keyboard ----------
