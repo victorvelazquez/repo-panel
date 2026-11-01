@@ -219,7 +219,7 @@ test('the filter is ONE aria-pressed toggle with the count of the current scope 
   const html = tools(MIX);
   assert.doesNotMatch(html, /All|data-filter="all"/);
   assert.match(html, /<button type="button" data-act="sfilter" data-filter="attention" aria-pressed="false">Needs attention · 4<\/button>/);
-  assert.match(html, /updated 0? ?just now/);
+  assert.doesNotMatch(html, /updated|just now/, 'RP82: the age of the data is no longer in the bar');
   const g1 = view(MIX, { scope: { kind: 'room', name: 'R' }, rooms: [{ name: 'R', repos: ['a', 'b'] }] });
   assert.equal(ids(g1).length, 0);
   const scoped = view(MIX.map((r) => (r.id === 'a' || r.id === 'b' ? { ...r, room: 'R' } : r)), { scope: { kind: 'room', name: 'R' }, rooms: [{ name: 'R', repos: ['a', 'b'] }] });
