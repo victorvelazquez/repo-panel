@@ -33,7 +33,7 @@ const S = {
   boardRev: 0, boardRefreshing: [], factAt: {},
   tab: 'summary', scope: { kind: 'all' }, summary: null, summaryKey: '', summaryFailed: false, sfilter: 'all', collapsed: {},
   timeouts: { get: 25000, post: 70000 },
-  tasks: {}, tasksFilter: '', tasksOpenDone: false, changes: {},
+  tasks: {}, tasksFilter: '', tasksOpenDone: false, changes: {}, files: {}, filesOpen: {}, fileData: {},
   chat: { id: null, seq: 0 }, chatCache: {}, actionsOpen: false, drafts: {}, notes: {}, msgBusy: {}, answer: {},
 };
 S.tab = S.prefs.tab === 'work' ? 'work' : 'summary';
@@ -919,11 +919,47 @@ async function loadChanges() {
   }
   if (chat.changesReq === req && S.chat.seq === seq) { chat.changesLoading = false; draw(); }
 }
+// RP65 (S62): the Files tab reads the tree (/api/files) each time the person SWITCHES to it and the open file again with it; opening a file reads
+// /api/file. Only the latest read of each kind counts and a read for a repo the person left is never painted over another. Nothing is written.
+async function loadFiles() {
+  const chat = S.chat;
+  const { id, seq } = chat;
+  if (!id) return;
+  const req = (chat.filesReq = (chat.filesReq || 0) + 1);
+  chat.filesLoading = true;
+  chat.filesFailed = false;
+  try {
+    const d = await api(`/api/files?id=${id}`);
+    if (chat.filesReq === req) S.files[id] = d;
+  } catch {
+    if (chat.filesReq === req && S.chat.seq === seq) chat.filesFailed = true;
+  }
+  if (chat.filesReq === req && S.chat.seq === seq) { chat.filesLoading = false; draw(); }
+  if (chat.filesReq === req && chat.fpath) loadFile(chat.fpath);
+}
+async function loadFile(p) {
+  const chat = S.chat;
+  const { id, seq } = chat;
+  if (!id) return;
+  const req = (chat.fileReq = (chat.fileReq || 0) + 1);
+  chat.fpath = p;
+  chat.fileLoading = true;
+  chat.fileFailed = '';
+  draw();
+  try {
+    const d = await api(`/api/file?id=${id}&path=${encodeURIComponent(p)}`);
+    if (chat.fileReq === req) S.fileData[id] = d;
+  } catch (e) {
+    if (chat.fileReq === req && S.chat.seq === seq) chat.fileFailed = e.message || 'File unavailable';
+  }
+  if (chat.fileReq === req && S.chat.seq === seq) { chat.fileLoading = false; draw(); }
+}
 function setChatTab(tab) {
   const was = S.chat.tab;
-  S.chat.tab = tab === 'tasks' || tab === 'changes' ? tab : 'chat';
+  S.chat.tab = ['tasks', 'changes', 'files'].includes(tab) ? tab : 'chat';
   if (S.chat.tab === 'tasks') loadTasks();
   else if (S.chat.tab === 'changes' && was !== 'changes') loadChanges();
+  else if (S.chat.tab === 'files' && was !== 'files') loadFiles();
   draw();
 }
 
@@ -961,7 +997,16 @@ function drawChat() {
   paint($('#chatHead'), R.chatHead(S.chat, { name: nameOf(S.chat.id) }));
   const tasksTab = S.chat.tab === 'tasks';
   const changesTab = S.chat.tab === 'changes';
-  $('#composer').hidden = tasksTab || changesTab;
+  const filesTab = S.chat.tab === 'files';
+  $('#composer').hidden = tasksTab || changesTab || filesTab;
+  if (filesTab) {
+    const id = S.chat.id;
+    const changed = {};
+    for (const f of (S.local[id] && Array.isArray(S.local[id].files) ? S.local[id].files : [])) changed[f.path] = f.untracked ? '?' : f.status;
+    paint($('#chatBody'), R.filesView(S.files[id] || null, { selected: S.chat.fpath || '', open: S.filesOpen[id] || {}, changed, loading: !!S.chat.filesLoading, failed: !!S.chat.filesFailed, fileLoading: !!S.chat.fileLoading, fileFailed: S.chat.fileFailed || '' }, S.fileData[id] || null));
+    chatShown = null;
+    return;
+  }
   if (changesTab) {
     paint($('#chatBody'), R.changesView(S.changes[S.chat.id] || null, { selected: S.chat.file || '', loading: !!S.chat.changesLoading, failed: !!S.chat.changesFailed }));
     chatShown = null;
@@ -1502,6 +1547,9 @@ const ACTIONS = {
   // RP64: the chip opens the single viewer, the Changes tab of the right panel; from the Work tab the page goes to the Summary first.
   'diff': (el) => { const id = el.dataset.id; if (S.tab !== 'summary') setTab('summary'); if (S.chat.id !== id) openChat(id); setChatTab('changes'); },
   'changes-file': (el) => { S.chat.file = el.dataset.path || ''; draw(); },
+  'files-open': (el) => loadFile(el.dataset.path || ''),
+  // The button says what the person SEES (data-open): the default is open only when a changed file is inside, so toggling flips that.
+  'files-dir': (el) => { (S.filesOpen[S.chat.id] ||= {})[el.dataset.path || ''] = el.dataset.open !== 'true'; draw(); },
   'tab': (el) => { if (['summary', 'work', 'conformity'].includes(el.dataset.tab)) setTab(el.dataset.tab); },
   'sfilter': (el) => { S.sfilter = el.dataset.filter === 'attention' ? 'attention' : 'all'; draw(); },
   'toggle-group': (el) => { S.collapsed[el.dataset.group] = !S.collapsed[el.dataset.group]; draw(); },

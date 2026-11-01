@@ -365,6 +365,16 @@ body.tab-conformity #viewbar { display: none; }
 .cv-l.h { background: #101d2e; color: var(--blue); }
 .cv-l.m { color: var(--muted); }
 .cv-more { text-align: center; padding: 8px 0; }
+/* RP65: the Files tab. The tree scrolls on its own so the file below it keeps its room; the changed lines of a file are a soft amber, apart from the green and red of a diff. */
+.ft-tree { flex: none; max-height: 40vh; overflow: auto; display: flex; flex-direction: column; margin-bottom: 12px; font-size: 13px; }
+.ft-row { display: flex; align-items: center; gap: 6px; width: 100%; text-align: left; border: 1px solid transparent; background: transparent; padding: 2px 6px 2px calc(6px + var(--d, 0) * 14px); border-radius: 6px; }
+.ft-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
+.ft-dir { color: var(--muted); }
+.ft-chg { color: var(--yellow); }
+.ft-on { border-color: var(--blue); background: #12253d; }
+.ft-mark { font-family: ui-monospace, Consolas, monospace; font-size: 11px; color: var(--yellow); }
+.ft-row:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.cv-l.e { background: #2a2410; color: #f0d98a; }
 .ch-name { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ch-body { flex: 1; min-height: 0; overflow: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
 .ch-body .empty { padding: 30px 0; }

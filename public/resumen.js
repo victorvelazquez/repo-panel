@@ -172,8 +172,8 @@
   function chatHead(c, ctx = {}) {
     const adopted = c.info && c.info.adopted;
     const tip = adopted ? `${ctx.name} · ${adopted.id}` : ctx.name;
-    const cur = c.tab === 'tasks' || c.tab === 'changes' ? c.tab : 'chat';
-    const tabs = [['chat', 'Chat'], ['tasks', 'Tasks'], ['changes', 'Changes']].map(([t, label]) => `<button type="button" role="tab" class="ch-tab" data-act="chat-tab" data-tab="${t}" aria-selected="${cur === t}">${label}</button>`).join('');
+    const cur = ['tasks', 'changes', 'files'].includes(c.tab) ? c.tab : 'chat';
+    const tabs = [['chat', 'Chat'], ['tasks', 'Tasks'], ['changes', 'Changes'], ['files', 'Files']].map(([t, label]) => `<button type="button" role="tab" class="ch-tab" data-act="chat-tab" data-tab="${t}" aria-selected="${cur === t}">${label}</button>`).join('');
     return `<div class="ch-row"><b class="ch-name" title="${esc(tip)}">${esc(ctx.name)}</b><button type="button" class="x" data-act="chat-close" aria-label="Close the chat" title="Close the chat (Esc)">✕</button></div><div class="ch-tabs" role="tablist" aria-label="Panel">${tabs}</div>`;
   }
 
@@ -293,6 +293,74 @@
       return `<section class="cv-file"><h3 class="cv-title" title="${esc(x.path)}">${esc(x.path)}</h3>${x.note ? `<div class="cv-note rs-sub">${esc(x.note)}</div>` : ''}${rows.length ? `<div class="cv-code">${rows.join('')}</div>` : ''}</section>`;
     }).join('');
     return `${list}${data.truncated ? '<div class="err">Diff truncated (too large).</div>' : ''}${sections}${cut ? `<div class="cv-more rs-sub">+${cut} more lines</div>` : ''}`;
+  }
+
+  // The Files tab (RP65, S62): the tree of files of the repo (GET /api/files) and the file read (GET /api/file) in the numbered-lines look of
+  // the Changes viewer. ctx = { selected, open: { dir: bool }, changed: { path: letter }, loading, failed, fileLoading, fileFailed }; `file` is the
+  // /api/file answer. A folder is open by default only when a changed file is inside it. Pure and total; every name and text goes through `esc`.
+  const TREE_MAX = 1500;
+  const MB = 1024 * 1024;
+  const byName = (a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
+  function fileSection(file, ctx) {
+    const note = (t) => `<div class="empty" role="status">${t}</div>`;
+    const sel = ctx.selected;
+    if (!sel) return note('Pick a file');
+    if (ctx.fileFailed) return note(typeof ctx.fileFailed === 'string' ? esc(ctx.fileFailed) : 'File unavailable');
+    if (!file || ctx.fileLoading || file.path !== sel) return note('Loading file…');
+    const head = `<h3 class="cv-title" title="${esc(sel)}">${esc(sel)}</h3>`;
+    const wrap = (inner) => `<section class="cv-file">${head}${inner}</section>`;
+    if (file.binary) return wrap('<div class="cv-note rs-sub">Binary file, not shown</div>');
+    if (file.tooLarge) return wrap(`<div class="cv-note rs-sub">File too large to show (${(num(file.size) / MB).toFixed(1)} MB)</div>`);
+    if (typeof file.text !== 'string') return note('File unavailable');
+    const lines = file.text.split('\n');
+    if (lines[lines.length - 1] === '') lines.pop();
+    if (!lines.length) return wrap('<div class="cv-note rs-sub">Empty file</div>');
+    const marks = (Array.isArray(file.changed) ? file.changed : []).filter(Array.isArray).map(([s, n]) => [Math.floor(Number(s)), Math.floor(Number(n))]).filter(([s, n]) => s >= 1 && n >= 1);
+    const hit = (i) => marks.some(([s, n]) => i >= s && i < s + n);
+    const rows = lines.slice(0, CODE_MAX).map((ln, i) => `<div class="cv-l${hit(i + 1) ? ' e' : ''}"><span class="cv-n">${i + 1}</span><span class="cv-t">${esc(ln.replace(/\r$/, ''))}</span></div>`);
+    return wrap(`<div class="cv-code">${rows.join('')}</div>${lines.length > CODE_MAX ? `<div class="cv-more rs-sub">+${lines.length - CODE_MAX} more lines</div>` : ''}`);
+  }
+  function filesView(tree, ctx = {}, file = null) {
+    ctx = ctx && typeof ctx === 'object' ? ctx : {};
+    const list = tree && Array.isArray(tree.files) ? tree.files.filter((f) => f && typeof f.path === 'string' && f.path) : null;
+    if (!list) return `<div class="empty" role="status">${ctx.failed ? 'Files unavailable' : 'Loading files…'}</div>`;
+    if (!list.length) return '<div class="empty" role="status">No files</div>';
+    const changed = ctx.changed && typeof ctx.changed === 'object' ? ctx.changed : {};
+    const folded = ctx.open && typeof ctx.open === 'object' ? ctx.open : {};
+    const mark = (p) => (Object.hasOwn(changed, p) && typeof changed[p] === 'string' ? changed[p] : '');
+    const root = { dirs: new Map(), files: [] };
+    for (const f of list) {
+      const parts = f.path.split('/');
+      const name = parts.pop();
+      const dirty = !!mark(f.path);
+      let node = root;
+      let at = '';
+      for (const part of parts) {
+        at = at ? `${at}/${part}` : part;
+        if (!node.dirs.has(part)) node.dirs.set(part, { name: part, path: at, dirs: new Map(), files: [], dirty: false });
+        node = node.dirs.get(part);
+        if (dirty) node.dirty = true;
+      }
+      node.files.push({ name, path: f.path });
+    }
+    const out = [];
+    let cut = 0;
+    const emit = (html) => { if (out.length < TREE_MAX) out.push(html); else cut++; };
+    const walk = (node, depth) => {
+      for (const d of [...node.dirs.values()].sort(byName)) {
+        const open = folded[d.path] === undefined ? d.dirty : folded[d.path] === true;
+        emit(`<button type="button" class="ft-row ft-dir${d.dirty ? ' ft-chg' : ''}" style="--d:${depth}" data-act="files-dir" data-path="${esc(d.path)}" data-open="${open}" aria-expanded="${open}"><span aria-hidden="true">${open ? '▾' : '▸'}</span> ${esc(d.name)}</button>`);
+        if (open) walk(d, depth + 1);
+      }
+      for (const f of node.files.sort(byName)) {
+        const m = mark(f.path);
+        const on = ctx.selected === f.path;
+        emit(`<button type="button" class="ft-row ft-file${m ? ' ft-chg' : ''}${on ? ' ft-on' : ''}" style="--d:${depth}" data-act="files-open" data-path="${esc(f.path)}" aria-pressed="${on}" title="${esc(f.path)}"><span class="ft-name">${esc(f.name)}</span>${m ? `<span class="ft-mark">${esc(m)}</span>` : ''}</button>`);
+      }
+    };
+    walk(root, 0);
+    const tail = cut ? `<div class="cv-more rs-sub">+${cut} more</div>` : '';
+    return `<div class="ft-tree" role="group" aria-label="Repository files">${out.join('')}${tail}</div>${fileSection(file, ctx)}`;
   }
 
   // The composer (RP68, S49): can the person send free text now, and if not, why. c = { id, info, sending }.
@@ -541,5 +609,5 @@
     return `${ctx.failed ? '<div class="rs-note" role="status">⚠ Summary unavailable: showing the last data we have.</div>' : ''}<div class="rs-list">${body}</div>${rows.length ? LEGEND : ''}`;
   }
 
-  return { esc, mdHtml, sessionChip, chatWidth, composerState, actionMenu, actionMenuHtml, composerNote, chatHead, tasksView, parseDiff, changesView, sessionState, sessionLabelHtml, chatBody, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
+  return { esc, mdHtml, sessionChip, chatWidth, composerState, actionMenu, actionMenuHtml, composerNote, chatHead, tasksView, parseDiff, changesView, filesView, sessionState, sessionLabelHtml, chatBody, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
 }));
