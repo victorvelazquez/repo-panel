@@ -34,7 +34,7 @@ const S = {
   tab: 'summary', scope: { kind: 'all' }, summary: null, summaryKey: '', summaryFailed: false, sfilter: 'all', collapsed: {},
   timeouts: { get: 25000, post: 70000 },
   tasks: {}, tasksFilter: '', tasksOpenDone: false, changes: {}, files: {}, filesOpen: {}, fileData: {},
-  chat: { id: null, seq: 0 }, chatCache: {}, actionsOpen: false, drafts: {}, recall: {}, notes: {}, msgBusy: {}, answer: {},
+  chat: { id: null, seq: 0 }, chatCache: {}, drafts: {}, recall: {}, notes: {}, msgBusy: {}, answer: {},
 };
 S.tab = S.prefs.tab === 'work' ? 'work' : 'summary';
 S.backTab = S.tab; // the tab Conformity returns to (it is never saved as the preference)
@@ -870,7 +870,6 @@ function openChat(id, tab) {
   saveDraft();
   S.recall = {};
   S.chat = { id, seq: S.chat.seq + 1, ...(V && V.chatFromCache(S.chatCache[id])), ...(tab === 'tasks' ? { tab } : {}) }; // RP79: cached messages at once, state unknown (no get: opening must not reorder the cache)
-  S.actionsOpen = false;
   $('#msgBox').value = S.drafts[id] || '';
   draw();
   if (chatCtl) chatCtl.abort();
@@ -881,7 +880,6 @@ function closeChat() {
   if (!S.chat.id) return;
   saveDraft();
   S.recall = {};
-  S.actionsOpen = false;
   if (chatCtl) { chatCtl.abort(); chatCtl = null; }
   S.chat = { id: null, seq: S.chat.seq + 1 };
   chatShown = null;
@@ -1036,8 +1034,7 @@ function drawChat() {
   $('#msgBox').placeholder = cs.placeholder;
   const row = S.summary && Array.isArray(S.summary.rows) ? S.summary.rows.find((r) => r.id === id) : null;
   const live = (S.chat.info && S.chat.info.live && S.chat.info.live.state) || 'unknown';
-  paint($('#actionsPop'), R.actionMenuHtml(R.actionMenu(row, { live, changes: summaryChanges(id), flow: summaryFlow(id) }), id));
-  $('#actionsPop').hidden = !S.actionsOpen;
+  paint($('#chatActions'), R.actionButtonsHtml(R.actionMenu(row, { live, changes: summaryChanges(id), flow: summaryFlow(id) }), id, { sending: !!S.sending[id] }));
   paint($('#msgNote'), R.composerNote(S.notes[id]));
 }
 
@@ -1075,7 +1072,6 @@ function prunePending(id) {
   const keep = (S.pending[id] || []).filter((p) => p.state === 'sending' || R.userCount(items, p.text) <= p.base);
   if (keep.length) S.pending[id] = keep; else delete S.pending[id];
 }
-const closeActions = () => { if (S.actionsOpen) { S.actionsOpen = false; draw(); } };
 const composerOf = (id) => R.composerState({ ...S.chat, sending: !!S.msgBusy[id] }, { name: nameOf(id) });
 const sayNote = (id, text, clear = false) => { S.notes[id] = { text, id, clear }; };
 
@@ -1581,7 +1577,6 @@ const ACTIONS = {
     } catch (e) { S.answer[id] = { fp, state: 'error', text: e.message }; }
     draw();
   },
-  'chat-menu': () => { S.actionsOpen = !S.actionsOpen; draw(); },
   'chat-clear': async (el) => {
     const { id } = el.dataset;
     try { await api('/api/chat/clear', { id }); delete S.notes[id]; } catch (e) { sayNote(id, e.message, true); }
@@ -1607,7 +1602,6 @@ const ACTIONS = {
   'pi': async (el) => {
     const { id, cmd, pr } = el.dataset;
     if (S.sending[id]) return; // a second click while the first order is on its way never sends another
-    S.actionsOpen = false;
     S.sending[id] = cmd;
     el.disabled = true;
     draw();
@@ -1713,7 +1707,6 @@ const ACTIONS = {
 };
 
 document.addEventListener('click', (e) => {
-  if (S.actionsOpen && !e.target.closest('#composer')) closeActions();
   if (S.menu && !e.target.closest('.more')) { S.menu = null; draw(); }
   const el = e.target.closest('[data-act]');
   if (!el || el.disabled) return;
@@ -1731,7 +1724,6 @@ document.addEventListener('submit', (e) => {
 // Escape closes the card menu first; with nothing else open it closes the chat. A focused repo card opens the chat with Enter or
 // Space (the buttons inside it have no chat-open act, so they are untouched).
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && S.actionsOpen) { closeActions(); return; }
   if (e.key === 'Escape' && S.menu) { S.menu = null; draw(); return; }
   if (e.key === 'Escape') {
     const menu = $('#mergeMenu');
