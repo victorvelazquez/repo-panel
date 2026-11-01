@@ -379,6 +379,34 @@
     return { canSend: !reason, reason, placeholder: reason || `Message the session of ${ctx.name ?? 'this repo'}` };
   }
 
+  // The message-box history (RP83, S3), like the prompt of pi: the texts the person sent to the session (the chat's own messages, then the
+  // ones still pending), oldest first, without empty entries or one repeated right after itself. Pure and total.
+  function inputHistory(items, pending) {
+    const sent = [...(Array.isArray(items) ? items : []).filter((it) => it && it.role === 'user').map((it) => it.text), ...(Array.isArray(pending) ? pending : []).map((p) => p && p.text)];
+    const out = [];
+    for (const t of sent) if (typeof t === 'string' && t.trim() && out[out.length - 1] !== t) out.push(t);
+    return out;
+  }
+  // One arrow key. `nav` is null when the person is not browsing, or { i, stash }: the position in `history` and the draft to give back.
+  // Returns { nav, text } (the new position, null past the newest, and the text for the box) or null when the key has nothing to do.
+  function historyStep(nav, key, current, history) {
+    const h = Array.isArray(history) ? history : [];
+    if (key === 'up') {
+      if (!h.length) return null;
+      if (!nav) return { nav: { i: h.length - 1, stash: String(current ?? '') }, text: h[h.length - 1] };
+      const i = Math.max(0, Math.min(nav.i, h.length - 1) - 1);
+      return { nav: { i, stash: nav.stash }, text: h[i] };
+    }
+    if (key === 'down' && nav) {
+      const i = Math.min(nav.i, h.length - 1) + 1;
+      return i < h.length ? { nav: { i, stash: nav.stash }, text: h[i] } : { nav: null, text: nav.stash };
+    }
+    return null;
+  }
+  // Up only acts on the first line of the box and Down on the last, with no selection: in the middle of a multi-line message the arrows move the cursor.
+  const canRecall = (key, value, start, end) => typeof value === 'string' && Number.isInteger(start) && start === end
+    && (key === 'up' ? !value.slice(0, start).includes('\n') : key === 'down' ? !value.slice(end).includes('\n') : false);
+
   // The "/ Actions" menu: always the four flow commands in a fixed order, each available or not with the reason. A deliver or
   // branch flow button (unstage, stash, disabled with a reason) takes the slot of its command. ctx = { live, changes, flow }.
   const SLOTS = [['flow-next', '/flow-next'], ['flow-commit', '/flow-commit'], ['flow-pr', '/flow-pr'], ['flow-base', '/flow-base']];
@@ -609,5 +637,5 @@
     return `${ctx.failed ? '<div class="rs-note" role="status">⚠ Summary unavailable: showing the last data we have.</div>' : ''}<div class="rs-list">${body}</div>${rows.length ? LEGEND : ''}`;
   }
 
-  return { esc, mdHtml, sessionChip, chatWidth, composerState, actionMenu, actionMenuHtml, composerNote, chatHead, tasksView, parseDiff, changesView, filesView, sessionState, sessionLabelHtml, chatBody, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
+  return { esc, mdHtml, sessionChip, chatWidth, composerState, actionMenu, actionMenuHtml, composerNote, chatHead, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, chatBody, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
 }));
