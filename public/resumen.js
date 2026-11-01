@@ -2,10 +2,10 @@
 // Pure helpers of the Summary tab (plain <script>, global RepoPanelResumen; CommonJS in tests). They take the payload of
 // GET /api/summary and return HTML strings; no DOM, no network. Every text that comes from data goes through `esc`.
 (function (root, factory) {
-  const api = factory();
+  const api = factory(root);
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.RepoPanelResumen = api;
-}(typeof self !== 'undefined' ? self : this, () => {
+}(typeof self !== 'undefined' ? self : this, (root) => {
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const clip = (s, n) => (String(s).length > n ? `${String(s).slice(0, n - 1)}…` : String(s));
   const ALL = { kind: 'all' };
@@ -67,14 +67,8 @@
     return `<div class="rs-prog"${open} title="${text}${id ? ' · Click to see the tasks' : ''}"><div class="rs-bar" role="img" aria-label="${text}">${seg('rs-done', p.completada)}${seg('rs-pr', p.enRevision)}${seg('rs-blk', p.bloqueada)}${seg('rs-pend', pending)}</div><span class="rs-sub rs-count">${num(p.completada)}/${num(p.total)}</span></div>`;
   }
 
-  // The change chips of the board card (S55): `c` is { files, added, deleted, ahead, behind, noUpstream } or null (not loaded).
-  function changeChips(c, id) {
-    if (!c) return '';
-    const files = num(c.files);
-    return (files ? `<button class="chip yellow chip-btn" data-act="diff" data-id="${id}" title="View diff">● ${plural(files, 'file')} <span class="add">+${num(c.added)}</span> <span class="del">−${num(c.deleted)}</span></button>` : '')
-      + (num(c.ahead) ? `<span class="chip blue">↑ ${num(c.ahead)} unpushed${c.noUpstream ? ' · no upstream' : ''}</span>` : '')
-      + (num(c.behind) ? `<span class="chip gray">↓ ${num(c.behind)} behind</span>` : '');
-  }
+  // RP87: the change chips are the board card's too, so they live in view.js (a global in the page, a module in Node) and are looked up when used.
+  const chipsOf = (c, id) => { const v = typeof module === 'object' && module.exports ? require('./view.js') : root.RepoPanelView; return v && v.changeChips ? v.changeChips(c, id) : ''; };
 
   // ONE line: the next unit (full entrega and result in the title), or what a blocked repo waits for.
   function nextHtml(r) {
@@ -127,7 +121,7 @@
     const lm = r.lastMovement || {};
     const a = r.error ? null : r.action;
     const cls = r.session && r.session.state === 'waiting' ? ' ask' : !r.error && !r.next && (r.blocking || []).length ? ' block' : '';
-    const chips = r.error ? '' : changeChips(ctx.changesFor ? ctx.changesFor(r.id) : null, id) + (a && a.kind === 'manual' ? '<span class="chip red">▲ manual action</span>' : '');
+    const chips = r.error ? '' : chipsOf(ctx.changesFor ? ctx.changesFor(r.id) : null, r.id) + (a && a.kind === 'manual' ? '<span class="chip red">▲ manual action</span>' : '');
     return `<article class="rs-card${cls}" data-id="${id}" data-act="chat-open" tabindex="0"${ctx.chatId === r.id ? ' aria-current="true"' : ''} aria-label="${esc(r.name)}">
       <div class="rs-l1"><b class="rs-name" title="${esc(r.name)}">${esc(r.name)}</b><span class="mono rs-branch" title="${esc(r.branch ?? '')}">${esc(r.branch ?? '')}</span>${chips}<span class="rs-spacer"></span><span class="rs-sub rs-when" title="${esc(lm.what ?? '')}">${esc(relativeTime(lm.at, ctx.now))}</span>${r.error ? '<span class="chip red">▲ error</span>' : sessionChip(r.session && r.session.state)}${r.error ? '' : staleMark(r)}</div>
       <div class="rs-l2">${r.error ? noData : progressHtml(r.progress, r.id)}${nextHtml(r)}${actionButton(r, ctx)}</div>
