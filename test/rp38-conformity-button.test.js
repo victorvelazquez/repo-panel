@@ -1,5 +1,5 @@
 'use strict';
-// RP38: the "Roadmap conformity" drawer already lists every repo with the requirements that do not pass. Each repo that
+// RP38: the Conformity tab (a full-width view since RP60, a drawer before) lists every repo with the requirements that do not pass. Each repo that
 // has a gap now carries a "Put in conditions" button there, the same action as the card's menu (so it keeps the
 // protection against a second click from RP33). Nothing is sent to a session by these tests: the fetch is a stub.
 const test = require('node:test');
@@ -23,7 +23,7 @@ async function loadPage(routes = {}) {
   const ctx = vm.createContext({
     console,
     document: new Proxy({}, {
-      get: (t, k) => (k === 'hidden' ? false : k === 'querySelector' ? (sel) => (sel === '#app' ? app : sel === '#drawerBody' ? drawer : sel === '#confBadge' ? { hidden: false, textContent: '' } : stub())
+      get: (t, k) => (k === 'hidden' ? false : k === 'querySelector' ? (sel) => (sel === '#app' ? app : sel === '#conformityView' ? drawer : sel === '#confBadge' ? { hidden: false, textContent: '' } : stub())
         : k === 'addEventListener' ? () => {} : stub),
     }),
     localStorage: { getItem: () => null, setItem() {} },
@@ -56,14 +56,14 @@ const entry = (results) => ({ state: 'loaded', data: { results, summary: { ready
 function open(page, repos, reqs) {
   const S = page.get('S');
   S.groups = [{ name: 'g', repos }];
-  S.confOpen = true;
+  S.tab = 'conformity';
   for (const [id, e] of Object.entries(reqs)) S.req[id] = e;
   page.get('drawConformity')();
   return S;
 }
 const putButtons = (html) => [...html.matchAll(/<button[^>]*data-act="put-in-conditions"[^>]*>[^<]*<\/button>/g)].map((m) => m[0]);
 
-test('a repo with a requirement that does not pass has a Put in conditions button in the drawer', async () => {
+test('a repo with a requirement that does not pass has a Put in conditions button in the Conformity view', async () => {
   const page = await loadPage();
   open(page, [R], { [R.id]: entry([result()]) });
   const buttons = putButtons(page.drawer.innerHTML);
@@ -95,7 +95,7 @@ test('only the repos with a gap get the button, each with its own id', async () 
   assert.match(buttons[0], /data-id="def"/);
 });
 
-test('while an order of the repo is on its way the drawer button is disabled', async () => {
+test('while an order of the repo is on its way the Conformity button is disabled', async () => {
   const page = await loadPage();
   const S = open(page, [R], { [R.id]: entry([result()]) });
   S.sending[R.id] = 'put-in-conditions';
@@ -118,7 +118,7 @@ test('the button runs the same action as the card menu, so a second click still 
   assert.match(putButtons(page.drawer.innerHTML).join(''), /data-id="abc"/);
 });
 
-test('what the drawer already showed is unchanged: the repo name filter, the failing line with its remedy and the passing list', async () => {
+test('what the Conformity view shows is unchanged: the repo name filter, the failing line with its remedy and the passing list', async () => {
   const page = await loadPage();
   open(page, [R], { [R.id]: entry([result(), result({ id: 'base-branch', title: 'Remote base branch exists', status: 'pass' })]) });
   const html = page.drawer.innerHTML;

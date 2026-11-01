@@ -302,12 +302,18 @@ test('switching tabs only toggles hidden: #app and #queue are not rewritten', ()
   assert.equal(page.get('#queue').writes, queue);
 });
 
-test('the Conformity tab opens the drawer and keeps the current tab', () => {
+test('the Conformity tab is a full-width view: it hides Summary and Work, and the other tabs bring them back', () => {
   const page = loadPage();
   const S = withRepos(page);
   page.run("ACTIONS.tab({ dataset: { tab: 'conformity' } })");
-  assert.equal(page.get('#drawer').hidden, false);
-  assert.equal(S.tab, 'summary');
+  assert.equal(S.tab, 'conformity');
+  assert.equal(page.get('#conformityView').hidden, false);
+  assert.equal(page.get('#sumLayout').hidden, true);
+  assert.equal(page.get('#work').hidden, true);
+  assert.deepEqual(page.tabEls.map((b) => b.attrs['aria-selected']), ['false', 'false', 'true']);
+  page.run("ACTIONS.tab({ dataset: { tab: 'work' } })");
+  assert.equal(page.get('#conformityView').hidden, true);
+  assert.equal(page.get('#work').hidden, false);
 });
 
 test('the scope action filters the painted summary', () => {

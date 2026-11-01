@@ -1,7 +1,7 @@
 'use strict';
 // RP64 (S62, S55, S78): the single code viewer, pure part. R.parseDiff turns the text of GET /api/diff into files with numbered lines;
 // R.changesView draws the file list and the code with line numbers; R.chatHead gains the third tab, Changes. The old diff drawer
-// (renderDiff / openDiff) is gone: the Conformity drawer stays. No network, no timers, no real clock.
+// (renderDiff / openDiff) is gone, and since RP60 so is the drawer: Conformity is a tab. No network, no timers, no real clock.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -181,11 +181,12 @@ test('chatHead: Chat, Tasks and Changes tabs in that order; Changes selected for
 });
 
 // ---------- the old drawer diff is gone ----------
-test('app.js no longer has the diff drawer (renderDiff, openDiff) and the Conformity drawer is still there', () => {
+test('app.js no longer has the diff drawer (renderDiff, openDiff) and Conformity is a tab, not a drawer (RP60)', () => {
   const app = read('app.js');
   assert.ok(!/function renderDiff|async function openDiff/.test(app));
   assert.match(app, /function openConformity|openConformity\s*=/);
-  assert.match(read('index.html'), /id="drawer"/);
+  assert.doesNotMatch(read('index.html'), /id="drawer"/);
+  assert.match(read('index.html'), /id="conformityView"/);
 });
 
 test('style.css has the viewer classes and no longer the drawer diff ones', () => {

@@ -145,15 +145,13 @@ test('d2: the diff chip on the Work tab switches to the Summary and opens Change
   assert.equal(diffReads(page, 'abc'), 1);
 });
 
-test('d3: the chip never opens the Conformity drawer and never touches it', async () => {
+test('d3: the chip never opens the Conformity tab and never touches it', async () => {
   const { page } = boot();
   serve(page, 'abc', infoOf(FREE), histOf('hi'));
   page.routes[DF('abc')] = () => Promise.resolve(ok(DATA()));
-  page.get('#drawer').hidden = true;
   diffAct(page, 'abc');
   await page.tick();
-  assert.equal(page.get('#drawer').hidden, true, 'the drawer stays closed');
-  assert.equal(page.run('S.confOpen'), false);
+  assert.equal(page.run('S.tab'), 'summary', 'the Conformity tab stays closed');
 });
 
 test('d4: the chip on the chat that is already open only switches the tab (no second chat open)', async () => {

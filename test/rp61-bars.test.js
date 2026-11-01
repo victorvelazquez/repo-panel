@@ -141,7 +141,8 @@ test('index.html: header, tabs and view bar in that order; shared controls in th
   assert.match(header, /id="method"[^>]*data-pref="method"|data-pref="method"[^>]*id="method"/);
   assert.match(header, /id="delBranch"[^>]*data-pref="del"|data-pref="del"[^>]*id="delBranch"/);
   assert.match(header, /Used by the Merge buttons of Summary and Work/);
-  assert.match(header, /id="conformity"[^>]*>Conformity <span id="confBadge"/);
+  assert.doesNotMatch(header, /id="conformity"|confBadge/, 'RP60: the duplicate Conformity button is gone from the header');
+  assert.match(html, /id="tab-conformity"[^>]*>Conformity <span id="confBadge"/);
   assert.match(header, /data-act="refresh-all"[^>]*><span class="ico">↻<\/span> Refresh<\/button>/);
   assert.match(bar, /id="summaryTools"/);
   assert.match(bar, /<input id="cleanAsColumn" type="checkbox" data-pref="cleanAsColumn">/);
