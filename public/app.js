@@ -34,7 +34,7 @@ const S = {
   tab: 'summary', scope: { kind: 'all' }, summary: null, summaryKey: '', summaryFailed: false, sfilter: 'all', collapsed: {},
   timeouts: { get: 25000, post: 70000 },
   tasks: {}, tasksFilter: '', tasksOpenDone: false, changes: {}, files: {}, filesOpen: {}, fileData: {},
-  chat: { id: null, seq: 0 }, chatCache: {}, actionsOpen: false, drafts: {}, notes: {}, msgBusy: {}, answer: {},
+  chat: { id: null, seq: 0 }, chatCache: {}, actionsOpen: false, drafts: {}, recall: {}, notes: {}, msgBusy: {}, answer: {},
 };
 S.tab = S.prefs.tab === 'work' ? 'work' : 'summary';
 S.backTab = S.tab; // the tab Conformity returns to (it is never saved as the preference)
@@ -868,6 +868,7 @@ async function loadChat(id, { user = false, signal } = {}) {
 function openChat(id, tab) {
   if (!R || !id || S.chat.id === id) return;
   saveDraft();
+  S.recall = {};
   S.chat = { id, seq: S.chat.seq + 1, ...(V && V.chatFromCache(S.chatCache[id])), ...(tab === 'tasks' ? { tab } : {}) }; // RP79: cached messages at once, state unknown (no get: opening must not reorder the cache)
   S.actionsOpen = false;
   $('#msgBox').value = S.drafts[id] || '';
@@ -879,6 +880,7 @@ function openChat(id, tab) {
 function closeChat() {
   if (!S.chat.id) return;
   saveDraft();
+  S.recall = {};
   S.actionsOpen = false;
   if (chatCtl) { chatCtl.abort(); chatCtl = null; }
   S.chat = { id: null, seq: S.chat.seq + 1 };
@@ -1088,6 +1090,7 @@ async function sendChatMessage() {
   const entry = { text, state: 'sending', base: R.userCount((S.chat.hist && S.chat.hist.items) || [], text) };
   S.msgBusy[id] = true;
   delete S.notes[id];
+  delete S.recall[id];
   $('#msgBox').value = '';
   delete S.drafts[id];
   (S.pending[id] || (S.pending[id] = [])).push(entry);
@@ -1737,13 +1740,29 @@ document.addEventListener('keydown', (e) => {
   else if ((e.key === 'Enter' || e.key === ' ') && e.target && e.target.dataset && e.target.dataset.act === 'tasks-open') { e.preventDefault(); e.stopPropagation(); ACTIONS['tasks-open'](e.target); }
 });
 
+// RP83 (S3): in the message box Up recalls what was sent to this session (again Up for the one before) and Down walks forward, giving back
+// the draft past the newest. Only on the first (Up) or last (Down) line, never with a modifier or an IME composition; typing or sending ends it.
+document.addEventListener('keydown', (e) => {
+  const box = e.target;
+  if (!R || !box || box.id !== 'msgBox' || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') || e.shiftKey || e.ctrlKey || e.altKey || e.metaKey || e.isComposing || e.keyCode === 229) return;
+  const id = S.chat.id;
+  const key = e.key === 'ArrowUp' ? 'up' : 'down';
+  if (!id || !R.canRecall(key, box.value, box.selectionStart, box.selectionEnd)) return;
+  const step = R.historyStep(S.recall[id] || null, key, box.value, R.inputHistory((S.chat.hist && S.chat.hist.items) || [], S.pending[id]));
+  if (!step) return;
+  e.preventDefault();
+  if (step.nav) S.recall[id] = step.nav; else delete S.recall[id];
+  box.value = step.text;
+  if (box.setSelectionRange) box.setSelectionRange(step.text.length, step.text.length);
+});
+
 // Enter in the message box sends it; Shift+Enter is a new line and an IME composition is left alone.
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Enter' || !e.target || e.target.id !== 'msgBox' || e.shiftKey || e.isComposing || e.keyCode === 229) return;
   e.preventDefault();
   sendChatMessage();
 });
-document.addEventListener('input', (e) => { if (e.target && e.target.id === 'msgBox') saveDraft(); else if (e.target && e.target.id === 'tasksFilter') ACTIONS['tasks-filter'](e.target); });
+document.addEventListener('input', (e) => { if (e.target && e.target.id === 'msgBox') { delete S.recall[S.chat.id]; saveDraft(); } else if (e.target && e.target.id === 'tasksFilter') ACTIONS['tasks-filter'](e.target); });
 
 // The passing list of a repo stays open (or closed) across redraws. `toggle` does not bubble, so capture it.
 document.addEventListener('toggle', (e) => {
