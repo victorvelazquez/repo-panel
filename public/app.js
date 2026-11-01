@@ -177,12 +177,16 @@ function stamp(id, kind) { (S.factAt[id] ||= {})[kind] = Date.now(); }
 function refreshRepo(id, { poll = true, catchUp = false } = {}) {
   markAsked(id, Date.now());
   if (catchUp && boardWorks()) api('/api/board/refresh', { id }).catch(() => {});
+  // RP86b: after an action of the person with the board LEADING, the server re-reads every fact of the repo (that is what the catch-up above asks) and the board
+  // brings them within seconds: reading the two slowest ones (the roadmap and the requirements) by hand too was the same work twice. local, prs and the declared state
+  // are still read at once, because they gate a button right then. A fact the page does not hold yet, or holds only as a failure or as "no roadmap", is read directly, and with no leading board nothing is skipped.
+  const viaBoard = catchUp && boardLeads();
   return Promise.all([
     loadLocal(id),
     loadPrs(id),
     // The roadmap is optional: a repo without one, or a failed request, simply shows nothing extra.
-    track(id, pooled(() => api(`/api/roadmap?id=${id}`)).then((d) => { setFact('roadmap', id, d); stamp(id, 'roadmap'); }, () => { setFact('roadmap', id, null); })),
-    loadRequirements(id),
+    viaBoard && S.roadmap[id] && S.roadmap[id].available ? Promise.resolve() : track(id, pooled(() => api(`/api/roadmap?id=${id}`)).then((d) => { setFact('roadmap', id, d); stamp(id, 'roadmap'); }, () => { setFact('roadmap', id, null); })),
+    viaBoard && S.req[id] && S.req[id].state === 'loaded' ? Promise.resolve() : loadRequirements(id),
     loadState(id),
     poll ? loadPiStatus(id) : Promise.resolve(),
   ]);
