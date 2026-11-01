@@ -113,8 +113,24 @@ function track(id, p) {
   return p.finally(() => { S.loading[id]--; draw(); });
 }
 
+// RP86 (S9): the ONE way a fact of a repo that feeds the Summary row (local, prs, roadmap, state) is written, from an answer of the board or of a direct read.
+// A CHANGE (not a re-read of the same content) asks for a fresh /api/summary soon, grouped: the row (action, next, progress, needs) is computed on the server
+// from these same facts, and waiting for the 20 s tick left the Summary card and the board disagreeing after every action of the person.
+const SUMMARY_TOUCH_MS = 1000;
+let summaryTouch = 0;
+function touchSummary() {
+  if (summaryTouch || S.tab !== 'summary' || !S.summary) return; // not before the first load (refreshAll's own), nor for a tab that does not show it
+  summaryTouch = setTimeout(() => { summaryTouch = 0; summaryTick(); }, SUMMARY_TOUCH_MS);
+}
+function setFact(kind, id, value) {
+  const before = JSON.stringify(S[kind][id]);
+  S[kind][id] = value;
+  // The FIRST value of a fact is start-up (the Summary and the board answer together, refreshAll asked for both): only a change of a known one counts.
+  if (before !== undefined && before !== JSON.stringify(value)) touchSummary();
+}
+
 // `poll: false` leaves the pi session status alone (the status poll itself refreshes the repo when a session finishes).
-const loadLocal = (id) => track(id, pooled(() => api(`/api/local?id=${id}`)).then((d) => { S.local[id] = d; stamp(id, 'local'); noteLocal(id); }, (e) => { S.local[id] = { error: e.message }; }));
+const loadLocal = (id) => track(id, pooled(() => api(`/api/local?id=${id}`)).then((d) => { setFact('local', id, d); stamp(id, 'local'); noteLocal(id); }, (e) => { setFact('local', id, { error: e.message }); }));
 
 // A repo seen dirty for the first time starts the checking of its pi session (view.js liveSession) and asks for the live
 // state at once, so the commit button is never enabled while the answer is still due. A repo that turns clean forgets
@@ -131,7 +147,7 @@ function noteLocal(id) {
 
 // The session state the buttons of a repo see (S.sent has its own verdict): the live answer, or 'checking' until it comes.
 const sessionOf = (id) => (V ? V.liveSession({ sent: S.sent[id], live: S.live[id], answered: S.liveAnswered[id], dirtyAt: S.dirtyAt[id] }) : S.sent[id] ? undefined : S.live[id]);
-const loadPrs = (id) => track(id, pooled(() => api(`/api/prs?id=${id}`)).then((d) => { S.prs[id] = d; stamp(id, 'prs'); wakeReady(id, d); releaseMerged(id, d); }, (e) => { S.prs[id] = { error: e.message }; }));
+const loadPrs = (id) => track(id, pooled(() => api(`/api/prs?id=${id}`)).then((d) => { setFact('prs', id, d); stamp(id, 'prs'); wakeReady(id, d); releaseMerged(id, d); }, (e) => { setFact('prs', id, { error: e.message }); }));
 
 // A merged PR keeps its Merge button disabled (S.merged: key -> time of the merge) until GitHub no longer lists it, or MERGE_HOLD_MS.
 const MERGE_HOLD_MS = 90000;
@@ -165,7 +181,7 @@ function refreshRepo(id, { poll = true, catchUp = false } = {}) {
     loadLocal(id),
     loadPrs(id),
     // The roadmap is optional: a repo without one, or a failed request, simply shows nothing extra.
-    track(id, pooled(() => api(`/api/roadmap?id=${id}`)).then((d) => { S.roadmap[id] = d; stamp(id, 'roadmap'); }, () => { S.roadmap[id] = null; })),
+    track(id, pooled(() => api(`/api/roadmap?id=${id}`)).then((d) => { setFact('roadmap', id, d); stamp(id, 'roadmap'); }, () => { setFact('roadmap', id, null); })),
     loadRequirements(id),
     loadState(id),
     poll ? loadPiStatus(id) : Promise.resolve(),
@@ -186,8 +202,8 @@ function loadRequirements(id) {
 function loadState(id) {
   const seq = S.stateSeq[id] = (S.stateSeq[id] || 0) + 1;
   return track(id, pooled(() => api(`/api/state?id=${id}`)).then(
-    (d) => { if (seq === S.stateSeq[id]) { S.state[id] = d; stamp(id, 'state'); } },
-    () => { if (seq === S.stateSeq[id]) S.state[id] = null; },
+    (d) => { if (seq === S.stateSeq[id]) { setFact('state', id, d); stamp(id, 'state'); } },
+    () => { if (seq === S.stateSeq[id]) setFact('state', id, null); },
   ));
 }
 
@@ -409,10 +425,10 @@ const AGED_MS = 120000;
 function applyBoardRepo(id, f, at = {}) {
   const err = f.errors || {};
   const aged = (k) => !!err[k] && Number.isFinite(at[k]) && Date.now() - at[k] >= AGED_MS;
-  if (f.local && !aged('local')) { S.local[id] = f.local; noteLocal(id); } else if (err.local && (aged('local') || !S.local[id] || S.local[id].error)) S.local[id] = { error: err.local };
-  if (f.prs && !aged('prs')) { S.prs[id] = f.prs; wakeReady(id, f.prs); releaseMerged(id, f.prs); } else if (err.prs && (aged('prs') || !S.prs[id] || S.prs[id].error)) S.prs[id] = { error: err.prs };
-  if (f.roadmap && !aged('roadmap')) S.roadmap[id] = f.roadmap; else if (err.roadmap && (aged('roadmap') || !S.roadmap[id])) S.roadmap[id] = null;
-  if (f.state && !aged('state')) S.state[id] = f.state; else if (err.state && (aged('state') || !S.state[id])) S.state[id] = null;
+  if (f.local && !aged('local')) { setFact('local', id, f.local); noteLocal(id); } else if (err.local && (aged('local') || !S.local[id] || S.local[id].error)) setFact('local', id, { error: err.local });
+  if (f.prs && !aged('prs')) { setFact('prs', id, f.prs); wakeReady(id, f.prs); releaseMerged(id, f.prs); } else if (err.prs && (aged('prs') || !S.prs[id] || S.prs[id].error)) setFact('prs', id, { error: err.prs });
+  if (f.roadmap && !aged('roadmap')) setFact('roadmap', id, f.roadmap); else if (err.roadmap && (aged('roadmap') || !S.roadmap[id])) setFact('roadmap', id, null);
+  if (f.state && !aged('state')) setFact('state', id, f.state); else if (err.state && (aged('state') || !S.state[id])) setFact('state', id, null);
   if (f.req && !aged('req')) S.req[id] = { state: 'loaded', data: f.req }; else if (err.req && (aged('req') || !(S.req[id] && S.req[id].state === 'loaded'))) S.req[id] = { state: 'failed' };
 }
 
@@ -523,16 +539,12 @@ async function setDismissed(id, on) {
 const nameOf = (id) => allRepos().find((r) => r.id === id)?.name || id;
 
 // ---------- derived state ----------
+// RP86 (S9): the read model of a repo (V.repoModel); info(), the Summary chips and button, the strip and the Files tab all read it.
+// The Summary row is given only by who draws a Summary card (summaryShown): the others do not need it, and then the verdict is not looked at.
+const modelOf = (id, row = null) => V.repoModel({ local: S.local[id], prs: S.prs[id], roadmap: S.roadmap[id], state: S.state[id], req: S.req[id], row, running: !!row && commandRunning(id) });
 function info(r) {
-  const l = S.local[r.id] || {};
-  const p = S.prs[r.id] || {};
-  const prs = p.prs || [];
-  return {
-    l, p, prs,
-    dirty: (l.files || []).length > 0,
-    unpushed: (l.ahead || 0) > 0,
-    ready: prs.filter((x) => x.ready).length,
-  };
+  const m = modelOf(r.id);
+  return { l: m.l, p: m.p, prs: m.prs, dirty: m.dirty, unpushed: m.unpushed, ready: m.ready };
 }
 
 // The shared filters (text, group, room scope) of both tabs. Without resumen.js the scope degrades to all.
@@ -549,10 +561,11 @@ function visibleRepos() {
 // Per-repo facts for /api/queue, only for repos whose local and PR state have loaded.
 function queueItems() {
   return visibleRepos().filter((r) => S.local[r.id] && S.prs[r.id]).map((r) => {
-    const { p, prs, dirty, unpushed } = info(r);
-    const rm = S.roadmap[r.id];
+    const m = modelOf(r.id);
+    const { p, prs, dirty, unpushed } = m;
+    const rm = m.roadmap;
     const s = rm && rm.available ? rm.summary : null;
-    const flags = V ? V.queueFlags(S.local[r.id], S.state[r.id], verdictOf(r), { override: S.showCommit.has(r.id) }) : {};
+    const flags = V ? V.queueFlags(S.local[r.id], m.state, verdictOf(r), { override: S.showCommit.has(r.id) }) : {};
     return {
       id: r.id, name: r.name, dirty, unpushed, stale: !!p.stale, hasPrs: prs.length > 0, ...flags,
       ready: prs.filter((x) => x.ready && !S.snoozed.has(snoozeKey(r.id, x.number))).map((x) => ({ number: x.number, title: x.title })),
@@ -741,10 +754,15 @@ function openConformity() { setTab('conformity'); }
 // out of the comparison: the page redraws only when the payload really changed. A failed read keeps the last data.
 const SUMMARY_TIMEOUT_MS = 90000;
 const SUMMARY_LOADING_MS = 2000;
+let summarySeq = 0;
+let summaryApplied = 0;
 async function loadSummary() {
+  const seq = ++summarySeq; // RP86: an answer older than one already applied is dropped (an older one that arrives FIRST still applies: a slow build never starves the Summary)
   try {
     // The whole-board build takes 20 to 30 s on a slow machine until RP78 serves it from memory: a 25 s limit would show a false failure.
     const d = await api('/api/summary', undefined, { timeoutMs: SUMMARY_TIMEOUT_MS });
+    if (seq < summaryApplied) return;
+    summaryApplied = seq;
     const key = JSON.stringify({ ...d, generatedAt: null });
     const recovered = S.summaryFailed;
     S.summaryFailed = false;
@@ -756,7 +774,7 @@ async function loadSummary() {
     // RP78: rows the store has not read yet are `loading`: ask again soon instead of waiting for the 20 s tick.
     if (Array.isArray(d.rows) && d.rows.some((r) => r.loading)) setTimeout(summaryTick, SUMMARY_LOADING_MS);
   } catch {
-    if (!S.summaryFailed) { S.summaryFailed = true; draw(); }
+    if (seq >= summaryApplied && !S.summaryFailed) { S.summaryFailed = true; draw(); }
   }
 }
 const summaryTick = () => { if (S.tab === 'summary' && !document.hidden) loadSummary(); };
@@ -781,24 +799,21 @@ function setTab(tab) {
 // The "deliver" button of a Summary row is the first button the board's own card would show for that repo.
 function summaryFlow(id) {
   const r = allRepos().find((x) => x.id === id);
-  const l = S.local[id];
-  const p = S.prs[id];
-  if (!r || !l || l.error || !Array.isArray(l.files) || !p || p.error) return null;
-  return flowFor(r, l, p, verdictOf(r))[0] || null;
+  const m = modelOf(id);
+  if (!r || !m.loaded) return null;
+  return flowFor(r, m.l, m.p, verdictOf(r))[0] || null;
 }
 
 // The change chips of a Summary card come from the same local state as the board card; null until that repo is loaded.
 function summaryChanges(id) {
-  const l = S.local[id];
-  if (!l || l.error || !Array.isArray(l.files)) return null;
-  return { files: l.files.length, added: l.added || 0, deleted: l.deleted || 0, ahead: l.ahead || 0, behind: l.behind || 0, noUpstream: !!l.noUpstream };
+  return modelOf(id).changes;
 }
 
 // A repo whose command is running (being sent, or sent and not finished) shows the session as working at once; the server
 // state shows again when the verdict ends. Copies only: S.summary is never changed.
 const commandRunning = (id) => { const v = verdictOf({ id }); return !!v && v.state === 'running'; };
 const summaryShown = () => (S.summary && Array.isArray(S.summary.rows)
-  ? { ...S.summary, rows: S.summary.rows.map((r) => (r.session && r.session.state === 'free' && commandRunning(r.id) ? { ...r, session: { ...r.session, state: 'working' } } : r)) }
+  ? { ...S.summary, rows: S.summary.rows.map((r) => modelOf(r.id, r).row) }
   : S.summary);
 // The chat as the label and the body see it: the live state lifted the same way, and the pending messages of the open repo.
 function chatView() {
@@ -1002,7 +1017,7 @@ function drawChat() {
   if (filesTab) {
     const id = S.chat.id;
     const changed = {};
-    for (const f of (S.local[id] && Array.isArray(S.local[id].files) ? S.local[id].files : [])) changed[f.path] = f.untracked ? '?' : f.status;
+    for (const f of (modelOf(id).l.files || [])) changed[f.path] = f.untracked ? '?' : f.status;
     paint($('#chatBody'), R.filesView(S.files[id] || null, { selected: S.chat.fpath || '', open: S.filesOpen[id] || {}, changed, loading: !!S.chat.filesLoading, failed: !!S.chat.filesFailed, fileLoading: !!S.chat.fileLoading, fileFailed: S.chat.fileFailed || '' }, S.fileData[id] || null));
     chatShown = null;
     return;
@@ -1611,7 +1626,7 @@ const ACTIONS = {
       const before = judged ? await api(`/api/local?id=${id}`).catch(() => null) : null;
       const d = await api('/api/pi', pr ? { id, command: cmd, pr: Number(pr) } : { id, command: cmd });
       if (judged && before && !before.error && d.sent) {
-        S.local[id] = before;
+        setFact('local', id, before);
         startSent(id, { cmd, at: Date.now(), head: before.head ?? null, branch: before.branch ?? null, files: before.files.length, ahead: before.ahead || 0 });
       } else if (!judged && d.sent) startSent(id, { cmd, at: Date.now() });
       const what = cmd === 'fix-pr' ? `the fix order for #${pr}` : cmd === 'flow-base-stash' ? '/flow-base --stash' : `/${cmd}`;

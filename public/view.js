@@ -607,6 +607,34 @@
     }
     return { set, rev: board.rev, refreshing: board.refreshing || [], missing };
   }
+  // RP86 (S9): ONE read model per repo. The page keeps each fact of a repo in its own map (local, prs, roadmap, state, req) and the Summary row in another; the
+  // board cards, the Summary cards, the "go work on" strip and the Files tab used to read those maps each its own way. This joins them, pure: `loaded` is what
+  // the Summary button needed (a good local state with its file list AND a good PR answer), `changes` the Summary chips (null until the local state loads), and
+  // `row` the Summary row with a free session lifted to "working" while a command of the repo runs (a copy: the server answer is never changed).
+  function repoModel(facts) {
+    const x = isObject(facts) ? facts : {};
+    const local = isObject(x.local) ? x.local : null;
+    const prs = isObject(x.prs) ? x.prs : null;
+    const l = local || {};
+    const p = prs || {};
+    const list = Array.isArray(p.prs) ? p.prs : [];
+    const files = Array.isArray(l.files) ? l.files : null;
+    const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
+    const row = isObject(x.row) ? x.row : null;
+    return {
+      l, p, prs: list,
+      dirty: !!files && files.length > 0,
+      unpushed: num(l.ahead) > 0,
+      ready: list.filter((q) => isObject(q) && q.ready).length,
+      loaded: !!local && !local.error && !!files && !!prs && !prs.error,
+      changes: local && !local.error && files ? { files: files.length, added: num(l.added), deleted: num(l.deleted), ahead: num(l.ahead), behind: num(l.behind), noUpstream: !!l.noUpstream } : null,
+      roadmap: x.roadmap ?? null,
+      state: x.state ?? null,
+      req: x.req ?? null,
+      row: row && isObject(row.session) && row.session.state === 'free' && x.running === true ? { ...row, session: { ...row.session, state: 'working' } } : row,
+    };
+  }
+
   // The wait before the next board request: 3 s while it works, then doubling per failure up to 30 s.
   const boardWait = ({ ok, failures }) => (ok ? 3000 : Math.min(30000, 3000 * 2 ** failures));
 
@@ -696,5 +724,5 @@
     return `${meters.join('')}${age}<div class="usage-pop" role="group" aria-label="Claude usage details">${details.join('')}${note}${foot}</div>`;
   }
 
-  return { usageView, usageHtml, usageRemaining, boardApply, boardWait, chatCachePut, chatCacheGet, chatFromCache, API_VERSION, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, piPollTargets, LIVE_CHECK_MS, liveSession, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, presenceLabel, presenceDot, parseSse, liveEvent, eventsPlan, eventsRetryMs, eventsStale };
+  return { repoModel, usageView, usageHtml, usageRemaining, boardApply, boardWait, chatCachePut, chatCacheGet, chatFromCache, API_VERSION, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, piPollTargets, LIVE_CHECK_MS, liveSession, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, presenceLabel, presenceDot, parseSse, liveEvent, eventsPlan, eventsRetryMs, eventsStale };
 }));
