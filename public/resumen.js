@@ -221,11 +221,30 @@
     // RP90: ONE diff tab, the last one, named after the file open in it (`c.dfile`), with its own close button; without a file there is no tab and a "diff" tab reads as the chat.
     const dfile = typeof c.dfile === 'string' ? c.dfile : '';
     // RP92: with the column in, the files card replaces the Changes tab as well.
-    const cur = dfile && c.tab === 'diff' ? 'diff' : ['tasks', 'changes', 'files'].includes(c.tab) && !(ctx.column && (c.tab === 'tasks' || c.tab === 'changes')) ? c.tab : 'chat';
+    const cur = dfile && c.tab === 'diff' ? 'diff' : ['tasks', 'changes', 'files', 'notes'].includes(c.tab) && !(ctx.column && (c.tab === 'tasks' || c.tab === 'changes')) ? c.tab : 'chat';
     const dname = dfile.split(/[\\/]/).pop() || dfile;
     const dtab = dfile ? `<span class="ch-dtab"><button type="button" role="tab" class="ch-tab" data-act="chat-tab" data-tab="diff" title="${esc(dfile)}" aria-selected="${cur === 'diff'}">${esc(dname)}</button><button type="button" class="ch-dclose" data-act="diff-close" aria-label="Close the diff of ${esc(dfile)}" title="Close the diff">✕</button></span>` : '';
-    const tabs = [['chat', 'Chat'], ['tasks', 'Tasks'], ['changes', 'Changes'], ['files', 'Files']].filter(([t]) => !(ctx.column && (t === 'tasks' || t === 'changes'))).map(([t, label]) => `<button type="button" role="tab" class="ch-tab" data-act="chat-tab" data-tab="${t}" aria-selected="${cur === t}">${label}</button>`).join('');
+    const tabs = [['chat', 'Chat'], ['tasks', 'Tasks'], ['changes', 'Changes'], ['files', 'Files'], ['notes', 'Notes']].filter(([t]) => !(ctx.column && (t === 'tasks' || t === 'changes'))).map(([t, label]) => `<button type="button" role="tab" class="ch-tab" data-act="chat-tab" data-tab="${t}" aria-selected="${cur === t}">${label}</button>`).join('');
     return `<div class="ch-row"><b class="ch-name" title="${esc(tip)}">${esc(ctx.name)}</b><button type="button" class="x" data-act="chat-close" aria-label="Close the chat" title="Close the chat (Esc)">✕</button></div><div class="ch-tabs" role="tablist" aria-label="Panel">${tabs}${dtab}</div>`;
+  }
+
+  // The Notes tab (RP93b, S8): the notepad of a repo (`.panel/notas.md`), one textarea and a status line apart so the page can repaint the status without touching the text.
+  // Pure and total. n = { text, status: loading | unavailable | saved | saving | error | conflict, error, loaded }; no n reads as loading.
+  const NOTES_STATUS = { saved: 'Saved', saving: 'Saving…' };
+  function notesStatus(n) {
+    const st = n && typeof n === 'object' ? n.status : '';
+    const why = n && typeof n.error === 'string' && n.error ? ` (${esc(n.error)})` : '';
+    if (st === 'error') return `Not saved${why} <button type="button" class="btn-sm" data-act="notes-retry">Retry</button>`;
+    if (st === 'conflict') return 'The notes file changed outside the panel. <button type="button" class="btn-sm" data-act="notes-disk">Load the version on disk</button> <button type="button" class="btn-sm" data-act="notes-mine">Keep mine</button>';
+    return NOTES_STATUS[st] || 'Saved';
+  }
+  function notesView(n) {
+    const o = n && typeof n === 'object' && !Array.isArray(n) ? n : {};
+    if (!o.loaded) {
+      if (o.status === 'unavailable') return `<div class="empty" role="status">${esc(typeof o.error === 'string' && o.error ? o.error : 'Notes unavailable')}</div>`;
+      return '<div class="empty" role="status">Loading notes…</div>';
+    }
+    return `<div class="notes"><textarea id="notesBox" class="notes-box" aria-label="Notes" spellcheck="false">${esc(o.text)}</textarea><div id="notesStatus" class="notes-status" role="status">${notesStatus(o)}</div></div>`;
   }
 
   // The Tasks tab (RP63, S60): the rows of the repo's ROADMAP (the /api/roadmap answer) grouped by state, the completed ones folded.
@@ -689,5 +708,5 @@
     return `${ctx.failed ? '<div class="rs-note" role="status">⚠ Summary unavailable: showing the last data we have.</div>' : ''}<div class="rs-list">${body}</div>${rows.length ? LEGEND : ''}`;
   }
 
-  return { esc, mdHtml, sessionChip, blockWidths, columnView, composerState, actionMenu, actionButtonsHtml, composerNote, chatHead, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, chatBody, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
+  return { esc, mdHtml, sessionChip, blockWidths, columnView, composerState, actionMenu, actionButtonsHtml, composerNote, chatHead, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, chatBody, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
 }));

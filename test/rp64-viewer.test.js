@@ -173,7 +173,7 @@ test('changesView: same output twice, input not mutated, no undefined or NaN, no
 // ---------- chatHead: the third tab ----------
 test('chatHead: Chat, Tasks, Changes and (RP65) Files tabs in that order; Changes selected for tab "changes"', () => {
   const h = R.chatHead({ id: 'abc', tab: 'changes' }, { name: 'demo' });
-  assert.deepEqual(Array.from(h.matchAll(/data-tab="(\w+)"/g)).map((m) => m[1]), ['chat', 'tasks', 'changes', 'files']);
+  assert.deepEqual(Array.from(h.matchAll(/data-tab="(\w+)"/g)).map((m) => m[1]), ['chat', 'tasks', 'changes', 'files', 'notes']);
   assert.match(h, /data-tab="changes"[^>]*aria-selected="true"[^>]*>Changes</);
   assert.match(h, /data-tab="chat"[^>]*aria-selected="false"/);
   assert.match(h, /data-tab="tasks"[^>]*aria-selected="false"/);

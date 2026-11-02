@@ -98,7 +98,7 @@ test('w5: any input gives a string and never throws', () => {
 // ---------- the tab ----------
 test('x1: chatHead has the Files tab after Changes, selected only when it is the current one', () => {
   const h = R.chatHead({ id: 'abc', tab: 'files' }, { name: 'demo' });
-  assert.deepEqual([...h.matchAll(/data-tab="(\w+)"/g)].map((m) => m[1]), ['chat', 'tasks', 'changes', 'files']);
+  assert.deepEqual([...h.matchAll(/data-tab="(\w+)"/g)].map((m) => m[1]), ['chat', 'tasks', 'changes', 'files', 'notes']);
   assert.match(h, /data-tab="files"[^>]*aria-selected="true"[^>]*>Files</);
   assert.match(R.chatHead({ id: 'abc' }, { name: 'demo' }), /data-tab="files"[^>]*aria-selected="false"/);
 });

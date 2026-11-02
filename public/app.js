@@ -33,7 +33,7 @@ const S = {
   boardRev: 0, boardRefreshing: [], factAt: {},
   tab: 'summary', scope: { kind: 'all' }, summary: null, summaryKey: '', summaryFailed: false, sfilter: 'all', collapsed: {},
   timeouts: { get: 25000, post: 70000 },
-  tasks: {}, tasksFilter: '', tasksOpenDone: false, changes: {}, files: {}, filesOpen: {}, fileData: {},
+  tasks: {}, tasksFilter: '', tasksOpenDone: false, changes: {}, files: {}, filesOpen: {}, fileData: {}, pad: {},
   chat: { id: null, seq: 0 }, chatCache: {}, drafts: {}, recall: {}, notes: {}, msgBusy: {}, answer: {},
 };
 S.tab = S.prefs.tab === 'work' ? 'work' : 'summary';
@@ -900,6 +900,7 @@ async function loadChat(id, { user = false, signal } = {}) {
 function openChat(id, tab) {
   if (!R || !id || S.chat.id === id) return;
   saveDraft();
+  flushNotes();
   S.recall = {};
   S.chat = { id, seq: S.chat.seq + 1, ...(V && V.chatFromCache(S.chatCache[id])), ...(tab === 'tasks' && !columnOn() ? { tab } : {}) }; // RP79: cached messages at once, state unknown (no get: opening must not reorder the cache)
   $('#msgBox').value = S.drafts[id] || '';
@@ -911,6 +912,7 @@ function openChat(id, tab) {
 function closeChat() {
   if (!S.chat.id) return;
   saveDraft();
+  flushNotes();
   S.recall = {};
   if (chatCtl) { chatCtl.abort(); chatCtl = null; }
   S.chat = { id: null, seq: S.chat.seq + 1 };
@@ -990,12 +992,75 @@ async function loadFile(p) {
   }
   if (chat.fileReq === req && S.chat.seq === seq) { chat.fileLoading = false; draw(); }
 }
+// RP93b (S8): the Notes tab. S.pad[id] = { text, base (the rev last seen, '' when there is no file), savedText, status, error, loaded, saving, again, timer, req, gen }.
+// The text lives here, not in the textarea, so it survives leaving the tab or the chat; a read never replaces text that is dirty or being saved, and a conflict never writes.
+// Saves of one pad run one at a time: text typed meanwhile sets `again` and goes out, with the new rev, when the one in flight ends. `gen` changes when the text is replaced from outside
+// (a read, "Load the version on disk"), which is the only time the textarea is painted again.
+const NOTES_MS = 800;
+const padOf = (id) => (S.pad[id] ||= { text: '', base: '', savedText: '', status: 'loading', error: '', loaded: false, saving: false, again: false, timer: 0, req: 0, gen: 0 });
+const padDirty = (p) => p.text !== p.savedText;
+// Reads the notes each time the person SWITCHES to the tab; only the latest read counts and it never replaces unsaved text.
+async function loadNotes() {
+  const { id } = S.chat;
+  if (!id) return;
+  const p = padOf(id);
+  if (padDirty(p) || p.saving || p.status === 'conflict') return;
+  const req = ++p.req;
+  if (!p.loaded) { p.status = 'loading'; p.error = ''; }
+  try {
+    const d = await api(`/api/notes?id=${id}`);
+    if (p.req !== req || padDirty(p) || p.saving) return;
+    if (d.text !== p.text || !p.loaded) p.gen++;
+    Object.assign(p, { text: d.text, savedText: d.text, base: d.rev, loaded: true, status: 'saved', error: '' });
+  } catch (e) {
+    if (p.req !== req) return;
+    if (!p.loaded) { p.status = 'unavailable'; p.error = e.message || ''; }
+  }
+  draw();
+}
+async function saveNotes(id) {
+  const p = S.pad[id];
+  if (!p) return;
+  clearTimeout(p.timer);
+  p.timer = 0;
+  if (!p.loaded || p.status === 'conflict' || !padDirty(p)) return;
+  if (p.saving) { p.again = true; return; }
+  const sent = p.text;
+  p.saving = true;
+  p.again = false;
+  p.status = 'saving';
+  p.req++; // a read still on its way must not land over this text
+  try {
+    const d = await api('/api/notes', { id, text: sent, base: p.base });
+    if (d.conflict) Object.assign(p, { status: 'conflict', error: '', disk: { text: String(d.text ?? ''), rev: String(d.rev ?? '') } });
+    else { Object.assign(p, { base: d.rev, savedText: sent, error: '' }); p.status = padDirty(p) ? 'saving' : 'saved'; }
+  } catch (e) {
+    Object.assign(p, { status: 'error', error: e.message || '' });
+  }
+  p.saving = false;
+  if (p.again && p.status === 'saving') saveNotes(id);
+  draw();
+}
+const flushNotes = (id = S.chat.id) => { if (id && S.pad[id]) saveNotes(id); };
+function notesInput(text) {
+  const id = S.chat.id;
+  if (!id || !S.pad[id]) return;
+  const p = S.pad[id];
+  p.text = text;
+  p.req++;
+  if (p.status !== 'conflict') p.status = 'saving';
+  clearTimeout(p.timer);
+  p.timer = setTimeout(() => saveNotes(id), NOTES_MS);
+  draw();
+}
 function setChatTab(tab) {
   const was = S.chat.tab;
-  S.chat.tab = ['tasks', 'changes', 'files'].includes(tab) && !((tab === 'tasks' || tab === 'changes') && columnOn()) ? tab : tab === 'diff' && S.chat.dfile ? 'diff' : 'chat'; // RP91, RP92: with the column in, the tasks and the changed files are its cards, not tabs; RP90: the diff tab needs a file
+  if (was === 'notes' && tab !== 'notes') flushNotes();
+  S.chat.tab = ['tasks', 'changes', 'files', 'notes'].includes(tab) && !((tab === 'tasks' || tab === 'changes') && columnOn()) ? tab : tab === 'diff' && S.chat.dfile ? 'diff' : 'chat'; // RP91, RP92: with the column in, the tasks and the changed files are its cards, not tabs; RP90: the diff tab needs a file
   if (S.chat.tab === 'tasks') loadTasks();
   else if ((S.chat.tab === 'changes' || S.chat.tab === 'diff') && was !== S.chat.tab) loadChanges();
   else if (S.chat.tab === 'files' && was !== 'files') loadFiles();
+  else if (S.chat.tab === 'notes' && was !== 'notes') loadNotes();
   draw();
 }
 
@@ -1033,6 +1098,7 @@ function resetLayout() {
   applyLayout();
 }
 
+let padShown = null; // the notepad painted in #chatBody: `id:loaded:gen`
 function drawChat() {
   const on = !!S.chat.id && !!R;
   $('#chat').hidden = !on;
@@ -1055,8 +1121,19 @@ function drawChat() {
   const tasksTab = S.chat.tab === 'tasks' && !column;
   const changesTab = S.chat.tab === 'changes' && !column; // RP92: with the column in, the files card replaces the tab
   const filesTab = S.chat.tab === 'files';
+  const notesTab = S.chat.tab === 'notes';
   const diffTab = S.chat.tab === 'diff' && !!S.chat.dfile; // RP90
-  $('#composer').hidden = tasksTab || changesTab || filesTab || diffTab;
+  $('#composer').hidden = tasksTab || changesTab || filesTab || diffTab || notesTab;
+  if (!notesTab) padShown = null;
+  if (notesTab) {
+    // The textarea is painted once per opening (and when its text is replaced from outside); after that only the status line changes, so the caret and the focus stay.
+    const p = padOf(S.chat.id);
+    const key = `${S.chat.id}:${p.loaded}:${p.gen}`;
+    if (padShown !== key) { paint($('#chatBody'), R.notesView(p)); padShown = key; }
+    paint($('#notesStatus'), R.notesStatus(p));
+    chatShown = null;
+    return;
+  }
   if (diffTab) {
     paint($('#chatBody'), R.changesView(S.changes[S.chat.id] || null, { selected: S.chat.dfile, only: true, loading: !!S.chat.changesLoading, failed: !!S.chat.changesFailed }));
     chatShown = null;
@@ -1645,6 +1722,9 @@ const ACTIONS = {
   // RP91: with the column in, setChatTab turns the Tasks tab into the Chat one (the tasks card is already there); without it the chat opens on its Tasks tab as before.
   'tasks-open': (el) => { openChat(el.dataset.id, 'tasks'); if (S.chat.id === el.dataset.id) setChatTab('tasks'); },
   'chat-tab': (el) => setChatTab(el.dataset.tab),
+  'notes-retry': () => flushNotes(),
+  'notes-disk': () => { const p = S.pad[S.chat.id]; if (p && p.status === 'conflict' && p.disk) { Object.assign(p, { text: p.disk.text, savedText: p.disk.text, base: p.disk.rev, status: 'saved', error: '', gen: p.gen + 1 }); p.req++; draw(); } },
+  'notes-mine': () => { const p = S.pad[S.chat.id]; if (p && p.status === 'conflict' && p.disk) { p.base = p.disk.rev; p.status = 'saving'; saveNotes(S.chat.id); draw(); } },
   'tasks-done': () => { S.tasksOpenDone = !S.tasksOpenDone; draw(); },
   'tasks-filter': (el) => { S.tasksFilter = String((el && el.value) || ''); draw(); },
   'chat-close': () => closeChat(),
@@ -1841,7 +1921,7 @@ document.addEventListener('keydown', (e) => {
   e.preventDefault();
   sendChatMessage();
 });
-document.addEventListener('input', (e) => { if (e.target && e.target.id === 'msgBox') { delete S.recall[S.chat.id]; saveDraft(); } else if (e.target && e.target.id === 'tasksFilter') ACTIONS['tasks-filter'](e.target); });
+document.addEventListener('input', (e) => { if (e.target && e.target.id === 'msgBox') { delete S.recall[S.chat.id]; saveDraft(); } else if (e.target && e.target.id === 'tasksFilter') ACTIONS['tasks-filter'](e.target); else if (e.target && e.target.id === 'notesBox') notesInput(e.target.value); });
 
 // The passing list of a repo stays open (or closed) across redraws. `toggle` does not bubble, so capture it.
 document.addEventListener('toggle', (e) => {
@@ -1892,8 +1972,9 @@ setInterval(() => { if (!document.hidden) loadUsage(); }, 30000);
 // RP96: Escape on the focused usage element closes its popover (the focus leaves it).
 document.addEventListener('keydown', (e) => { const el = $('#usage'); if (e.key === 'Escape' && el && document.activeElement === el && el.blur) el.blur(); });
 loadUsage();
+if (window.addEventListener) window.addEventListener('pagehide', () => flushNotes());
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) { stopEvents(); return; }
+  if (document.hidden) { flushNotes(); stopEvents(); return; }
   loadUsage();
   ev.attempt = 0;
   startEvents();
