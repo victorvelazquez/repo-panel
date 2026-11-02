@@ -13,7 +13,7 @@ const TEXT_MAX = 20000;
 const ANSWER_MAX = 4000;
 const EVENT_MAX = 256 * 1024;
 const SESSION_ID = /^[A-Za-z0-9._-]{1,80}$/;
-// Same set as server/chatsend.js: everything but LF and TAB (C0, DEL, C1, line separators, bidi and zero-width controls).
+// Everything but LF and TAB (C0, DEL, C1, line separators, bidi and zero-width controls).
 const CONTROLS = /[\x00-\x08\x0b-\x1f\x7f-\x9f\u2028\u2029\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g;
 const BEHAVIORS = ['steer', 'followUp'];
 
@@ -36,19 +36,56 @@ function sessionIdFor(repo, adopted) {
   return `panel-${slug || String(repo.id).replace(/[^A-Za-z0-9]/g, '').slice(0, 20) || 'repo'}`;
 }
 
-// What the host tells the page: the dialog id travels as `requestId` (the hub reserves `id` for the repo), a huge record is cut to its type.
+const CONTENT_MAX = 8 * 1024;
+const own = (o, ...keys) => Object.fromEntries(keys.filter((k) => o[k] !== undefined).map((k) => [k, o[k]]));
+// The text of a finished assistant turn (the page needs nothing else of it).
+const turnText = (m) => (m && Array.isArray(m.content) ? m.content.filter((c) => c && c.type === 'text' && typeof c.text === 'string').map((c) => c.text).join('\n\n') : '');
+// Per type, the small fields the page uses. `message_start`, `message_end` and `agent_end` carry the whole system prompt (about 180 KB) and
+// `agent_end` every message, so nothing is copied by default: what is not listed here never leaves the server.
+const WHITELIST = {
+  message_update: (r) => {
+    const a = r.assistantMessageEvent && typeof r.assistantMessageEvent === 'object' ? r.assistantMessageEvent : null;
+    if (!a) return {};
+    const out = own(a, 'type', 'contentIndex');
+    // Only the text blocks carry their words: the thinking and the tool-call deltas are not used by the page and can hold private or huge data.
+    if (typeof a.type === 'string' && a.type.startsWith('text_')) {
+      if (typeof a.delta === 'string') out.delta = a.delta;
+      if (typeof a.content === 'string' && a.content.length <= CONTENT_MAX) out.content = a.content;
+    }
+    return { assistantMessageEvent: out };
+  },
+  turn_end: (r) => ({ ...own(r, 'stopReason'), text: turnText(r.message) }),
+  agent_start: (r) => own(r, 'aborted'),
+  agent_end: (r) => own(r, 'aborted'),
+  agent_settled: (r) => own(r, 'aborted'),
+  tool_execution_start: (r) => own(r, 'toolName', 'isError', 'durationMs'),
+  tool_execution_end: (r) => own(r, 'toolName', 'isError', 'durationMs'),
+};
+const slim = (r) => {
+  const rec = r && typeof r === 'object' && !Array.isArray(r) ? r : {};
+  return { ...(rec.type === undefined ? {} : { type: rec.type }), ...(WHITELIST[rec.type] || (() => ({})))(rec) };
+};
+
+// What the host tells the page: the dialog id travels as `requestId` (the hub reserves `id` for the repo); a record is cut to its whitelist,
+// and what is still huge after that is cut to its type.
 function wire(e) {
   if (!e || typeof e !== 'object') return null;
   if (e.kind === 'dialog' || e.kind === 'dialog-closed') { const { id, ...rest } = e; return { ...rest, requestId: id }; }
-  if (e.kind === 'event' && JSON.stringify(e.record).length > EVENT_MAX) return { kind: 'event', record: { type: e.record.type, truncated: true } };
+  if (e.kind === 'event') {
+    const record = slim(e.record);
+    return { kind: 'event', record: JSON.stringify(record).length > EVENT_MAX ? { type: record.type, truncated: true } : record };
+  }
   return e;
 }
 
-function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClient, max = 6, adoptedOf = (id) => (loadConfig().sessions || {})[id], env = process.env }) {
+function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClient, max = 6, adoptedOf = (id) => (loadConfig().sessions || {})[id], adopt = () => {}, env = process.env }) {
   const live = new Map(); // repo id -> { client, sessionId, ready }
 
   const closedStatus = { state: 'closed', pendingDialogs: [], sessionId: null };
-  const statusOf = (entry) => (entry && entry.client ? { state: entry.client.state(), pendingDialogs: entry.client.pendingDialogs(), sessionId: entry.sessionId } : closedStatus);
+  // A pending dialog is named `requestId` here as in the SSE `dialog` event.
+  const statusOf = (entry) => (entry && entry.client
+    ? { state: entry.client.state(), pendingDialogs: entry.client.pendingDialogs().map(({ id, ...rest }) => ({ requestId: id, ...rest })), sessionId: entry.sessionId }
+    : closedStatus);
   const running = (id) => {
     const entry = live.get(id);
     if (!entry) throw new HttpError(409, 'The session is not started');
@@ -79,7 +116,10 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
       onEvent: (e) => { const w = wire(e); if (w) publish(id, w); },
       onExit: () => { if (live.get(id) === entry) live.delete(id); publish(id, { kind: 'exit' }); },
     });
-    try { await entry.client.start(); } catch { throw new HttpError(502, 'The session could not be started'); }
+    try { await entry.client.start(); } catch (e) {
+      // Fixed messages only: a start that ran out of time is not a failure to launch, and the raw error never reaches the page.
+      throw e && e.message === 'The session did not start in time' ? new HttpError(504, 'The session did not start in time') : new HttpError(502, 'The session could not be started');
+    }
   }
 
   async function start(id) {
@@ -95,6 +135,8 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
       throw e;
     });
     await entry.ready;
+    // The session id it used becomes the adopted one when the repo has none (the history is read from the adopted id); never fails the start.
+    try { adopt(id, entry.sessionId); } catch { /* the chat shows no history until a session is adopted */ }
     return statusOf(live.get(id));
   }
 

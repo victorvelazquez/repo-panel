@@ -34,7 +34,7 @@ const S = {
   tab: 'summary', scope: { kind: 'all' }, summary: null, summaryKey: '', summaryFailed: false, sfilter: 'all', collapsed: {},
   timeouts: { get: 25000, post: 70000 },
   tasks: {}, tasksFilter: '', tasksOpenDone: false, changes: {}, files: {}, filesOpen: {}, fileData: {}, pad: {},
-  chat: { id: null, seq: 0 }, chatCache: {}, drafts: {}, recall: {}, notes: {}, msgBusy: {}, answer: {},
+  chat: { id: null, seq: 0 }, chatCache: {}, drafts: {}, recall: {}, notes: {}, answer: {}, rpc: {},
 };
 S.tab = S.prefs.tab === 'work' ? 'work' : 'summary';
 S.backTab = S.tab; // the tab Conformity returns to (it is never saved as the preference)
@@ -263,9 +263,31 @@ function applyLive(entries) {
   if (changed) draw();
 }
 
+// RPC2-1: the live session of each repo (S.rpc[id], kept by V.rpcReduce). `rpc` frames feed it; the status read puts it right on open and on every (re)connect.
+function applyRpc(p) {
+  const { entry, reload } = V.rpcReduce(S.rpc[p.id], p, Date.now());
+  S.rpc[p.id] = entry;
+  if (reload && S.chat.id === p.id) settled(p.id);
+  else if (reload) Object.assign(entry, { blocks: [], text: '' }); // nobody is looking: the history will have it
+  draw();
+}
+// A run ended: the persisted messages (read ONCE) replace the streaming bubble, and the pending ones the history has now go with it.
+async function settled(id) {
+  await loadChat(id);
+  const e = S.rpc[id];
+  if (e && !e.streaming) Object.assign(e, { blocks: [], text: '' });
+  S.pending[id] = (S.pending[id] || []).filter((p) => p.state === 'sending');
+  draw();
+}
+async function rpcSync(id) {
+  try { S.rpc[id] = V.rpcFromStatus(S.rpc[id], await api(`/api/rpc/status?id=${encodeURIComponent(id)}`)); draw(); } catch { if (!S.rpc[id]) S.rpc[id] = V.rpcFromStatus(undefined, null); } // the stream keeps it up to date; with no answer at all it reads as not started, never stuck on unknown
+}
+const rpcSyncAll = () => new Set([S.chat.id, ...Object.keys(S.rpc)].filter((id) => id && !String(id).startsWith('room:'))).forEach(rpcSync);
+
 async function readEvents(ctl) {
   const res = await fetch('/api/events', { headers: { 'x-token': TOKEN }, signal: ctl.signal });
   if (!res.ok || !res.body) throw new Error('No event stream');
+  rpcSyncAll(); // what happened while the stream was down is read from the status
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let rest = '';
@@ -281,6 +303,8 @@ async function readEvents(ctl) {
     for (const frame of parsed.events) {
       const out = V.liveEvent(frame);
       if (out) applyLive(Array.isArray(out) ? out : [out]);
+      const rpc = V.rpcEvent(frame);
+      if (rpc) applyRpc(rpc);
     }
   }
 }
@@ -836,12 +860,10 @@ const commandRunning = (id) => { const v = verdictOf({ id }); return !!v && v.st
 const summaryShown = () => (S.summary && Array.isArray(S.summary.rows)
   ? { ...S.summary, rows: S.summary.rows.map((r) => modelOf(r.id, r).row) }
   : S.summary);
-// The chat as the label and the body see it: the live state lifted the same way, and the pending messages of the open repo.
+// The chat as the label and the body see it: the pending messages and the live session (S.rpc) of the open repo.
 function chatView() {
   const id = S.chat.id;
-  const live = S.chat.info && S.chat.info.live;
-  const info = live && live.state === 'free' && commandRunning(id) ? { ...S.chat.info, live: { ...live, state: 'working' } } : S.chat.info;
-  return { ...S.chat, info, pending: S.pending[id], answer: S.answer[id] };
+  return { ...S.chat, pending: S.pending[id], answer: S.answer[id], rpc: S.rpc[id] };
 }
 
 function drawSummary() {
@@ -918,6 +940,7 @@ function openChat(id, tab) {
   if (chatCtl) chatCtl.abort();
   chatCtl = new AbortController();
   loadChat(id, { user: true, signal: chatCtl.signal });
+  rpcSync(id);
 }
 function closeChat() {
   if (!S.chat.id) return;
@@ -1182,10 +1205,11 @@ function drawChat() {
   $('#msgSend').disabled = !cs.canSend;
   $('#msgSend').title = cs.reason;
   $('#msgBox').placeholder = cs.placeholder;
+  $('#msgStop').hidden = !(S.rpc[id] && S.rpc[id].state === 'busy');
   const row = S.summary && Array.isArray(S.summary.rows) ? S.summary.rows.find((r) => r.id === id) : null;
   const live = (S.chat.info && S.chat.info.live && S.chat.info.live.state) || 'unknown';
   paint($('#chatActions'), R.actionButtonsHtml(R.actionMenu(row, { live, changes: summaryChanges(id), flow: summaryFlow(id) }), id, { sending: !!S.sending[id] }));
-  paint($('#msgNote'), R.composerNote(S.notes[id]));
+  paint($('#msgNote'), R.composerNote(S.notes[id] || (S.rpc[id] && S.rpc[id].error ? { text: S.rpc[id].error } : null)));
 }
 
 // One separator: drag it with the pointer, move it with the arrows (24 px) and reset all three blocks with Enter or a double click. `onDrag(clientX, rect, half)` and
@@ -1225,31 +1249,39 @@ function prunePending(id) {
   const keep = (S.pending[id] || []).filter((p) => p.state === 'sending' || R.userCount(items, p.text) <= p.base);
   if (keep.length) S.pending[id] = keep; else delete S.pending[id];
 }
-const composerOf = (id) => R.composerState({ ...S.chat, sending: !!S.msgBusy[id] }, { name: nameOf(id) });
-const sayNote = (id, text, clear = false) => { S.notes[id] = { text, id, clear }; };
+const sendingNow = (id) => (S.pending[id] || []).some((p) => p.state === 'sending');
+const composerOf = (id) => R.composerState({ ...S.chat, rpc: S.rpc[id], sending: sendingNow(id) }, { name: nameOf(id) });
+const sayNote = (id, text) => { S.notes[id] = { text, id }; };
+const setRpc = (id, patch) => { S.rpc[id] = { ...(S.rpc[id] || V.rpcFromStatus(undefined, null)), ...patch }; };
 
+// Send: a session that is not started is started FIRST (it can take up to two minutes: the label says Starting…), then the prompt goes. The start also adopts the
+// session id the history is read from. A failure puts the text back and shows the server's message; the optimistic user bubble goes with it.
 async function sendChatMessage() {
   const id = S.chat.id;
-  if (!R || !id || S.msgBusy[id]) return;
+  if (!R || !id) return;
   const text = $('#msgBox').value;
   if (!text.trim()) return;
   const cs = composerOf(id);
   if (!cs.canSend) { sayNote(id, cs.reason); draw(); return; }
-  // Optimistic: in this same tick the text leaves the box and shows as a pending bubble.
   const entry = { text, state: 'sending', base: R.userCount((S.chat.hist && S.chat.hist.items) || [], text) };
-  S.msgBusy[id] = true;
+  const starting = !S.rpc[id] || S.rpc[id].state === 'closed';
   delete S.notes[id];
   delete S.recall[id];
   $('#msgBox').value = '';
   delete S.drafts[id];
   (S.pending[id] || (S.pending[id] = [])).push(entry);
+  setRpc(id, starting ? { state: 'starting', error: '' } : { error: '' });
   draw();
   try {
-    const d = await api('/api/chat/send', { id, text });
-    if (!d.sent) throw new Error('The message was not sent');
-    entry.state = d.delivered ? 'ok' : 'unconfirmed';
-    if (d.leftInBox) sayNote(id, 'The text is still in the prompt box; the panel never resends it.', true);
-    else if (!d.delivered) sayNote(id, 'Sent, but it could not be confirmed: check the session.');
+    if (starting) {
+      try { S.rpc[id] = V.rpcFromStatus(S.rpc[id], await api('/api/rpc/start', { id }, { timeoutMs: 125000 })); } catch (e) {
+        setRpc(id, { state: 'closed' });
+        throw e.message === 'Request timed out' ? new Error('The session did not start in two minutes') : e;
+      }
+      if (S.chat.id === id) loadChat(id);
+    }
+    await api('/api/rpc/prompt', { id, text });
+    entry.state = 'ok';
   } catch (e) {
     S.pending[id] = (S.pending[id] || []).filter((p) => p !== entry);
     const now = S.chat.id === id ? $('#msgBox').value : S.drafts[id] || '';
@@ -1257,8 +1289,7 @@ async function sendChatMessage() {
 ${now}` : text;
     if (S.chat.id === id) $('#msgBox').value = back; else S.drafts[id] = back;
     sayNote(id, e.message);
-  } finally { delete S.msgBusy[id]; }
-  if (S.chat.id === id) loadChat(id);
+  }
   draw();
 }
 
@@ -1754,10 +1785,16 @@ const ACTIONS = {
     } catch (e) { S.answer[id] = { fp, state: 'error', text: e.message }; }
     draw();
   },
-  'chat-clear': async (el) => {
-    const { id } = el.dataset;
-    try { await api('/api/chat/clear', { id }); delete S.notes[id]; } catch (e) { sayNote(id, e.message, true); }
-    draw();
+  'chat-stop': async () => {
+    const id = S.chat.id;
+    if (!id) return;
+    try { await api('/api/rpc/abort', { id }); } catch (e) { toast(e.message, 'bad'); }
+  },
+  // RPC2-1: a dialog pi is waiting for can only be cancelled from here; answering it is RPC2-3.
+  'rpc-cancel': async (el) => {
+    const { id, request } = el.dataset;
+    if (!id || !request) return;
+    try { await api('/api/rpc/dialog', { id, requestId: request, cancelled: true }); } catch (e) { toast(e.message, 'bad'); }
   },
   'chat-adopt': async (el) => {
     const { id, session } = el.dataset;
@@ -1770,7 +1807,7 @@ const ACTIONS = {
     S.chat.starting = true;
     el.disabled = true;
     draw();
-    try { await api('/api/sessions/start', { id }); } catch (e) { toast(e.message, 'bad'); }
+    try { S.rpc[id] = V.rpcFromStatus(S.rpc[id], await api('/api/rpc/start', { id }, { timeoutMs: 125000 })); } catch (e) { toast(e.message, 'bad'); }
     S.chat.starting = false;
     el.disabled = false;
     if (S.chat.id === id) loadChat(id);

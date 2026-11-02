@@ -261,12 +261,14 @@ test('chat header: only the repo name (the session id is its tooltip) and the cl
   assert.match(w, /<b class="ch-name" title="alpha · s1">alpha<\/b>[\s\S]*data-act="chat-close"/);
   assert.doesNotMatch(w, /chip|panel:alpha|working|role="status"/);
   assert.match(head({ info: null }), /title="alpha">alpha<\/b>/);
-  const label = (i) => R.sessionLabelHtml({ id: 'r1', info: i });
-  assert.match(label(info({ adopted, adoptedFound: true, live: { state: 'working', count: 1 } })), /ss-working[\s\S]*●<\/i> working…/);
-  assert.match(label(info({ adopted, adoptedFound: true, live: { state: 'waiting', count: 1 } })), /ss-waiting[\s\S]*◐<\/i> asking you something/);
-  assert.match(label(info({ adopted, adoptedFound: true, live: { state: 'free', count: 1 } })), /○<\/i> free/);
-  assert.match(label(info()), /○<\/i> no session/);
-  assert.match(label(null), /loading…/);
+  const label = (i, state) => R.sessionLabelHtml({ id: 'r1', info: i, rpc: state ? { state } : undefined });
+  const loaded = info({ adopted, adoptedFound: true });
+  assert.match(label(loaded, 'busy'), /ss-working[\s\S]*●<\/i> Working…/);
+  assert.match(label(loaded, 'asking'), /ss-waiting[\s\S]*◐<\/i> Asking you something/);
+  assert.match(label(loaded, 'idle'), /○<\/i> Idle/);
+  assert.match(label(loaded, 'starting'), /ss-starting[\s\S]*Starting…/);
+  assert.match(label(info(), 'closed'), /○<\/i> Not started/);
+  assert.match(label(null), /Loading…/);
 });
 
 test('no adopted session: up to 5 sessions with Adopt buttons, a Start button, all text escaped; Start is disabled while starting', () => {
@@ -411,7 +413,7 @@ test('opening a card shows the chat and the divider, marks the card, and reads s
   page.fetches.length = 0;
   page.run("ACTIONS['chat-open']({ dataset: { id: 'abc' } })");
   await page.tick();
-  assert.deepEqual(page.fetches.map((f) => f.url), ['/api/sessions?id=abc', '/api/chat?id=abc']);
+  assert.deepEqual(page.fetches.map((f) => f.url), ['/api/sessions?id=abc', '/api/chat?id=abc', '/api/rpc/status?id=abc'], 'the two reads of the history and the status of the live session');
   assert.equal(page.run('S.chat.id'), 'abc');
   assert.equal(page.get('#chat').hidden, false);
   assert.equal(page.get('#split').hidden, false);
@@ -531,11 +533,11 @@ test('a stale answer is ignored when the user switches cards quickly', async () 
   assert.doesNotMatch(page.get('#chatBody').html, /from abc/);
 });
 
-test('Adopt posts to /api/sessions/adopt and reloads; Start posts to /api/sessions/start, disables itself, shows the 409 message and reloads', async () => {
+test('Adopt posts to /api/sessions/adopt and reloads; Start posts to /api/rpc/start, disables itself, shows the 409 message and reloads', async () => {
   const noSession = { key: 'abc', adopted: null, adoptedFound: false, sessions: [sess()], live: { state: 'none', count: 0 } };
   let startOk = false;
   const page = loadPage({ answers: {
-    '/api/sessions/adopt': { ok: true }, '/api/sessions/start': () => Promise.resolve(startOk ? { ok: true, json: async () => ({ started: true }) } : { ok: false, status: 409, statusText: 'Conflict', json: async () => ({ error: 'This folder already has a session open; adopt it instead of starting another' }) }),
+    '/api/sessions/adopt': { ok: true }, '/api/rpc/start': () => Promise.resolve(startOk ? { ok: true, json: async () => ({ state: 'idle', pendingDialogs: [], sessionId: 's1' }) } : { ok: false, status: 409, statusText: 'Conflict', json: async () => ({ error: 'This folder already has a session open; adopt it instead of starting another' }) }),
     '/api/sessions?': noSession,
     '/api/chat?': { key: 'abc', sessionId: null, found: false, items: [], truncated: false, updatedAt: null }, // RP79: both reads go out together, so the chat read is always asked
   } });
@@ -558,8 +560,8 @@ test('Adopt posts to /api/sessions/adopt and reloads; Start posts to /api/sessio
   assert.equal(btn.disabled, true);
   await running;
   await page.tick();
-  assert.equal(page.fetches.find((f) => f.url === '/api/sessions/start').method, 'POST');
-  assert.deepEqual(JSON.parse(page.fetches.find((f) => f.url === '/api/sessions/start').body), { id: 'abc' });
+  assert.equal(page.fetches.find((f) => f.url === '/api/rpc/start').method, 'POST');
+  assert.deepEqual(JSON.parse(page.fetches.find((f) => f.url === '/api/rpc/start').body), { id: 'abc' });
   assert.ok(toasts.some((t) => /already has a session open/.test(t.textContent)), '409 message shown');
   assert.equal(page.run('S.chat.starting'), false);
   assert.ok(page.fetches.some((f) => f.url === '/api/sessions?id=abc'), 'reloads');

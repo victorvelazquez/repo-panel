@@ -568,6 +568,56 @@
     if (frame.event === 'live') return liveEntry(body);
     return Array.isArray(body) ? body.map(liveEntry).filter(Boolean) : null;
   }
+  // RPC2-1 (S1): the `rpc` event carries what one pi session does ({ id, kind, ... }; the id is a repo id like the live ones). Same limit as liveEvent.
+  const RPC_KINDS = ['event', 'state', 'dialog', 'dialog-closed', 'exit'];
+  const RPC_STATES = ['starting', 'idle', 'busy', 'asking', 'closed'];
+  function rpcEvent(frame) {
+    if (!frame || frame.event !== 'rpc' || typeof frame.data !== 'string' || frame.data.length > EVENT_MAX) return null;
+    let body;
+    try { body = JSON.parse(frame.data); } catch { return null; }
+    return isObject(body) && typeof body.id === 'string' && /^[0-9a-f]{10}$/.test(body.id) && RPC_KINDS.includes(body.kind) ? body : null;
+  }
+  // What the chat shows of one session: { state, text, blocks, error, startedAt } plus `streaming` (a run is on) and `asks` (pending dialog ids). The text is
+  // the blocks in order (the index is the `contentIndex` of pi; thinking and tool blocks leave theirs empty), capped.
+  const RPC_BLOCKS = 64;
+  const RPC_TEXT_MAX = 200000;
+  const rpcBlank = () => ({ state: 'closed', text: '', blocks: [], error: '', startedAt: 0, streaming: false, asks: [] });
+  const rpcText = (blocks) => blocks.filter(Boolean).join('\n\n').slice(0, RPC_TEXT_MAX);
+  const rpcAsks = (a, add, remove) => [...(Array.isArray(a) ? a : []).filter((x) => x !== remove), ...(add && !(a || []).includes(add) ? [add] : [])].slice(0, 20);
+  // A pure reducer: (entry, payload of rpcEvent, now) -> { entry, reload }. `reload` is true when a run settled and the history must be read ONCE.
+  function rpcReduce(prev, p, now = 0) {
+    const e = { ...rpcBlank(), ...(isObject(prev) ? prev : {}) };
+    e.blocks = Array.isArray(e.blocks) ? e.blocks.slice(0, RPC_BLOCKS) : [];
+    let reload = false;
+    if (!isObject(p)) return { entry: e, reload };
+    if (p.kind === 'state' && RPC_STATES.includes(p.state)) { e.state = p.state; if (p.state === 'busy') e.streaming = true; }
+    else if (p.kind === 'exit') Object.assign(e, { state: 'closed', blocks: [], text: '', streaming: false, asks: [] });
+    else if (p.kind === 'dialog' && typeof p.requestId === 'string') e.asks = rpcAsks(e.asks, p.requestId);
+    else if (p.kind === 'dialog-closed' && typeof p.requestId === 'string') e.asks = rpcAsks(e.asks, null, p.requestId);
+    else if (p.kind === 'event' && isObject(p.record)) {
+      const r = p.record;
+      const a = isObject(r.assistantMessageEvent) ? r.assistantMessageEvent : {};
+      if (r.type === 'agent_start') Object.assign(e, { blocks: [], streaming: true, error: '', startedAt: now });
+      else if (r.type === 'agent_settled') { e.streaming = false; reload = true; }
+      else if (r.type === 'message_update' && Number.isInteger(a.contentIndex) && a.contentIndex >= 0 && a.contentIndex < RPC_BLOCKS) {
+        for (let i = e.blocks.length; i < a.contentIndex; i++) e.blocks[i] = '';
+        if (a.type === 'text_delta' && typeof a.delta === 'string') e.blocks[a.contentIndex] = ((e.blocks[a.contentIndex] || '') + a.delta).slice(0, RPC_TEXT_MAX);
+        else if (a.type === 'text_end' && typeof a.content === 'string') e.blocks[a.contentIndex] = a.content;
+      }
+      if (r.type === 'agent_start' || r.type === 'message_update') e.text = rpcText(e.blocks);
+    }
+    return { entry: e, reload };
+  }
+  // GET /api/rpc/status: the state and the pending dialogs (by `requestId`). A run that is not on any more leaves no streaming text.
+  function rpcFromStatus(prev, st) {
+    const e = { ...rpcBlank(), ...(isObject(prev) ? prev : {}) };
+    if (!isObject(st) || !RPC_STATES.includes(st.state)) return e;
+    e.state = st.state;
+    e.asks = (Array.isArray(st.pendingDialogs) ? st.pendingDialogs : []).map((d) => (isObject(d) ? d.requestId : null)).filter((x) => typeof x === 'string').slice(0, 20);
+    e.streaming = st.state === 'busy' || st.state === 'asking';
+    if (!e.streaming) Object.assign(e, { blocks: [], text: '' });
+    return e;
+  }
   // RP79 (S68, S74): the page keeps the last chats it read, per repo, and paints them at once when the card is opened again. The use order
   // is a counter, never a clock. A cached live state is never reused: chatFromCache replaces it with 'unknown' (no question, no answer buttons).
   let cacheTick = 0;
@@ -840,5 +890,5 @@
     return `${meters.join('')}${age}<div class="usage-pop" role="group" aria-label="Claude usage details">${details.join('')}${note}${foot}</div>`;
   }
 
-  return { repoModel, changeChips, prChip, idleChip, conflictChip, sizeChip, RepoCard, stateLineHidden, usageView, usageHtml, usageRemaining, boardApply, boardWait, chatCachePut, chatCacheGet, chatFromCache, API_VERSION, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, piPollTargets, LIVE_CHECK_MS, liveSession, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, presenceLabel, presenceDot, parseSse, liveEvent, eventsPlan, eventsRetryMs, eventsStale };
+  return { repoModel, changeChips, prChip, idleChip, conflictChip, sizeChip, RepoCard, stateLineHidden, usageView, usageHtml, usageRemaining, boardApply, boardWait, chatCachePut, chatCacheGet, chatFromCache, API_VERSION, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, piPollTargets, LIVE_CHECK_MS, liveSession, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, presenceLabel, presenceDot, parseSse, liveEvent, rpcEvent, rpcReduce, rpcFromStatus, eventsPlan, eventsRetryMs, eventsStale };
 }));

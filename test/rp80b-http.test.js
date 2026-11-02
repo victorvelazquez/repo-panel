@@ -1,7 +1,7 @@
 'use strict';
-// RP80b (S68, S76), design points 3 and 4: after POST /api/merge, /rerun, /fetch, /pi and /chat/send end (success or failure of the action) the
+// RP80b (S68, S76), design points 3 and 4: after POST /api/merge, /rerun, /fetch and /pi end (success or failure of the action) the
 // server calls deps.summaryStore.catchUp(body.id) fire-and-forget, never changing the reply; POST /api/board/refresh with an id uses catchUp(id);
-// chat/clear and every GET do not; and the page's doRerun asks the server to catch up too. A fake store, fake gh/git/Orca (mocked before
+// the other POSTs and every GET do not; and the page's doRerun asks the server to catch up too. A fake store, fake gh/git/Orca (mocked before
 // http.js loads) and a temp config only: the real config, Orca, git and gh are never used. The page runs in a vm with a stubbed DOM and fetch.
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -114,7 +114,6 @@ const ACTIONS = {
   merge: { path: '/api/merge', body: { number: 5, method: 'squash', deleteBranch: false }, good: () => {}, ok: { merged: true, branch: 'auto' }, bad: () => { world.pr = { state: 'CLOSED' }; }, fail: [409, { error: 'PR is CLOSED' }] },
   rerun: { path: '/api/rerun', body: { number: 5 }, good: () => { world.rollup = [{ name: 'ci', status: 'COMPLETED', conclusion: 'FAILURE', detailsUrl: 'https://x/actions/runs/123/job/1' }]; }, ok: { rerun: 1 }, bad: () => {}, fail: [409, { error: 'No failed GitHub Actions runs to re-run' }] },
   pi: { path: '/api/pi', body: { command: 'flow-commit-unstage' }, good: withTerminal, ok: { sent: true, confirmed: true }, bad: () => {}, fail: [400, { error: 'Unknown command' }], failBody: { command: 'rm -rf' } },
-  chat: { path: '/api/chat/send', body: { text: 'hola' }, good: withTerminal, ok: { sent: true, delivered: false, leftInBox: false }, bad: () => {}, fail: [409, { error: 'No open session found for this repo in Orca' }] },
 };
 const names = Object.keys(ACTIONS);
 
@@ -233,12 +232,11 @@ test('no handler ran, no catch-up: a missing token, a foreign host and a body th
   assert.deepEqual(store.log, [['catchUp', ID]], 'only the one valid request');
 });
 
-test('chat/clear, the other POSTs and the GETs do NOT catch up', async () => {
+test('the other POSTs and the GETs do NOT catch up', async () => {
   resetWorld();
   withTerminal();
   const store = fakeStore();
   await withServer({ summaryStore: store }, async ({ get, post }) => {
-    await post('/api/chat/clear', { id: ID });
     await post('/api/snooze', { id: ID, number: 1, on: true });
     await post('/api/dismiss', { id: ID, on: false });
     await post('/api/board/refresh', {});
@@ -416,7 +414,7 @@ test('the hook skips a store that says it is not awake, and calls one that is (a
     await withServer({ summaryStore: store }, async ({ post }) => {
       resetWorld();
       withTerminal();
-      await post('/api/chat/send', { id: ID, text: `hello ${expected}${String(awake)}` });
+      await post('/api/pi', { id: ID, command: 'flow-commit-unstage' });
       await flush();
       assert.equal(store.log.filter((l) => l[0] === 'catchUp').length, expected, String(awake));
     });
@@ -434,18 +432,18 @@ test('POST /api/board/refresh with an id still catches up even when the store sa
   });
 });
 
-test('a real server with a real store nobody has asked reads NOTHING after a chat message; after a page asks the board, it does', async () => {
+test('a real server with a real store nobody has asked reads NOTHING after a command; after a page asks the board, it does', async () => {
   const calls = [];
   const readers = Object.fromEntries(['local', 'prs', 'roadmap', 'state', 'requirements'].map((k) => [k, async () => { calls.push(k); return { error: 'fake' }; }]));
   const deps = { ...readers, git: async () => { calls.push('git'); return { code: 1, stdout: '', stderr: 'fake' }; } };
   await withServer(deps, async ({ post, get }) => {
     resetWorld();
     withTerminal();
-    await post('/api/chat/send', { id: ID, text: 'first message' });
+    await post('/api/pi', { id: ID, command: 'flow-commit-unstage' });
     await flush();
     assert.deepEqual(calls, [], 'nobody asked: no read of any kind');
     await get('/api/board?since=0'); // a page asks
-    await post('/api/chat/send', { id: ID, text: 'second message' });
+    await post('/api/pi', { id: ID, command: 'flow-commit-unstage' });
     await flush();
     assert.ok(calls.length > 0, 'a page is there: the repo is read');
   });

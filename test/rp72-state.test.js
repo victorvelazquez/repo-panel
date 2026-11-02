@@ -85,9 +85,10 @@ const ADOPTED = { key: 'abc', adopted: { id: 's1', name: 'panel:demo', adoptedAt
 const UNADOPTED = { key: 'abc', adopted: null, adoptedFound: false, sessions: [sess()], live: { state: 'none', count: 0 } };
 const HIST = { key: 'abc', sessionId: 's1', found: true, items: [{ role: 'user', text: 'hello there', at: null, tools: [] }], truncated: false, updatedAt: null };
 const okJson = (body) => Promise.resolve({ ok: true, json: async () => body });
-// '/api/chat/send' and '/api/chat/clear' come BEFORE '/api/chat': the fake fetch takes the first key the url starts with.
+// The live session answers /api/rpc/status (RPC2-1): its state is what the label shows.
+const rpcState = (state, pendingDialogs = []) => ({ state, pendingDialogs, sessionId: 's1' });
 const answersFor = (extra = {}) => ({
-  '/api/chat/send': { sent: true, delivered: true }, '/api/chat/clear': { cleared: true }, '/api/pi': { sent: true, confirmed: true },
+  '/api/rpc/status': rpcState('closed'), '/api/pi': { sent: true, confirmed: true },
   '/api/sessions': ADOPTED, '/api/chat': HIST, ...extra,
 });
 async function ready(extra = {}) {
@@ -98,26 +99,24 @@ async function ready(extra = {}) {
   return { page, S: S2 };
 }
 const live = (state, o = {}) => ({ ...ADOPTED, live: { state, count: state === 'none' ? 0 : 1 }, ...o });
-const WORKING = 'The session is working: wait until it is free';
-const WAITING_TITLE = 'Answer it in its terminal: the panel does not answer yet.';
+const WORKING = 'The session is working: wait until it is idle, or press Stop';
+const WAITING_TITLE = 'pi is asking something; answering from the panel comes next';
 const text = (html) => html.replace(/<[^>]*>/g, '');
 const classes = (html) => new Set((/^<span[^>]*\sclass="([^"]*)"/.exec(html) || [, ''])[1].split(/\s+/).filter(Boolean));
 
 // ---------- sessionState ----------
 const ss = (c) => R.sessionState({ id: 'r1', ...c }, { name: 'alpha' });
 const STATES = [
-  ['info missing (not loaded)', { info: null }, { key: 'loading', tone: 'gray', icon: '○', word: 'loading…', animate: false }],
-  ['not adopted', { info: info() }, { key: 'none', tone: 'gray', icon: '○', word: 'no session', animate: false }],
-  ['not adopted, live working', { info: info({ live: { state: 'working', count: 1 } }) }, { key: 'none', tone: 'gray', icon: '○', word: 'no session', animate: false }],
-  ['adopted, live none', { info: adoptedInfo('none') }, { key: 'closed', tone: 'gray', icon: '○', word: 'session closed', animate: false }],
-  ['adopted, live free', { info: adoptedInfo('free') }, { key: 'free', tone: 'gray', icon: '○', word: 'free', animate: false }],
-  ['adopted, live working', { info: adoptedInfo('working') }, { key: 'working', tone: 'green', icon: '●', word: 'working…', animate: true }],
-  ['adopted, live waiting', { info: adoptedInfo('waiting') }, { key: 'waiting', tone: 'yellow', icon: '◐', word: 'asking you something', animate: false }],
-  ['adopted, live unknown', { info: adoptedInfo('unknown') }, { key: 'unknown', tone: 'gray', icon: '?', word: 'unknown', animate: false }],
-  ['adopted, live something else', { info: adoptedInfo('bogus') }, { key: 'unknown', tone: 'gray', icon: '?', word: 'unknown', animate: false }],
-  ['adopted, no live at all', { info: adoptedInfo('free', { live: undefined }) }, { key: 'unknown', tone: 'gray', icon: '?', word: 'unknown', animate: false }],
-  ['adopted but not found yet (live free)', { info: adoptedInfo('free', { adoptedFound: false }) }, { key: 'loading', tone: 'gray', icon: '○', word: 'session loading…', animate: false }],
-  ['adopted but not found yet (live working)', { info: adoptedInfo('working', { adoptedFound: false }) }, { key: 'loading', tone: 'gray', icon: '○', word: 'session loading…', animate: false }],
+  ['info missing (not loaded)', { info: null }, { key: 'loading', tone: 'gray', icon: '○', word: 'Loading…', animate: false }],
+  ['not adopted, no rpc entry', { info: info() }, { key: 'unknown', tone: 'gray', icon: '?', word: 'Unknown', animate: false }],
+  ['adopted, no rpc entry', { info: adoptedInfo() }, { key: 'unknown', tone: 'gray', icon: '?', word: 'Unknown', animate: false }],
+  ['adopted, closed', { info: adoptedInfo(), rpc: { state: 'closed' } }, { key: 'none', tone: 'gray', icon: '○', word: 'Not started', animate: false }],
+  ['starting', { info: adoptedInfo(), rpc: { state: 'starting' } }, { key: 'starting', tone: 'yellow', icon: '◌', word: 'Starting…', animate: true }],
+  ['idle', { info: adoptedInfo(), rpc: { state: 'idle' } }, { key: 'free', tone: 'gray', icon: '○', word: 'Idle', animate: false }],
+  ['busy', { info: adoptedInfo(), rpc: { state: 'busy' } }, { key: 'working', tone: 'green', icon: '●', word: 'Working…', animate: true }],
+  ['asking', { info: adoptedInfo(), rpc: { state: 'asking' } }, { key: 'waiting', tone: 'yellow', icon: '◐', word: 'Asking you something', animate: false }],
+  ['an unknown rpc state', { info: adoptedInfo(), rpc: { state: 'bogus' } }, { key: 'unknown', tone: 'gray', icon: '?', word: 'Unknown', animate: false }],
+  ['the Orca live state is ignored', { info: adoptedInfo('working'), rpc: { state: 'idle' } }, { key: 'free', tone: 'gray', icon: '○', word: 'Idle', animate: false }],
 ];
 
 test('sessionState: key, tone, icon, word and animate for every case', () => {
@@ -128,14 +127,14 @@ test('sessionState: key, tone, icon, word and animate for every case', () => {
   }
 });
 
-test('sessionState: only working animates; title is a non-empty string everywhere and the exact old banner sentence for waiting', () => {
+test('sessionState: only working and starting animate; title is a non-empty string everywhere and the asking sentence for waiting', () => {
   for (const [name, c, want] of STATES) {
     const got = ss(c);
     assert.equal(typeof got.title, 'string', name);
     assert.ok(got.title.trim().length > 0, `${name}: title is not empty`);
-    assert.strictEqual(got.animate, want.key === 'working', name);
+    assert.strictEqual(got.animate, want.key === 'working' || want.key === 'starting', name);
   }
-  assert.equal(ss({ info: adoptedInfo('waiting') }).title, WAITING_TITLE);
+  assert.equal(ss({ info: adoptedInfo(), rpc: { state: 'asking' } }).title, WAITING_TITLE);
 });
 
 // ---------- sessionLabelHtml ----------
@@ -159,15 +158,15 @@ test('sessionLabelHtml: ONE span with role=status, the tone and key classes, the
   }
 });
 
-test('sessionLabelHtml: ss-anim only while working; the label never uses the hidden attribute; the waiting title is escaped and in the element', () => {
+test('sessionLabelHtml: ss-anim only while working or starting; the label never uses the hidden attribute; the waiting title is escaped and in the element', () => {
   for (const [name, c, want] of STATES) {
     const html = label(c);
-    assert.strictEqual(classes(html).has('ss-anim'), want.key === 'working', `${name}: ss-anim`);
+    assert.strictEqual(classes(html).has('ss-anim'), want.key === 'working' || want.key === 'starting', `${name}: ss-anim`);
     assert.doesNotMatch(html, /\shidden(?=[\s=>])/, name); // the attribute, not aria-hidden
     const t = /title="([^"]*)"/.exec(html); // the value ends at the first quote: a raw quote would cut it short
     assert.ok(t && !/[<>]/.test(t[1]) && /^(?: |>)/.test(html.slice(html.indexOf(t[0]) + t[0].length)), `${name}: nothing raw in the title attribute`);
   }
-  assert.ok(label({ info: adoptedInfo('waiting') }).includes(`title="${R.esc(WAITING_TITLE)}"`));
+  assert.ok(label({ info: adoptedInfo(), rpc: { state: 'asking' } }).includes(`title="${R.esc(WAITING_TITLE)}"`));
 });
 
 // ---------- chatHead (cleaned) ----------
@@ -215,11 +214,10 @@ test('chatHead: the id is escaped in the title and the name too; the close butto
 });
 
 // ---------- composerState unchanged (PRESERVE) ----------
-test('composerState: unchanged by RP72 (working: cannot send, same reason, same placeholder)', () => {
-  assert.deepEqual(R.composerState({ id: 'r1', sending: false, info: adoptedInfo('working') }, { name: 'alpha' }), { canSend: false, reason: WORKING, placeholder: WORKING });
-  assert.deepEqual(R.composerState({ id: 'r1', sending: false, info: adoptedInfo('free') }, { name: 'alpha' }), { canSend: true, reason: '', placeholder: 'Message the session of alpha' });
+test('composerState: busy cannot send (same reason, same placeholder); idle can', () => {
+  assert.deepEqual(R.composerState({ id: 'r1', sending: false, info: adoptedInfo(), rpc: { state: 'busy' } }, { name: 'alpha' }), { canSend: false, reason: WORKING, placeholder: WORKING });
+  assert.deepEqual(R.composerState({ id: 'r1', sending: false, info: adoptedInfo(), rpc: { state: 'idle' } }, { name: 'alpha' }), { canSend: true, reason: '', placeholder: 'Message the session of alpha' });
 });
-
 // ---------- index.html ----------
 test('index.html: div#sessState.sess-state is the FIRST child of div#composer and comes before textarea#msgBox; it is never hidden', () => {
   const html = read('index.html');
@@ -241,27 +239,26 @@ const box = (page) => {
   return w;
 };
 
-test('page: after drawChat #sessState holds the label of the state: working (ss-working, ss-anim, working…), free (ss-free, no ss-anim)', async () => {
-  const w = (await ready({ '/api/sessions': live('working') })).page.get('#sessState').html;
-  assert.ok(w.includes('ss-working') && w.includes('ss-anim') && w.includes('working…'), w);
-  const f = (await ready({ '/api/sessions': live('free') })).page.get('#sessState').html;
-  assert.ok(f.includes('ss-free'), f);
+test('page: after drawChat #sessState holds the label of the state: working (ss-working, ss-anim, Working…), idle (ss-free, no ss-anim)', async () => {
+  const w = (await ready({ '/api/rpc/status': rpcState('busy') })).page.get('#sessState').html;
+  assert.ok(w.includes('ss-working') && w.includes('ss-anim') && w.includes('Working…'), w);
+  const f = (await ready({ '/api/rpc/status': rpcState('idle') })).page.get('#sessState').html;
+  assert.ok(f.includes('ss-free') && f.includes('Idle'), f);
   assert.ok(!f.includes('ss-anim'), f);
 });
-
-test('page: an unadopted repo shows ss-none; adopted with a closed session shows ss-closed; waiting shows ss-waiting', async () => {
+test('page: a session that is not started shows ss-none (adopted or not); starting shows ss-starting; asking shows ss-waiting', async () => {
   assert.ok((await ready({ '/api/sessions': UNADOPTED })).page.get('#sessState').html.includes('ss-none'));
-  assert.ok((await ready({ '/api/sessions': live('none') })).page.get('#sessState').html.includes('ss-closed'));
-  assert.ok((await ready({ '/api/sessions': live('waiting') })).page.get('#sessState').html.includes('ss-waiting'));
+  assert.ok((await ready({ '/api/rpc/status': rpcState('closed') })).page.get('#sessState').html.includes('ss-none'));
+  assert.ok((await ready({ '/api/rpc/status': rpcState('starting') })).page.get('#sessState').html.includes('ss-starting'));
+  assert.ok((await ready({ '/api/rpc/status': rpcState('asking', [{ requestId: 'd1' }]) })).page.get('#sessState').html.includes('ss-waiting'));
 });
-
 test('page: while the chat info is still loading the label says loading… (ss-loading)', async () => {
   const page = loadPage({ answers: {} });
   seed(page);
   page.run("ACTIONS['chat-open']({ dataset: { id: 'abc' } })");
   await page.tick();
   const html = page.get('#sessState').html;
-  assert.ok(html.includes('ss-loading') && html.includes('loading…'), html);
+  assert.ok(html.includes('ss-loading') && html.includes('Loading…'), html);
 });
 
 test('page: the label is painted only while the chat is open; closing it leaves #sessState untouched and it is never hidden', async () => {
@@ -281,7 +278,7 @@ test('page: the label is painted only while the chat is open; closing it leaves 
 });
 
 test('page: the 5 s poll with an unchanged answer does not rewrite #sessState (paint cache) and never touches #msgBox.value', async () => {
-  const { page } = await ready({ '/api/sessions': live('working') });
+  const { page } = await ready({ '/api/rpc/status': rpcState('busy') });
   const el = page.get('#sessState');
   const w = box(page);
   const before = el.writes;
@@ -293,23 +290,22 @@ test('page: the 5 s poll with an unchanged answer does not rewrite #sessState (p
   assert.equal(page.get('#msgBox').value, 'half-typed message');
 });
 
-test('page: when the live state changes the poll repaints #sessState (working to free) and still leaves #msgBox.value alone', async () => {
-  let state = 'working';
-  const { page } = await ready({ '/api/sessions': () => okJson(live(state)) });
+test('page: when the session state changes the status read repaints #sessState (working to idle) and still leaves #msgBox.value alone', async () => {
+  let state = 'busy';
+  const { page } = await ready({ '/api/rpc/status': () => okJson(rpcState(state)) });
   const el = page.get('#sessState');
   const w = box(page);
   assert.ok(el.html.includes('ss-working'), el.html);
   const before = el.writes;
-  state = 'free';
-  page.intervals.find((i) => i.ms === 5000).fn();
+  state = 'idle';
+  page.run("rpcSync('abc')");
   await page.tick();
   assert.ok(el.writes > before, 'repainted');
   assert.ok(el.html.includes('ss-free') && !el.html.includes('ss-anim'), el.html);
   assert.equal(w.count, 0);
 });
-
 test('page: the chat head painted by the page has no chip and no banner either', async () => {
-  const { page } = await ready({ '/api/sessions': live('working') });
+  const { page } = await ready({ '/api/rpc/status': rpcState('busy') });
   const html = page.get('#chatHead').html;
   assert.ok(html.includes('ch-name'), html);
   assert.doesNotMatch(html, /chip|ch-live|ch-sess/);

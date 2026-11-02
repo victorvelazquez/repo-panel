@@ -29,23 +29,6 @@ const BUSY = '▎ ✿ working…\n▎\n~\\proj (main) • panel:demo\n';
 const tick = () => new Promise((r) => setImmediate(r));
 test.beforeEach(() => { clearLiveCache(); });
 
-test('S3: two starts AT THE SAME TIME open ONE terminal (the `starting` guard)', async () => {
-  const world = {};
-  let creates = 0;
-  const orca = async (args) => {
-    await tick();
-    if (args[0] === 'list') return { terminals: Object.keys(world).map((handle) => ({ handle, worktreePath: repoDir, connected: true, writable: true, lastOutputAt: 1 })) };
-    if (args[0] === 'show') return { terminal: { preview: IDLE } };
-    if (args[0] === 'create') { creates++; world.t1 = {}; return { terminal: { handle: 't1' } }; }
-    throw new Error('unexpected');
-  };
-  const id = lib.repoId(repoDir);
-  const r = await Promise.allSettled([S.startSession(id, orca), S.startSession(id, orca)]);
-  assert.equal(creates, 1);
-  assert.deepEqual(r.map((x) => x.status).sort(), ['fulfilled', 'rejected']);
-  assert.match(r.find((x) => x.status === 'rejected').reason.message, /already being started/);
-});
-
 test('A5b: a list in flight for one orca function is not shared with a caller of ANOTHER orca function', async () => {
   let release;
   const gate = new Promise((r) => { release = r; });

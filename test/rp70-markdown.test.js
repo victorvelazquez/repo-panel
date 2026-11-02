@@ -1,7 +1,7 @@
 'use strict';
 // RP70 (S64): chat messages keep their format. Server: readChat keeps line structure (LF and TAB survive, blocks are
-// joined with a blank line) and the delivery check still works on multi-line text. Client: R.mdHtml turns ONE message into
-// safe HTML (escape first, tiny markdown subset) and R.chatBody uses it. Temp dirs and a fake Orca only.
+// joined with a blank line). Client: R.mdHtml turns ONE message into
+// safe HTML (escape first, tiny markdown subset) and R.chatBody uses it. Temp dirs only.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -20,7 +20,6 @@ test.after(() => fs.rmSync(scratch, { recursive: true, force: true, maxRetries: 
 
 const lib = require('../lib.js');
 const S = require('../server/sessions.js');
-const { sendChat } = require('../server/chatsend.js');
 const R = require('../public/resumen.js');
 
 // ---------- server helpers ----------
@@ -95,44 +94,7 @@ test('listSessions: the lastMessage preview stays flattened to one line', () => 
   assert.equal(s.lastMessage.text, 'first line second line');
 });
 
-// ---------- B: the delivery check with multi-line text ----------
-const NAME = 'panel:my-repo';
-const ADOPTED = { id: 'panel-my-repo', name: NAME, adoptedAt: '2026-10-28T10:00:00.000Z' };
-const REPO_ID = lib.repoId(repoDir);
-const IDLE = `▎ ✿ waiting for input\n▎   type, or / for commands\n▎\n~\\Developer\\my-repo (main) • ${NAME}\n`;
-const userLine = (t) => JSON.stringify({ type: 'message', message: { role: 'user', content: [{ type: 'text', text: t }], timestamp: 1793232936000 } });
-function appendUser(t, id = ADOPTED.id) {
-  const dir = S.sessionsDirFor(repoDir, sessionsBase);
-  fs.mkdirSync(dir, { recursive: true });
-  const file = path.join(dir, `2026-10-28T10-00-00-000Z_${id}.jsonl`);
-  if (!fs.existsSync(file)) fs.writeFileSync(file, `${header(id)}\n`);
-  fs.appendFileSync(file, `${userLine(t)}\n`);
-}
-function fakeOrca(onSend = () => {}) {
-  const calls = [];
-  const orca = async (args) => {
-    calls.push(args);
-    if (args[0] === 'list') return { terminals: [{ handle: 'h1', title: 'Terminal 1', worktreePath: repoDir, connected: true, writable: true }] };
-    if (args[0] === 'show') return { terminal: { preview: IDLE } };
-    if (args[0] === 'send') onSend(args);
-    return { send: { accepted: true } };
-  };
-  return { orca, calls };
-}
-const textOfSend = (a) => a.find((x) => String(x).startsWith('--text=')).slice('--text='.length);
-const sendDeps = (f) => ({ orca: f.orca, wait: async () => {}, sessionsDir: sessionsBase });
-
-test('sendChat: a multi-line message is delivered when the history keeps its newlines', async () => {
-  resetDisk();
-  fs.writeFileSync(configFile, JSON.stringify({ port: 4310, groups: [{ name: 'G', repos: [{ path: repoDir }] }], rooms: [], sessions: { [REPO_ID]: ADOPTED } }));
-  const f = fakeOrca((a) => appendUser(textOfSend(a)));
-  const out = await sendChat(REPO_ID, { text: 'line one\n\nline two' }, sendDeps(f));
-  assert.deepEqual(out, { sent: true, delivered: true, leftInBox: false });
-  assert.equal(f.calls.filter((c) => c[0] === 'send').length, 1);
-  assert.equal(textOfSend(f.calls.find((c) => c[0] === 'send')), 'line one\n\nline two');
-});
-
-// ---------- C: R.mdHtml ----------
+// ---------- B: R.mdHtml ----------
 // Every call goes through here so a missing function fails with a clear message instead of a bare TypeError.
 const md = (t) => {
   assert.equal(typeof R.mdHtml, 'function', 'R.mdHtml is missing');

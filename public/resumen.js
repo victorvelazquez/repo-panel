@@ -187,26 +187,20 @@
     const tasks = typeof c.tasksHtml === 'string' && c.tasksHtml ? `<section class="col-card col-tasks" aria-label="Tasks${c.name ? ` of ${esc(c.name)}` : ''}"><h3 class="col-title">Tasks</h3>${c.tasksHtml}</section>` : '';
     return `${tasks}${filesCard(c)}`;
   };
-  const liveOf = (c) => (c.info && c.info.live && c.info.live.state) || 'unknown';
-  // The state of the adopted session, shown inside the composer frame (RP72). Icon + word, never colour alone.
+  // The state of the session (RPC2-1), shown inside the composer frame. Icon + word, never colour alone. c = { info, rpc } (rpc: what V.rpcReduce keeps).
   const SESS_TITLE = {
-    loading: 'Loading the session', none: 'No session adopted for this repo', closed: 'The adopted session is not open any more',
-    free: 'The session is free: you can write to it', working: 'The session is working', waiting: 'Answer it in its terminal: the panel does not answer yet.',
-    unknown: 'The session state is unknown',
+    loading: 'Loading the session', unknown: 'The session state is unknown', none: 'The session is not started: sending a message starts it', starting: 'The session is starting; this can take half a minute',
+    free: 'The session is idle: you can write to it', working: 'The session is working', waiting: 'pi is asking something; answering from the panel comes next',
   };
   const SESS_VIEW = {
-    loading: ['gray', '○', 'loading…'], none: ['gray', '○', 'no session'], closed: ['gray', '○', 'session closed'], free: ['gray', '○', 'free'],
-    working: ['green', '●', 'working…'], waiting: ['yellow', '◐', 'asking you something'], unknown: ['gray', '?', 'unknown'],
+    loading: ['gray', '○', 'Loading…'], unknown: ['gray', '?', 'Unknown'], none: ['gray', '○', 'Not started'], starting: ['yellow', '◌', 'Starting…'], free: ['gray', '○', 'Idle'],
+    working: ['green', '●', 'Working…'], waiting: ['yellow', '◐', 'Asking you something'],
   };
+  const SESS_OF = { closed: 'none', starting: 'starting', idle: 'free', busy: 'working', asking: 'waiting' };
   function sessionState(c) {
-    const info = c.info;
-    let key;
-    if (!info) key = 'loading';
-    else if (!info.adopted) key = 'none';
-    else if (!info.adoptedFound) key = 'loading';
-    else key = { none: 'closed', free: 'free', working: 'working', waiting: 'waiting' }[liveOf(c)] || 'unknown';
+    const key = !c.info ? 'loading' : SESS_OF[c.rpc && c.rpc.state] || 'unknown'; // no rpc entry yet: the status read has not answered
     const [tone, icon, word] = SESS_VIEW[key];
-    return { key, tone, icon, word: info && info.adopted && key === 'loading' ? `session ${word}` : word, title: SESS_TITLE[key], animate: key === 'working' };
+    return { key, tone, icon, word, title: SESS_TITLE[key], animate: key === 'working' || key === 'starting' };
   }
   const sessionLabelHtml = (c) => {
     const s = sessionState(c);
@@ -435,19 +429,19 @@
     return `<div class="ft-tree" role="group" aria-label="Repository files">${out.join('')}${tail}</div>${fileSection(file, ctx)}`;
   }
 
-  // The composer (RP68, S49): can the person send free text now, and if not, why. c = { id, info, sending }.
+  // The composer: can the person send free text now, and if not, why. c = { info, rpc, sending }. A session that is not started can be written to
+  // (sending starts it); one that is starting, working or asking cannot. REASON words the same cases for the command menu (actionMenu).
   const REASON = {
     working: 'The session is working: wait until it is free', waiting: 'The session is asking you something: answer it in its terminal',
     none: 'No open session of this repo', unknown: 'The session state is unknown',
   };
+  const COMPOSER_WAIT = {
+    starting: 'The session is starting…', busy: 'The session is working: wait until it is idle, or press Stop',
+    asking: 'pi is asking something; answering from the panel comes next',
+  };
+  const rpcWait = (c) => (c.rpc && COMPOSER_WAIT[c.rpc.state]) || (!c.rpc ? REASON.unknown : '');
   function composerState(c, ctx = {}) {
-    const info = c.info;
-    let reason = '';
-    if (!info) reason = 'Loading the chat…';
-    else if (!info.adopted) reason = 'Adopt or start a session first';
-    else if (!info.adoptedFound) reason = 'The session is loading';
-    else if (c.sending) reason = 'Sending…';
-    else if (liveOf(c) !== 'free') reason = REASON[liveOf(c)] || REASON.unknown;
+    const reason = !c.info ? 'Loading the chat…' : c.sending ? 'Sending…' : rpcWait(c);
     return { canSend: !reason, reason, placeholder: reason || `Message the session of ${ctx.name ?? 'this repo'}` };
   }
 
@@ -486,7 +480,7 @@
     const items = SLOTS.map(([cmd, label]) => ({ cmd, label, available: false, why: '' }));
     const live = ctx.live || 'unknown';
     if (live !== 'free') {
-      const why = composerState({ info: { adopted: true, adoptedFound: true, live: { state: live } } }).reason;
+      const why = REASON[live] || REASON.unknown;
       return { items: items.map((i) => ({ ...i, why })) };
     }
     if (!row || row.error) return { items: items.map((i) => ({ ...i, why: 'No data for this repo' })) };
@@ -512,8 +506,8 @@
     const items = menu && Array.isArray(menu.items) ? menu.items : [];
     return items.filter((i) => i && i.available).map((i) => `<button type="button" class="c-act" data-act="pi" data-id="${esc(id)}" data-cmd="${esc(i.cmd)}" title="${esc(i.why || `Send ${i.label} to the open session of this repo`)}"${ctx.sending ? ' disabled' : ''}>${esc(i.label)}</button>`).join('');
   }
-  // The line under the box: a message, plus the Clear button when text stayed in the prompt box of pi.
-  const composerNote = (n) => (n && n.text ? `<span>${esc(n.text)}</span>${n.clear ? ` <button type="button" data-act="chat-clear" data-id="${esc(n.id)}">Clear the box</button>` : ''}` : '');
+  // The line under the box: a message (a refused send, a failed start).
+  const composerNote = (n) => (n && n.text ? `<span>${esc(n.text)}</span>` : '');
 
   const hhmm = (iso) => { const d = new Date(iso); return iso && !Number.isNaN(d.getTime()) ? `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}` : ''; };
   const toolsLine = (t) => (t.length ? `<div class="tools">▸ ${plural(t.length, 'tool')} · ${esc(t.slice(0, 3).join(', '))}${t.length > 3 ? ` (+${t.length - 3})` : ''}</div>` : '');
@@ -609,9 +603,20 @@
   // had the same flattened text when it was sent; more of them now means the history holds it.
   const flat = (t) => String(t).replace(/\s+/g, ' ').trim();
   const userCount = (items, text) => items.filter((it) => it.role === 'user' && flat(it.text) === flat(text)).length;
-  const PENDING_WHO = { sending: 'sending…', ok: '<span class="ok">✓</span>', unconfirmed: '<span class="warn">⚠</span> not confirmed' };
+  const PENDING_WHO = { sending: 'sending…', ok: '<span class="ok">✓</span>' };
   const pendingHtml = (pending, items) => (pending || []).filter((p) => userCount(items, p.text) <= p.base)
     .map((p) => `<div class="m me pending"><span class="who">You · ${PENDING_WHO[p.state] || PENDING_WHO.sending}</span>${mdHtml(p.text)}</div>`).join('');
+
+  // RPC2-1: what the live session adds under the history: the answer being written (escaped like every message) and, while pi waits for a dialog, one line
+  // with a Cancel button (answering from the panel is RPC2-3).
+  const ASK_LINE = 'pi is asking something; answering from the panel comes next';
+  function rpcTail(c, who) {
+    const r = c.rpc && typeof c.rpc === 'object' ? c.rpc : {};
+    const streaming = r.text ? `<div class="m streaming"><span class="who">${esc(who)}</span>${mdHtml(r.text)}</div>` : r.streaming ? '<div class="m working">working…</div>' : '';
+    const first = Array.isArray(r.asks) && typeof r.asks[0] === 'string' ? r.asks[0] : '';
+    const ask = r.state === 'asking' ? `<div class="rs-note ch-asking" role="status">${ASK_LINE}${first ? ` <button type="button" class="btn-sm" data-act="rpc-cancel" data-id="${esc(c.id)}" data-request="${esc(first)}">Cancel</button>` : ''}</div>` : '';
+    return streaming + ask;
+  }
 
   function chatBody(c, ctx = {}) {
     const info = c.info;
@@ -622,15 +627,15 @@
       const rows = (info.sessions || []).slice(0, 5).map((s) => `<div class="ch-pick"><div class="ch-pick-l1"><span class="mono ch-sname" title="${esc(s.id)}">${esc(s.name || s.id)}</span><span class="rs-sub">${esc(relativeTime(s.updatedAt, ctx.now))}</span><button type="button" data-act="chat-adopt" data-id="${id}" data-session="${esc(s.id)}">Adopt</button></div>${s.lastMessage ? `<div class="rs-sub ch-last">${esc(clip(s.lastMessage.text, 90))}</div>` : ''}</div>`).join('');
       return `${note}<div class="ch-state"><p>No session is adopted for this folder.${rows ? ' Adopt one, or start a new one.' : ''}</p>${rows}<button type="button" data-act="chat-start" data-id="${id}"${c.starting ? ' disabled' : ''}>Start panel session</button></div>`;
     }
-    if (!info.adoptedFound) return `${note}<div class="ch-state" role="status"><p>The session is loading. The history appears with its first message.</p></div>`;
     const who = info.adopted.name || info.adopted.id;
+    if (!info.adoptedFound) return `${note}<div class="ch-state" role="status"><p>The session is loading. The history appears with its first message.</p></div>${pendingHtml(c.pending, [])}${rpcTail(c, who)}`;
     const items = (c.hist && c.hist.items) || [];
     // The question the session shows on its screen, pinned after the bubbles; read-only.
     const d = info.live && info.live.state === 'waiting' ? info.live.dialog || {} : null;
     const shown = d && Array.isArray(d.lines) ? d.lines.map((l, i) => (i === d.selected ? `<mark class="ask-sel">${esc(l)}</mark>` : esc(l))).join('\n') : '';
     const card = d ? `<div class="ch-ask" role="alert"><div class="ch-ask-title">The session is asking</div>${shown ? `<pre class="ch-ask-text">${shown}</pre>` : ''}${askAnswers(d.choices, c.answer)}</div>` : '';
     const pending = pendingHtml(c.pending, items);
-    return `${note}${c.hist && c.hist.truncated ? '<div class="rs-sub ch-older">Older messages are not shown</div>' : ''}${items.map((it) => bubble(it, who)).join('') || (pending ? '' : '<div class="empty">No messages yet.</div>')}${pending}${card}`;
+    return `${note}${c.hist && c.hist.truncated ? '<div class="rs-sub ch-older">Older messages are not shown</div>' : ''}${items.map((it) => bubble(it, who)).join('') || (pending ? '' : '<div class="empty">No messages yet.</div>')}${pending}${rpcTail(c, who)}${card}`;
   }
 
   // The answer buttons of the pinned question (RP73): one per option the server could read (dialog.choices), or the old note when there

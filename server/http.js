@@ -24,12 +24,11 @@ const { roomsState, createRoom, removeRoom, assignRoom } = require('./rooms.js')
 const { queueFor, conformityFor } = require('./queue.js');
 const { summaryFor } = require('./summary.js');
 const { createSummaryStore } = require('./summarystore.js');
-const { sendChat, clearChat } = require('./chatsend.js');
 const { answerDialog } = require('./dialoganswer.js');
 const { createEventHub } = require('./events.js');
 const { createRpcHost, rpcApi } = require('./rpchost.js');
 const { readUsage, usageFile } = require('./usage.js');
-const { sessionsState, chatState, adoptSession, releaseSession, startSession } = require('./sessions.js');
+const { sessionsState, chatState, adoptSession, releaseSession, adoptIfNone } = require('./sessions.js');
 
 const ROOT = path.join(__dirname, '..');
 const TOKEN = crypto.randomBytes(24).toString('hex');
@@ -37,7 +36,7 @@ const TOKEN = crypto.randomBytes(24).toString('hex');
 // RP76: these POSTs only calculate; every other POST is an action of the person and goes through the interactive lane.
 const READ_ONLY_POSTS = new Set(['POST /api/queue', 'POST /api/conformity']);
 // RP80b: after these actions end (success or failure) the store catches up that repo, fire-and-forget.
-const CATCH_UP_POSTS = new Set(['POST /api/merge', 'POST /api/rerun', 'POST /api/fetch', 'POST /api/pi', 'POST /api/chat/send']);
+const CATCH_UP_POSTS = new Set(['POST /api/merge', 'POST /api/rerun', 'POST /api/fetch', 'POST /api/pi']);
 // No client, no work: a store that has never been asked (awake() false) is left alone; a store without awake() is always called.
 const catchUp = (store, id) => { if (store && (typeof store.awake !== 'function' || store.awake())) Promise.resolve().then(() => store.catchUp(id)).catch(() => {}); };
 const query = (u) => Object.fromEntries(new URL(u, 'http://x').searchParams);
@@ -139,9 +138,6 @@ const routes = {
   'POST /api/pi': (q, b, d) => piSend(findRepo(b.id), b.command, d.orca, d.wait, d.requirements, { pr: b.pr, prs: d.prs, guard: d.guard }),
   'POST /api/sessions/adopt': (q, b, d) => adoptSession(b.id, b.session, d.orca, d.sessionsDir),
   'POST /api/sessions/release': (q, b, d) => releaseSession(b.id, d.orca, d.sessionsDir),
-  'POST /api/sessions/start': (q, b, d) => startSession(b.id, d.orca),
-  'POST /api/chat/send': (q, b, d) => sendChat(b && b.id, b, { orca: d.orca, wait: d.wait, sessionsDir: d.sessionsDir, now: d.now }),
-  'POST /api/chat/clear': (q, b, d) => clearChat(b && b.id, { orca: d.orca, wait: d.wait }),
   'POST /api/dialog/answer': (q, b, d) => answerDialog(b && b.id, b, { orca: d.orca, wait: d.wait, now: d.now }),
   // RPC1b: pi sessions in RPC mode, one per repo; the repo comes from the config by id and no program, folder or argument comes from the page.
   'POST /api/rpc/start': (q, b, d) => rpcApi(d.rpcHost).start(b),
@@ -203,7 +199,7 @@ function createServer(port, deps = {}) {
   const flights = new Map();
   const hub = deps.hub || createEventHub();
   // RPC1b: the pi sessions live in this process (a restart ends them; they come back with the same --session-id). Their events go to the hub as `rpc`.
-  if (!deps.rpcHost) deps.rpcHost = createRpcHost({ resolve: () => resolveRuntime(deps.piRuntime), repoOf: findRepo, publish: (id, payload) => hub.emit('rpc', id, payload) });
+  if (!deps.rpcHost) deps.rpcHost = createRpcHost({ resolve: deps.rpcResolve || (() => resolveRuntime(deps.piRuntime)), repoOf: findRepo, publish: (id, payload) => hub.emit('rpc', id, payload), adopt: adoptIfNone, createClient: deps.rpcClient });
   const server = http.createServer((req, res) => {
     if (req.method === 'GET' && req.url.split('?')[0] === '/api/events') return openStream(req, res);
     const t0 = Date.now();

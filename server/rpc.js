@@ -9,6 +9,8 @@ const fs = require('node:fs');
 const { StringDecoder } = require('node:string_decoder');
 const { commandProblem, launchSpec, killTree, makeWhich, isAbs } = require('./piruntime.js');
 
+// Two minutes: the real pi took 4 s to over 60 s to start, with no pattern (measured through the panel, RPC2-1).
+const START_MS = 120000;
 const MAX_LINE = 8 * 1024 * 1024;
 const MAX_WAITING = 200;
 const MAX_DIALOGS = 20;
@@ -20,7 +22,7 @@ class RpcError extends Error { constructor(message) { super(message); this.name 
 const fail = (message) => new RpcError(message);
 const text = (v, max) => (typeof v === 'string' ? v.slice(0, max) : '');
 
-function createRpcClient({ command, args = [], cwd, env, spawn = cp.spawn, platform = process.platform, kill = process.kill, startTimeoutMs = 60000, requestTimeoutMs = 120000, onEvent = () => {}, onExit = () => {} }) {
+function createRpcClient({ command, args = [], cwd, env, spawn = cp.spawn, platform = process.platform, kill = process.kill, startTimeoutMs = START_MS, requestTimeoutMs = 120000, onEvent = () => {}, onExit = () => {} }) {
   const pending = new Map(); // id -> { type, resolve, reject, timer, ends }
   const queue = []; // commands issued before ready
   const outbox = []; // lines waiting for stdin to drain
@@ -251,4 +253,4 @@ function createRpcClient({ command, args = [], cwd, env, spawn = cp.spawn, platf
   };
 }
 
-module.exports = { createRpcClient, RpcError };
+module.exports = { createRpcClient, RpcError, START_MS };

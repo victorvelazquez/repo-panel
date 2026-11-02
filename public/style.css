@@ -481,6 +481,9 @@ body.tab-conformity #viewbar { display: none; }
 .m { max-width: 90%; padding: 8px 11px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel2); overflow-wrap: anywhere; }
 .m.me { align-self: flex-end; background: #12253d; border-color: #1d3a5f; border-radius: 12px 12px 3px 12px; }
 .m.working { color: var(--muted); font-style: italic; }
+.m.streaming { border-left: 2px solid var(--green); }
+.ch-asking { margin: 8px 0 4px; color: var(--yellow); }
+#msgStop[hidden] { display: none; }
 .m p, .m ul, .m ol, .m pre, .m blockquote, .m h3, .m h4, .m h5 { margin: 6px 0; }
 .m > .who + *, .m > :first-child:not(.who) { margin-top: 0; }
 .m > :last-child { margin-bottom: 0; }

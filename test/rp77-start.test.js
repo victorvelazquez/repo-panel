@@ -1,6 +1,5 @@
 'use strict';
-// RP77 (S68, S71): found by the independent verification. `startSession` DECIDES (it creates a terminal when the folder has no session), so it
-// is a writer: it must list Orca fresh and never use the shared 1 s list or a cached screen, or two starts within a second open two terminals.
+// RP77 (S68, S71): the read-only answer of a folder shares the 1 s list and the cached screens. (The start tests went with `startSession`, RPC2-1.)
 // A fake Orca counting every call (list, show, create), temp dirs, no real Orca, no real session, no waiting.
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -41,47 +40,7 @@ function fakeOrca() {
   const count = (verb) => calls.filter((c) => c[0] === verb).length;
   return { orca, world, calls, lists: () => count('list'), shows: () => count('show'), creates: () => count('create') };
 }
-const refusal = (p) => assert.rejects(p, (e) => e.status === 409 && /already has a session open/.test(e.message));
-
 test.beforeEach(() => { clearLiveCache(); });
-
-test('two starts in a row open ONE terminal: the second lists fresh and finds the first', async () => {
-  const f = fakeOrca();
-  const first = await S.startSession(REPO_ID, f.orca);
-  assert.equal(first.started, true);
-  await refusal(S.startSession(REPO_ID, f.orca));
-  assert.equal(f.creates(), 1, 'a stale "no session" must never open a second terminal');
-});
-
-test('a read-only call just before a start does not make the start decide with its list', async () => {
-  const f = fakeOrca();
-  const before = await S.sessionsState(REPO_ID, f.orca, sessionsBase);
-  assert.deepEqual(before.live, { state: 'none', count: 0 });
-  f.world.t0 = { preview: IDLE, at: 7 }; // a session opens a moment later, inside the second of the shared list
-  await refusal(S.startSession(REPO_ID, f.orca));
-  assert.equal(f.creates(), 0);
-});
-
-test('a start always lists Orca itself, and reads the screens uncached, even when everything is warm', async () => {
-  const f = fakeOrca();
-  f.world.t0 = { preview: IDLE, at: 7 };
-  await S.sessionsState(REPO_ID, f.orca, sessionsBase);
-  await S.sessionsState(REPO_ID, f.orca, sessionsBase);
-  assert.deepEqual([f.lists(), f.shows()], [1, 1], 'the read-only calls shared one list and one screen read');
-  await refusal(S.startSession(REPO_ID, f.orca));
-  assert.equal(f.lists(), 2, 'one list of its own');
-  assert.equal(f.shows(), 2, 'one screen read of its own');
-});
-
-test('a start after the session closed (inside the second of the shared list) proceeds on the fresh list', async () => {
-  const f = fakeOrca();
-  f.world.t0 = { preview: IDLE, at: 7 };
-  assert.deepEqual((await S.sessionsState(REPO_ID, f.orca, sessionsBase)).live, { state: 'free', count: 1 });
-  delete f.world.t0; // closed a moment ago
-  const started = await S.startSession(REPO_ID, f.orca);
-  assert.equal(started.started, true);
-  assert.equal(f.creates(), 1);
-});
 
 test('the read-only answer of a folder is unchanged: still shared and cached', async () => {
   const f = fakeOrca();
