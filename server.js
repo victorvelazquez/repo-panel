@@ -20,6 +20,8 @@ if (require.main === module) {
     if (every) createWatcher({ orca: orcaTerminal, intervalMs: every }).start();
   }
   const server = createServer(port);
+  // RPC1b: the pi sessions are children of this process; no child may outlive the panel, so they end with it (Ctrl+C, a stop, a restart).
+  for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { server.rpcHost.closeAll(); setTimeout(() => process.exit(0), 300); });
   // The live warmer keeps the read-only screens cached (RP77) and feeds the event stream (RP77b): it warms every second while someone listens.
   const warm = warmInterval(process.env);
   // RP78: the Summary store learns each session state from the very payload the hub publishes.

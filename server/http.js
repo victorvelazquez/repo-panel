@@ -27,6 +27,7 @@ const { createSummaryStore } = require('./summarystore.js');
 const { sendChat, clearChat } = require('./chatsend.js');
 const { answerDialog } = require('./dialoganswer.js');
 const { createEventHub } = require('./events.js');
+const { createRpcHost, rpcApi } = require('./rpchost.js');
 const { readUsage, usageFile } = require('./usage.js');
 const { sessionsState, chatState, adoptSession, releaseSession, startSession } = require('./sessions.js');
 
@@ -142,6 +143,13 @@ const routes = {
   'POST /api/chat/send': (q, b, d) => sendChat(b && b.id, b, { orca: d.orca, wait: d.wait, sessionsDir: d.sessionsDir, now: d.now }),
   'POST /api/chat/clear': (q, b, d) => clearChat(b && b.id, { orca: d.orca, wait: d.wait }),
   'POST /api/dialog/answer': (q, b, d) => answerDialog(b && b.id, b, { orca: d.orca, wait: d.wait, now: d.now }),
+  // RPC1b: pi sessions in RPC mode, one per repo; the repo comes from the config by id and no program, folder or argument comes from the page.
+  'POST /api/rpc/start': (q, b, d) => rpcApi(d.rpcHost).start(b),
+  'POST /api/rpc/prompt': (q, b, d) => rpcApi(d.rpcHost).prompt(b),
+  'POST /api/rpc/steer': (q, b, d) => rpcApi(d.rpcHost).steer(b),
+  'POST /api/rpc/abort': (q, b, d) => rpcApi(d.rpcHost).abort(b),
+  'POST /api/rpc/dialog': (q, b, d) => rpcApi(d.rpcHost).dialog(b),
+  'GET /api/rpc/status': (q, b, d) => rpcApi(d.rpcHost).status(q),
   'POST /api/queue': (q, b) => queueFor(b),
   'POST /api/conformity': (q, b) => conformityFor(b),
   'POST /api/repos': (q, b) => addRepo(b.path, b.group),
@@ -194,6 +202,8 @@ function createServer(port, deps = {}) {
   const perf = createPerf();
   const flights = new Map();
   const hub = deps.hub || createEventHub();
+  // RPC1b: the pi sessions live in this process (a restart ends them; they come back with the same --session-id). Their events go to the hub as `rpc`.
+  if (!deps.rpcHost) deps.rpcHost = createRpcHost({ resolve: () => resolveRuntime(deps.piRuntime), repoOf: findRepo, publish: (id, payload) => hub.emit('rpc', id, payload) });
   const server = http.createServer((req, res) => {
     if (req.method === 'GET' && req.url.split('?')[0] === '/api/events') return openStream(req, res);
     const t0 = Date.now();
@@ -258,8 +268,9 @@ function createServer(port, deps = {}) {
     return send(res, 503, { error: 'Too many event streams open' });
   }
   const close = server.close.bind(server);
-  server.close = (cb) => { hub.closeAll(); if (deps.summaryStore) deps.summaryStore.stop(); return close(cb); };
+  server.close = (cb) => { hub.closeAll(); deps.rpcHost.closeAll(); if (deps.summaryStore) deps.summaryStore.stop(); return close(cb); };
   server.hub = hub;
+  server.rpcHost = deps.rpcHost;
   server.summaryStore = deps.summaryStore;
   return server;
 }
