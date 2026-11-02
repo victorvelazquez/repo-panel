@@ -648,6 +648,30 @@
     };
   }
 
+  // RP88b (S9, S10): the frame of a repo card, ONE function for the Summary card and the board card. `m` carries ready HTML for what differs on purpose (the caller
+  // escapes it) and the raw text it must escape itself (id, label, branch). Mode 'summary': { id, label, cls, current, identity, branch: { text, title }, chips, meta,
+  // body }. Mode 'work': { attn, top, before: [lines], branch, between: [lines], chips, after: [lines] }: one line each, in that order. Total: anything else draws ''.
+  function RepoCard(m, mode) {
+    if (!isObject(m)) return '';
+    const e = (v) => htmlEsc(v == null ? '' : v);
+    const b = isObject(m.branch) ? m.branch : {};
+    const s = (v) => (typeof v === 'string' ? v : '');
+    const chips = s(m.chips);
+    if (mode === 'summary') {
+      return `<article class="rs-card${s(m.cls)}" data-id="${e(m.id)}" data-act="chat-open" tabindex="0"${m.current ? ' aria-current="true"' : ''} aria-label="${e(m.label)}">
+      <div class="rs-l1">${s(m.identity)}<span class="mono rs-branch" title="${e(b.title)}">${e(b.text)}</span>${chips ? `<span class="rs-chips">${chips}</span>` : ''}<span class="rs-spacer"></span>${s(m.meta)}</div>
+      <div class="rs-l2">${s(m.body)}</div>
+    </article>`;
+    }
+    if (mode === 'work') {
+      const lines = (a) => (Array.isArray(a) ? a.map(s) : []);
+      return `<div class="card ${m.attn ? 'attn' : ''}">
+    ${[s(m.top), ...lines(m.before), `<div class="branch one-line" title="${e(b.title)}">${e(b.text)}</div>`, ...lines(m.between), chips ? `<div class="chips">${chips}</div>` : '', ...lines(m.after)].join('\n    ')}
+  </div>`;
+    }
+    return '';
+  }
+
   // The wait before the next board request: 3 s while it works, then doubling per failure up to 30 s.
   const boardWait = ({ ok, failures }) => (ok ? 3000 : Math.min(30000, 3000 * 2 ** failures));
 
@@ -737,5 +761,5 @@
     return `${meters.join('')}${age}<div class="usage-pop" role="group" aria-label="Claude usage details">${details.join('')}${note}${foot}</div>`;
   }
 
-  return { repoModel, changeChips, usageView, usageHtml, usageRemaining, boardApply, boardWait, chatCachePut, chatCacheGet, chatFromCache, API_VERSION, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, piPollTargets, LIVE_CHECK_MS, liveSession, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, presenceLabel, presenceDot, parseSse, liveEvent, eventsPlan, eventsRetryMs, eventsStale };
+  return { repoModel, changeChips, RepoCard, usageView, usageHtml, usageRemaining, boardApply, boardWait, chatCachePut, chatCacheGet, chatFromCache, API_VERSION, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, piPollTargets, LIVE_CHECK_MS, liveSession, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, presenceLabel, presenceDot, parseSse, liveEvent, eventsPlan, eventsRetryMs, eventsStale };
 }));
