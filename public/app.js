@@ -1335,9 +1335,11 @@ function reqWarn(r) {
 }
 
 // The line the agent declared for "what to do now", with a dot per state; a stale state is only a small marker.
+// RP94b2: it is left out only where it would repeat the roadmap block (a `working` or outdated state on a card that has the block); see V.stateLineHidden.
+const hasRoadmapBlock = (r) => !!(S.roadmap[r.id] && S.roadmap[r.id].available && S.roadmap[r.id].summary);
 function stateRow(r) {
   const l = V ? V.stateLine(S.state[r.id]) : null;
-  if (!l) return '';
+  if (!l || V.stateLineHidden(S.state[r.id], l, hasRoadmapBlock(r))) return '';
   if (l.kind === 'outdated') return `<div class="state-line" title="${esc(l.title)}"><span class="dot dot-${l.dot}"></span></div>`;
   return `<div class="state-line" title="${esc(l.title)}"><span class="dot dot-${l.dot}"></span><span class="state-text">${esc(l.text)}</span></div>`;
 }
@@ -1345,7 +1347,10 @@ function stateRow(r) {
 // Room tag with a status dot; only for repos assigned to a room.
 function roomTag(r) {
   const t = V ? V.roomTag(S.rooms, r.id, S.roomData) : null;
-  return t ? `<span class="tag room-tag" title="${esc(t.title)}"><span class="dot dot-${t.dot}"></span>${esc(t.name)}</span>` : '';
+  if (!t) return '';
+  // RP94b2: with ONE room the name tells nothing (every repo of the room carries the same one), so the tag is only its dot; the name and the state stay in the tooltip and the aria-label.
+  if (S.rooms.length === 1) return `<span class="tag room-tag room-dot" role="img" title="${esc(t.title)}" aria-label="${esc(t.title)}"><span class="dot dot-${t.dot}"></span></span>`;
+  return `<span class="tag room-tag" title="${esc(t.title)}"><span class="dot dot-${t.dot}"></span>${esc(t.name)}</span>`;
 }
 
 // RP87: who a card is about (group tag, room tag and the repo name), shared by the board card and the clean row; and its branch text.
