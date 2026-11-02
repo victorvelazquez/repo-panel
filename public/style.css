@@ -401,6 +401,17 @@ body.tab-conformity #viewbar { display: none; }
 }
 #colBody { padding: 12px; display: grid; gap: 8px; align-content: start; }
 .col-tasks { min-width: 0; align-content: start; }
+/* RP92: the files card: one row per changed file (status, name clipped with an ellipsis, +added -deleted that keep their place); the whole path is the tooltip. */
+.col-files { min-width: 0; align-content: start; }
+.col-n { color: var(--muted); font-weight: 400; }
+.cf-list { display: grid; gap: 2px; min-width: 0; }
+.cf-item { display: flex; align-items: center; gap: 8px; width: 100%; min-width: 0; text-align: left; border: 1px solid transparent; background: transparent; padding: 3px 6px; border-radius: 6px; }
+.cf-on { border-color: var(--blue); background: #12253d; }
+.cf-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
+.cf-n { flex: none; font-size: 11px; color: var(--muted); font-family: ui-monospace, Consolas, monospace; }
+.cf-n .a { font-style: normal; color: var(--green); }
+.cf-n .d { font-style: normal; color: var(--red); }
+.cf-item:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 .col-title { margin: 0; font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
 /* RP91: in a narrow column the id sits above the text, which wraps freely. */
 #col .task-text { flex: 1 1 100%; overflow-wrap: anywhere; }

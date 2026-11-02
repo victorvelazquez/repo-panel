@@ -992,7 +992,7 @@ async function loadFile(p) {
 }
 function setChatTab(tab) {
   const was = S.chat.tab;
-  S.chat.tab = ['tasks', 'changes', 'files'].includes(tab) && !(tab === 'tasks' && columnOn()) ? tab : tab === 'diff' && S.chat.dfile ? 'diff' : 'chat'; // RP91: with the column in, the tasks are its card, not a tab; RP90: the diff tab needs a file
+  S.chat.tab = ['tasks', 'changes', 'files'].includes(tab) && !((tab === 'tasks' || tab === 'changes') && columnOn()) ? tab : tab === 'diff' && S.chat.dfile ? 'diff' : 'chat'; // RP91, RP92: with the column in, the tasks and the changed files are its cards, not tabs; RP90: the diff tab needs a file
   if (S.chat.tab === 'tasks') loadTasks();
   else if ((S.chat.tab === 'changes' || S.chat.tab === 'diff') && was !== S.chat.tab) loadChanges();
   else if (S.chat.tab === 'files' && was !== 'files') loadFiles();
@@ -1046,12 +1046,14 @@ function drawChat() {
   // RP91: with the column in, its tasks card is read when the repo OPENS (once per opening); the filter box keeps the focus across redraws.
   if (column) loadTasks();
   const colFocus = column && document.activeElement && document.activeElement.id === 'tasksFilter';
-  paint($('#colBody'), R.columnView({ name: nameOf(S.chat.id), tasksHtml: column ? R.tasksView(S.tasks[S.chat.id] || null, { filter: S.tasksFilter, openDone: S.tasksOpenDone, loading: !!S.chat.tasksLoading, failed: !!S.chat.tasksFailed }) : '' }));
+  // RP92: the files card is drawn from the facts the board keeps fresh (S.local), so it reads nothing.
+  const facts = S.local[S.chat.id];
+  paint($('#colBody'), R.columnView({ name: nameOf(S.chat.id), files: facts && !facts.error && Array.isArray(facts.files) ? facts.files : null, failed: !!(facts && facts.error), selected: S.chat.dfile || '', tasksHtml: column ? R.tasksView(S.tasks[S.chat.id] || null, { filter: S.tasksFilter, openDone: S.tasksOpenDone, loading: !!S.chat.tasksLoading, failed: !!S.chat.tasksFailed }) : '' }));
   const colBox = colFocus ? $('#tasksFilter') : null;
   if (colBox && colBox.focus && document.activeElement !== colBox) { colBox.focus(); if (colBox.setSelectionRange) colBox.setSelectionRange(colBox.value.length, colBox.value.length); }
   paint($('#chatHead'), R.chatHead(S.chat, { name: nameOf(S.chat.id), column }));
   const tasksTab = S.chat.tab === 'tasks' && !column;
-  const changesTab = S.chat.tab === 'changes';
+  const changesTab = S.chat.tab === 'changes' && !column; // RP92: with the column in, the files card replaces the tab
   const filesTab = S.chat.tab === 'files';
   const diffTab = S.chat.tab === 'diff' && !!S.chat.dfile; // RP90
   $('#composer').hidden = tasksTab || changesTab || filesTab || diffTab;
