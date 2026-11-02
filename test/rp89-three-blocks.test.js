@@ -71,14 +71,11 @@ test('b6: it is total: a width that is not a positive number gives zeros, and ti
   }
 });
 
-test('b7: the column notice names the repo, says what will come, escapes the name, and draws nothing for an empty name', () => {
-  const h = R.columnNotice('a<b>"c');
-  assert.match(h, /^<div class="col-card">/);
-  assert.match(h, /<b class="col-name" title="a&lt;b&gt;&quot;c">a&lt;b&gt;&quot;c<\/b>/);
-  assert.match(h, /Tasks and files of this repo will appear here/);
-  assert.doesNotMatch(h, /<b>|<\/b>c/);
-  assert.match(R.columnNotice(''), /^<div class="col-card"><p class="rs-sub">Tasks and files/);
-  assert.match(R.columnNotice(undefined), /col-card/);
+test('b7 (RP91 replaced the single notice by R.columnView): the column always has the small files notice, and the tasks card only when there are tasks to show', () => {
+  const none = R.columnView({ name: 'demo' });
+  assert.match(none, /^<div class="col-card col-soon"><p class="rs-sub">Files with changes will appear here\.<\/p><\/div>$/);
+  assert.match(R.columnView({ name: 'a<b>"c', tasksHtml: '<p>T</p>' }), /aria-label="Tasks of a&lt;b&gt;&quot;c"/);
+  assert.equal(R.columnNotice, undefined, 'the notice of RP89 is gone');
 });
 
 // ---------- index.html and the styles ----------

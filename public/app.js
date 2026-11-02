@@ -901,7 +901,7 @@ function openChat(id, tab) {
   if (!R || !id || S.chat.id === id) return;
   saveDraft();
   S.recall = {};
-  S.chat = { id, seq: S.chat.seq + 1, ...(V && V.chatFromCache(S.chatCache[id])), ...(tab === 'tasks' ? { tab } : {}) }; // RP79: cached messages at once, state unknown (no get: opening must not reorder the cache)
+  S.chat = { id, seq: S.chat.seq + 1, ...(V && V.chatFromCache(S.chatCache[id])), ...(tab === 'tasks' && !columnOn() ? { tab } : {}) }; // RP79: cached messages at once, state unknown (no get: opening must not reorder the cache)
   $('#msgBox').value = S.drafts[id] || '';
   draw();
   if (chatCtl) chatCtl.abort();
@@ -921,18 +921,21 @@ const chatTick = () => { if (S.chat.id && (!S.chat.tab || S.chat.tab === 'chat')
 
 // RP63 (S60): the Tasks tab reads /api/roadmap once per chat opening, when the tab is first shown. The last good answer of a repo
 // is kept; a failure only shows when there is none. An answer for a repo the person left is stored but never painted for another.
+// RP91: the opening is identified by the S.chat OBJECT (openChat and closeChat replace it), not by `seq`: loadChat bumps `seq` on every read and, with the tasks in the column, the chat keeps
+// being read while the roadmap is on its way.
 async function loadTasks() {
-  const { id, seq } = S.chat;
-  if (!id || S.chat.tasksAsked) return;
-  S.chat.tasksAsked = true;
-  S.chat.tasksLoading = true;
-  S.chat.tasksFailed = false;
+  const chat = S.chat;
+  const { id } = chat;
+  if (!id || chat.tasksAsked) return;
+  chat.tasksAsked = true;
+  chat.tasksLoading = true;
+  chat.tasksFailed = false;
   try {
     S.tasks[id] = await api(`/api/roadmap?id=${id}`);
   } catch {
-    if (S.chat.seq === seq) S.chat.tasksFailed = true;
+    if (S.chat === chat) chat.tasksFailed = true;
   }
-  if (S.chat.seq === seq) { S.chat.tasksLoading = false; draw(); }
+  if (S.chat === chat) { chat.tasksLoading = false; draw(); }
 }
 // RP64 (S62): the Changes tab reads /api/diff each time the person SWITCHES to it (the files change), keeps the last good answer of a repo,
 // and only the latest read of a chat opening counts. A read of a repo the person left is stored for that repo and never paints another.
@@ -988,13 +991,17 @@ async function loadFile(p) {
 }
 function setChatTab(tab) {
   const was = S.chat.tab;
-  S.chat.tab = ['tasks', 'changes', 'files'].includes(tab) ? tab : 'chat';
+  S.chat.tab = ['tasks', 'changes', 'files'].includes(tab) && !(tab === 'tasks' && columnOn()) ? tab : 'chat'; // RP91: with the column in, the tasks are its card, not a tab
   if (S.chat.tab === 'tasks') loadTasks();
   else if (S.chat.tab === 'changes' && was !== 'changes') loadChanges();
   else if (S.chat.tab === 'files' && was !== 'files') loadFiles();
   draw();
 }
 
+// RP91: whether the right column is in (from COLUMN_FROM px of layout): then the tasks are its card and the chat has no Tasks tab.
+function columnOn() {
+  return ($('#sumLayout').clientWidth || 0) >= COLUMN_FROM;
+}
 // The widths now: the layout without its separators (the column's separator only counts while the column is in), and the three blocks from the saved shares.
 function layoutNow() {
   const width = $('#sumLayout').clientWidth || 0;
@@ -1034,9 +1041,15 @@ function drawChat() {
   if (document.body && document.body.classList) $('#sumLayout').classList.toggle('chat-open', on);
   if (!on) return;
   applyLayout();
-  paint($('#colBody'), R.columnNotice(nameOf(S.chat.id)));
-  paint($('#chatHead'), R.chatHead(S.chat, { name: nameOf(S.chat.id) }));
-  const tasksTab = S.chat.tab === 'tasks';
+  const column = columnOn();
+  // RP91: with the column in, its tasks card is read when the repo OPENS (once per opening); the filter box keeps the focus across redraws.
+  if (column) loadTasks();
+  const colFocus = column && document.activeElement && document.activeElement.id === 'tasksFilter';
+  paint($('#colBody'), R.columnView({ name: nameOf(S.chat.id), tasksHtml: column ? R.tasksView(S.tasks[S.chat.id] || null, { filter: S.tasksFilter, openDone: S.tasksOpenDone, loading: !!S.chat.tasksLoading, failed: !!S.chat.tasksFailed }) : '' }));
+  const colBox = colFocus ? $('#tasksFilter') : null;
+  if (colBox && colBox.focus && document.activeElement !== colBox) { colBox.focus(); if (colBox.setSelectionRange) colBox.setSelectionRange(colBox.value.length, colBox.value.length); }
+  paint($('#chatHead'), R.chatHead(S.chat, { name: nameOf(S.chat.id), column }));
+  const tasksTab = S.chat.tab === 'tasks' && !column;
   const changesTab = S.chat.tab === 'changes';
   const filesTab = S.chat.tab === 'files';
   $('#composer').hidden = tasksTab || changesTab || filesTab;
@@ -1618,6 +1631,7 @@ const ACTIONS = {
   // "Open", "Start" and "⋯" of the Summary: show only this repo on the board.
   'focus-repo': (el) => { S.q = nameOf(el.dataset.id); $('#search').value = S.q; setTab('work'); },
   'chat-open': (el) => openChat(el.dataset.id),
+  // RP91: with the column in, setChatTab turns the Tasks tab into the Chat one (the tasks card is already there); without it the chat opens on its Tasks tab as before.
   'tasks-open': (el) => { openChat(el.dataset.id, 'tasks'); if (S.chat.id === el.dataset.id) setChatTab('tasks'); },
   'chat-tab': (el) => setChatTab(el.dataset.tab),
   'tasks-done': () => { S.tasksOpenDone = !S.tasksOpenDone; draw(); },

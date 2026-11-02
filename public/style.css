@@ -400,6 +400,10 @@ body.tab-conformity #viewbar { display: none; }
   #split2 { display: block; }
 }
 #colBody { padding: 12px; display: grid; gap: 8px; align-content: start; }
+.col-tasks { min-width: 0; align-content: start; }
+.col-title { margin: 0; font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+/* RP91: in a narrow column the id sits above the text, which wraps freely. */
+#col .task-text { flex: 1 1 100%; overflow-wrap: anywhere; }
 .col-card { border: 1px solid var(--line); border-radius: 8px; background: var(--panel2); padding: 10px 12px; display: grid; gap: 6px; min-width: 0; }
 .col-card p { margin: 0; }
 .col-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
