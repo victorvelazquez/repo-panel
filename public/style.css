@@ -314,7 +314,12 @@ details.pop > summary:focus-visible { outline: 2px solid var(--blue); outline-of
 .rs-bar { display: flex; height: 6px; border-radius: 3px; overflow: hidden; background: var(--line); flex: 1; min-width: 60px; }
 .rs-seg { display: block; }
 .rs-done { background: var(--green); } .rs-pr { background: var(--blue); } .rs-blk { background: var(--red); } .rs-pend { background: #3a4350; }
-.rs-legend { display: flex; flex-wrap: wrap; gap: 14px; color: var(--muted); font-size: 12px; margin: 10px 2px; }
+.rs-legend { color: var(--muted); font-size: 12px; margin: 10px 2px; }
+.rs-legend summary { display: inline-block; cursor: pointer; list-style: none; width: 20px; height: 20px; line-height: 18px; text-align: center; border: 1px solid #222a33; border-radius: 50%; }
+.rs-legend summary::-webkit-details-marker { display: none; }
+.rs-legend summary:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.rs-legend[open] summary { color: var(--text); }
+.rs-legend-body { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 8px; }
 .rs-key { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
 @container cards (max-width: 320px) {
   .rs-when { display: none; }

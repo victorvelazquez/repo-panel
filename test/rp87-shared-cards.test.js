@@ -111,9 +111,10 @@ test('p4: branchLabel is the branch, then "(detached)", then nothing', () => {
   assert.equal(page.run('branchLabel({})'), '');
 });
 
-test('p5: identityHtml is group tag, room tag and repo name, and both the board card top and the clean row use it (for a repo in a room too)', () => {
+test('p5: identityHtml is group tag, room tag and repo name, and both the board card top and the clean row use it (for a repo in a room too; RP94b: the group tag shows with several groups)', () => {
   const page = loadPage();
   seed(page, { branch: 'main', files: [], ahead: 0, behind: 0 });
+  page.run("S.groups.push({ name: 'Work', repos: [] }); S.group = '';");
   for (const room of [false, true]) {
     if (room) page.run("S.rooms = [{ name: 'UPEN', repos: ['abc'] }];");
     const id = page.run(`identityHtml(${REPO}, 'https://github.com/o/r')`);

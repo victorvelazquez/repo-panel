@@ -648,7 +648,7 @@
   }
 
   // RP88b (S9, S10): the frame of a repo card, ONE function for the Summary card and the board card. `m` carries ready HTML for what differs on purpose (the caller
-  // escapes it) and the raw text it must escape itself (id, label, branch). Mode 'summary': { id, label, cls, current, identity, branch: { text, title }, chips, meta,
+  // escapes it) and the raw text it must escape itself (id, label, branch). Mode 'summary': { id, label, cls, current, title, busy, identity, branch: { text, title }, chips, meta,
   // body }. Mode 'work': { attn, top, before: [lines], branch, between: [lines], chips, after: [lines] }: one line each, in that order. Mode 'compact' (RP88c, the clean row): { identity, branch, tail, actions, after: [lines] }. Total: anything else draws ''.
   function RepoCard(m, mode) {
     if (!isObject(m)) return '';
@@ -657,7 +657,7 @@
     const s = (v) => (typeof v === 'string' ? v : '');
     const chips = s(m.chips);
     if (mode === 'summary') {
-      return `<article class="rs-card${s(m.cls)}" data-id="${e(m.id)}" data-act="chat-open" tabindex="0"${m.current ? ' aria-current="true"' : ''} aria-label="${e(m.label)}">
+      return `<article class="rs-card${s(m.cls)}" data-id="${e(m.id)}" data-act="chat-open" tabindex="0"${m.current ? ' aria-current="true"' : ''} aria-label="${e(m.label)}"${m.title ? ` title="${e(m.title)}"` : ''}${m.busy ? ' aria-busy="true"' : ''}>
       <div class="rs-l1">${s(m.identity)}<span class="mono rs-branch" title="${e(b.title)}">${e(b.text)}</span>${chips ? `<span class="rs-chips">${chips}</span>` : ''}<span class="rs-spacer"></span>${s(m.meta)}</div>
       <div class="rs-l2">${s(m.body)}</div>
     </article>`;

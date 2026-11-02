@@ -1329,7 +1329,9 @@ function moreMenu(r, slot, extra = []) {
 function reqWarn(r) {
   const w = V ? V.cardWarning(S.req[r.id], S.dismissed.has(r.id)) : null;
   if (!w) return '';
-  return `<div class="req-warn" title="${esc(w.ids.join(', '))}"><span>⚠ ${w.count} requirement${w.count === 1 ? '' : 's'} missing</span><button data-act="hide-warning" data-id="${r.id}" title="Hide this warning (more options → Show warning)">✕</button></div>`;
+  // RP94b: one small warning with the number; the way to hide it is the card menu ("Hide warning"), not a button on the card.
+  const said = `${w.count} requirement${w.count === 1 ? '' : 's'} missing`;
+  return `<div class="req-warn" title="${esc(`${said}: ${w.ids.join(', ')}`)}"><span role="img" aria-label="${said}">⚠ ${w.count}</span></div>`;
 }
 
 // The line the agent declared for "what to do now", with a dot per state; a stale state is only a small marker.
@@ -1347,7 +1349,9 @@ function roomTag(r) {
 }
 
 // RP87: who a card is about (group tag, room tag and the repo name), shared by the board card and the clean row; and its branch text.
-const identityHtml = (r, url) => `${groupTag(r.group)}${roomTag(r)}${repoName(r, url)}`;
+// RP94b: the group tag only when several groups are visible (more than one group and the filter on "All groups"); otherwise it repeats what the person already knows.
+const showGroupTag = () => S.groups.length > 1 && !S.group;
+const identityHtml = (r, url) => `${showGroupTag() ? groupTag(r.group) : ''}${roomTag(r)}${repoName(r, url)}`;
 const branchLabel = (l) => l.branch || (l.detached ? '(detached)' : '');
 
 // Repo name + group on the left, more options and remove (with confirmation) pinned to the right.

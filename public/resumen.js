@@ -110,9 +110,8 @@
   const loadingCard = (r, id) => `<article class="rs-card rs-loading" data-id="${id}" aria-busy="true" aria-label="${esc(r.name)}">
       <div class="rs-l1"><b class="rs-name" title="${esc(r.name)}">${esc(r.name)}</b><span class="rs-spacer"></span><span class="rs-sub" role="status">Loading…</span></div>
     </article>`;
-  // The small marker of a row served from memory while a fact is being refreshed (RP78); the title names the facts.
-  const staleMark = (r) => (r.stale && Array.isArray(r.stale.facts) && r.stale.facts.length
-    ? `<span class="rs-sub rs-stale" title="Updating: ${r.stale.facts.map(esc).join(', ')}">Updating…</span>` : '');
+  // A row served from memory while a fact is being refreshed (RP78): RP94b dropped the "Updating…" text; the card itself is marked busy and its tooltip names the facts.
+  const staleFacts = (r) => (r.stale && Array.isArray(r.stale.facts) && r.stale.facts.length ? r.stale.facts : null);
 
   // Two lines: name, branch, change chips, time, session; then bar, next unit, the action.
   function cardHtml(r, ctx) {
@@ -126,9 +125,10 @@
     const view = typeof module === 'object' && module.exports ? require('./view.js') : root.RepoPanelView;
     return view.RepoCard({
       id: r.id, label: r.name, cls, current: ctx.chatId === r.id,
+      ...(!r.error && staleFacts(r) ? { title: `Updating: ${staleFacts(r).join(', ')}`, busy: true } : {}),
       identity: `<b class="rs-name" title="${esc(r.name)}">${esc(r.name)}</b>`,
       branch: { text: r.branch ?? '', title: r.branch ?? '' }, chips,
-      meta: `<span class="rs-sub rs-when" title="${esc(lm.what ?? '')}">${esc(relativeTime(lm.at, ctx.now))}</span>${r.error ? '<span class="chip red">▲ error</span>' : sessionChip(r.session && r.session.state)}${r.error ? '' : staleMark(r)}`,
+      meta: `<span class="rs-sub rs-when" title="${esc(lm.what ?? '')}">${esc(relativeTime(lm.at, ctx.now))}</span>${r.error ? '<span class="chip red">▲ error</span>' : sessionChip(r.session && r.session.state)}`,
       body: `${r.error ? noData : progressHtml(r.progress, r.id)}${nextHtml(r)}${actionButton(r, ctx)}`,
     }, 'summary');
   }
@@ -596,7 +596,8 @@
     </article>`;
   }
 
-  const LEGEND = '<div class="rs-legend" aria-label="Bar legend"><span><i class="rs-key rs-done"></i>Completed</span><span><i class="rs-key rs-pr"></i>In review</span><span><i class="rs-key rs-blk"></i>Blocked</span><span><i class="rs-key rs-pend"></i>Pending</span><span>The button on the right is the best next action</span></div>';
+  // RP94b: the legend is behind a "?" (a native details element: no script, it opens with the keyboard too).
+  const LEGEND = '<details class="rs-legend"><summary title="Bar legend" aria-label="Bar legend">?</summary><div class="rs-legend-body"><span><i class="rs-key rs-done"></i>Completed</span><span><i class="rs-key rs-pr"></i>In review</span><span><i class="rs-key rs-blk"></i>Blocked</span><span><i class="rs-key rs-pend"></i>Pending</span><span>The button on the right is the best next action</span></div></details>';
 
   // The view-specific part of the view bar: the one Needs attention toggle (the button sets the value it is NOT in); it sits next to the scope buttons (RP82).
   function summaryTools(payload, ctx = {}) {
