@@ -86,6 +86,7 @@ test('p2: the parts of the row keep their order: identity, branch, behind, GitHu
   seed(page, { branch: 'main', files: [], ahead: 0, behind: 2 }, { prs: [], error: 'rate limited' });
   page.run(`S.req.abc = { state: 'loaded', data: { results: [{ id: 'R1', level: 'required', status: 'fail' }] } };
     S.roadmap.abc = { available: true, summary: { kind: 'next', id: 'X1', entrega: 'y', waiting: [], extra: 0, problems: { total: 0 }, done: 1, total: 2, pct: 50, header: {} } };`);
+  page.run("S.groups.push({ name: 'Work', repos: [] }); S.group = '';"); // RP94b: the group tag shows with several groups
   const h = page.run(`cleanRow(${REPO})`);
   const at = (s) => { const i = h.indexOf(s); assert.ok(i >= 0, `${s} is on the row`); return i; };
   const order = ['class="tag"', 'class="repo-name"', 'class="branch"', 'class="behind"', 'class="warn"', 'class="row-actions"', 'class="req-warn"', 'class="roadmap"'].map(at);
