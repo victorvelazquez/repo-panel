@@ -30,7 +30,8 @@ const loading = (o = {}) => row({
 });
 const view = (rows, ctx = {}) => R.summaryView({ rows, counts: {}, attention: [], generatedAt: '2026-05-01T12:00:00Z' }, { now: NOW, scope: { kind: 'all' }, rooms: [], ...ctx });
 const cardOf = (html, id) => (new RegExp(`<article class="rs-card[^"]*"[^>]* data-id="${id}"[\\s\\S]*?</article>`).exec(html) || [''])[0];
-const marker = (html) => /<(\w+)[^>]*title="([^"]*)"[^>]*>[^<]*Updating…/.exec(html);
+// RP94b: the "Updating…" text is gone; the card carries the tooltip with the facts and aria-busy.
+const marker = (html) => (/^<article class="rs-card[^"]*"[^>]* title="([^"]*)" aria-busy="true">/.exec(html) ? [null, null, /title="Updating: ([^"]*)" aria-busy="true">/.exec(html)[1]] : null);
 
 // ---------- loading ----------
 test('a loading row is a calm placeholder card: the repo name and "Loading…", no button, no action, no error look', () => {
@@ -59,17 +60,17 @@ test('a loading row escapes its name and group', () => {
 });
 
 // ---------- stale ----------
-test('a stale row is a normal card plus a small "Updating…" marker whose title names the stale facts', () => {
+test('a stale row is a normal card marked busy (RP94b: no "Updating…" text) whose tooltip names the stale facts', () => {
   const plain = cardOf(view([row({ action: { kind: 'merge', label: 'Merge #9', pr: 9 } })]), 'r1');
   const html = view([row({ action: { kind: 'merge', label: 'Merge #9', pr: 9 }, stale: { facts: ['prs', 'local'] } })]);
   const card = cardOf(html, 'r1');
   const m = marker(card);
-  assert.ok(m, 'the marker is there');
+  assert.ok(m, 'the card is marked busy, with its tooltip');
   assert.match(m[2], /prs/);
   assert.match(m[2], /local/);
   assert.match(card, /<button class="merge"/, 'the action is still offered');
   assert.match(card, /30 of 74 completed/, 'the progress is still shown (in its title and aria-label)');
-  assert.equal(card.replace(/<(\w+)[^>]*title="[^"]*"[^>]*>[^<]*Updating…<\/\1>/, ''), plain, 'nothing else changes in the card');
+  assert.equal(card.replace(/ title="Updating: [^"]*" aria-busy="true">/, '>'), plain, 'nothing else changes in the card');
 });
 
 test('no "Updating…" without stale or with an empty list of facts; a loading row never carries it', () => {
@@ -78,11 +79,11 @@ test('no "Updating…" without stale or with an empty list of facts; a loading r
   assert.doesNotMatch(view([loading({ stale: { facts: ['prs'] } })]), /Updating…/);
 });
 
-test('the stale marker escapes the fact names and says "session", never "pi"', () => {
+test('the stale tooltip escapes the fact names and says "session", never "pi"', () => {
   const html = cardOf(view([row({ stale: { facts: [BAD, 'session'] } })]), 'r1');
   assert.doesNotMatch(html, /<img/);
   assert.match(marker(html)[2], /&lt;img/);
-  assert.doesNotMatch(marker(html)[0], /\bpi\b/i);
+  assert.doesNotMatch(marker(html)[2], /\bpi\b/i);
 });
 
 test('the resumen.js source keeps the wording rule: no visible "pi session", "pi screen", "Gentle Shell"', () => {
