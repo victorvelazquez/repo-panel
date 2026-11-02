@@ -156,9 +156,9 @@ test('POST /api/pi put-in-conditions for the room repo answers 409 and names the
 
 test('piSend refuses the member order for a room before touching any session', async () => {
   const calls = [];
-  const orca = async (args) => { calls.push(args); return { terminals: [] }; };
+  const host = { status: async () => { calls.push('status'); return { state: 'idle' }; }, prompt: async () => { calls.push('prompt'); } };
   const requirements = async () => ({ available: true, results: [], isRoom: true, room: { name: 'Casa' } });
-  await assert.rejects(piSend({ path: 'C:\\dev\\room' }, 'put-in-conditions', orca, async () => {}, requirements),
+  await assert.rejects(piSend({ id: 'r1', path: 'C:\dev\room' }, 'put-in-conditions', host, requirements),
     (e) => e.status === 409 && /Casa/.test(e.message) && /room standard/.test(e.message));
   assert.deepEqual(calls, []);
 });

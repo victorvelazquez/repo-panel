@@ -15,7 +15,9 @@ const stub = () => new Proxy(function stubElement() {}, {
 });
 
 // `routes` maps a url (no query) to (body, url) => { status, json } or a promise of it. A missing route is "offline".
-async function loadPage(routes = {}) {
+async function loadPage(extraRoutes = {}) {
+  // RPC2-2: a click starts the session first (a session of unknown state counts as not started).
+  const routes = { '/api/rpc/start': () => ({ json: { state: 'idle', pendingDialogs: [], sessionId: 's1' } }), ...extraRoutes };
   const app = { innerHTML: '' };
   const calls = [];
   const state = { hidden: false };

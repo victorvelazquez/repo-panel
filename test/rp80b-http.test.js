@@ -75,7 +75,9 @@ const fakeOrca = () => async (args) => {
 };
 // A clock that moves 10 s per read: the duplicate-message guard of the chat never refuses the same text twice.
 let clock = 0;
-const baseDeps = () => ({ now: () => (clock += 10000), orca: fakeOrca(), wait: async () => {}, sessionsDir: path.join(scratch, 'sessions'), requirements: async () => ({ available: false }) });
+// RPC2-2: POST /api/pi talks to the rpc host (an idle session that takes any prompt), not to Orca.
+const fakeHost = () => ({ status: async () => ({ state: 'idle' }), prompt: async () => ({}), closeAll() {} });
+const baseDeps = () => ({ now: () => (clock += 10000), rpcHost: fakeHost(), orca: fakeOrca(), wait: async () => {}, sessionsDir: path.join(scratch, 'sessions'), requirements: async () => ({ available: false }) });
 const withTerminal = () => { world.terminals = [{ handle: 'h1', title: 'T1', worktreePath: repoDir.replace(/\\/g, '/'), connected: true, writable: true }]; };
 
 const freePort = () => new Promise((resolve) => {

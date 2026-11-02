@@ -145,8 +145,15 @@ function noteLocal(id) {
   setTimeout(draw, (V ? V.LIVE_CHECK_MS : 20000) + 50); // the hold ends by itself: redraw once it has
 }
 
-// The session state the buttons of a repo see (S.sent has its own verdict): the live answer, or 'checking' until it comes.
-const sessionOf = (id) => (V ? V.liveSession({ sent: S.sent[id], live: S.live[id], answered: S.liveAnswered[id], dirtyAt: S.dirtyAt[id] }) : S.sent[id] ? undefined : S.live[id]);
+// The session state the buttons of a repo see (S.sent has its own verdict). RPC2-2: the live session (S.rpc) rules once it is known: idle, busy
+// (a session that is starting works), asking or closed (a closed one is not a hold: the click starts it). Before that, the live answer, or 'checking'.
+const rpcSession = (id) => { const r = S.rpc[id]; return r && r.state ? (r.state === 'starting' ? 'busy' : r.state) : undefined; };
+function sessionOf(id) {
+  if (S.sent[id]) return undefined;
+  const known = rpcSession(id);
+  if (known) return known;
+  return V ? V.liveSession({ live: S.live[id], answered: S.liveAnswered[id], dirtyAt: S.dirtyAt[id] }) : S.live[id];
+}
 const loadPrs = (id) => track(id, pooled(() => api(`/api/prs?id=${id}`)).then((d) => { setFact('prs', id, d); stamp(id, 'prs'); wakeReady(id, d); releaseMerged(id, d); }, (e) => { setFact('prs', id, { error: e.message }); }));
 
 // A merged PR keeps its Merge button disabled (S.merged: key -> time of the merge) until GitHub no longer lists it, or MERGE_HOLD_MS.
@@ -267,6 +274,11 @@ function applyLive(entries) {
 function applyRpc(p) {
   const { entry, reload } = V.rpcReduce(S.rpc[p.id], p, Date.now());
   S.rpc[p.id] = entry;
+  // RPC2-2: the verdict of a command sent from this page follows the session at once (the poll of /api/pi-status stays as the fallback).
+  if (S.sent[p.id]) {
+    const seen = p.kind === 'exit' ? 'closed' : p.kind === 'state' && entry.state !== 'starting' ? entry.state : null;
+    if (seen) applyPiState(p.id, seen);
+  }
   if (reload && S.chat.id === p.id) settled(p.id);
   else if (reload) Object.assign(entry, { blocks: [], text: '' }); // nobody is looking: the history will have it
   draw();
@@ -1254,8 +1266,23 @@ const composerOf = (id) => R.composerState({ ...S.chat, rpc: S.rpc[id], sending:
 const sayNote = (id, text) => { S.notes[id] = { text, id }; };
 const setRpc = (id, patch) => { S.rpc[id] = { ...(S.rpc[id] || V.rpcFromStatus(undefined, null)), ...patch }; };
 
-// Send: a session that is not started is started FIRST (it can take up to two minutes: the label says Starting…), then the prompt goes. The start also adopts the
-// session id the history is read from. A failure puts the text back and shows the server's message; the optimistic user bubble goes with it.
+// A session that is not started is started first (it can take up to two minutes: the label says Starting…); the start also adopts the session id the
+// history is read from. A failure leaves the session closed and throws the server's message. The chat Send and the flow buttons share it.
+// The callers check rpcNeedsStart first, so a session that is up adds no await (the send goes out in the same tick).
+const rpcNeedsStart = (id) => !S.rpc[id] || S.rpc[id].state === 'closed';
+async function ensureRpcStarted(id) {
+  if (!rpcNeedsStart(id)) return;
+  setRpc(id, { state: 'starting', error: '' });
+  draw();
+  try { S.rpc[id] = V.rpcFromStatus(S.rpc[id], await api('/api/rpc/start', { id }, { timeoutMs: 125000 })); } catch (e) {
+    setRpc(id, { state: 'closed' });
+    throw e.message === 'Request timed out' ? new Error('The session did not start in two minutes') : e;
+  }
+  if (S.chat.id === id) loadChat(id);
+}
+
+// Send: the session is started first if needed (ensureRpcStarted), then the prompt goes. A failure puts the text back and shows the server's message; the optimistic
+// user bubble goes with it.
 async function sendChatMessage() {
   const id = S.chat.id;
   if (!R || !id) return;
@@ -1264,22 +1291,15 @@ async function sendChatMessage() {
   const cs = composerOf(id);
   if (!cs.canSend) { sayNote(id, cs.reason); draw(); return; }
   const entry = { text, state: 'sending', base: R.userCount((S.chat.hist && S.chat.hist.items) || [], text) };
-  const starting = !S.rpc[id] || S.rpc[id].state === 'closed';
   delete S.notes[id];
   delete S.recall[id];
   $('#msgBox').value = '';
   delete S.drafts[id];
   (S.pending[id] || (S.pending[id] = [])).push(entry);
-  setRpc(id, starting ? { state: 'starting', error: '' } : { error: '' });
+  setRpc(id, { error: '' });
   draw();
   try {
-    if (starting) {
-      try { S.rpc[id] = V.rpcFromStatus(S.rpc[id], await api('/api/rpc/start', { id }, { timeoutMs: 125000 })); } catch (e) {
-        setRpc(id, { state: 'closed' });
-        throw e.message === 'Request timed out' ? new Error('The session did not start in two minutes') : e;
-      }
-      if (S.chat.id === id) loadChat(id);
-    }
+    if (rpcNeedsStart(id)) await ensureRpcStarted(id);
     await api('/api/rpc/prompt', { id, text });
     entry.state = 'ok';
   } catch (e) {
@@ -1820,6 +1840,7 @@ const ACTIONS = {
     el.disabled = true;
     draw();
     try {
+      if (rpcNeedsStart(id)) await ensureRpcStarted(id);
       // The baseline of the verdict is read fresh, right before sending, so a stale card cannot fake "HEAD changed".
       const judged = JUDGED_CMDS.includes(cmd);
       const before = judged ? await api(`/api/local?id=${id}`).catch(() => null) : null;
@@ -1875,6 +1896,7 @@ const ACTIONS = {
     S.sending[id] = 'put-in-conditions'; // the repo behaves as if the command were running from the click until the answer
     draw();
     try {
+      if (rpcNeedsStart(id)) await ensureRpcStarted(id);
       const d = await api('/api/pi', { id, command: 'put-in-conditions' });
       if (d.sent) startSent(id, { cmd: 'put-in-conditions', at: Date.now() });
       toast(d.confirmed ? 'Sent the put-in-conditions order to the session' : 'Sent the put-in-conditions order, not confirmed: check the session', d.confirmed ? 'ok' : '');

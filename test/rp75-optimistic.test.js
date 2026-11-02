@@ -98,7 +98,7 @@ const prsOf = (prs) => ({ prs, stale: null, repo: { url: 'https://github.com/o/d
 
 // The fake fetch takes the FIRST key the url starts with, so the longer routes come before their prefixes.
 const BASE = {
-  '/api/rpc/status': { state: 'idle', pendingDialogs: [], sessionId: 's1' }, '/api/rpc/prompt': { disposition: 'started' }, '/api/pi-status': { state: 'busy' }, '/api/pi': { sent: true, confirmed: true },
+  '/api/rpc/start': { state: 'idle', pendingDialogs: [], sessionId: 's1' }, '/api/rpc/status': { state: 'idle', pendingDialogs: [], sessionId: 's1' }, '/api/rpc/prompt': { disposition: 'started' }, '/api/pi-status': { state: 'busy' }, '/api/pi': { sent: true, confirmed: true },
   '/api/sessions': ADOPTED, '/api/chat': histOf(HELLO_THERE),
 };
 const answers = (extra = {}) => ({ ...Object.fromEntries(Object.entries(BASE).map(([k, v]) => [k, k in extra ? extra[k] : v])), ...Object.fromEntries(Object.entries(extra).filter(([k]) => !(k in BASE))) });
@@ -656,6 +656,7 @@ test('D8: page: refreshTick on kind sent asks ONLY /api/pi-status for that repo,
 test('E1: a click on an action sends exactly ONE POST /api/pi; a second dispatch while the first is in flight sends nothing', async () => {
   const post = gate();
   const { page } = await summaryPage({ '/api/pi': () => post.promise }, [START_ROW(), card({ id: 'xyz', name: 'other' })]);
+  page.run("S.rpc.abc = V.rpcFromStatus(undefined, { state: 'idle', pendingDialogs: [] })"); // RPC2-2: a started session, so the POST goes out in the same tick
   const pis = () => page.fetches.filter((f) => f.method === 'POST' && f.url === '/api/pi');
   page.run(PI_CLICK);
   page.run(PI_CLICK);

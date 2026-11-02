@@ -16,57 +16,38 @@ const { piSend, sendGuard } = require('../server/pi.js');
 
 test.after(() => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5 }));
 
-const IDLE_PI = '▎ ✿ waiting for input\n▎   type, or / for commands\n▎\n';
-const BUSY_PI = '$ sleep 20 (timeout 30s)\nElapsed 7.2s\n▎ ❁ working…\n▎   type, or / for commands\n▎\n';
-const piTerm = (o = {}) => ({ handle: 'h1', title: 'Terminal 1', worktreePath: 'C:/dev/repo', connected: true, writable: true, ...o });
-function fakeOrca({ terminals = [piTerm()], previews = [IDLE_PI, IDLE_PI, 'working'] } = {}) {
-  const calls = [];
-  let n = 0;
-  const orca = async (args) => {
-    calls.push(args);
-    if (args[0] === 'list') return { terminals };
-    if (args[0] === 'show') return { terminal: { preview: previews[Math.min(n++, previews.length - 1)] } };
-    return { send: { accepted: true } };
-  };
-  return { orca, calls, sends: () => calls.filter((c) => c[0] === 'send') };
-}
-const REPO = { path: 'C:\\dev\\repo' };
-const noWait = async () => {};
+// RPC2-2: the key goes to the session through the rpc host (status + prompt), not through Orca.
+const fakeHost = (state = 'idle') => { const sent = []; return { sent, status: async () => ({ state }), prompt: async (id, text) => { sent.push(text); return {}; } }; };
+const REPO = { id: 'r1', path: 'C:\dev\repo' };
 const refuses = (p, status, re) => assert.rejects(p, (e) => e.status === status && re.test(e.message));
 
 test('flow-next is a fixed command: exactly /flow-next, no arguments', async () => {
   assert.equal(lib.PI_COMMANDS['flow-next'], '/flow-next');
-  const f = fakeOrca();
-  assert.deepEqual(await piSend(REPO, 'flow-next', f.orca, noWait), { sent: true, confirmed: true });
-  assert.deepEqual(f.sends(), [['send', '--terminal', 'h1', '--text', '/flow-next', '--enter']]);
+  const h = fakeHost();
+  assert.deepEqual(await piSend(REPO, 'flow-next', h), { sent: true, confirmed: true });
+  assert.deepEqual(h.sent, ['/flow-next']);
 });
 
-test('flow-next goes through the same guards: no session, several sessions, busy, and the same-key refusal', async () => {
-  for (const [opts, re] of [
-    [{ terminals: [] }, /No open session/],
-    [{ terminals: [piTerm(), piTerm({ handle: 'h2' })] }, /Several sessions/],
-    [{ previews: [BUSY_PI] }, /busy or has text typed/],
-  ]) {
-    const f = fakeOrca(opts);
-    await refuses(piSend(REPO, 'flow-next', f.orca, noWait), 409, re);
-    assert.equal(f.sends().length, 0);
+test('flow-next goes through the same guards: not started, busy, asking, and the same-key refusal', async () => {
+  for (const [state, re] of [['closed', /not started/], ['busy', /busy/], ['asking', /waiting for an answer/]]) {
+    const h = fakeHost(state);
+    await refuses(piSend(REPO, 'flow-next', h), 409, re);
+    assert.deepEqual(h.sent, []);
   }
   const guard = sendGuard(() => 1000);
-  assert.equal((await piSend(REPO, 'flow-next', fakeOrca().orca, noWait, undefined, { guard })).confirmed, true);
-  await refuses(piSend(REPO, 'flow-next', fakeOrca().orca, noWait, undefined, { guard }), 409, /already sent/);
+  assert.equal((await piSend(REPO, 'flow-next', fakeHost(), undefined, { guard })).confirmed, true);
+  await refuses(piSend(REPO, 'flow-next', fakeHost(), undefined, { guard }), 409, /already sent/);
 });
 
 test('an unknown key is still refused and sends nothing; flow-base keeps its text', async () => {
-  const f = fakeOrca();
-  await refuses(piSend(REPO, 'flow-nextt', f.orca, noWait), 400, /Unknown command/);
-  await refuses(piSend(REPO, 'flow-next --x', f.orca, noWait), 400, /Unknown command/);
-  assert.equal(f.sends().length, 0);
+  const h = fakeHost();
+  await refuses(piSend(REPO, 'flow-nextt', h), 400, /Unknown command/);
+  await refuses(piSend(REPO, 'flow-next --x', h), 400, /Unknown command/);
+  assert.deepEqual(h.sent, []);
   assert.equal(lib.PI_COMMANDS['flow-base'], '/flow-base');
-  const b = fakeOrca();
-  await piSend(REPO, 'flow-base', b.orca, noWait);
-  assert.deepEqual(b.sends(), [['send', '--terminal', 'h1', '--text', '/flow-base', '--enter']]);
-  const busy = fakeOrca({ previews: [BUSY_PI] });
-  await refuses(piSend(REPO, 'flow-base', busy.orca, noWait), 409, /busy or has text typed/);
+  await piSend(REPO, 'flow-base', h);
+  assert.deepEqual(h.sent, ['/flow-base']);
+  await refuses(piSend(REPO, 'flow-base', fakeHost('busy')), 409, /busy/);
 });
 
 // ---------- the Summary button ----------

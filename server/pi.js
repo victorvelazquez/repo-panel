@@ -1,8 +1,7 @@
 'use strict';
-// Types a fixed command into the one idle pi session Orca has open for the repo. It fails closed: no session,
-// several sessions, a busy prompt or text already typed all refuse instead of guessing. A pi session is found by
-// its screen, never by the terminal title (Orca renames the same session), so each check reads one `show` per
-// terminal of the repo's worktree.
+// Sends a fixed command to the repo's pi session over RPC (RPC2-2): the text is built here, the session must be started and idle, and the
+// same text is not accepted twice within a window (sendGuard). It fails closed: not started, busy or asking all refuse. The Orca scan below
+// is still read by the warmer, the watcher and the rooms until RPC2b.
 const path = require('node:path');
 const lib = require('../lib.js');
 const { HttpError } = require('./errors.js');
@@ -14,6 +13,7 @@ const INSTALL_PATH = path.join(__dirname, '..', 'requirements', 'INSTALL.md');
 const PUT_IN_CONDITIONS = 'put-in-conditions';
 const FIX_PR = 'fix-pr';
 
+// Only server/dialoganswer.js still takes this lock; RPC2-3 removes it together with that file. piSend no longer uses it.
 const piBusy = new Set();
 
 // The same command key is not accepted twice for one repo within this window after a confirmed send: a pi screen
@@ -30,13 +30,12 @@ function sendGuard(now = Date.now) {
       if (ago < DUPLICATE_MS) throw new HttpError(409, `That command was already sent ${Math.max(0, Math.round(ago / 1000))} s ago; wait for it to finish`);
     },
     record(repo, key) { last.set(id(repo, key), now()); },
+    forget(repo, key) { last.delete(id(repo, key)); },
   };
 }
 
 // Appended to the orders that make a session edit files: /flow-commit refuses to start when the index is not empty.
 const INDEX_RULE = 'Never use git mv or git add; keep the git index empty (/flow-commit refuses to start with staged files).';
-
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function orcaTerminal(args) {
   const r = await run('orca', ['terminal', ...args, '--json'], { timeout: 15000 });
@@ -209,32 +208,27 @@ async function scanSessions(folder, orca, listed, withPreview = false, askAware 
 // The pi sessions of the repo: [{ handle, state }] with state idle | typed | busy | asking.
 const piSessions = async (repo, orca = orcaTerminal) => (await scanSessions(repo.path, orca, undefined, false, true)).sessions;
 
-// `extra` is { pr, prs, guard }: the PR number of fix-pr, the provider of the repo's open PRs (injectable for tests) and
-// the duplicate-send guard of sendGuard (the HTTP server always passes one; without it nothing is refused as a repeat).
-async function piSend(repo, key, orca = orcaTerminal, wait = sleep, requirements = requirementsFor, { pr, prs = prState, guard = null } = {}) {
+// The fixed refusal for each session state that cannot take a command; a session that is still starting counts as busy.
+const REFUSALS = { closed: 'The session is not started', starting: 'The session is busy', busy: 'The session is busy', asking: 'The session is waiting for an answer' };
+
+// `extra` is { pr, prs, guard }: the PR number of fix-pr, the provider of the repo's open PRs (injectable for tests) and the duplicate-send
+// guard of sendGuard (the HTTP server always passes one; without it nothing is refused as a repeat). `host` is the rpc host (status, prompt).
+async function piSend(repo, key, host, requirements = requirementsFor, { pr, prs = prState, guard = null } = {}) {
   if (key !== PUT_IN_CONDITIONS && key !== FIX_PR && !Object.hasOwn(lib.PI_COMMANDS, key)) throw new HttpError(400, 'Unknown command');
   if (key === FIX_PR && !(Number.isInteger(pr) && pr > 0)) throw new HttpError(400, 'fix-pr needs the pr number of an open pull request (a positive integer)');
-  if (piBusy.has(repo.path)) throw new HttpError(409, 'A command is already being sent to this repo');
-  piBusy.add(repo.path);
-  try {
-    const text = await orderText(repo, key, requirements, { pr, prs });
-    const mine = await piSessions(repo, orca);
-    if (!mine.length) throw new HttpError(409, 'No open session found for this repo in Orca');
-    if (mine.length > 1) throw new HttpError(409, 'Several sessions are open for this repo; close the extra ones');
-    if (mine[0].state === 'asking') throw new HttpError(409, 'The session is waiting for your answer to a question');
-    const { handle } = mine[0];
-    const state = async () => lib.piPromptState(((await orca(['show', '--terminal', handle])).terminal || {}).preview);
-    if (mine[0].state !== 'idle') throw new HttpError(409, 'The session is busy or has text typed in its prompt');
-    if (guard) guard.check(repo, key);
-    await orca(['send', '--terminal', handle, '--text', text, '--enter']);
-    // Orca cannot report delivery, so look for the session to leave the idle prompt. `confirmed` only means the
-    // prompt left the idle state (the agent started something); it does not prove the order was read or applied.
-    for (let i = 0; i < 6; i++) {
-      await wait(700);
-      if (await state() !== 'idle') { if (guard) guard.record(repo, key); return { sent: true, confirmed: true }; }
-    }
-    return { sent: true, confirmed: false };
-  } finally { piBusy.delete(repo.path); }
+  const text = await orderText(repo, key, requirements, { pr, prs });
+  const { state } = await host.status(repo.id);
+  if (state !== 'idle') throw new HttpError(409, REFUSALS[state] || 'The session is busy');
+  // Armed before the await so two clicks in flight cannot both pass; a refused prompt gives the slot back.
+  if (guard) { guard.check(repo, key); guard.record(repo, key); }
+  try { await host.prompt(repo.id, text); } catch (e) { if (guard) guard.forget(repo, key); throw e instanceof HttpError ? e : new HttpError(500, 'The session failed'); }
+  return { sent: true, confirmed: true };
+}
+
+// The session state for the commit verdict and the buttons, from the host: closed | idle | busy | asking (starting reads as busy). Never Orca.
+async function rpcPiStatus(repo, host) {
+  const { state } = await host.status(repo.id);
+  return { state: state === 'starting' ? 'busy' : state };
 }
 
 const TAIL_LINES = 6;
@@ -283,4 +277,4 @@ async function piStatus(repo, orca = orcaTerminal, { tail = false } = {}) {
   } catch { return out('unknown'); }
 }
 
-module.exports = { piSend, piStatus, piStateOf, piSessions, scanSessions, clearLiveCache, liveCacheStats, listTerminals, primeList, conditionsOrder, fixPrOrder, orcaTerminal, readScreen, sendGuard, setCaseRecorder, caseRecorderInstalled, piBusy };
+module.exports = { piSend, piStatus, piStateOf, piSessions, scanSessions, clearLiveCache, liveCacheStats, listTerminals, primeList, conditionsOrder, fixPrOrder, orcaTerminal, readScreen, sendGuard, rpcPiStatus, setCaseRecorder, caseRecorderInstalled, piBusy };

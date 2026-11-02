@@ -16,7 +16,8 @@ const stub = () => new Proxy(function stubElement() {}, {
 
 function loadPage() {
   const calls = [];
-  const answers = {};
+  // RPC2-2: a click starts the session first (a session of unknown state counts as not started).
+  const answers = { '/api/rpc/start': { state: 'idle', pendingDialogs: [], sessionId: 's1' } };
   const ctx = vm.createContext({
     console,
     document: new Proxy({}, { get: (t, k) => (k === 'hidden' ? false : stub) }),

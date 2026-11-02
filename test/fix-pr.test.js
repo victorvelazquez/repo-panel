@@ -19,22 +19,13 @@ const { piSend, fixPrOrder, sendGuard } = require('../server/pi.js');
 
 test.after(() => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5 }));
 
-const IDLE_PI = '▎ ✿ waiting for input\n▎   type, or / for commands\n▎\n';
-const BUSY_PI = '$ sleep 20 (timeout 30s)\nElapsed 7.2s\n▎ ❁ working…\n▎   type, or / for commands\n▎\n';
-const piTerm = (o = {}) => ({ handle: 'h1', title: 'Terminal 1', worktreePath: 'C:/dev/repo', connected: true, writable: true, ...o });
-function fakeOrca({ terminals = [piTerm()], previews = [IDLE_PI, IDLE_PI, 'working'] } = {}) {
-  const calls = [];
-  let n = 0;
-  const orca = async (args) => {
-    calls.push(args);
-    if (args[0] === 'list') return { terminals };
-    if (args[0] === 'show') return { terminal: { preview: previews[Math.min(n++, previews.length - 1)] } };
-    return { send: { accepted: true } };
-  };
-  return { orca, calls, sends: () => calls.filter((c) => c[0] === 'send') };
+// RPC2-2: the order goes to the session through the rpc host (status + prompt), not through Orca.
+function fakeHost(state = 'idle') {
+  const sent = [];
+  let calls = 0;
+  return { sent, calls: () => calls, status: async () => { calls++; return { state }; }, prompt: async (id, text) => { calls++; sent.push(text); return { disposition: 'started' }; } };
 }
-const REPO = { path: REPO_PATH };
-const noWait = async () => {};
+const REPO = { id: 'r1', path: REPO_PATH };
 const refuses = (p, status, re) => assert.rejects(p, (e) => e.status === status && re.test(e.message));
 
 const check = (name, state = 'failed') => ({ name, state });
@@ -89,58 +80,45 @@ test('fix-pr order: stays one line under 1500 characters for 5 names and a 120-c
 });
 
 // ---------- piSend ----------
-test('fix-pr: piSend types the built order into the one idle session', async () => {
-  const f = fakeOrca();
-  assert.deepEqual(await piSend(REPO, 'fix-pr', f.orca, noWait, NEVER, { pr: 7, prs: provider(prOf({ number: 6, title: 'other', checks: { state: 'success', items: [] } }), prOf()) }), { sent: true, confirmed: true });
-  assert.deepEqual(f.sends(), [['send', '--terminal', 'h1', '--text', fixPrOrder(prOf()), '--enter']]);
+test('fix-pr: piSend sends the built order to the idle session', async () => {
+  const h = fakeHost();
+  assert.deepEqual(await piSend(REPO, 'fix-pr', h, NEVER, { pr: 7, prs: provider(prOf({ number: 6, title: 'other', checks: { state: 'success', items: [] } }), prOf()) }), { sent: true, confirmed: true });
+  assert.deepEqual(h.sent, [fixPrOrder(prOf())]);
 });
 
 test('fix-pr: a missing or invalid pr is a 400 that touches nothing', async () => {
-  const f = fakeOrca();
+  const h = fakeHost();
   for (const pr of [undefined, null, 0, -3, 1.5, '7', NaN, [7], {}]) {
-    await refuses(piSend(REPO, 'fix-pr', f.orca, noWait, NEVER, { pr, prs: NEVER }), 400, /pr/i);
+    await refuses(piSend(REPO, 'fix-pr', h, NEVER, { pr, prs: NEVER }), 400, /pr/i);
   }
-  assert.equal(f.calls.length, 0);
-  assert.equal((await piSend(REPO, 'fix-pr', fakeOrca().orca, noWait, NEVER, { pr: 7, prs: provider(prOf()) })).sent, true); // lock freed
+  assert.equal(h.calls(), 0);
 });
 
 test('fix-pr: a PR that does not exist, is not open, has no failing checks or cannot be read is a 409 that touches nothing', async () => {
-  const f = fakeOrca();
+  const h = fakeHost();
   const ok = (state) => prOf({ checks: { state, items: [] } });
-  await refuses(piSend(REPO, 'fix-pr', f.orca, noWait, NEVER, { pr: 99, prs: provider(prOf()) }), 409, /#99.*(does not exist|not open)/i);
-  for (const state of ['pending', 'success', 'none']) await refuses(piSend(REPO, 'fix-pr', f.orca, noWait, NEVER, { pr: 7, prs: provider(ok(state)) }), 409, /no failing checks/i);
-  await refuses(piSend(REPO, 'fix-pr', f.orca, noWait, NEVER, { pr: 7, prs: async () => ({ repo: {}, error: 'gh pr list failed' }) }), 409, /could not be read/i);
-  await refuses(piSend(REPO, 'fix-pr', f.orca, noWait, NEVER, { pr: 7, prs: async () => ({ noRemote: true, prs: [] }) }), 409, /could not be read/i);
-  assert.equal(f.calls.length, 0);
+  await refuses(piSend(REPO, 'fix-pr', h, NEVER, { pr: 99, prs: provider(prOf()) }), 409, /#99.*(does not exist|not open)/i);
+  for (const state of ['pending', 'success', 'none']) await refuses(piSend(REPO, 'fix-pr', h, NEVER, { pr: 7, prs: provider(ok(state)) }), 409, /no failing checks/i);
+  await refuses(piSend(REPO, 'fix-pr', h, NEVER, { pr: 7, prs: async () => ({ repo: {}, error: 'gh pr list failed' }) }), 409, /could not be read/i);
+  await refuses(piSend(REPO, 'fix-pr', h, NEVER, { pr: 7, prs: async () => ({ noRemote: true, prs: [] }) }), 409, /could not be read/i);
+  assert.equal(h.calls(), 0);
 });
 
-test('fix-pr: keeps the session safeguards (no session, busy prompt, several sessions) and sends nothing', async () => {
-  for (const [opts, re] of [[{ terminals: [] }, /No open session/], [{ previews: [BUSY_PI] }, /busy or has text/], [{ terminals: [piTerm(), piTerm({ handle: 'h2' })] }, /Several sessions/]]) {
-    const f = fakeOrca(opts);
-    await refuses(piSend(REPO, 'fix-pr', f.orca, noWait, NEVER, { pr: 7, prs: provider(prOf()) }), 409, re);
-    assert.equal(f.sends().length, 0);
+test('fix-pr: keeps the session safeguards (not started, busy, asking) and sends nothing', async () => {
+  for (const [state, re] of [['closed', /not started/], ['busy', /busy/], ['asking', /waiting for an answer/]]) {
+    const h = fakeHost(state);
+    await refuses(piSend(REPO, 'fix-pr', h, NEVER, { pr: 7, prs: provider(prOf()) }), 409, re);
+    assert.deepEqual(h.sent, []);
   }
 });
 
-test('fix-pr: refuses a second send to the same repo while one is in flight', async () => {
-  let release;
-  const gate = new Promise((r) => { release = r; });
-  const slowPrs = async () => { await gate; return { repo: {}, prs: [prOf()] }; };
-  const first = piSend(REPO, 'fix-pr', fakeOrca().orca, noWait, NEVER, { pr: 7, prs: slowPrs });
-  await refuses(piSend(REPO, 'fix-pr', fakeOrca().orca, noWait, NEVER, { pr: 7, prs: provider(prOf()) }), 409, /already being sent/);
-  release();
-  assert.equal((await first).sent, true);
-});
-
 test('piSend still refuses an unknown key before reading anything, and the fixed keys ignore a pr', async () => {
-  const f = fakeOrca();
-  for (const c of ['rm -rf', '/fix-pr', 'fix_pr', 'constructor', undefined]) await refuses(piSend(REPO, c, f.orca, noWait, NEVER, { pr: 7, prs: NEVER }), 400, /Unknown command/);
-  assert.equal(f.calls.length, 0);
-  await piSend(REPO, 'flow-base', f.orca, noWait, NEVER, { pr: 7, prs: NEVER });
-  assert.deepEqual(f.sends(), [['send', '--terminal', 'h1', '--text', '/flow-base', '--enter']]);
-  const g = fakeOrca();
-  await piSend(REPO, 'flow-base-stash', g.orca, noWait, NEVER, { pr: 7, prs: NEVER });
-  assert.deepEqual(g.sends(), [['send', '--terminal', 'h1', '--text', '/flow-base --stash', '--enter']]);
+  const h = fakeHost();
+  for (const c of ['rm -rf', '/fix-pr', 'fix_pr', 'constructor', undefined]) await refuses(piSend(REPO, c, h, NEVER, { pr: 7, prs: NEVER }), 400, /Unknown command/);
+  assert.equal(h.calls(), 0);
+  await piSend(REPO, 'flow-base', h, NEVER, { pr: 7, prs: NEVER });
+  await piSend(REPO, 'flow-base-stash', h, NEVER, { pr: 7, prs: NEVER });
+  assert.deepEqual(h.sent, ['/flow-base', '/flow-base --stash']);
 });
 
 // ---------- the real server ----------
@@ -167,47 +145,38 @@ async function withServer(deps, fn) {
 
 test('POST /api/pi with fix-pr sends the order through the real server, and refuses what it must', async () => {
   const id = lib.repoId(REPO_PATH);
-  // A new fake session per request: the fake leaves the idle prompt once it was typed into.
-  let f = fakeOrca();
-  const fresh = () => { f = fakeOrca(); return f; };
+  const h = fakeHost();
+  const host = { status: h.status, prompt: h.prompt, closeAll() {} };
   const failing = prOf();
   const passing = prOf({ number: 8, checks: { state: 'success', items: [] } });
   let clock = 1_000_000;
-  await withServer({ orca: (args) => f.orca(args), wait: noWait, requirements: NEVER, prs: provider(failing, passing), guard: sendGuard(() => clock) }, async ({ post }) => {
+  await withServer({ rpcHost: host, requirements: NEVER, prs: provider(failing, passing), guard: sendGuard(() => clock) }, async ({ post }) => {
     const ok = await post('/api/pi', { id, command: 'fix-pr', pr: 7 });
     assert.deepEqual([ok.status, ok.json], [200, { sent: true, confirmed: true }]);
-    assert.deepEqual(f.sends(), [['send', '--terminal', 'h1', '--text', fixPrOrder(failing), '--enter']]);
-    fresh();
+    assert.deepEqual(h.sent, [fixPrOrder(failing)]);
     for (const body of [{ id, command: 'fix-pr' }, { id, command: 'fix-pr', pr: '7' }, { id, command: 'fix-pr', pr: 0 }]) assert.equal((await post('/api/pi', body)).status, 400);
     for (const pr of [8, 99]) assert.equal((await post('/api/pi', { id, command: 'fix-pr', pr })).status, 409);
     assert.equal((await post('/api/pi', { id, command: 'rm -rf', pr: 7 })).status, 400);
     assert.equal((await post('/api/pi', { id: 'nope', command: 'fix-pr', pr: 7 })).status, 404);
     assert.equal((await post('/api/pi', { id, command: 'fix-pr', pr: 7 }, false)).status, 401);
-    assert.equal(f.calls.length, 0);
+    assert.equal(h.sent.length, 1);
     // the browser cannot supply text: an extra text field is ignored (a minute later, so the duplicate guard is not involved)
     clock += 60_000;
     await post('/api/pi', { id, command: 'fix-pr', pr: 7, text: 'rm -rf /' });
-    assert.deepEqual(f.sends().map((c) => c[4]), [fixPrOrder(failing)]);
-    // the fixed keys keep working through the same route
-    fresh();
+    assert.deepEqual(h.sent, [fixPrOrder(failing), fixPrOrder(failing)]);
+    // the fixed keys keep working through the same route, and the carry-over key sends exactly /flow-base --stash
     await post('/api/pi', { id, command: 'flow-base' });
-    assert.deepEqual(f.sends(), [['send', '--terminal', 'h1', '--text', '/flow-base', '--enter']]);
-    // the carry-over key types exactly /flow-base --stash through the same safeguards
-    fresh();
     const stash = await post('/api/pi', { id, command: 'flow-base-stash' });
     assert.deepEqual([stash.status, stash.json], [200, { sent: true, confirmed: true }]);
-    assert.deepEqual(f.sends(), [['send', '--terminal', 'h1', '--text', '/flow-base --stash', '--enter']]);
+    assert.deepEqual(h.sent.slice(2), ['/flow-base', '/flow-base --stash']);
     assert.equal((await post('/api/pi', { id, command: 'flow-base-stash' }, false)).status, 401);
     assert.equal((await post('/api/pi', { id: 'nope', command: 'flow-base-stash' })).status, 404);
-    // near-miss keys and free text are still unknown
-    fresh();
+    // near-miss keys, free text and the keys of the renamed skill are unknown
     for (const command of ['flow-base --stash', 'flow-base-stash ', 'FLOW-BASE-STASH', '/flow-base --stash', 'flow-base-stash2']) assert.equal((await post('/api/pi', { id, command })).status, 400, command);
-    assert.equal(f.calls.length, 0);
-    // no alias: the keys of the renamed skill are gone
     for (const command of ['flow-branch', 'flow-branch-stash']) {
       const old = await post('/api/pi', { id, command });
       assert.deepEqual([old.status, old.json.error], [400, 'Unknown command'], command);
     }
-    assert.equal(f.calls.length, 0);
+    assert.equal(h.sent.length, 4);
   });
 });
