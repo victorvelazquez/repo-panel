@@ -270,7 +270,7 @@ test('s3: no active runtime or a detection that throws keeps the old default; RE
 test('s4: baseDir reads the setting fresh: changing pi.runtime in config.json changes the folder at once', () => {
   const gs = path.join(homedir, '.gentle-shell', 'agent', 'sessions');
   const pi = path.join(homedir, '.pi', 'agent', 'sessions');
-  const list = findRuntimes({ env: { LOCALAPPDATA: 'C:\\L' }, platform: 'win32', homedir, exists: (p) => p === 'C:\\L\\gentle-shell\\bin\\gentle-shell.cmd', readText: () => '1', which: (n) => (n === 'pi' ? 'X:\\pi.cmd' : null) });
+  const list = finder(gsFiles, { ...gsPath, pi: 'X:\\pi.cmd' })(); // the real platform, like the other tests: a forced win32 builds backslash paths on Linux
   const candidates = () => list; // one detection kept (like findCached); the setting is read on every call
   writeConfig({});
   assert.equal(baseDir({ candidates }), gs, 'auto -> Gentle Shell');
