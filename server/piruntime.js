@@ -241,4 +241,4 @@ function findCached() {
   return syncCache.candidates;
 }
 
-module.exports = { findRuntimes, detectRuntimes, chooseRuntime, runtimeEnv, handshake, resolveRuntime, findCached, commandProblem, LABELS };
+module.exports = { findRuntimes, detectRuntimes, chooseRuntime, runtimeEnv, handshake, resolveRuntime, findCached, commandProblem, launchSpec, killTree, makeWhich, isAbs, LABELS };

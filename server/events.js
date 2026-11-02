@@ -53,6 +53,14 @@ function createEventHub({ maxClients = 8, heartbeatMs = 15000, maxBuffer = 10485
     if (clients.size) writeAll(frame('live', entry(id, json)));
   }
 
+  // RPC1b: a one-off event of another type (`rpc`). It is never stored, so the snapshot and the `live` events stay as they were; the repo id
+  // always wins over an `id` inside the payload, and the same escaping keeps it on one data line.
+  function emit(event, id, payload) {
+    if (!clients.size) return;
+    const json = JSON.stringify({ ...payload, id }).replace(/[\u2028\u2029]/g, (c) => `\\u${c.charCodeAt(0).toString(16)}`);
+    writeAll(frame(event, json));
+  }
+
   function closeAll() {
     const all = [...clients];
     clients.clear();
@@ -60,7 +68,7 @@ function createEventHub({ maxClients = 8, heartbeatMs = 15000, maxBuffer = 10485
     stopTimer();
   }
 
-  return { add, size: () => clients.size, publish, snapshotFor, closeAll };
+  return { add, size: () => clients.size, publish, emit, snapshotFor, closeAll };
 }
 
 module.exports = { createEventHub };

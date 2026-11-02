@@ -38,9 +38,9 @@ function fakeTimers() {
 const hubWith = (over = {}) => { const timers = fakeTimers(); return { timers, hub: createEventHub({ setTimer: timers.setTimer, clearTimer: timers.clearTimer, ...over }) }; };
 const frame = (id, payload) => `event: live\ndata: ${JSON.stringify({ id, ...payload })}\n\n`;
 
-test('exports: createEventHub returns add, size, publish, snapshotFor and closeAll', () => {
+test('exports: createEventHub returns add, size, publish, emit, snapshotFor and closeAll', () => {
   const { hub } = hubWith();
-  assert.deepEqual(Object.keys(hub).sort(), ['add', 'closeAll', 'publish', 'size', 'snapshotFor']);
+  assert.deepEqual(Object.keys(hub).sort(), ['add', 'closeAll', 'emit', 'publish', 'size', 'snapshotFor']);
   for (const k of Object.keys(hub)) assert.equal(typeof hub[k], 'function', k);
   assert.equal(hub.size(), 0);
 });
