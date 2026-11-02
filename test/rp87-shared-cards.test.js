@@ -28,13 +28,14 @@ test('c2: the files chip is a button that opens the diff, with singular and plur
     '<button class="chip yellow chip-btn" data-act="diff" data-id="abc" title="View diff">● 2 files <span class="add">+0</span> <span class="del">−7</span></button>');
 });
 
-test('c3: unpushed and behind are plain chips; "no upstream" only on unpushed; the order is files, unpushed, behind', () => {
+test('c3: unpushed is a plain chip, "no upstream" only on unpushed, there is no behind chip (RP94); the order is files, then unpushed', () => {
   assert.equal(V.changeChips(C({ ahead: 2 }), 'abc'), '<span class="chip blue">↑ 2 unpushed</span>');
   assert.equal(V.changeChips(C({ ahead: 1, noUpstream: true }), 'abc'), '<span class="chip blue">↑ 1 unpushed · no upstream</span>');
-  assert.equal(V.changeChips(C({ behind: 3 }), 'abc'), '<span class="chip gray">↓ 3 behind</span>');
+  assert.equal(V.changeChips(C({ behind: 3 }), 'abc'), '', 'RP94: behind alone says nothing');
   assert.equal(V.changeChips(C({ noUpstream: true }), 'abc'), '', 'no upstream without commits ahead says nothing');
   const all = V.changeChips(C({ files: 1, added: 1, deleted: 0, ahead: 1, behind: 1 }), 'abc');
-  assert.ok(all.indexOf('chip yellow') < all.indexOf('chip blue') && all.indexOf('chip blue') < all.indexOf('chip gray'));
+  assert.ok(all.indexOf('chip yellow') < all.indexOf('chip blue'));
+  assert.doesNotMatch(all, /chip gray|behind/);
 });
 
 test('c4: the repo id is escaped, and numbers that are not counts read as 0 (never NaN or a string)', () => {
@@ -94,11 +95,12 @@ test('p2: a clean repo shows no change chips on either card', () => {
   assert.doesNotMatch(page.run(`repoCard(${REPO})`), /chip yellow|chip blue|↓ \d+ behind/);
 });
 
-test('p3: the board card keeps its other chips after the shared ones (stale, branch gone, no GitHub remote)', () => {
+test('p3: the board card keeps its other chips after the shared ones (stale, branch gone); the "no GitHub remote" chip is gone (RP94)', () => {
   const page = loadPage();
   seed(page, { ...LOCAL }, { prs: [], noRemote: true });
   const html = page.run(`repoCard(${REPO})`);
-  assert.ok(html.indexOf('chip yellow') < html.indexOf('no GitHub remote'));
+  assert.match(html, /chip yellow/);
+  assert.doesNotMatch(html, /no GitHub remote/);
 });
 
 test('p4: branchLabel is the branch, then "(detached)", then nothing', () => {
@@ -135,7 +137,8 @@ test('s1: the chip markup exists once in the page code (view.js) and resumen.js 
 test('s2: the Summary still renders its chips when resumen.js is loaded on its own in Node (it finds view.js itself)', () => {
   const row = { id: 'abc', name: 'demo', group: 'g', room: null, branch: 'b', needs: false, rank: 9, progress: { total: null }, next: null, blocking: [], lastMovement: {}, session: { state: 'free' }, action: null };
   const html = R.summaryView({ rows: [row], generatedAt: 't' }, { now: 0, scope: { kind: 'all' }, rooms: [], changesFor: () => C({ behind: 4 }) });
-  assert.match(html, /<span class="chip gray">↓ 4 behind<\/span>/);
+  assert.match(html, /<span class="chip red">▲ manual action<\/span>|rs-card/, 'the card is still drawn');
+  assert.doesNotMatch(html, /behind/, 'RP94: no behind chip');
 });
 
 test('s3: a Summary card without a changes provider draws no chips and does not fail', () => {

@@ -68,7 +68,7 @@ test('a stale row is a normal card plus a small "Updating…" marker whose title
   assert.match(m[2], /prs/);
   assert.match(m[2], /local/);
   assert.match(card, /<button class="merge"/, 'the action is still offered');
-  assert.match(card, /30\/74/, 'the progress is still shown');
+  assert.match(card, /30 of 74 completed/, 'the progress is still shown (in its title and aria-label)');
   assert.equal(card.replace(/<(\w+)[^>]*title="[^"]*"[^>]*>[^<]*Updating…<\/\1>/, ''), plain, 'nothing else changes in the card');
 });
 

@@ -96,7 +96,7 @@ test('every text that comes from data is HTML-escaped', () => {
 test('the segmented bar has an aria-label and the short n/total text, and its widths never exceed 100', () => {
   const html = view([row({ progress: progress({ total: 7, completada: 3, enRevision: 1, bloqueada: 1, pendiente: 1, enCurso: 1 }) })]);
   assert.match(html, /role="img" aria-label="3 of 7 completed · 1 in review · 1 blocked"/);
-  assert.match(html, />3\/7</);
+  assert.doesNotMatch(html, /rs-count|>3\/7</, 'RP94: no count next to the bar; the aria-label above says it');
   const widths = [...html.matchAll(/class="rs-seg [a-z-]+" style="width:(\d+(?:\.\d+)?)%"/g)].map((m) => Number(m[1]));
   assert.equal(widths.length, 4);
   assert.ok(widths.reduce((a, b) => a + b, 0) <= 100);
