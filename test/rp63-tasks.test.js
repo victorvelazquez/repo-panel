@@ -231,10 +231,10 @@ test('the bar of a room card (a sum of repos) does not open tasks: only a repo h
   assert.equal((h.match(/tasks-open/g) || []).length, 2, 'only the two repo cards');
 });
 
-test('the bar markup (segments, count) is the same as before for a sample', () => {
+test('the bar markup (segments) is the same as before for a sample, and has no count (RP94)', () => {
   const h = cards({ progress: { total: 4, completada: 2, enRevision: 1, bloqueada: 1, pendiente: 0, enCurso: 0 } });
   assert.ok(h.includes('<i class="rs-seg rs-done" style="width:50%"></i><i class="rs-seg rs-pr" style="width:25%"></i><i class="rs-seg rs-blk" style="width:25%"></i><i class="rs-seg rs-pend" style="width:0%"></i>'), h);
-  assert.ok(h.includes('<span class="rs-sub rs-count">2/4</span>'), h);
+  assert.ok(!h.includes('rs-count'), h);
 });
 
 // ---------- the static page ----------

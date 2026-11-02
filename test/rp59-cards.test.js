@@ -107,9 +107,9 @@ test('card variants: yellow left border when asking, red when blocked with no ne
 });
 
 // ---------- cards: progress and next ----------
-test('the bar has a short count; the full breakdown goes in the title and the aria-label of the bar', () => {
+test('the bar has no count (RP94); the full breakdown goes in the title and the aria-label of the bar', () => {
   const html = view([row({ progress: progress({ total: 74, completada: 30, enRevision: 1, bloqueada: 3, pendiente: 40 }) })]);
-  assert.match(html, /30\/74/);
+  assert.doesNotMatch(html, /30\/74|rs-count/);
   assert.match(html, /title="30 of 74 completed · 1 in review · 3 blocked · Click to see the tasks"/);
   assert.match(html, /role="img" aria-label="30 of 74 completed · 1 in review · 3 blocked"/);
   assert.match(view([row({ progress: progress({ total: 5, completada: 5, enRevision: 0, bloqueada: 0, pendiente: 0 }) })]), /title="5 of 5 completed · Click to see the tasks"/);
@@ -186,11 +186,11 @@ test('an error row shows the error text, "no data", no zeros and an Open button'
 // ---------- change chips (S55) ----------
 const CH = { files: 3, added: 120, deleted: 4, ahead: 1, behind: 2, noUpstream: true };
 
-test('change chips: the diff button, unpushed (+ no upstream) and behind, and nothing when clean or not loaded', () => {
+test('change chips: the diff button and unpushed (+ no upstream), no behind chip (RP94), and nothing when clean or not loaded', () => {
   const html = view([row()], { changesFor: () => CH });
   assert.match(html, /<button class="chip yellow chip-btn" data-act="diff" data-id="r1" title="View diff">● 3 files <span class="add">\+120<\/span> <span class="del">−4<\/span><\/button>/);
   assert.match(html, /<span class="chip blue">↑ 1 unpushed · no upstream<\/span>/);
-  assert.match(html, /<span class="chip gray">↓ 2 behind<\/span>/);
+  assert.doesNotMatch(html, /behind/, 'RP94: the behind chip is gone');
   const single = view([row()], { changesFor: () => ({ files: 1, added: 1, deleted: 0, ahead: 2, behind: 0, noUpstream: false }) });
   assert.match(single, /● 1 file </);
   assert.match(single, /↑ 2 unpushed<\/span>/);
@@ -282,7 +282,7 @@ test('room cards come first, in config order, with name, room chip, session chip
   const card = html.slice(html.indexOf('★ UPEN') - 80, html.indexOf('★ H2O'));
   assert.match(card, /<span class="chip purple">room<\/span>/);
   assert.match(card, /○ free/);
-  assert.match(card, /6\/15/);
+  assert.doesNotMatch(card, /6\/15|rs-count/, 'RP94: no count next to the bar');
   assert.match(card, /3 projects · 1 need attention/);
   assert.match(card, /3 h ago/);
   assert.doesNotMatch(card, /<button/);
@@ -399,7 +399,7 @@ test('the page feeds the cards: change chips from the local state, nothing while
   const html = page.get('#summary').html;
   assert.match(html, /data-act="diff" data-id="abc" title="View diff">● 2 files <span class="add">\+10<\/span> <span class="del">−3<\/span>/);
   assert.match(html, /↑ 2 unpushed · no upstream/);
-  assert.match(html, /↓ 1 behind/);
+  assert.doesNotMatch(html, /behind/, 'RP94: no behind chip on the Summary card');
   delete S.local.abc;
   page.run('render()');
   assert.doesNotMatch(page.get('#summary').html, /chip-btn|unpushed/);

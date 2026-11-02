@@ -616,8 +616,7 @@
     const n = (v) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? Math.floor(v) : 0);
     const files = n(c.files);
     return (files ? `<button class="chip yellow chip-btn" data-act="diff" data-id="${htmlEsc(id)}" title="View diff">● ${files} file${files === 1 ? '' : 's'} <span class="add">+${n(c.added)}</span> <span class="del">−${n(c.deleted)}</span></button>` : '')
-      + (n(c.ahead) ? `<span class="chip blue">↑ ${n(c.ahead)} unpushed${c.noUpstream ? ' · no upstream' : ''}</span>` : '')
-      + (n(c.behind) ? `<span class="chip gray">↓ ${n(c.behind)} behind</span>` : '');
+      + (n(c.ahead) ? `<span class="chip blue">↑ ${n(c.ahead)} unpushed${c.noUpstream ? ' · no upstream' : ''}</span>` : '');
   }
 
   // RP86 (S9): ONE read model per repo. The page keeps each fact of a repo in its own map (local, prs, roadmap, state, req) and the Summary row in another; the

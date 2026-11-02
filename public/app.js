@@ -1304,7 +1304,8 @@ const repoName = (r, url) => (url
   ? `<a class="repo-name" href="${esc(url)}" target="_blank" rel="noopener" title="Open ${esc(r.name)} on GitHub">${esc(r.name)}</a>`
   : `<span class="repo-name">${esc(r.name)}</span>`);
 
-const removeBtn = (r) => `<button class="x" data-act="remove" data-id="${r.id}" title="Remove from panel (deletes nothing)">✕</button>`;
+// RP94: removing a repo is the last item of its ⋯ menu (it asks before it removes; nothing is deleted from disk or GitHub), not a loose ✕ button.
+const removeItem = (r) => `<button role="menuitem" data-act="remove" data-id="${r.id}" title="Remove from panel (deletes nothing)">Remove from panel…</button>`;
 
 // Types the command into the repo's open pi session (through Orca); the server refuses when that is not safe.
 const piBtn = (r, cmd, label = `/${cmd}`, { title = `Send /${cmd} to the open session of this repo`, pr, disabled = false } = {}) => `<button data-act="pi" data-id="${r.id}" data-cmd="${cmd}"${pr ? ` data-pr="${pr}"` : ''} title="${esc(title)}"${disabled ? ' disabled' : ''}>${esc(label)}</button>`;
@@ -1314,13 +1315,13 @@ const piBtn = (r, cmd, label = `/${cmd}`, { title = `Send /${cmd} to the open se
 function moreMenu(r, slot, extra = []) {
   const items = [...(V ? V.cardMenu(S.req[r.id], S.dismissed.has(r.id)) : []), ...extra];
   const rooms = V ? V.roomMenu(S.rooms, r.id) : null;
-  if (!items.length && !rooms) return '';
   const key = `${r.id}|${slot}`;
   const open = S.menu === key;
   const list = items.map((i) => `<button role="menuitem" data-act="${i.act}" data-id="${r.id}">${esc(i.label)}</button>`).join('')
     + (rooms ? `${rooms.title ? `<div class="more-head">${esc(rooms.title)}</div>` : ''}${rooms.items.map((i) => (i.act === 'assign-room'
       ? `<button role="menuitemradio" aria-checked="${i.current}" data-act="assign-room" data-id="${r.id}" data-room="${esc(i.room ?? '')}">${i.current ? '✓ ' : ''}${esc(i.label)}</button>`
-      : `<button role="menuitem" data-act="${i.act}">${esc(i.label)}</button>`)).join('')}` : '');
+      : `<button role="menuitem" data-act="${i.act}">${esc(i.label)}</button>`)).join('')}` : '')
+    + removeItem(r);
   return `<span class="more"><button data-act="toggle-menu" data-menu="${esc(key)}" title="More options" aria-haspopup="true" aria-expanded="${open}">⋯</button>${open ? `<div class="more-menu" role="menu">${list}</div>` : ''}</span>`;
 }
 
@@ -1351,7 +1352,7 @@ const branchLabel = (l) => l.branch || (l.detached ? '(detached)' : '');
 
 // Repo name + group on the left, more options and remove (with confirmation) pinned to the right.
 function cardTop(r, url, slot, extra = []) {
-  return `<div class="card-top">${identityHtml(r, url)}${moreMenu(r, slot, extra)}${removeBtn(r)}</div>`;
+  return `<div class="card-top">${identityHtml(r, url)}${moreMenu(r, slot, extra)}</div>`;
 }
 
 // What the project is working on, from the remote roadmap. Empty when the repo has no usable one.
@@ -1368,7 +1369,7 @@ function roadmapBlock(r) {
   const h = s.header;
   const lines = [['Where it stands:', h.dondeEsta], ['What is next:', h.queSigue], ['What blocks it:', h.queLoBloquea]].filter(([, v]) => v);
   return `<div class="roadmap" data-act="toggle-roadmap" data-id="${r.id}" title="Click to show the roadmap header">
-    <div class="rm-line"><span class="rm-dot ${esc(s.kind)}"></span><span class="rm-text" title="${esc(text)}">${esc(text)}</span>${badge}<span class="rm-count">${s.done}/${s.total}</span></div>
+    <div class="rm-line"><span class="rm-dot ${esc(s.kind)}"></span><span class="rm-text" title="${esc(text)}">${esc(text)}</span>${badge}</div>
     <div class="rm-bar"><span style="width:${s.pct}%"></span></div>
     ${open ? `<div class="rm-header">${lines.map(([k, v]) => `<div><b>${k}</b> ${esc(v)}</div>`).join('')}</div>` : ''}
   </div>`;
@@ -1384,7 +1385,7 @@ function cleanRow(r) {
     identity: identityHtml(r, p.repo?.url),
     branch: { text: branchLabel(l), title: l.branch || '' },
     tail: `${behind}${warn}`,
-    actions: `<span class="row-actions">${moreMenu(r, 'row')}${removeBtn(r)}</span>`,
+    actions: `<span class="row-actions">${moreMenu(r, 'row')}</span>`,
     after: [reqWarn(r), roadmapBlock(r)],
   }, 'compact');
 }
@@ -1437,7 +1438,6 @@ function repoCard(r, attn = false, verdict = null) {
   if (shared) chips.push(shared);
   if (p.stale) chips.push(`<span class="chip red" title="${esc(V ? V.staleChipTitle(p.stale, dirty) : p.stale.reason)}">${esc(p.stale.reason)}</span>`);
   else if (l.currentGone) chips.push('<span class="chip gray" title="The remote branch was deleted (merged PR?)">remote branch deleted</span>');
-  if (p.noRemote) chips.push('<span class="chip gray">no GitHub remote</span>');
   // RP88b: the frame (top line, branch line, chips block, order of the lines) is V.RepoCard; what is specific to the board card is built here.
   return V.RepoCard({
     attn,
