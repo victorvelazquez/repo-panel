@@ -1437,20 +1437,25 @@ function repoCard(r, attn = false, verdict = null) {
   if (p.stale) chips.push(`<span class="chip red" title="${esc(V ? V.staleChipTitle(p.stale, dirty) : p.stale.reason)}">${esc(p.stale.reason)}</span>`);
   else if (l.currentGone) chips.push('<span class="chip gray" title="The remote branch was deleted (merged PR?)">remote branch deleted</span>');
   if (p.noRemote) chips.push('<span class="chip gray">no GitHub remote</span>');
-  return `<div class="card ${attn ? 'attn' : ''}">
-    ${cardTop(r, p.repo?.url, 'repo', overrideItem ? [overrideItem] : [])}
-    ${manual ? `<div class="manual-bar">⚠ Needs manual action: ${esc(manual)}</div>` : ''}
-    ${verdictRow(r, verdict)}
-    ${flow.some((b) => b.cmd === 'flow-commit-unstage') ? stagedBar(l) : ''}
-    ${reqWarn(r)}
-    <div class="branch one-line" title="${esc(l.branch || '')}">${esc(branchLabel(l))}</div>
-    ${stateRow(r)}
-    ${roadmapBlock(r)}
-    ${chips.length ? `<div class="chips">${chips.join('')}</div>` : ''}
-    ${l.error ? `<div class="err">${esc(l.error)}</div>` : ''}
-    ${p.error ? `<div class="err">GitHub: ${esc(p.error)}</div>` : ''}
-    ${flow.map((b) => `<div class="actions">${piBtn(r, b.cmd, b.label, { ...(b.reason ? { title: b.reason } : {}), disabled: b.disabled })}</div>`).join('')}
-  </div>`;
+  // RP88b: the frame (top line, branch line, chips block, order of the lines) is V.RepoCard; what is specific to the board card is built here.
+  return V.RepoCard({
+    attn,
+    top: cardTop(r, p.repo?.url, 'repo', overrideItem ? [overrideItem] : []),
+    before: [
+      manual ? `<div class="manual-bar">⚠ Needs manual action: ${esc(manual)}</div>` : '',
+      verdictRow(r, verdict),
+      flow.some((b) => b.cmd === 'flow-commit-unstage') ? stagedBar(l) : '',
+      reqWarn(r),
+    ],
+    branch: { text: branchLabel(l), title: l.branch || '' },
+    between: [stateRow(r), roadmapBlock(r)],
+    chips: chips.join(''),
+    after: [
+      l.error ? `<div class="err">${esc(l.error)}</div>` : '',
+      p.error ? `<div class="err">GitHub: ${esc(p.error)}</div>` : '',
+      flow.map((b) => `<div class="actions">${piBtn(r, b.cmd, b.label, { ...(b.reason ? { title: b.reason } : {}), disabled: b.disabled })}</div>`).join(''),
+    ],
+  }, 'work');
 }
 
 function checksChip(c) {
