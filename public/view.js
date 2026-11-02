@@ -627,6 +627,36 @@
       + (n(c.ahead) ? `<span class="chip blue">↑ ${n(c.ahead)} unpushed${c.noUpstream ? ' · no upstream' : ''}</span>` : '');
   }
 
+  // RP94c (S9): the chip of a repo's open pull request(s) with the state of the checks, for the Summary card. `prs` is the page's list of open PRs ({ number, title, checks });
+  // none (or not a list) draws nothing. State is never colour alone: the chip has the number, a symbol and the counts. One PR: "PR #12 ✔ 5/5". Several: ONE chip with the
+  // count and the worst state (failed, then running, then passing, then none); the tooltip lists every PR. Total, and escaped.
+  function prChip(prs) {
+    const list = (Array.isArray(prs) ? prs : []).filter((p) => isObject(p) && typeof p.number === 'number' && Number.isFinite(p.number));
+    if (!list.length) return '';
+    const n = (v) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? Math.floor(v) : 0);
+    const kind = (p) => { const s = isObject(p.checks) ? p.checks.state : 'none'; return s === 'none' || s === undefined ? 'none' : s === 'success' ? 'success' : s === 'failed' ? 'failed' : 'pending'; };
+    const counts = (p) => { const c = isObject(p.checks) ? p.checks : {}; return `${n(c.passed)}/${n(c.total)}`; };
+    const describe = (p) => {
+      const c = isObject(p.checks) ? p.checks : {};
+      return { none: 'no checks', success: `✔ ${counts(p)} checks`, failed: `✘ ${n(c.failed)} failed · ${counts(p)} checks`, pending: `… ${n(c.pending)} running · ${counts(p)} checks` }[kind(p)];
+    };
+    const tip = list.map((p) => `#${p.number}${typeof p.title === 'string' && p.title ? ` ${p.title}` : ''} — ${describe(p)}`).join('\n');
+    const kinds = list.map(kind);
+    const worst = ['failed', 'pending', 'success', 'none'].find((k) => kinds.includes(k));
+    const tone = { failed: 'red', pending: 'yellow', success: 'green', none: 'gray' }[worst];
+    let text;
+    if (list.length === 1) {
+      const p = list[0];
+      const c = isObject(p.checks) ? p.checks : {};
+      text = `PR #${p.number} ${{ none: '· no checks', success: `✔ ${counts(p)}`, failed: `✘ ${n(c.failed)} failed`, pending: `… ${n(c.pending)} running` }[worst]}`;
+    } else {
+      const count = (k) => kinds.filter((x) => x === k).length;
+      const tail = { failed: `✘ ${count('failed')} failing`, pending: `… ${count('pending')} running`, success: count('success') === list.length ? '✔ all passing' : `✔ ${count('success')} passing`, none: '· no checks' }[worst];
+      text = `${list.length} PRs ${tail}`;
+    }
+    return `<span class="chip ${tone}" title="${htmlEsc(tip)}">${htmlEsc(text)}</span>`;
+  }
+
   // RP86 (S9): ONE read model per repo. The page keeps each fact of a repo in its own map (local, prs, roadmap, state, req) and the Summary row in another; the
   // board cards, the Summary cards, the "go work on" strip and the Files tab used to read those maps each its own way. This joins them, pure: `loaded` is what
   // the Summary button needed (a good local state with its file list AND a good PR answer), `changes` the Summary chips (null until the local state loads), and
@@ -656,7 +686,7 @@
   }
 
   // RP88b (S9, S10): the frame of a repo card, ONE function for the Summary card and the board card. `m` carries ready HTML for what differs on purpose (the caller
-  // escapes it) and the raw text it must escape itself (id, label, branch). Mode 'summary': { id, label, cls, current, title, busy, identity, branch: { text, title }, chips, meta,
+  // escapes it) and the raw text it must escape itself (id, label, branch). Mode 'summary': { id, label, cls, current, title, busy, identity, commit, branch: { text, title }, chips, meta,
   // body }. Mode 'work': { attn, top, before: [lines], branch, between: [lines], chips, after: [lines] }: one line each, in that order. Mode 'compact' (RP88c, the clean row): { identity, branch, tail, actions, after: [lines] }. Total: anything else draws ''.
   function RepoCard(m, mode) {
     if (!isObject(m)) return '';
@@ -666,7 +696,7 @@
     const chips = s(m.chips);
     if (mode === 'summary') {
       return `<article class="rs-card${s(m.cls)}" data-id="${e(m.id)}" data-act="chat-open" tabindex="0"${m.current ? ' aria-current="true"' : ''} aria-label="${e(m.label)}"${m.title ? ` title="${e(m.title)}"` : ''}${m.busy ? ' aria-busy="true"' : ''}>
-      <div class="rs-l1">${s(m.identity)}<span class="mono rs-branch" title="${e(b.title)}">${e(b.text)}</span>${chips ? `<span class="rs-chips">${chips}</span>` : ''}<span class="rs-spacer"></span>${s(m.meta)}</div>
+      <div class="rs-l1">${s(m.identity)}<span class="mono rs-branch" title="${e(b.title)}">${e(b.text)}</span>${s(m.commit)}${chips ? `<span class="rs-chips">${chips}</span>` : ''}<span class="rs-spacer"></span>${s(m.meta)}</div>
       <div class="rs-l2">${s(m.body)}</div>
     </article>`;
     }
@@ -774,5 +804,5 @@
     return `${meters.join('')}${age}<div class="usage-pop" role="group" aria-label="Claude usage details">${details.join('')}${note}${foot}</div>`;
   }
 
-  return { repoModel, changeChips, RepoCard, stateLineHidden, usageView, usageHtml, usageRemaining, boardApply, boardWait, chatCachePut, chatCacheGet, chatFromCache, API_VERSION, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, piPollTargets, LIVE_CHECK_MS, liveSession, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, presenceLabel, presenceDot, parseSse, liveEvent, eventsPlan, eventsRetryMs, eventsStale };
+  return { repoModel, changeChips, prChip, RepoCard, stateLineHidden, usageView, usageHtml, usageRemaining, boardApply, boardWait, chatCachePut, chatCacheGet, chatFromCache, API_VERSION, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, piPollTargets, LIVE_CHECK_MS, liveSession, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, presenceLabel, presenceDot, parseSse, liveEvent, eventsPlan, eventsRetryMs, eventsStale };
 }));
