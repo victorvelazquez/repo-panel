@@ -1379,13 +1379,14 @@ function cleanRow(r) {
   const { l, p } = info(r);
   const behind = l.behind ? `<span class="behind" title="${l.behind} commit${l.behind === 1 ? '' : 's'} behind the remote — time to pull">↓${l.behind}</span>` : '';
   const warn = p.error ? `<span class="warn" title="${esc('GitHub: ' + p.error)}">⚠</span>` : '';
-  return `<div class="clean-row">
-    ${identityHtml(r, p.repo?.url)}
-    <span class="branch" title="${esc(l.branch || '')}">${esc(branchLabel(l))}</span>${behind}${warn}
-    <span class="row-actions">${moreMenu(r, 'row')}${removeBtn(r)}</span>
-    ${reqWarn(r)}
-    ${roadmapBlock(r)}
-  </div>`;
+  // RP88c: the frame (row element, identity, branch, order of the parts) is V.RepoCard in compact mode; what is specific to the row is built here.
+  return V.RepoCard({
+    identity: identityHtml(r, p.repo?.url),
+    branch: { text: branchLabel(l), title: l.branch || '' },
+    tail: `${behind}${warn}`,
+    actions: `<span class="row-actions">${moreMenu(r, 'row')}${removeBtn(r)}</span>`,
+    after: [reqWarn(r), roadmapBlock(r)],
+  }, 'compact');
 }
 
 // The inline style that keeps a CSS animation continuous although #app is re-rendered on every draw (see view.js).
