@@ -650,7 +650,7 @@
 
   // RP88b (S9, S10): the frame of a repo card, ONE function for the Summary card and the board card. `m` carries ready HTML for what differs on purpose (the caller
   // escapes it) and the raw text it must escape itself (id, label, branch). Mode 'summary': { id, label, cls, current, identity, branch: { text, title }, chips, meta,
-  // body }. Mode 'work': { attn, top, before: [lines], branch, between: [lines], chips, after: [lines] }: one line each, in that order. Total: anything else draws ''.
+  // body }. Mode 'work': { attn, top, before: [lines], branch, between: [lines], chips, after: [lines] }: one line each, in that order. Mode 'compact' (RP88c, the clean row): { identity, branch, tail, actions, after: [lines] }. Total: anything else draws ''.
   function RepoCard(m, mode) {
     if (!isObject(m)) return '';
     const e = (v) => htmlEsc(v == null ? '' : v);
@@ -667,6 +667,12 @@
       const lines = (a) => (Array.isArray(a) ? a.map(s) : []);
       return `<div class="card ${m.attn ? 'attn' : ''}">
     ${[s(m.top), ...lines(m.before), `<div class="branch one-line" title="${e(b.title)}">${e(b.text)}</div>`, ...lines(m.between), chips ? `<div class="chips">${chips}</div>` : '', ...lines(m.after)].join('\n    ')}
+  </div>`;
+    }
+    if (mode === 'compact') {
+      const rest = Array.isArray(m.after) ? m.after.map(s) : [];
+      return `<div class="clean-row">
+    ${[s(m.identity), `<span class="branch" title="${e(b.title)}">${e(b.text)}</span>${s(m.tail)}`, s(m.actions), ...rest].join('\n    ')}
   </div>`;
     }
     return '';

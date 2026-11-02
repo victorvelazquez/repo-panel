@@ -61,7 +61,7 @@ test('w3: the branch is escaped in the board card too', () => {
 // ---------- pure: total ----------
 test('t1: a model that is not an object or an unknown mode draws nothing and never fails', () => {
   for (const m of [null, undefined, 5, 'x', []]) assert.equal(V.RepoCard(m, 'summary'), '');
-  assert.equal(V.RepoCard(S({ top: '<p>T</p>' }), 'compact'), '');
+  assert.equal(V.RepoCard(S({ top: '<p>T</p>' }), 'tiny'), '');
   assert.equal(V.RepoCard(S({ top: '<p>T</p>' }), undefined), '');
   assert.equal(V.RepoCard({}, 'summary').includes('undefined'), false);
   assert.equal(V.RepoCard({}, 'work').includes('undefined'), false);
