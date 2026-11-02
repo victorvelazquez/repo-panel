@@ -29,7 +29,6 @@ const S = require('../server/sessions.js');
 const P = require('../server/pi.js');
 const { createWarmer } = require('../server/livewarm.js');
 const { answerDialog } = require('../server/dialoganswer.js');
-const { sendChat } = require('../server/chatsend.js');
 const { scanSessions, piStatus, piSend, piSessions, clearLiveCache, liveCacheStats } = P;
 
 const REPO_ID = lib.repoId(repoDir);
@@ -360,9 +359,6 @@ test('piSend, piSessions, the dialog answer and the chat send each make their ow
   assert.equal(f.lists(), 4, 'piSessions, twice');
   await assert.rejects(answerDialog(REPO_ID, { fingerprint: '0123456789abcdef', index: 0 }, { orca: f.orca, wait: async () => {}, now }), (e) => e.status === 409);
   assert.equal(f.lists(), 5, 'the dialog answer');
-  writeConfig({ sessions: { [REPO_ID]: { id: 'sid-1', name: 'panel:demo', adoptedAt: '2026-10-30T10:00:00Z' } } });
-  await assert.rejects(sendChat(REPO_ID, { text: 'hello' }, { orca: f.orca, wait: async () => {}, sessionsDir: sessionsBase, now }), (e) => e.status === 409);
-  assert.equal(f.lists(), 6, 'the chat send');
   assert.equal(f.sends(), 1, 'nothing else was sent');
 });
 

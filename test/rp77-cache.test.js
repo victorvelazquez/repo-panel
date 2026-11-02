@@ -4,7 +4,7 @@
 // `listed` array, a terminal whose `lastOutputAt` (a finite number) equals the cached one, whose cached read did not fail and did not read
 // 'asking', and whose entry is younger than 30000 ms, is answered with NO orca call. The entry is keyed `${handle}|${withPreview}|${askAware}`,
 // holds the whole per-terminal result and a terminal missing in `listed` is dropped. `clearLiveCache()` empties it. The read-only callers
-// (liveOf, sessionState, piStatus) opt in; the writers (piSend, the dialog answer, the chat send) read fresh. The real Orca, the real config
+// (liveOf, sessionState, piStatus) opt in; the writers (piSend, the dialog answer) read fresh. The real Orca, the real config
 // and the real sessions are never touched: a fake Orca counting every call, temp dirs and an injected clock (no real waiting).
 const test = require('node:test');
 const { mock } = require('node:test');
@@ -29,7 +29,6 @@ const S = require('../server/sessions.js');
 const P = require('../server/pi.js');
 const { summaryFor } = require('../server/summary.js');
 const { answerDialog } = require('../server/dialoganswer.js');
-const { sendChat } = require('../server/chatsend.js');
 const { scanSessions, piStatus, piSend, piSessions, clearLiveCache } = P;
 
 const REPO_ID = lib.repoId(repoDir);
@@ -525,18 +524,6 @@ test('the dialog answer reads fresh: a warm cache that says idle does not hide a
   const before = f.calls.length;
   await assert.rejects(answerDialog(REPO_ID, { fingerprint: '0123456789abcdef', index: 0 }, { orca: f.orca, wait: async () => {}, now }),
     (e) => e.status === 409 && e.message === 'The question changed: look at the card again');
-  assert.equal(showsOf(f, before), 1);
-  assert.equal(f.sends(), 0);
-});
-
-test('the chat send reads fresh: a warm cache that says idle does not let a message go to a session that is working now', async () => {
-  writeConfig({ sessions: { [REPO_ID]: { id: 'sid-1', name: 'panel:demo', adoptedAt: '2026-10-30T10:00:00Z' } } });
-  const f = fakeOrca({ t1: term(IDLE, 5) });
-  await warm(f);
-  f.world.t1.preview = WORKING;
-  const before = f.calls.length;
-  await assert.rejects(sendChat(REPO_ID, { text: 'hello' }, { orca: f.orca, wait: async () => {}, sessionsDir: sessionsBase, now }),
-    (e) => e.status === 409 && e.message === 'The session is working; wait until it is free');
   assert.equal(showsOf(f, before), 1);
   assert.equal(f.sends(), 0);
 });

@@ -90,9 +90,10 @@ const ADOPTED = { key: 'abc', adopted: { id: 's1', name: 'panel:demo', adoptedAt
 const HIST = { key: 'abc', sessionId: 's1', found: true, items: [{ role: 'user', text: 'hello there', at: null, tools: [] }], truncated: false, updatedAt: null };
 const okJson = (body) => Promise.resolve({ ok: true, json: async () => body });
 const fail = (status, error) => Promise.resolve({ ok: false, status, statusText: 'Error', json: async () => ({ error }) });
-// '/api/chat/send' and '/api/chat/clear' come BEFORE '/api/chat': the fake fetch takes the first key the url starts with.
+// The live session answers /api/rpc/*: the fake fetch takes the first key the url starts with.
+const rpcState = (state, pendingDialogs = []) => ({ state, pendingDialogs, sessionId: 's1' });
 const answersFor = (extra = {}) => ({
-  '/api/chat/send': { sent: true, delivered: true }, '/api/chat/clear': { cleared: true }, '/api/pi': { sent: true, confirmed: true },
+  '/api/rpc/status': rpcState('idle'), '/api/rpc/start': rpcState('idle'), '/api/rpc/prompt': { disposition: 'started' }, '/api/rpc/abort': {}, '/api/pi': { sent: true, confirmed: true },
   '/api/sessions': ADOPTED, '/api/chat': HIST, ...extra,
 });
 async function ready(extra = {}) {
@@ -110,7 +111,7 @@ const act = (page, name, el) => {
 const posts = (page, url) => page.fetches.filter((f) => f.method === 'POST' && f.url === url);
 const typeIn = (page, text) => { page.get('#msgBox').value = text; page.fire('input', { target: page.get('#msgBox') }); };
 const sendClick = (page) => act(page, 'chat-send', page.get('#msgSend'));
-const WORKING = 'The session is working: wait until it is free';
+const WORKING = 'The session is working: wait until it is idle, or press Stop';
 
 // ---------- index.html ----------
 test('index.html: the composer replaces the read-only footer inside aside#chat', () => {
@@ -132,35 +133,32 @@ test('index.html: the composer replaces the read-only footer inside aside#chat',
 // ---------- composerState ----------
 const cs = (c) => R.composerState({ id: 'r1', sending: false, ...c }, { name: 'alpha' });
 
-test('composerState: canSend only for an adopted, found, free session that is not sending', () => {
-  assert.equal(cs({ info: adoptedInfo('free') }).canSend, true);
-  assert.match(cs({ info: adoptedInfo('free') }).placeholder, /alpha/);
-  assert.equal(cs({ info: adoptedInfo('free'), sending: true }).canSend, false);
-  assert.equal(cs({ info: adoptedInfo('free', { adoptedFound: false }) }).canSend, false);
-  assert.equal(cs({ info: info({ live: { state: 'free', count: 1 } }) }).canSend, false);
-  for (const s of ['working', 'waiting', 'none', 'unknown']) assert.equal(cs({ info: adoptedInfo(s) }).canSend, false, s);
+test('composerState: canSend for a loaded chat whose session is idle or not started (sending starts it), not while sending, starting, working or asking', () => {
+  const rpc = (state) => ({ state });
+  assert.equal(cs({ info: adoptedInfo(), rpc: rpc('idle') }).canSend, true);
+  assert.match(cs({ info: adoptedInfo(), rpc: rpc('idle') }).placeholder, /alpha/);
+  assert.equal(cs({ info: info(), rpc: rpc('closed') }).canSend, true, 'not adopted and not started: the send starts it');
+  assert.equal(cs({ info: adoptedInfo() }).canSend, false, 'no rpc entry yet: the status read has not answered');
+  assert.equal(cs({ info: adoptedInfo() }).reason, 'The session state is unknown');
+  assert.equal(cs({ info: adoptedInfo(), rpc: rpc('idle'), sending: true }).canSend, false);
+  for (const st of ['starting', 'busy', 'asking']) assert.equal(cs({ info: adoptedInfo(), rpc: rpc(st) }).canSend, false, st);
   assert.equal(cs({ info: null }).canSend, false);
 });
-
 test('composerState: one distinct, non-empty reason per blocked case and a non-empty placeholder always', () => {
   const cases = {
-    notLoaded: cs({ info: null }), notAdopted: cs({ info: info() }), loading: cs({ info: adoptedInfo('free', { adoptedFound: false }) }), none: cs({ info: adoptedInfo('none') }),
-    working: cs({ info: adoptedInfo('working') }), waiting: cs({ info: adoptedInfo('waiting') }), unknown: cs({ info: adoptedInfo('unknown') }), sending: cs({ info: adoptedInfo('free'), sending: true }),
+    notLoaded: cs({ info: null }), sending: cs({ info: adoptedInfo(), rpc: { state: 'idle' }, sending: true }),
+    starting: cs({ info: adoptedInfo(), rpc: { state: 'starting' } }), working: cs({ info: adoptedInfo(), rpc: { state: 'busy' } }), asking: cs({ info: adoptedInfo(), rpc: { state: 'asking' } }),
   };
   for (const [k, v] of Object.entries(cases)) {
     assert.ok(v.reason && typeof v.reason === 'string', `${k} has a reason`);
     assert.ok(v.placeholder && typeof v.placeholder === 'string', `${k} has a placeholder`);
   }
-  assert.equal(new Set(Object.values(cases).map((v) => v.reason)).size, 8);
-  assert.equal(cases.notAdopted.reason, 'Adopt or start a session first');
-  assert.equal(cases.loading.reason, 'The session is loading');
-  assert.equal(cases.none.reason, 'No open session of this repo');
+  assert.equal(new Set(Object.values(cases).map((v) => v.reason)).size, 5);
   assert.equal(cases.working.reason, WORKING);
-  assert.equal(cases.waiting.reason, 'The session is asking you something: answer it in its terminal');
+  assert.equal(cases.asking.reason, 'pi is asking something; answering from the panel comes next');
   assert.equal(cases.sending.reason, 'Sending…');
-  assert.ok(cs({ info: adoptedInfo('free') }).placeholder.length > 0);
+  assert.ok(cs({ info: adoptedInfo(), rpc: { state: 'idle' } }).placeholder.length > 0);
 });
-
 // ---------- actionMenu ----------
 const NEXT = { id: 'RP9', entrega: 'The thing', resultadoVisible: 'x' };
 const menuOf = (row, ctx = {}) => R.actionMenu(row, { live: 'free', changes: { files: 0, ahead: 0, behind: 0 }, flow: null, ...ctx });
@@ -214,15 +212,14 @@ test('actionMenu: flow-next reasons (changes first, then no unit), and a repo wi
   }
 });
 
-test('actionMenu: when the session is not free all four are unavailable with the composer reason', () => {
-  for (const live of ['working', 'waiting', 'none', 'unknown']) {
+test('actionMenu: when the session is not free all four are unavailable with the reason of that state', () => {
+  const REASONS = { working: 'The session is working: wait until it is free', waiting: 'The session is asking you something: answer it in its terminal', none: 'No open session of this repo', unknown: 'The session state is unknown' };
+  for (const [live, reason] of Object.entries(REASONS)) {
     const m = menuOf(card({ action: { kind: 'start' }, next: NEXT }), { live });
     assert.deepEqual(avail(m), [false, false, false, false], live);
-    const reason = cs({ info: adoptedInfo(live) }).reason;
     assert.deepEqual(whys(m), [reason, reason, reason, reason], live);
   }
 });
-
 // ---------- actionButtonsHtml (RP85: the menu became direct buttons) ----------
 const MENU = {
   items: [
@@ -261,23 +258,20 @@ test('the menu helpers are gone: no actionMenuHtml export', () => {
 });
 
 // ---------- composerNote + chatHead ----------
-test('composerNote: empty for null; escaped text in a span; the Clear button only when note.clear', () => {
+test('composerNote: empty for null; escaped text in a span; never a Clear button (the Orca prompt box is gone)', () => {
   assert.equal(R.composerNote(null), '');
   const plain = R.composerNote({ text: 'Sent <b>x</b>', id: 'abc' });
   assert.match(plain, /<span[^>]*>Sent &lt;b&gt;x&lt;\/b&gt;<\/span>/);
   assert.doesNotMatch(plain, /chat-clear|<b>/);
-  const withClear = R.composerNote({ text: 'Still there', id: 'a"c', clear: true });
-  assert.match(withClear, /<button type="button" data-act="chat-clear" data-id="a&quot;c">Clear the box<\/button>/);
+  assert.doesNotMatch(R.composerNote({ text: 'Still there', id: 'a"c', clear: true }), /button|chat-clear/);
 });
-
-test('sessionState: an adopted session that is closed says "session closed"; with none adopted it still says "no session"', () => {
-  const word = (i) => R.sessionState({ id: 'r1', info: i }).word;
-  assert.equal(word(adoptedInfo('none')), 'session closed');
-  assert.equal(word(info()), 'no session');
-  assert.doesNotMatch(R.sessionLabelHtml({ id: 'r1', info: info() }), /session closed/);
-  assert.doesNotMatch(R.chatHead({ id: 'r1', info: adoptedInfo('none') }, { name: 'alpha' }), /session closed|no session/);
+test('sessionState: the label follows the rpc state, and the header never shows it', () => {
+  const word = (rpc, i = adoptedInfo()) => R.sessionState({ id: 'r1', info: i, rpc }).word;
+  assert.deepEqual(['starting', 'idle', 'busy', 'asking', 'closed'].map((state) => word({ state })), ['Starting…', 'Idle', 'Working…', 'Asking you something', 'Not started']);
+  assert.equal(word(undefined), 'Unknown');
+  assert.equal(R.sessionState({ id: 'r1', info: null }).word, 'Loading…');
+  assert.doesNotMatch(R.chatHead({ id: 'r1', info: adoptedInfo(), rpc: { state: 'busy' } }, { name: 'alpha' }), /Working|Idle|Not started/);
 });
-
 // ---------- server: readChat file match ----------
 test('readChat: another session whose id ends with "_<id>" is not read; the real "<ts>_<id>.jsonl" still is', () => {
   const folder = path.join(scratch, 'Some Repo');
@@ -300,123 +294,80 @@ test('chat-send: an empty or whitespace-only box posts nothing', async () => {
   const { page } = await ready();
   for (const v of ['', '   \n\t ']) { page.get('#msgBox').value = v; await sendClick(page); }
   await page.tick();
-  assert.deepEqual(posts(page, '/api/chat/send'), []);
+  assert.deepEqual(posts(page, '/api/rpc/prompt'), []);
 });
-
 test('chat-send: a session that cannot receive posts nothing and the note shows why', async () => {
-  const { page } = await ready({ '/api/sessions': { ...ADOPTED, live: { state: 'working', count: 1 } } });
+  const { page } = await ready({ '/api/rpc/status': rpcState('busy') });
   typeIn(page, 'hello');
   await sendClick(page);
   await page.tick();
-  assert.deepEqual(posts(page, '/api/chat/send'), []);
+  assert.deepEqual(posts(page, '/api/rpc/prompt'), []);
   assert.ok(page.get('#msgNote').html.includes(WORKING), page.get('#msgNote').html);
   assert.equal(page.get('#msgBox').value, 'hello');
 });
-
-test('chat-send: ONE post with the text exactly as typed; delivered clears the box and the note, refreshes the chat and leaves no draft', async () => {
+test('chat-send: ONE prompt with the text exactly as typed; it clears the box and the note and leaves no draft', async () => {
   const { page } = await ready();
   const typed = '  hello there \n second line  ';
   typeIn(page, typed);
   page.fetches.length = 0;
   await sendClick(page);
   await page.tick();
-  const sent = posts(page, '/api/chat/send');
+  const sent = posts(page, '/api/rpc/prompt');
   assert.equal(sent.length, 1);
   assert.deepEqual(JSON.parse(sent[0].body), { id: 'abc', text: typed });
+  assert.equal(posts(page, '/api/rpc/start').length, 0, 'an idle session is not started again');
   assert.equal(page.get('#msgBox').value, '');
   assert.equal(page.get('#msgNote').html, '');
-  assert.ok(page.fetches.some((f) => f.method === 'GET' && f.url === '/api/chat?id=abc'), 'refreshes the history');
   page.run("ACTIONS['chat-open']({ dataset: { id: 'xyz' } })");
   await page.tick();
   page.run("ACTIONS['chat-open']({ dataset: { id: 'abc' } })");
   await page.tick();
   assert.equal(page.get('#msgBox').value, '', 'the sent text did not come back as a draft');
 });
-
 test('chat-send: the button is disabled while the request is in flight and a second dispatch posts nothing', async () => {
   let release;
   const gate = new Promise((r) => { release = r; });
-  const { page } = await ready({ '/api/chat/send': () => gate });
+  const { page } = await ready({ '/api/rpc/prompt': () => gate });
   typeIn(page, 'once');
   const first = sendClick(page);
   await page.tick(2);
   assert.equal(page.get('#msgSend').disabled, true);
   await sendClick(page);
   await page.tick(2);
-  assert.equal(posts(page, '/api/chat/send').length, 1);
-  release({ ok: true, json: async () => ({ sent: true, delivered: true }) });
+  assert.equal(posts(page, '/api/rpc/prompt').length, 1);
+  release({ ok: true, json: async () => ({ disposition: 'started' }) });
   await first;
   await page.tick();
   assert.equal(page.get('#msgSend').disabled, false);
-  assert.equal(posts(page, '/api/chat/send').length, 1);
+  assert.equal(posts(page, '/api/rpc/prompt').length, 1);
 });
-
-test('chat-send: sent but not confirmed clears the box (the text WAS sent) and tells the person to check the session', async () => {
-  const { page } = await ready({ '/api/chat/send': { sent: true, delivered: false } });
-  typeIn(page, 'maybe');
-  await sendClick(page);
-  await page.tick();
-  assert.equal(page.get('#msgBox').value, '');
-  assert.match(page.get('#msgNote').html, /could not be confirmed/i);
-  assert.match(page.get('#msgNote').html, /check the session/i);
-  assert.doesNotMatch(page.get('#msgNote').html, /chat-clear/);
-});
-
-test('chat-send: text left in the prompt box clears the textarea, offers Clear the box, and chat-clear posts {id} and removes the note', async () => {
-  const { page } = await ready({ '/api/chat/send': { sent: true, delivered: false, leftInBox: true } });
-  typeIn(page, 'stuck');
-  await sendClick(page);
-  await page.tick();
-  assert.equal(page.get('#msgBox').value, '');
-  assert.match(page.get('#msgNote').html, /still in the .*prompt box/i);
-  assert.match(page.get('#msgNote').html, /data-act="chat-clear" data-id="abc"/);
-  await act(page, 'chat-clear', element({ dataset: { id: 'abc' } }));
-  await page.tick();
-  const cleared = posts(page, '/api/chat/clear');
-  assert.equal(cleared.length, 1);
-  assert.deepEqual(JSON.parse(cleared[0].body), { id: 'abc' });
-  assert.equal(page.get('#msgNote').html, '');
-});
-
-test('chat-clear: an error shows its message', async () => {
-  const { page } = await ready({ '/api/chat/send': { sent: true, delivered: false, leftInBox: true }, '/api/chat/clear': () => fail(409, 'The session is working; wait until it is free') });
-  typeIn(page, 'stuck');
-  await sendClick(page);
-  await page.tick();
-  await act(page, 'chat-clear', element({ dataset: { id: 'abc' } }));
-  await page.tick();
-  assert.match(page.get('#msgNote').html, /The session is working; wait until it is free/);
-});
-
 test('chat-send: a server error keeps the text, shows the server message, and a later dispatch is allowed', async () => {
-  const msg = 'The session is working; wait until it is free';
-  const { page } = await ready({ '/api/chat/send': () => fail(409, msg) });
+  const msg = 'The agent rejected the command';
+  const { page } = await ready({ '/api/rpc/prompt': () => fail(409, msg) });
   typeIn(page, 'keep me');
   await sendClick(page);
   await page.tick();
   assert.equal(page.get('#msgBox').value, 'keep me');
   assert.ok(page.get('#msgNote').html.includes(msg), page.get('#msgNote').html);
-  assert.equal(posts(page, '/api/chat/send').length, 1);
+  assert.equal(posts(page, '/api/rpc/prompt').length, 1);
   await sendClick(page);
   await page.tick();
-  assert.equal(posts(page, '/api/chat/send').length, 2);
+  assert.equal(posts(page, '/api/rpc/prompt').length, 2);
 });
-
-test('the send button follows the session: disabled with the reason as title while working, enabled once free', async () => {
-  let live = 'working';
-  const { page } = await ready({ '/api/sessions': () => okJson({ ...ADOPTED, live: { state: live, count: 1 } }) });
+test('the send button follows the session: disabled with the reason as title while working, enabled once idle', async () => {
+  let state = 'busy';
+  const { page } = await ready({ '/api/rpc/status': () => okJson(rpcState(state)) });
   const title = () => page.get('#msgSend').title || page.get('#msgSend').attrs.title || '';
   assert.equal(page.get('#msgSend').disabled, true);
   assert.ok(title().includes(WORKING), title());
   await sendClick(page);
-  assert.deepEqual(posts(page, '/api/chat/send'), []);
-  live = 'free';
-  page.intervals.find((i) => i.ms === 5000).fn();
+  assert.deepEqual(posts(page, '/api/rpc/prompt'), []);
+  state = 'idle';
+  page.run("rpcSync('abc')");
   await page.tick();
   assert.equal(page.get('#msgSend').disabled, false);
   assert.ok(!title().includes(WORKING));
 });
-
 // ---------- page: drafts and polling ----------
 test('drafts: the text typed for one repo survives opening another repo, coming back, and closing the chat', async () => {
   const { page } = await ready();
@@ -543,24 +494,24 @@ test('keyboard: Enter sends once and is prevented; Shift+Enter and IME compositi
   const prevented = enter(page);
   await page.tick();
   assert.equal(prevented(), 1);
-  assert.equal(posts(page, '/api/chat/send').length, 1);
-  assert.deepEqual(JSON.parse(posts(page, '/api/chat/send')[0].body), { id: 'abc', text: 'via keyboard' });
+  assert.equal(posts(page, '/api/rpc/prompt').length, 1);
+  assert.deepEqual(JSON.parse(posts(page, '/api/rpc/prompt')[0].body), { id: 'abc', text: 'via keyboard' });
   typeIn(page, 'second');
   const shift = enter(page, { shiftKey: true });
   const composing = enter(page, { isComposing: true });
   await page.tick();
   assert.equal(shift(), 0);
   assert.equal(composing(), 0);
-  assert.equal(posts(page, '/api/chat/send').length, 1);
+  assert.equal(posts(page, '/api/rpc/prompt').length, 1);
 });
 
 test('keyboard: Enter when the session cannot receive is prevented, posts nothing and the note shows the reason', async () => {
-  const { page } = await ready({ '/api/sessions': { ...ADOPTED, live: { state: 'working', count: 1 } } });
+  const { page } = await ready({ '/api/rpc/status': rpcState('busy') });
   typeIn(page, 'too soon');
   const prevented = enter(page);
   await page.tick();
   assert.equal(prevented(), 1);
-  assert.deepEqual(posts(page, '/api/chat/send'), []);
+  assert.deepEqual(posts(page, '/api/rpc/prompt'), []);
   assert.ok(page.get('#msgNote').html.includes(WORKING), page.get('#msgNote').html);
   assert.equal(page.get('#msgBox').value, 'too soon');
 });

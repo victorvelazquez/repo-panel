@@ -233,14 +233,14 @@ test('h14: status carries state, pending dialogs and the session id; events are 
   await host.start(a);
   made[0].st = 'asking';
   made[0].dialogs.push('d9');
-  assert.deepEqual(await host.status(a), { state: 'asking', pendingDialogs: [{ id: 'd9', method: 'select' }], sessionId: 'panel-alpha' });
+  assert.deepEqual(await host.status(a), { state: 'asking', pendingDialogs: [{ requestId: 'd9', method: 'select' }], sessionId: 'panel-alpha' });
   made[0].opts.onEvent({ kind: 'dialog', id: 'd9', method: 'select', title: 'T' });
   made[0].opts.onEvent({ kind: 'event', record: { type: 'agent_start' } });
   made[0].opts.onEvent({ kind: 'event', record: { type: 'huge', text: 'z'.repeat(400000) } });
   const out = published.filter(([, p]) => p.kind !== 'state' && p.kind !== 'exit');
   assert.deepEqual(out[0], [a, { kind: 'dialog', requestId: 'd9', method: 'select', title: 'T' }]);
   assert.deepEqual(out[1], [a, { kind: 'event', record: { type: 'agent_start' } }]);
-  assert.deepEqual(out[2], [a, { kind: 'event', record: { type: 'huge', truncated: true } }]);
+  assert.deepEqual(out[2], [a, { kind: 'event', record: { type: 'huge' } }]);
 });
 
 test('h5b: the slug of panel-<slug> is the last folder with either separator, on any platform, and a root path falls back to the repo id', () => {

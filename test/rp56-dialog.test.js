@@ -344,13 +344,13 @@ test('page: the card appears with the dialog, disappears when the next poll has 
   assert.match(html, /hello there/);
   assert.match(cardOf(html), TITLE);
   assert.match(cardOf(html), /<mark class="ask-sel">→ Allow once<\/mark>/);
-  assert.match(page.get('#sessState').html, /asking you something/);
+  const label = page.get('#sessState').html;
   live = { state: 'free', count: 1 };
   page.intervals.find((i) => i.ms === 5000).fn();
   await page.tick();
   assert.doesNotMatch(page.get('#chatBody').html, /ch-ask/);
   assert.match(page.get('#chatBody').html, /hello there/);
-  assert.match(page.get('#sessState').html, /free/);
+  assert.equal(page.get('#sessState').html, label, 'the label follows the rpc state (RPC2-1), not the screen the card was read from');
   assert.ok(page.fetches.length >= 4, 'it did poll');
   // The board POSTs its own read-only queries (/api/queue, /api/conformity); what must never happen is an order or a message to a session.
   assert.deepEqual(page.fetches.filter((f) => /^\/api\/(pi|chat\/send|chat\/clear)\b/.test(String(f.url))), []);

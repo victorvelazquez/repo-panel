@@ -1,7 +1,7 @@
 'use strict';
 // The ONE pi session the panel adopts per repo and per room (config.json `sessions`). Gentle Shell keeps every session
 // as a .jsonl file under <base>/--<folder>--/; a file can be 25 MB, so only its first and last 64 KB are ever read.
-// Nothing here sends text to a session: `startSession` only asks Orca to open a terminal that runs `gentle-shell`.
+// Nothing here sends text to a session.
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -20,8 +20,6 @@ const CHAT_MAX = 100;
 const SESSION_ID = /^[A-Za-z0-9._-]{1,80}$/;
 const LIVE_OF = { idle: 'free', typed: 'free', busy: 'working', asking: 'waiting' };
 const RANK = { free: 1, working: 2, waiting: 3 };
-
-const starting = new Set();
 
 // REPO_PANEL_SESSIONS_DIR wins; else the folder of the ACTIVE pi (<agentDir>/sessions); with none active, or when detection fails, the
 // old default (Gentle Shell's). The detection is sync and spawns nothing (files and PATH only), and `findCached` keeps it for 30 s.
@@ -231,22 +229,12 @@ async function releaseSession(id, orca = orcaTerminal, base = baseDir()) {
   return sessionsState(id, orca, base);
 }
 
-// Opens a terminal that runs `gentle-shell -n <name> --session-id <id>` and adopts that id. The id and the name are
-// built here from the repo or room name with a closed character set, so nothing else reaches the command string.
-async function startSession(id, orca = orcaTerminal) {
-  const { key, folder, prefix, label } = sessionKeyFor(id);
-  if (starting.has(key)) throw new HttpError(409, 'A session is already being started for this folder');
-  starting.add(key);
-  try {
-    const sid = `${prefix}-${label.toLowerCase().replace(/[^a-z0-9.-]/g, '-')}`.slice(0, 80);
-    const name = `${prefix === 'sala' ? 'sala' : 'panel'}:${label.replace(/[^A-Za-z0-9._-]/g, '-')}`.slice(0, 100);
-    const live = await liveOf(folder, orca, { fresh: true });
-    if (live.state === 'unknown') throw new HttpError(409, 'Orca could not be read, so it is not known whether a session is already open; try again');
-    if (live.state !== 'none') throw new HttpError(409, 'This folder already has a session open; adopt it instead of starting another');
-    const created = await orca(['create', '--worktree', `path:${folder}`, '--title', name, '--command', `gentle-shell -n ${name} --session-id ${sid}`]);
-    store(key, { id: sid, name, adoptedAt: new Date().toISOString() });
-    return { started: true, handle: (created.terminal && created.terminal.handle) || null, id: sid, name, state: 'starting' };
-  } finally { starting.delete(key); }
+// RPC2-1: `rpc/start` adopts the id it runs under when the repo has none, so the history (read from the adopted id) shows what the session writes.
+// Same entry as `adoptSession` stores, without Orca; an adopted session is never replaced and an id that is not a session id is never written.
+function adoptIfNone(key, sid) {
+  if (typeof sid !== 'string' || !SESSION_ID.test(sid) || (loadConfig().sessions || {})[key]) return false;
+  store(key, { id: sid, name: sid, adoptedAt: new Date().toISOString() });
+  return true;
 }
 
-module.exports = { baseDir, liveFromSessions, sessionsDirFor, listSessions, readChat, chatState, sessionKeyFor, sessionsState, adoptSession, releaseSession, startSession, SESSION_ID };
+module.exports = { baseDir, liveFromSessions, sessionsDirFor, listSessions, readChat, chatState, sessionKeyFor, sessionsState, adoptSession, releaseSession, adoptIfNone, SESSION_ID };

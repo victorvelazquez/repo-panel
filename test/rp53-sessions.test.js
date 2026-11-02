@@ -217,52 +217,6 @@ test('sessionsState: live comes from ONE list; free, working, waiting, none; an 
   assert.equal(st.adoptedFound, false);
 });
 
-test('startSession builds the exact orca vector (list first, then create once), stores the adoption and never sends', async () => {
-  resetDisk();
-  writeConfig(baseConfig());
-  const f = fakeOrca();
-  const r = await S.startSession(REPO_ID, f.orca);
-  assert.deepEqual(r, { started: true, handle: 'term_new', id: 'panel-my-repo.api', name: 'panel:My-Repo.Api', state: 'starting' });
-  const creates = f.calls.filter((c) => c[0] === 'create');
-  assert.equal(creates.length, 1);
-  assert.deepEqual(creates[0], ['create', '--worktree', 'path:' + repoDir, '--title', 'panel:My-Repo.Api', '--command', 'gentle-shell -n panel:My-Repo.Api --session-id panel-my-repo.api']);
-  assert.equal(f.calls[0][0], 'list');
-  assert.ok(f.calls.indexOf(creates[0]) > f.calls.findIndex((c) => c[0] === 'list'));
-  assert.equal(f.calls.some((c) => c[0] === 'send'), false);
-  const a = readConfig().sessions[REPO_ID];
-  assert.deepEqual([a.id, a.name], ['panel-my-repo.api', 'panel:My-Repo.Api']);
-  assert.ok(!Number.isNaN(Date.parse(a.adoptedAt)));
-});
-
-test('startSession for a room uses sala-<slug> and sala:<name>, with the room folder as the only path', async () => {
-  resetDisk();
-  writeConfig(baseConfig({ rooms: [{ name: 'Sala $(x) Uno', path: roomDir, repos: [] }] }));
-  const f = fakeOrca();
-  const r = await S.startSession('room:Sala $(x) Uno', f.orca);
-  assert.equal(r.id, 'sala-sala---x--uno');
-  assert.equal(r.name, 'sala:Sala---x--Uno');
-  const create = f.calls.find((c) => c[0] === 'create');
-  assert.equal(create[2], 'path:' + roomDir);
-  assert.equal(create[6], 'gentle-shell -n sala:Sala---x--Uno --session-id sala-sala---x--uno');
-  assert.equal(/[$()&|;<>`"' ]/.test(create[4] + create[6].replace(/ /g, '')), false);
-  assert.match(r.id, /^[A-Za-z0-9._-]{1,80}$/);
-});
-
-test('startSession refuses with 409 when a live session exists or Orca cannot be listed: nothing is created or stored', async () => {
-  resetDisk();
-  writeConfig(baseConfig());
-  const live = fakeOrca({ terminals: [{ handle: 't1', worktreePath: repoDir, connected: true, writable: true }], previews: { t1: '▎ repo waiting for input' } });
-  await assert.rejects(() => S.startSession(REPO_ID, live.orca), (e) => e.status === 409 && /adopt/i.test(e.message));
-  assert.equal(live.calls.some((c) => c[0] === 'create'), false);
-  const down = fakeOrca({ failList: true });
-  await assert.rejects(() => S.startSession(REPO_ID, down.orca), (e) => e.status === 409);
-  assert.equal(down.calls.some((c) => c[0] === 'create'), false);
-  const failing = fakeOrca({ failCreate: true });
-  await assert.rejects(() => S.startSession(REPO_ID, failing.orca));
-  assert.equal(readConfig().sessions, undefined);
-  await assert.rejects(() => S.startSession('nonexistent01', fakeOrca().orca), (e) => e.status === 404);
-});
-
 // ---- routes (in-process server with an injected fake Orca) ----
 const freePort = () => new Promise((resolve) => {
   const s = net.createServer().listen(0, '127.0.0.1', () => { const { port } = s.address(); s.close(() => resolve(port)); });
@@ -292,7 +246,7 @@ test('routes answer 401 without the token and work with it', async () => {
   putSession(repoDir, 'route-1', [header('route-1', repoDir), msg('user', 'hi')]);
   const f = fakeOrca();
   await withServer({ orca: f.orca }, async ({ call, token }) => {
-    for (const [m, p] of [['GET', `/api/sessions?id=${REPO_ID}`], ['POST', '/api/sessions/adopt'], ['POST', '/api/sessions/release'], ['POST', '/api/sessions/start']]) {
+    for (const [m, p] of [['GET', `/api/sessions?id=${REPO_ID}`], ['POST', '/api/sessions/adopt'], ['POST', '/api/sessions/release']]) {
       assert.equal((await call(m, p, null, m === 'POST' ? {} : undefined)).status, 401, `${m} ${p}`);
     }
     assert.equal(f.calls.length, 0);
@@ -306,9 +260,6 @@ test('routes answer 401 without the token and work with it', async () => {
     assert.equal(adopted.adopted.id, 'route-1');
     assert.equal(adopted.adoptedFound, true);
     assert.equal(JSON.parse((await call('POST', '/api/sessions/release', token, { id: REPO_ID })).text).adopted, null);
-    const started = JSON.parse((await call('POST', '/api/sessions/start', token, { id: REPO_ID })).text);
-    assert.equal(started.started, true);
-    assert.equal(f.calls.filter((c) => c[0] === 'create').length, 1);
   });
 });
 

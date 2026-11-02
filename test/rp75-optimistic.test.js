@@ -98,7 +98,7 @@ const prsOf = (prs) => ({ prs, stale: null, repo: { url: 'https://github.com/o/d
 
 // The fake fetch takes the FIRST key the url starts with, so the longer routes come before their prefixes.
 const BASE = {
-  '/api/chat/send': { sent: true, delivered: true }, '/api/chat/clear': { cleared: true }, '/api/pi-status': { state: 'busy' }, '/api/pi': { sent: true, confirmed: true },
+  '/api/rpc/status': { state: 'idle', pendingDialogs: [], sessionId: 's1' }, '/api/rpc/prompt': { disposition: 'started' }, '/api/pi-status': { state: 'busy' }, '/api/pi': { sent: true, confirmed: true },
   '/api/sessions': ADOPTED, '/api/chat': histOf(HELLO_THERE),
 };
 const answers = (extra = {}) => ({ ...Object.fromEntries(Object.entries(BASE).map(([k, v]) => [k, k in extra ? extra[k] : v])), ...Object.fromEntries(Object.entries(extra).filter(([k]) => !(k in BASE))) });
@@ -177,17 +177,6 @@ test('A3: the override never changes the server rows: S.summary.rows stays as re
   assert.match(cardOf(page, 'abc'), /● working/, 'precondition: the chip is overridden');
   assert.equal(JSON.stringify(page.run('S.summary.rows')), before);
   assert.deepEqual(page.run('S.summary.rows').map((r) => r.session.state), ['free', 'free']);
-});
-
-test('A4: with the chat of that repo open, #sessState shows ss-working and ss-anim BEFORE the POST resolves', async () => {
-  const post = gate();
-  const { page } = await chatPage({ '/api/pi': () => post.promise });
-  assert.ok(page.get('#sessState').html.includes('ss-free'), 'precondition: free');
-  page.run(PI_CLICK);
-  page.flush();
-  const html = page.get('#sessState').html;
-  assert.ok(html.includes('ss-working') && html.includes('ss-anim'), html);
-  assert.ok(!html.includes('ss-free'), html);
 });
 
 test('A5: once the POST resolves {sent:true,confirmed:true} the chip is STILL working; when the sent record ends it goes back to the server state', async () => {
@@ -390,11 +379,11 @@ test('B2g: doRerun keeps working with the same rules: one POST /api/rerun, busy 
 // ====================================================================================================
 const body = (page) => page.get('#chatBody').html;
 const typeAndSend = (page, text = 'hello team') => { page.get('#msgBox').value = text; page.run("ACTIONS['chat-send']({})"); };
-const sendsOf = (page) => page.fetches.filter((f) => f.method === 'POST' && f.url === '/api/chat/send');
+const sendsOf = (page) => page.fetches.filter((f) => f.method === 'POST' && f.url === '/api/rpc/prompt');
 
 test('C1: sending clears the box, the draft and shows the pending bubble «sending…» after the real messages, all before the POST resolves', async () => {
   const post = gate();
-  const { page } = await chatPage({ '/api/chat/send': () => post.promise });
+  const { page } = await chatPage({ '/api/rpc/prompt': () => post.promise });
   page.run("S.drafts.abc = 'hello team'");
   assert.ok(!body(page).includes('pending'), 'precondition: no pending bubble');
   typeAndSend(page);
@@ -413,7 +402,7 @@ test('C1: sending clears the box, the draft and shows the pending bubble «sendi
 test('C2: the pending text goes through the same Markdown renderer as the other bubbles, escaped', async () => {
   const post = gate();
   const text = '**bold** <b>raw</b>';
-  const { page } = await chatPage({ '/api/chat/send': () => post.promise });
+  const { page } = await chatPage({ '/api/rpc/prompt': () => post.promise });
   typeAndSend(page, text);
   page.flush();
   const html = body(page);
@@ -421,11 +410,11 @@ test('C2: the pending text goes through the same Markdown renderer as the other 
   assert.ok(!html.includes('<b>raw</b>'), 'escaped');
 });
 
-test('C3: {sent:true,delivered:true}: the bubble shows a discreet check (class ok, «✓»), no «sending…», and stays until the history has it', async () => {
+test('C3: the prompt accepted: the bubble shows a discreet check (class ok, «✓»), no «sending…», and stays until the history has it', async () => {
   const post = gate();
-  const { page } = await chatPage({ '/api/chat/send': () => post.promise });
+  const { page } = await chatPage({ '/api/rpc/prompt': () => post.promise });
   typeAndSend(page);
-  post.resolve(reply({ sent: true, delivered: true }));
+  post.resolve(reply({ disposition: 'started' }));
   await page.tick(); // loadChat ran: the history still lacks the message
   const html = body(page);
   assert.ok(html.includes('hello team') && !html.includes('sending…'), html);
@@ -437,9 +426,9 @@ test('C3: {sent:true,delivered:true}: the bubble shows a discreet check (class o
 test('C4: when the next /api/chat answer has the message (count above the one at send time) the pending bubble is removed: exactly one «hello team»', async () => {
   const post = gate();
   let hist = histOf(HELLO_THERE);
-  const { page } = await chatPage({ '/api/chat/send': () => post.promise, '/api/chat': () => reply(hist) });
+  const { page } = await chatPage({ '/api/rpc/prompt': () => post.promise, '/api/chat': () => reply(hist) });
   typeAndSend(page);
-  post.resolve(reply({ sent: true, delivered: true }));
+  post.resolve(reply({ disposition: 'started' }));
   await page.tick();
   assert.match(body(page), /pending|✓/, 'precondition: the pending bubble is still there');
   hist = histOf(HELLO_THERE, userItem('hello team'));
@@ -453,33 +442,17 @@ test('C4: when the next /api/chat answer has the message (count above the one at
 test('C5: a message equal to an OLD one is not taken for the new one: the old copy does not remove the pending bubble', async () => {
   const post = gate();
   const hist = histOf(HELLO_THERE, userItem('hello team'));
-  const { page } = await chatPage({ '/api/chat/send': () => post.promise, '/api/chat': () => reply(hist) });
+  const { page } = await chatPage({ '/api/rpc/prompt': () => post.promise, '/api/chat': () => reply(hist) });
   typeAndSend(page);
-  post.resolve(reply({ sent: true, delivered: true }));
+  post.resolve(reply({ disposition: 'started' }));
   await page.tick();
   assert.equal(count(body(page), 'hello team'), 2, 'the old one plus the pending one');
   assert.match(body(page), /pending|✓/);
 });
 
-test('C6: {sent:true,delivered:false}: the bubble shows «not confirmed» and ALSO disappears once the history contains it', async () => {
-  const post = gate();
-  let hist = histOf(HELLO_THERE);
-  const { page } = await chatPage({ '/api/chat/send': () => post.promise, '/api/chat': () => reply(hist) });
-  typeAndSend(page);
-  post.resolve(reply({ sent: true, delivered: false }));
-  await page.tick();
-  assert.ok(body(page).includes('not confirmed'), body(page));
-  assert.ok(body(page).includes('hello team'));
-  hist = histOf(HELLO_THERE, userItem('hello team'));
-  page.run("loadChat('abc')");
-  await page.tick();
-  assert.equal(count(body(page), 'hello team'), 1);
-  assert.ok(!body(page).includes('not confirmed'));
-});
-
 test('C7: a rejected send (409): the bubble is removed, the text comes back to the empty box and #msgNote shows the server message', async () => {
   const post = gate();
-  const { page } = await chatPage({ '/api/chat/send': () => post.promise });
+  const { page } = await chatPage({ '/api/rpc/prompt': () => post.promise });
   typeAndSend(page);
   page.flush();
   assert.ok(body(page).includes('sending…'), 'precondition');
@@ -492,7 +465,7 @@ test('C7: a rejected send (409): the bubble is removed, the text comes back to t
 
 test('C8: a rejected send when the person already typed something new: the old text goes before it, separated by a newline', async () => {
   const post = gate();
-  const { page } = await chatPage({ '/api/chat/send': () => post.promise });
+  const { page } = await chatPage({ '/api/rpc/prompt': () => post.promise });
   typeAndSend(page);
   page.get('#msgBox').value = 'and also this';
   post.resolve(fail(409, { error: 'The session is working; wait until it is free' }));
@@ -502,7 +475,7 @@ test('C8: a rejected send when the person already typed something new: the old t
 
 test('C9: a network failure also removes the bubble and gives the text back', async () => {
   const post = gate();
-  const { page } = await chatPage({ '/api/chat/send': () => post.promise });
+  const { page } = await chatPage({ '/api/rpc/prompt': () => post.promise });
   typeAndSend(page);
   page.flush();
   assert.ok(body(page).includes('sending…') && page.get('#msgBox').value === '', 'precondition: optimistic state');
@@ -515,7 +488,7 @@ test('C9: a network failure also removes the bubble and gives the text back', as
 
 test('C10: pending bubbles are kept per repo: another card hides it and coming back shows it again', async () => {
   const post = gate();
-  const { page } = await chatPage({ '/api/chat/send': () => post.promise });
+  const { page } = await chatPage({ '/api/rpc/prompt': () => post.promise });
   typeAndSend(page);
   page.flush();
   assert.ok(body(page).includes('sending…'), 'precondition');
@@ -528,18 +501,18 @@ test('C10: pending bubbles are kept per repo: another card hides it and coming b
 });
 
 test('C11: a message the composer refuses (session working) clears nothing and shows no pending bubble; the note keeps the reason', async () => {
-  const { page } = await chatPage({ '/api/sessions': live('working') });
+  const { page } = await chatPage({ '/api/rpc/status': { state: 'busy', pendingDialogs: [] } });
   typeAndSend(page);
   page.flush();
   assert.equal(sendsOf(page).length, 0);
   assert.equal(page.get('#msgBox').value, 'hello team');
   assert.ok(!body(page).includes('pending') && !body(page).includes('sending…'));
-  assert.ok(page.get('#msgNote').html.includes('The session is working: wait until it is free'), page.get('#msgNote').html);
+  assert.ok(page.get('#msgNote').html.includes('The session is working: wait until it is idle, or press Stop'), page.get('#msgNote').html);
 });
 
 test('C12: PRESERVE: one send per repo at a time (a second dispatch sends nothing), and an empty box sends nothing', async () => {
   const post = gate();
-  const { page } = await chatPage({ '/api/chat/send': () => post.promise });
+  const { page } = await chatPage({ '/api/rpc/prompt': () => post.promise });
   typeAndSend(page);
   typeAndSend(page, 'second');
   assert.equal(sendsOf(page).length, 1);
@@ -570,14 +543,11 @@ test('R.chatBody: a pending entry is a bubble «m me pending» with the text and
   assert.ok(html.indexOf('hello there') < html.indexOf('hello team'));
 });
 
-test('R.chatBody: state ok shows the check (class ok, «✓»), unconfirmed shows «not confirmed», neither says «sending…»', () => {
+test('R.chatBody: state ok shows the check (class ok, «✓») and does not say «sending…»', () => {
   const ok = R.chatBody(chatC([], [P('hello team', 'ok')]));
   assert.match(ok, /<[^>]*class="[^"]*\bok\b[^"]*"[^>]*>✓</, ok);
   assert.ok(!ok.includes('sending…'));
-  const un = R.chatBody(chatC([], [P('hello team', 'unconfirmed')]));
-  assert.ok(un.includes('not confirmed') && !un.includes('sending…'), un);
 });
-
 test('R.chatBody: an entry is hidden when the user items with the same text outnumber its base', () => {
   const same = userItem('hello team');
   assert.ok(R.chatBody(chatC([same], [P('hello team', 'ok', 0)])).split('hello team').length === 2, 'base 0, one in history: hidden (only the real bubble)');
@@ -609,11 +579,11 @@ test('R.chatBody: pending text is escaped', () => {
   assert.ok(!html.includes('<img'), html);
 });
 
-test('R.chatBody: pending is never rendered when the chat has no adopted session', () => {
+test('R.chatBody: pending is not rendered when the chat has no adopted session (an adopted session whose file is not there yet shows it)', () => {
   const none = R.chatBody(chatC([], [P('hello team')], { info: { key: 'abc', adopted: null, adoptedFound: false, sessions: [sess()], live: { state: 'none', count: 0 } } }));
   assert.ok(!none.includes('hello team') && !none.includes('pending'), none);
   const notFound = R.chatBody(chatC([], [P('hello team')], { info: { ...ADOPTED, adoptedFound: false } }));
-  assert.ok(!notFound.includes('hello team'), notFound);
+  assert.ok(notFound.includes('hello team'), 'adopted but its file is not there yet (the first message of a new session): the pending bubble is the only thing to show');
 });
 
 // ====================================================================================================
