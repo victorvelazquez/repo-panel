@@ -9,6 +9,7 @@ const { baseBranchOf } = require('./local.js');
 const PR_FIELDS = [
   'number', 'title', 'url', 'headRefName', 'baseRefName', 'headRefOid', 'isDraft', 'isCrossRepository',
   'mergeable', 'mergeStateStatus', 'reviewDecision', 'statusCheckRollup', 'author',
+  'additions', 'deletions', 'changedFiles', // RP94d: the size of the PR (additive; the Summary card flags a large one)
 ].join(',');
 
 function ghError(r) {

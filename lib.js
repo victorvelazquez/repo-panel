@@ -125,6 +125,9 @@ function blockedReason(pr, checks) {
   return null;
 }
 
+// RP94d: a size GitHub sends as a count, or null (never a made-up number): a finite, non-negative number, cut to an integer.
+const countOrNull = (v) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.floor(v) : null);
+
 function enrichPr(pr) {
   const checks = summarizeChecks(pr.statusCheckRollup);
   const blocked = blockedReason(pr, checks);
@@ -134,6 +137,7 @@ function enrichPr(pr) {
     isDraft: !!pr.isDraft, isCrossRepository: !!pr.isCrossRepository,
     author: pr.author && pr.author.login, reviewDecision: pr.reviewDecision || null,
     mergeStateStatus: pr.mergeStateStatus, checks, ready: blocked === null, blockedReason: blocked,
+    additions: countOrNull(pr.additions), deletions: countOrNull(pr.deletions), changedFiles: countOrNull(pr.changedFiles),
   };
 }
 

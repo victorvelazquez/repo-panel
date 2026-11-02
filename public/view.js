@@ -630,8 +630,44 @@
   // RP94c (S9): the chip of a repo's open pull request(s) with the state of the checks, for the Summary card. `prs` is the page's list of open PRs ({ number, title, checks });
   // none (or not a list) draws nothing. State is never colour alone: the chip has the number, a symbol and the counts. One PR: "PR #12 ✔ 5/5". Several: ONE chip with the
   // count and the worst state (failed, then running, then passing, then none); the tooltip lists every PR. Total, and escaped.
+  // RP94d: the open PRs that have a number (anything else is skipped); the size GitHub said for one PR ({ add, del, files } or null: half a size is not a size).
+  const numberedPrs = (prs) => (Array.isArray(prs) ? prs : []).filter((p) => isObject(p) && typeof p.number === 'number' && Number.isFinite(p.number));
+  const countOf = (v) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.floor(v) : null);
+  const sizeOfPr = (p) => (countOf(p.additions) !== null && countOf(p.deletions) !== null ? { add: countOf(p.additions), del: countOf(p.deletions), files: countOf(p.changedFiles) } : null);
+  const sizeText = (s) => `+${s.add} −${s.del}${s.files !== null ? ` · ${s.files} file${s.files === 1 ? '' : 's'}` : ''}`;
+  const LARGE_PR_LINES = 400;
+
+  // RP94d: how long uncommitted work has sat untouched, from the newest edit among the changed files (`lastChangeMs`). Nothing under a day (a day exactly counts), nothing for a
+  // future or missing time. Gray under a week, yellow from a week. Total.
+  function idleChip(lastChangeMs, now = Date.now()) {
+    if (typeof lastChangeMs !== 'number' || !Number.isFinite(lastChangeMs) || typeof now !== 'number' || !Number.isFinite(now)) return '';
+    const days = Math.floor((now - lastChangeMs) / (24 * 60 * 60 * 1000));
+    if (days < 1) return '';
+    const when = new Date(lastChangeMs).toISOString().slice(0, 16).replace('T', ' ');
+    return `<span class="chip ${days >= 7 ? 'yellow' : 'gray'}" title="Newest uncommitted change: ${when} UTC">⏳ edited ${days} d ago</span>`;
+  }
+
+  // RP94d: a red chip for the open PR(s) that conflict with the base branch (GitHub's merge state DIRTY), with their numbers. Behind and blocked are not conflicts. Total.
+  function conflictChip(prs) {
+    const bad = numberedPrs(prs).filter((p) => p.mergeStateStatus === 'DIRTY');
+    return bad.length ? `<span class="chip red" title="Merge conflicts with the base branch">✘ merge conflict ${bad.map((p) => `#${p.number}`).join(', ')}</span>` : '';
+  }
+
+  // RP94d: a yellow chip for the LARGEST open PR when it changes 400 lines or more (the ceiling this project uses for its own PRs); the tooltip has its title and size. A PR whose
+  // size GitHub did not say is never large. Total, and escaped.
+  function sizeChip(prs) {
+    let best = null;
+    for (const p of numberedPrs(prs)) {
+      const s = sizeOfPr(p);
+      if (s && s.add + s.del >= LARGE_PR_LINES && (!best || s.add + s.del > best.s.add + best.s.del)) best = { p, s };
+    }
+    if (!best) return '';
+    const title = typeof best.p.title === 'string' && best.p.title ? ` ${best.p.title}` : '';
+    return `<span class="chip yellow" title="${htmlEsc(`#${best.p.number}${title} — ${sizeText(best.s)}`)}">large PR #${best.p.number} · +${best.s.add} −${best.s.del}</span>`;
+  }
+
   function prChip(prs) {
-    const list = (Array.isArray(prs) ? prs : []).filter((p) => isObject(p) && typeof p.number === 'number' && Number.isFinite(p.number));
+    const list = numberedPrs(prs);
     if (!list.length) return '';
     const n = (v) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? Math.floor(v) : 0);
     const kind = (p) => { const s = isObject(p.checks) ? p.checks.state : 'none'; return s === 'none' || s === undefined ? 'none' : s === 'success' ? 'success' : s === 'failed' ? 'failed' : 'pending'; };
@@ -640,7 +676,7 @@
       const c = isObject(p.checks) ? p.checks : {};
       return { none: 'no checks', success: `✔ ${counts(p)} checks`, failed: `✘ ${n(c.failed)} failed · ${counts(p)} checks`, pending: `… ${n(c.pending)} running · ${counts(p)} checks` }[kind(p)];
     };
-    const tip = list.map((p) => `#${p.number}${typeof p.title === 'string' && p.title ? ` ${p.title}` : ''} — ${describe(p)}`).join('\n');
+    const tip = list.map((p) => `#${p.number}${typeof p.title === 'string' && p.title ? ` ${p.title}` : ''} — ${describe(p)}${sizeOfPr(p) ? ` · ${sizeText(sizeOfPr(p))}` : ''}`).join('\n');
     const kinds = list.map(kind);
     const worst = ['failed', 'pending', 'success', 'none'].find((k) => kinds.includes(k));
     const tone = { failed: 'red', pending: 'yellow', success: 'green', none: 'gray' }[worst];
@@ -804,5 +840,5 @@
     return `${meters.join('')}${age}<div class="usage-pop" role="group" aria-label="Claude usage details">${details.join('')}${note}${foot}</div>`;
   }
 
-  return { repoModel, changeChips, prChip, RepoCard, stateLineHidden, usageView, usageHtml, usageRemaining, boardApply, boardWait, chatCachePut, chatCacheGet, chatFromCache, API_VERSION, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, piPollTargets, LIVE_CHECK_MS, liveSession, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, presenceLabel, presenceDot, parseSse, liveEvent, eventsPlan, eventsRetryMs, eventsStale };
+  return { repoModel, changeChips, prChip, idleChip, conflictChip, sizeChip, RepoCard, stateLineHidden, usageView, usageHtml, usageRemaining, boardApply, boardWait, chatCachePut, chatCacheGet, chatFromCache, API_VERSION, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, piPollTargets, LIVE_CHECK_MS, liveSession, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, presenceLabel, presenceDot, parseSse, liveEvent, eventsPlan, eventsRetryMs, eventsStale };
 }));

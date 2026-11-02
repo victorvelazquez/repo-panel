@@ -814,6 +814,12 @@ function summaryPrs(id) {
   return modelOf(id).prs;
 }
 
+// RP94d: when the newest uncommitted change was made (the server's `lastChangeMs`), only for a repo that HAS uncommitted changes; null otherwise.
+function summaryIdle(id) {
+  const m = modelOf(id);
+  return m.dirty && typeof m.l.lastChangeMs === 'number' ? m.l.lastChangeMs : null;
+}
+
 // A repo whose command is running (being sent, or sent and not finished) shows the session as working at once; the server
 // state shows again when the verdict ends. Copies only: S.summary is never changed.
 const commandRunning = (id) => { const v = verdictOf({ id }); return !!v && v.state === 'running'; };
@@ -840,7 +846,7 @@ function drawSummary() {
   const box = $('#summary');
   const ctx = {
     now: Date.now(), scope, rooms: S.rooms, q: S.q, group: S.group, roomData: S.roomData.data, filter: S.sfilter, collapsed: S.collapsed, failed: S.summaryFailed,
-    flowFor: summaryFlow, changesFor: summaryChanges, prsFor: summaryPrs, sending: S.sending, busy: busyView(), chatId: S.chat.id,
+    flowFor: summaryFlow, changesFor: summaryChanges, prsFor: summaryPrs, idleFor: summaryIdle, sending: S.sending, busy: busyView(), chatId: S.chat.id,
   };
   if (paint($('#summaryTools'), R.summaryTools(S.summary, ctx)) && kept && kept.act === 'sfilter') { const on = $('#summaryTools [data-act="sfilter"]'); if (on && on.focus) on.focus(); }
   const changed = paint(box, R.summaryView(summaryShown(), ctx));

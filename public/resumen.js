@@ -70,6 +70,8 @@
   // RP87: the change chips are the board card's too, so they live in view.js (a global in the page, a module in Node) and are looked up when used.
   // RP94c: the chip of the open pull request(s) with the state of their checks (view.js), looked up the same way.
   const prChipOf = (prs) => { const v = typeof module === 'object' && module.exports ? require('./view.js') : root.RepoPanelView; return v && v.prChip ? v.prChip(prs) : ''; };
+  // RP94d: the chips that say how long the changes have sat, that a PR conflicts and that a PR is large (all in view.js, looked up the same way).
+  const viewChip = (name, ...args) => { const v = typeof module === 'object' && module.exports ? require('./view.js') : root.RepoPanelView; return v && v[name] ? v[name](...args) : ''; };
   const chipsOf = (c, id) => { const v = typeof module === 'object' && module.exports ? require('./view.js') : root.RepoPanelView; return v && v.changeChips ? v.changeChips(c, id) : ''; };
 
   // ONE line: the next unit (full entrega and result in the title), or what a blocked repo waits for.
@@ -122,7 +124,8 @@
     const lm = r.lastMovement || {};
     const a = r.error ? null : r.action;
     const cls = r.session && r.session.state === 'waiting' ? ' ask' : !r.error && !r.next && (r.blocking || []).length ? ' block' : '';
-    const chips = r.error ? '' : chipsOf(ctx.changesFor ? ctx.changesFor(r.id) : null, r.id) + prChipOf(ctx.prsFor ? ctx.prsFor(r.id) : null) + (a && a.kind === 'manual' ? '<span class="chip red">▲ manual action</span>' : '');
+    const prs = !r.error && ctx.prsFor ? ctx.prsFor(r.id) : null;
+    const chips = r.error ? '' : chipsOf(ctx.changesFor ? ctx.changesFor(r.id) : null, r.id) + viewChip('idleChip', ctx.idleFor ? ctx.idleFor(r.id) : null, ctx.now) + prChipOf(prs) + viewChip('conflictChip', prs) + viewChip('sizeChip', prs) + (a && a.kind === 'manual' ? '<span class="chip red">▲ manual action</span>' : '');
     // RP88b: the frame is V.RepoCard (view.js), shared with the board card; what is specific to the Summary card is built here.
     const view = typeof module === 'object' && module.exports ? require('./view.js') : root.RepoPanelView;
     return view.RepoCard({
