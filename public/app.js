@@ -26,7 +26,7 @@ const S = {
   dismissed: new Set(), menu: null, reqPassOpen: {},
   group: '', q: '', queue: [], queueKey: '', queueSeq: 0,
   conf: { items: [], ok: 0, loaded: false, failed: false, key: '', seq: 0 },
-  req: {}, reqSeq: {}, state: {}, stateSeq: {}, sent: {}, pistatus: {}, pistatusSeq: {}, live: {}, liveBusy: {}, liveAnswered: {}, dirtyAt: {}, sending: {}, merged: {}, pending: {}, pitail: {}, piask: {}, tailFor: {}, finishing: {}, showCommit: new Set(), prereq: { state: 'loading', items: [], seq: 0 },
+  req: {}, reqSeq: {}, state: {}, stateSeq: {}, sent: {}, pistatus: {}, pistatusSeq: {}, live: {}, liveBusy: {}, liveAnswered: {}, dirtyAt: {}, sending: {}, merged: {}, pending: {}, pitail: {}, piask: {}, tailFor: {}, finishing: {}, showCommit: new Set(), prereq: { state: 'loading', items: [], seq: 0, pi: null },
   rooms: [], roomIssues: [], roomData: { state: 'loading', data: null }, roomSeq: 0,
   prefs: store('prefs', { method: 'squash', del: true }),
   lastRefresh: 0, lastAt: {}, scan: [],
@@ -378,8 +378,10 @@ function clearSent(id) {
 
 function loadPrerequisites() {
   const seq = ++S.prereq.seq;
-  return pooled(() => api('/api/prerequisites')).then(
-    (d) => { if (seq === S.prereq.seq) { S.prereq.state = 'loaded'; S.prereq.items = d.items || []; draw(); } },
+  // RPC1a: the pi runtimes (for the selector) are read apart; if that read fails the list still shows.
+  const runtimes = api('/api/pi-runtime').catch(() => null); // not pooled: it must not take a slot from the repo reads
+  return Promise.all([pooled(() => api('/api/prerequisites')), runtimes]).then(
+    ([d, pi]) => { if (seq === S.prereq.seq) { S.prereq.state = 'loaded'; S.prereq.items = d.items || []; S.prereq.pi = pi; draw(); } },
     () => { if (seq === S.prereq.seq) { S.prereq.state = 'failed'; draw(); } },
   );
 }
@@ -675,12 +677,20 @@ const reqSummary = () => ({
   }),
 });
 
+// RPC1a: the pi in use, chosen among Auto and the detected runtimes; it only affects sessions started afterwards.
+function piSelect(pi) {
+  if (!pi) return '';
+  const opts = [['auto', 'Auto'], ...pi.candidates.filter((c) => c.available).map((c) => [c.id, c.label])];
+  const options = opts.map(([id, label]) => `<option value="${esc(id)}"${id === pi.mode ? ' selected' : ''}>${esc(label)}</option>`).join('');
+  return `<div class="conf-line">pi to use: <select data-pi-runtime aria-label="pi to use">${options}</select></div>`;
+}
+
 function prereqBlock() {
   const p = S.prereq;
   const lines = p.state === 'loaded'
     ? p.items.map((i) => `<div class="conf-line req-${i.ok ? 'pass' : 'fail'}">${i.ok ? '✓' : '✗'} ${esc(i.id)} · ${esc(i.detail)}</div>`).join('')
     : `<div class="conf-line">${p.state === 'failed' ? 'Could not check the prerequisites' : 'Checking the prerequisites…'}</div>`;
-  return `<div class="conf-item"><div class="conf-title">Prerequisites on this machine</div>${lines}</div>`;
+  return `<div class="conf-item"><div class="conf-title">Prerequisites on this machine</div>${lines}${piSelect(p.pi)}</div>`;
 }
 
 // The remedy is the instruction an AI agent applies in the repo; the panel only shows it.
@@ -1929,6 +1939,10 @@ document.addEventListener('toggle', (e) => {
 }, true);
 
 document.addEventListener('change', (e) => {
+  if (e.target.dataset.piRuntime !== undefined) {
+    api('/api/pi-runtime', { runtime: e.target.value }).then(() => loadPrerequisites(), () => loadPrerequisites());
+    return;
+  }
   const key = e.target.dataset.pref;
   if (!key) return;
   setPref(key, e.target.type === 'checkbox' ? e.target.checked : e.target.value);

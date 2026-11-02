@@ -8,6 +8,7 @@ const path = require('node:path');
 const { HttpError } = require('./errors.js');
 const { loadConfig, saveConfig, findRepo } = require('./config.js');
 const { orcaTerminal, scanSessions, listTerminals } = require('./pi.js');
+const { chooseRuntime, findCached } = require('./piruntime.js');
 
 const CHUNK = 64 * 1024;
 const LIMIT = 20;
@@ -22,7 +23,16 @@ const RANK = { free: 1, working: 2, waiting: 3 };
 
 const starting = new Set();
 
-const baseDir = () => process.env.REPO_PANEL_SESSIONS_DIR || path.join(os.homedir(), '.gentle-shell', 'agent', 'sessions');
+// REPO_PANEL_SESSIONS_DIR wins; else the folder of the ACTIVE pi (<agentDir>/sessions); with none active, or when detection fails, the
+// old default (Gentle Shell's). The detection is sync and spawns nothing (files and PATH only), and `findCached` keeps it for 30 s.
+function baseDir({ candidates = findCached } = {}) {
+  if (process.env.REPO_PANEL_SESSIONS_DIR) return process.env.REPO_PANEL_SESSIONS_DIR;
+  try {
+    const { active } = chooseRuntime(candidates(), loadConfig().pi);
+    if (active) return path.join(active.agentDir, 'sessions');
+  } catch { /* keep the default */ }
+  return path.join(os.homedir(), '.gentle-shell', 'agent', 'sessions');
+}
 
 // <base>/--<folder>--/ with the folder's `:`, `\` and `/` each turned into a dash (dots and spaces stay).
 const sessionsDirFor = (folder, base = baseDir()) => path.join(base, `--${String(folder).replace(/[:\\/]/g, '-')}--`);
@@ -239,4 +249,4 @@ async function startSession(id, orca = orcaTerminal) {
   } finally { starting.delete(key); }
 }
 
-module.exports = { liveFromSessions, sessionsDirFor, listSessions, readChat, chatState, sessionKeyFor, sessionsState, adoptSession, releaseSession, startSession, SESSION_ID };
+module.exports = { baseDir, liveFromSessions, sessionsDirFor, listSessions, readChat, chatState, sessionKeyFor, sessionsState, adoptSession, releaseSession, startSession, SESSION_ID };
