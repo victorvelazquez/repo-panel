@@ -164,8 +164,13 @@
     const col = within(Math.round(t * share(r.col, 0.25)), COL_MIN, t - CHAT_MIN - list);
     return { list, chat: t - list - col, col };
   }
-  // RP89: what the right column holds until its cards arrive (RP91, RP92): a small notice with the name of the open repo.
-  const columnNotice = (name) => `<div class="col-card">${name ? `<b class="col-name" title="${esc(name)}">${esc(name)}</b>` : ''}<p class="rs-sub">Tasks and files of this repo will appear here.</p></div>`;
+  // RP91 (S4, S5): what the right column holds: the TASKS card of the open repo (`tasksHtml` is R.tasksView's answer, drawn by the page; left out when empty) and, until RP92 fills it, a
+  // small notice where the files card will go. Total.
+  const columnView = (ctx) => {
+    const c = ctx && typeof ctx === 'object' ? ctx : {};
+    const tasks = typeof c.tasksHtml === 'string' && c.tasksHtml ? `<section class="col-card col-tasks" aria-label="Tasks${c.name ? ` of ${esc(c.name)}` : ''}"><h3 class="col-title">Tasks</h3>${c.tasksHtml}</section>` : '';
+    return `${tasks}<div class="col-card col-soon"><p class="rs-sub">Files with changes will appear here.</p></div>`;
+  };
   const liveOf = (c) => (c.info && c.info.live && c.info.live.state) || 'unknown';
   // The state of the adopted session, shown inside the composer frame (RP72). Icon + word, never colour alone.
   const SESS_TITLE = {
@@ -196,8 +201,9 @@
   function chatHead(c, ctx = {}) {
     const adopted = c.info && c.info.adopted;
     const tip = adopted ? `${ctx.name} · ${adopted.id}` : ctx.name;
-    const cur = ['tasks', 'changes', 'files'].includes(c.tab) ? c.tab : 'chat';
-    const tabs = [['chat', 'Chat'], ['tasks', 'Tasks'], ['changes', 'Changes'], ['files', 'Files']].map(([t, label]) => `<button type="button" role="tab" class="ch-tab" data-act="chat-tab" data-tab="${t}" aria-selected="${cur === t}">${label}</button>`).join('');
+    // RP91: with the right column in (`ctx.column`) the tasks are its card, so the chat has no Tasks tab; where there is no column (under 1100 px) the tab stays.
+    const cur = ['tasks', 'changes', 'files'].includes(c.tab) && !(ctx.column && c.tab === 'tasks') ? c.tab : 'chat';
+    const tabs = [['chat', 'Chat'], ['tasks', 'Tasks'], ['changes', 'Changes'], ['files', 'Files']].filter(([t]) => !(ctx.column && t === 'tasks')).map(([t, label]) => `<button type="button" role="tab" class="ch-tab" data-act="chat-tab" data-tab="${t}" aria-selected="${cur === t}">${label}</button>`).join('');
     return `<div class="ch-row"><b class="ch-name" title="${esc(tip)}">${esc(ctx.name)}</b><button type="button" class="x" data-act="chat-close" aria-label="Close the chat" title="Close the chat (Esc)">✕</button></div><div class="ch-tabs" role="tablist" aria-label="Panel">${tabs}</div>`;
   }
 
@@ -660,5 +666,5 @@
     return `${ctx.failed ? '<div class="rs-note" role="status">⚠ Summary unavailable: showing the last data we have.</div>' : ''}<div class="rs-list">${body}</div>${rows.length ? LEGEND : ''}`;
   }
 
-  return { esc, mdHtml, sessionChip, blockWidths, columnNotice, composerState, actionMenu, actionButtonsHtml, composerNote, chatHead, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, chatBody, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
+  return { esc, mdHtml, sessionChip, blockWidths, columnView, composerState, actionMenu, actionButtonsHtml, composerNote, chatHead, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, chatBody, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
 }));
