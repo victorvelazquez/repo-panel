@@ -31,7 +31,8 @@ function cleanText(value) {
 // The adopted session of the repo (config.json `sessions`), else `panel-<slug>` like the sessions the panel names itself.
 function sessionIdFor(repo, adopted) {
   if (adopted && typeof adopted.id === 'string' && SESSION_ID.test(adopted.id)) return adopted.id;
-  const slug = path.basename(repo.path).toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^[-.]+|[-.]+$/g, '').slice(0, 60);
+  // The last folder name with BOTH separators: `path.basename` only knows the ones of the platform, so a Windows path read on Linux would give the whole string.
+  const slug = (String(repo.path).split(/[\\/]/).filter((s) => s && !/^[A-Za-z]:$/.test(s)).pop() || '').toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^[-.]+|[-.]+$/g, '').slice(0, 60);
   return `panel-${slug || String(repo.id).replace(/[^A-Za-z0-9]/g, '').slice(0, 20) || 'repo'}`;
 }
 

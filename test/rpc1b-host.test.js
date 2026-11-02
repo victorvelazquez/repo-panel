@@ -3,7 +3,7 @@
 // rpc1b-client.test.js), so nothing is spawned here.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { createRpcHost } = require('../server/rpchost.js');
+const { createRpcHost, sessionIdFor } = require('../server/rpchost.js');
 const { RpcError } = require('../server/rpc.js');
 const { SESSION_ID } = require('../server/sessions.js');
 
@@ -241,6 +241,16 @@ test('h14: status carries state, pending dialogs and the session id; events are 
   assert.deepEqual(out[0], [a, { kind: 'dialog', requestId: 'd9', method: 'select', title: 'T' }]);
   assert.deepEqual(out[1], [a, { kind: 'event', record: { type: 'agent_start' } }]);
   assert.deepEqual(out[2], [a, { kind: 'event', record: { type: 'huge', truncated: true } }]);
+});
+
+test('h5b: the slug of panel-<slug> is the last folder with either separator, on any platform, and a root path falls back to the repo id', () => {
+  const slug = (p, id = 'ab1') => sessionIdFor({ path: p, id }, null);
+  assert.equal(slug('C:\\repos\\My App'), 'panel-my-app');
+  assert.equal(slug('/home/u/repos/my-app/'), 'panel-my-app');
+  assert.equal(slug('C:/repos/my-app'), 'panel-my-app');
+  assert.equal(slug('/', 'ab1'), 'panel-ab1', 'no folder name: the repo id, never a throw');
+  assert.equal(slug('C:\\'), 'panel-ab1');
+  for (const p of ['C:\\repos\\x y', '/a/b', '/', 'C:\\']) assert.match(slug(p), SESSION_ID);
 });
 
 test('h16: a start that was waiting for the runtime when closeAll ran creates no client, and the host works again afterwards', async () => {
