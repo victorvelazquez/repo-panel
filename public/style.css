@@ -371,7 +371,8 @@ button:is([data-cmd], [data-kind], header .primary, .empty .primary, .merge):dis
 .chip.chip-btn:hover { border-color: var(--muted); }
 
 /* ---------- RP54: chat panel next to the Summary cards ---------- */
-.chatlayout { display: flex; align-items: stretch; }
+/* RP89: the layout is a named container, so the column can appear from 1100 px of ITS width (the same width the page measures to size the blocks). */
+.chatlayout { display: flex; align-items: stretch; container-type: inline-size; container-name: sum; }
 /* An author `display` beats the browser's `[hidden] { display: none }`: every block the page hides with the attribute and that gets a display rule needs this line (RP71). */
 .chatlayout[hidden], .queue[hidden], .composer[hidden] { display: none; }
 #conformityView[hidden] { display: none; }
@@ -379,17 +380,29 @@ button:is([data-cmd], [data-kind], header .primary, .empty .primary, .merge):dis
 body.tab-conformity #viewbar { display: none; }
 .chatlayout #summary { flex: 1 1 0; min-width: 0; }
 .chatlayout.chat-open { height: calc(100vh - 140px); min-height: 480px; }
-.chatlayout.chat-open #summary { max-width: none; margin: 0; min-width: 360px; overflow: auto; }
+.chatlayout.chat-open #summary { flex: none; width: var(--list-w, 25%); max-width: none; margin: 0; min-width: 260px; overflow: auto; }
 .rs-card[data-act="chat-open"] { cursor: pointer; }
 .rs-card[data-act="chat-open"]:hover { border-color: #3a4553; }
 .rs-card[aria-current="true"] { border-color: var(--blue); background: #12253d; }
 .rs-card:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
-#split { flex: none; width: 10px; cursor: col-resize; position: relative; touch-action: none; background: var(--panel); border-left: 1px solid var(--line); }
-#split::after { content: ""; position: absolute; top: 50%; left: 50%; width: 4px; height: 36px; transform: translate(-50%, -50%); border-radius: 2px; background: var(--line); }
-#split:hover::after, #split:focus-visible::after { background: var(--blue); }
-#split:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
+#split, #split2 { flex: none; width: 10px; cursor: col-resize; position: relative; touch-action: none; background: var(--panel); border-left: 1px solid var(--line); }
+#split::after, #split2::after { content: ""; position: absolute; top: 50%; left: 50%; width: 4px; height: 36px; transform: translate(-50%, -50%); border-radius: 2px; background: var(--line); }
+#split:hover::after, #split:focus-visible::after, #split2:hover::after, #split2:focus-visible::after { background: var(--blue); }
+#split:focus-visible, #split2:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
 #split[hidden], #chat[hidden] { display: none; }
-#chat { flex: none; width: var(--chat-w, 460px); min-width: 340px; display: flex; flex-direction: column; min-height: 0; background: var(--panel); }
+#split2[hidden], #col[hidden] { display: none; }
+#chat { flex: 1 1 0; min-width: 340px; display: flex; flex-direction: column; min-height: 0; background: var(--panel); }
+/* RP89: the right column (RP91 and RP92 will fill it); out below 1100 px of layout. */
+#col, #split2 { display: none; }
+#col { flex: none; width: var(--col-w, 25%); min-width: 220px; flex-direction: column; min-height: 0; overflow: auto; background: var(--panel); border-left: 1px solid var(--line); }
+@container sum (min-width: 1100px) {
+  #col { display: flex; }
+  #split2 { display: block; }
+}
+#colBody { padding: 12px; display: grid; gap: 8px; align-content: start; }
+.col-card { border: 1px solid var(--line); border-radius: 8px; background: var(--panel2); padding: 10px 12px; display: grid; gap: 6px; min-width: 0; }
+.col-card p { margin: 0; }
+.col-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ch-head { border-bottom: 1px solid var(--line); }
 .ch-row { display: flex; align-items: center; gap: 8px; padding: 10px 14px; min-width: 0; }
 /* RP63: the Chat / Tasks tabs of the right panel and the task list. */
@@ -468,8 +481,8 @@ body.tab-conformity #viewbar { display: none; }
 .ch-last { margin-top: 4px; overflow-wrap: anywhere; }
 @media (max-width: 720px) {
   .chatlayout.chat-open { flex-direction: column; height: auto; }
-  .chatlayout.chat-open #summary { min-width: 0; max-height: 50vh; }
-  #split { display: none; }
+  .chatlayout.chat-open #summary { min-width: 0; max-height: 50vh; width: auto; }
+  #split, #split2 { display: none; }
   #chat { width: auto; min-width: 0; height: 60vh; border-top: 1px solid var(--line); }
 }
 
