@@ -20,7 +20,7 @@ const tabsOf = (h) => [...h.matchAll(/data-tab="(\w+)"/g)].map((m) => m[1]);
 // ---------- pure: the tab bar ----------
 test('t1: with a file open the bar gets ONE more tab, the last one, named after the file; it is selected only for the diff tab', () => {
   const h = R.chatHead({ id: 'abc', dfile: 'src/one.js', tab: 'diff' }, { name: 'demo' });
-  assert.deepEqual(tabsOf(h), ['chat', 'tasks', 'changes', 'files', 'diff']);
+  assert.deepEqual(tabsOf(h), ['chat', 'tasks', 'changes', 'files', 'notes', 'diff']);
   assert.match(h, /<button type="button" role="tab" class="ch-tab" data-act="chat-tab" data-tab="diff" title="src\/one\.js" aria-selected="true">one\.js<\/button>/);
   assert.match(h, /data-tab="chat"[^>]*aria-selected="false"/);
   const back = R.chatHead({ id: 'abc', dfile: 'src/one.js', tab: 'chat' }, { name: 'demo' });
@@ -31,7 +31,7 @@ test('t1: with a file open the bar gets ONE more tab, the last one, named after 
 test('t2: the diff tab has its own close button, labelled with the path, next to it (not inside the tab button)', () => {
   const h = R.chatHead({ id: 'abc', dfile: 'src/one.js', tab: 'diff' }, { name: 'demo' });
   assert.match(h, /<span class="ch-dtab">[^]*data-tab="diff"[^]*<button type="button" class="ch-dclose" data-act="diff-close" aria-label="Close the diff of src\/one\.js" title="Close the diff">✕<\/button><\/span>/);
-  assert.equal((h.match(/<button/g) || []).length, 4 + 1 + 1 + 1, 'four standard tabs, the diff tab, its close button and the close of the chat');
+  assert.equal((h.match(/<button/g) || []).length, 5 + 1 + 1 + 1, 'five standard tabs, the diff tab, its close button and the close of the chat');
 });
 
 test('t3: without a file there is no diff tab, and a "diff" tab without a file reads as the chat', () => {
@@ -52,7 +52,7 @@ test('t4: the name is the last part of the path (either slash), the whole path i
 
 test('t5: with the column in the diff tab is still there, after Chat and Files (RP92: the Changes tab is the files card)', () => {
   const h = R.chatHead({ id: 'abc', dfile: 'x.js', tab: 'chat' }, { name: 'demo', column: true });
-  assert.deepEqual(tabsOf(h), ['chat', 'files', 'diff']);
+  assert.deepEqual(tabsOf(h), ['chat', 'files', 'notes', 'diff']);
 });
 
 // ---------- pure: the viewer for ONE file ----------

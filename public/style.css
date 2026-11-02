@@ -557,3 +557,9 @@ body.tab-conformity #viewbar { display: none; }
 .ch-ask-error { margin-top: 4px; font-size: 12px; color: var(--red); }
 
 .ch-ask-warn { margin: 6px 0 2px; font-size: 12px; font-weight: 600; color: var(--yellow); }
+/* RP93b: the Notes tab. The textarea fills the block; the status line stays below it. */
+.notes { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; }
+.notes-box { flex: 1; min-height: 0; width: 100%; box-sizing: border-box; resize: none; font: 13px/1.5 ui-monospace, Consolas, monospace; background: var(--panel); }
+.notes-box:focus-visible, .btn-sm:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.notes-status { flex: none; font-size: 12px; color: var(--muted); }
+.btn-sm { font-size: 12px; padding: 2px 8px; }
