@@ -20,7 +20,8 @@ function code(line) {
 }
 const files = (dir, ext) => fs.readdirSync(path.join(ROOT, dir)).filter((n) => n.endsWith(ext)).map((n) => path.join(dir, n));
 
-const VISIBLE = [...files('public', '.js'), 'public/index.html', ...files('server', '.js'), 'lib.js', 'checks.js'];
+// RPC1a (S11): server/piruntime.js names the two runtimes on purpose, because the person chooses between them.
+const VISIBLE = [...files('public', '.js'), 'public/index.html', ...files('server', '.js').filter((f) => !f.endsWith('piruntime.js')), 'lib.js', 'checks.js'];
 
 test('no visible text names pi or Gentle Shell (source files)', () => {
   const found = [];
@@ -37,7 +38,7 @@ test('the README talks about "the session", never "the pi session", and names Ge
   const readme = fs.readFileSync(path.join(ROOT, 'README.md'), 'utf8');
   const found = readme.split(/\r?\n/).map((l, i) => [i + 1, l]).filter(([, l]) => /\b[Pp]i sessions?\b/.test(l)).map(([n, l]) => `README.md:${n}: ${l.slice(0, 90)}`);
   assert.deepEqual(found, []);
-  assert.ok((readme.match(/Gentle Shell/g) || []).length <= 3, 'Gentle Shell stays in the technical recognition and folder notes only');
+  assert.ok((readme.match(/Gentle Shell/g) || []).length <= 5, 'Gentle Shell stays in the technical recognition, folder and runtime-choice (RPC1a) notes only');
 });
 
 test('the guard itself catches what it must and lets the internal names through', () => {

@@ -9,7 +9,8 @@ const view = require('../public/view.js');
 const { HttpError } = require('./errors.js');
 const { git, firstLine, withContext, withPriority, singleFlight, stats } = require('./exec.js');
 const { createPerf } = require('./perf.js');
-const { loadConfig, findRepo, roomIssues } = require('./config.js');
+const { loadConfig, saveConfig, findRepo, roomIssues } = require('./config.js');
+const { resolveRuntime, handshake } = require('./piruntime.js');
 const { localState, diffText } = require('./local.js');
 const { listFiles, readFile } = require('./files.js');
 const { readNotes, saveNotes } = require('./notes.js');
@@ -39,6 +40,25 @@ const CATCH_UP_POSTS = new Set(['POST /api/merge', 'POST /api/rerun', 'POST /api
 // No client, no work: a store that has never been asked (awake() false) is left alone; a store without awake() is always called.
 const catchUp = (store, id) => { if (store && (typeof store.awake !== 'function' || store.awake())) Promise.resolve().then(() => store.catchUp(id)).catch(() => {}); };
 const query = (u) => Object.fromEntries(new URL(u, 'http://x').searchParams);
+
+// What the page may know of the runtimes: ids, labels, versions and state; never a command or a folder.
+const piState = (r) => ({
+  mode: r.mode,
+  active: r.active ? r.active.id : null,
+  ...(r.problem ? { problem: r.problem } : {}),
+  candidates: r.candidates.map((c) => ({ id: c.id, label: c.label, version: c.version, available: c.available, ...(c.reason ? { reason: c.reason } : {}), active: !!(r.active && r.active.id === c.id) })),
+});
+
+// RPC1a: only `auto` or the id of a runtime detected as available can be chosen; the body carries nothing else (no command, no folder).
+async function setPiRuntime(b, deps) {
+  const found = await resolveRuntime(deps);
+  const allowed = new Set(['auto', ...found.candidates.filter((c) => c.available).map((c) => c.id)]);
+  const keys = b && typeof b === 'object' && !Array.isArray(b) ? Object.keys(b) : null;
+  if (!keys || keys.length !== 1 || keys[0] !== 'runtime' || typeof b.runtime !== 'string' || !allowed.has(b.runtime)) throw new HttpError(400, 'runtime must be auto or a detected pi runtime');
+  const cfg = loadConfig();
+  saveConfig({ ...cfg, pi: { ...(cfg.pi || {}), runtime: b.runtime } });
+  return piState(await resolveRuntime(deps));
+}
 
 const routes = {
   'GET /api/config': () => {
@@ -80,7 +100,24 @@ const routes = {
   'GET /api/chat': (q, b, d) => chatState(q.id, q.session, q.limit, d.sessionsDir),
   // RP62: the Claude usage file, read on every request (no cache); a missing or broken file is a normal 200 with available false.
   'GET /api/usage': (q, b, d) => readUsage({ file: d.usageFile || usageFile() }),
-  'GET /api/prerequisites': () => prerequisites(),
+  'GET /api/prerequisites': (q, b, d) => prerequisites(undefined, d.piRuntime ? () => resolveRuntime(d.piRuntime) : undefined),
+  // RPC1a: spawns nothing unless ?check=1, which starts the active runtime once (`get_state`) and ends it.
+  'GET /api/pi-runtime': async (q, b, d) => {
+    const found = await resolveRuntime(d.piRuntime);
+    const out = piState(found);
+    if (q.check === '1') {
+      // The last check is reused for 5 s (ok or failed): the page cannot make the panel spawn the runtime over and over.
+      const now = d.now || Date.now;
+      const id = found.active ? found.active.id : null;
+      if (!d.piCheck || d.piCheck.id !== id || now() - d.piCheck.at >= 5000) {
+        const check = found.active ? await handshake(found.active, d.piRuntime) : { ok: false, error: found.problem };
+        d.piCheck = { at: now(), id, check };
+      }
+      out.check = d.piCheck.check;
+    }
+    return out;
+  },
+  'POST /api/pi-runtime': (q, b, d) => setPiRuntime(b, d.piRuntime),
   'GET /api/diff': (q) => diffText(findRepo(q.id)),
   // RP65: the file explorer; the repo comes only from the config by id, the path is validated and matched against git's own listing.
   'GET /api/files': (q) => listFiles(findRepo(q.id)),

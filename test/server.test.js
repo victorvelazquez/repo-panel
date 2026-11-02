@@ -785,17 +785,17 @@ test('GET /api/requirements: an unknown base branch makes the dependent checks u
   });
 });
 
-test('GET /api/prerequisites needs the token and answers git, gh and orca without failing', async () => {
+test('GET /api/prerequisites needs the token and answers git, gh, orca and pi without failing', async () => {
   await withPanel({}, async ({ getApi }) => {
     assert.equal((await getApi('/api/prerequisites', false)).status, 401);
     const r = await getApi('/api/prerequisites');
     assert.equal(r.status, 200);
-    assert.deepEqual(r.json.items.map((i) => i.id), ['git', 'gh', 'orca']);
+    assert.deepEqual(r.json.items.map((i) => i.id), ['git', 'gh', 'orca', 'pi']); // RPC1a added pi
     for (const i of r.json.items) { assert.equal(typeof i.ok, 'boolean'); assert.equal(typeof i.detail, 'string'); }
   });
 });
 
-test('prerequisites: runs the three fixed commands; a missing tool is ok false, never a throw', async () => {
+test('prerequisites: runs the three fixed commands (pi is detected apart); a missing tool is ok false, never a throw', async () => {
   const { prerequisites } = require('../server/requirements.js');
   const calls = [];
   const runner = async (cmd, args) => {
@@ -804,12 +804,13 @@ test('prerequisites: runs the three fixed commands; a missing tool is ok false, 
     if (cmd === 'gh') return { code: 1, stdout: '', stderr: 'You are not logged into any GitHub hosts.\n' };
     return { code: -1, stdout: '', stderr: '' };
   };
-  const { items } = await prerequisites(runner);
+  const { items } = await prerequisites(runner, async () => ({ active: null, mode: 'auto', problem: 'none' })); // RPC1a: a fake detection, nothing real runs
   assert.deepEqual(calls, ['git --version', 'gh auth status', 'orca --version']);
   assert.deepEqual(items, [
     { id: 'git', ok: true, detail: 'git version 2.50.0' },
     { id: 'gh', ok: false, detail: 'You are not logged into any GitHub hosts.' },
     { id: 'orca', ok: false, detail: 'not available' },
+    { id: 'pi', ok: false, detail: 'none' },
   ]);
 });
 

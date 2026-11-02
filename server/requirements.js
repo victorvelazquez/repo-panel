@@ -9,6 +9,7 @@ const lib = require('../lib.js');
 const { run, git, firstLine } = require('./exec.js');
 const { roomOf, roomByPath } = require('./config.js');
 const { remoteFile } = require('./roadmap.js');
+const { resolveRuntime } = require('./piruntime.js');
 
 const REGISTRY_PATH = path.join(__dirname, '..', 'requirements.json');
 let registry = null;
@@ -74,15 +75,23 @@ const TOOLS = [
   { id: 'orca', cmd: 'orca', args: ['--version'] },
 ];
 
-// The runner is injectable so tests do not need the real tools. A missing tool is ok:false, never an error.
-async function prerequisites(runner = run) {
+// RPC1a: the pi item says which runtime the panel uses, its version and how it was chosen (or why none can be).
+async function piItem(resolve) {
+  const r = await Promise.resolve().then(resolve).catch(() => null);
+  if (!r) return { id: 'pi', ok: false, detail: 'could not detect pi' };
+  if (!r.active) return { id: 'pi', ok: false, detail: r.problem || 'not available' };
+  return { id: 'pi', ok: true, detail: `${r.active.label}${r.active.version ? ` ${r.active.version}` : ''} (${r.mode})` };
+}
+
+// The runner and the pi detection are injectable so tests do not need the real tools. A missing tool is ok:false, never an error.
+async function prerequisites(runner = run, resolve = () => resolveRuntime()) {
   const items = await Promise.all(TOOLS.map(async ({ id, cmd, args }) => {
     const r = await runner(cmd, args, { timeout: 15000 }).catch(() => ({ code: -1, stdout: '', stderr: '' }));
     const ok = r.code === 0;
     const detail = ok ? firstLine(r.stdout) || firstLine(r.stderr) : firstLine(r.stderr) || firstLine(r.stdout);
     return { id, ok, detail: detail || (ok ? 'ok' : 'not available') };
   }));
-  return { items };
+  return { items: [...items, await piItem(resolve)] };
 }
 
 // The version of the whole set of rules, written in requirements.json: the order cites it and each repo records it.

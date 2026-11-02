@@ -1,5 +1,5 @@
 'use strict';
-// Config file: groups of repos, rooms, snoozed PRs, dismissed warnings, adopted pi sessions and the manual priority order. REPO_PANEL_CONFIG picks the file.
+// Config file: groups of repos, rooms, snoozed PRs, dismissed warnings, adopted pi sessions, the pi runtime and the manual priority order. REPO_PANEL_CONFIG picks the file.
 const fs = require('node:fs');
 const path = require('node:path');
 const lib = require('../lib.js');
@@ -87,6 +87,19 @@ function cleanSessions(map) {
   return out;
 }
 
+const PI_RUNTIMES = ['auto', 'gentle-shell', 'pi'];
+
+// The `pi` setting: which pi the panel runs. `runtime` is one of PI_RUNTIMES; `command` and `agentDir` are only ever written by hand in
+// the file (the browser cannot set them) and are validated again before use. Anything else is dropped.
+function cleanPi(v) {
+  const out = {};
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return out;
+  if (PI_RUNTIMES.includes(v.runtime)) out.runtime = v.runtime;
+  if (typeof v.command === 'string') out.command = v.command;
+  if (typeof v.agentDir === 'string') out.agentDir = v.agentDir;
+  return out;
+}
+
 function loadConfig() {
   let cfg = {};
   try { cfg = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8')); } catch { /* first run */ }
@@ -105,6 +118,8 @@ function loadConfig() {
     ...(cleaned ? { rooms: cleaned.rooms } : {}),
     // The pi session the panel adopted per repo and room; written back only when present.
     ...(cfg.sessions !== undefined ? { sessions: cleanSessions(cfg.sessions) } : {}),
+    // Which pi the panel runs; written back only when present.
+    ...(cfg.pi !== undefined ? { pi: cleanPi(cfg.pi) } : {}),
     // Optional manual order of the "Go work on" strip; written back only when present.
     ...(Array.isArray(cfg.priority) ? { priority: cleanPriority(cfg.priority) } : {}),
   };
@@ -155,4 +170,4 @@ function roomByPath(p) {
   return (loadConfig().rooms || []).find((r) => normPath(r.path) === want) || null;
 }
 
-module.exports = { loadConfig, saveConfig, findRepo, roomOf, roomByPath, roomIssues, nameProblem, pathProblem, ROOM_NAME_MAX, ROOMS_NOT_LIST };
+module.exports = { loadConfig, saveConfig, findRepo, roomOf, roomByPath, roomIssues, PI_RUNTIMES, nameProblem, pathProblem, ROOM_NAME_MAX, ROOMS_NOT_LIST };
