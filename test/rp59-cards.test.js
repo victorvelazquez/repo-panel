@@ -475,10 +475,11 @@ test('the page tolerates stubs without dataset, querySelectorAll or activeElemen
 });
 
 // ---------- style and contract ----------
-test('style: compact card rules, a container query below 520px, no table/KPI rules, focus and reduced motion kept', () => {
+test('style: compact card rules, the list as a named container with queries by card width (RP88), no table/KPI rules, focus and reduced motion kept', () => {
   const css = fs.readFileSync(path.join(PUBLIC, 'style.css'), 'utf8');
-  assert.match(css, /\.rs-panel\s*\{[^}]*container-type:\s*inline-size/);
-  assert.match(css, /@container \(max-width:\s*520px\)/);
+  assert.match(css, /\.rs-list\s*\{[^}]*container-type:\s*inline-size/);
+  assert.match(css, /@container cards \(max-width:\s*320px\)/);
+  assert.match(css, /@container cards \(min-width:\s*640px\)/);
   assert.match(css, /\.rs-card\.ask\s*\{[^}]*border-left:[^}]*var\(--yellow\)/);
   assert.match(css, /\.rs-card\.block\s*\{[^}]*border-left:[^}]*var\(--red\)/);
   assert.match(css, /\.rs-card[^{]*:focus-visible|\.rs-panel :focus-visible/);

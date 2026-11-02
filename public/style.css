@@ -275,7 +275,7 @@ body.tab-summary #workTools, body.tab-work #summaryTools { display: none; }
 .rs-tabs button { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; padding: 8px 14px; color: var(--muted); }
 .rs-tabs button[aria-selected="true"] { color: var(--text); border-bottom-color: var(--blue); }
 .rs-tabs button:focus-visible, .rs-scope button:focus-visible, .rs-panel :focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
-.rs-panel { padding: 12px 16px; max-width: 1360px; margin: 0 auto; container-type: inline-size; }
+.rs-panel { padding: 12px 16px; max-width: 1360px; margin: 0 auto; }
 .rs-note { margin-bottom: 10px; padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--yellow); background: #251d08; border: 1px solid #53410f; }
 /* RP61: header (global), tabs, then the view bar: shared filters on the left, the view's own controls on the right. */
 .viewbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
@@ -288,20 +288,25 @@ details.pop[open] > summary { border-color: var(--blue); }
 details.pop > summary:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 .pop-body { position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; width: 250px; display: grid; gap: 8px; padding: 10px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px rgba(0, 0, 0, .45); }
 .pop-body .opt { justify-content: space-between; }
-.rs-list { display: flex; flex-direction: column; gap: 8px; }
+/* RP88: the list is a named container, so a query sees the width of every card (the cards fill it): the stacked card is the default, up to 320 px the time goes, from 640 px the card is the horizontal one it always was. */
+.rs-list { display: flex; flex-direction: column; gap: 8px; container-type: inline-size; container-name: cards; }
 .rs-group { align-self: stretch; text-align: left; background: transparent; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; padding: 4px 2px; margin-top: 4px; }
 .rs-card { background: var(--panel); border: 1px solid #222a33; border-radius: 8px; padding: 8px 12px; display: grid; gap: 6px; }
 .rs-card.ask { border-left: 3px solid var(--yellow); }
 .rs-card.block { border-left: 3px solid var(--red); }
 .rs-room { border-color: var(--purple); }
 .chip.purple { color: var(--purple); border-color: var(--purple); background: var(--panel); }
-.rs-l1 { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.rs-name { font-size: 14px; white-space: nowrap; }
-.rs-branch { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.rs-spacer { flex: 1; }
+.rs-l1 { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; }
+.rs-name { font-size: 14px; flex: 1 1 55%; min-width: 0; order: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rs-l1 > .chip { order: 2; }
+.rs-branch { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1 1 55%; order: 3; }
 .rs-when, .rs-count { white-space: nowrap; }
-.rs-l2 { display: grid; grid-template-columns: minmax(110px, 170px) minmax(0, 1fr) auto; gap: 12px; align-items: center; }
-.rs-l2 button { padding: 2px 10px; }
+.rs-when { order: 4; }
+.rs-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; flex: 1 1 100%; order: 5; }
+.rs-l1 > .rs-stale { order: 6; }
+.rs-spacer { display: none; }
+.rs-l2 { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px 12px; align-items: center; }
+.rs-l2 button { padding: 2px 10px; width: 100%; }
 .rs-prog { display: flex; align-items: center; gap: 8px; }
 .rs-next { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .rs-err { color: var(--red); }
@@ -311,9 +316,18 @@ details.pop > summary:focus-visible { outline: 2px solid var(--blue); outline-of
 .rs-done { background: var(--green); } .rs-pr { background: var(--blue); } .rs-blk { background: var(--red); } .rs-pend { background: #3a4350; }
 .rs-legend { display: flex; flex-wrap: wrap; gap: 14px; color: var(--muted); font-size: 12px; margin: 10px 2px; }
 .rs-key { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
-@container (max-width: 520px) {
-  .rs-l2 { grid-template-columns: minmax(0, 1fr) auto; }
-  .rs-l2 .rs-prog { grid-column: 1 / -1; order: 2; }
+@container cards (max-width: 320px) {
+  .rs-when { display: none; }
+}
+@container cards (min-width: 640px) {
+  .rs-l1 { flex-wrap: nowrap; }
+  .rs-name, .rs-branch, .rs-chips, .rs-when, .rs-l1 > .chip, .rs-l1 > .rs-stale { order: 0; }
+  .rs-name { flex: 0 0 auto; }
+  .rs-branch { flex: 0 1 auto; max-width: 26ch; }
+  .rs-chips { flex: 0 1 auto; }
+  .rs-spacer { display: block; flex: 1; }
+  .rs-l2 { grid-template-columns: minmax(110px, 170px) minmax(0, 1fr) auto; }
+  .rs-l2 button { width: auto; }
 }
 
 /* ---------- RP67: soft action palette (calm look) ----------
