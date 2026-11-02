@@ -12,6 +12,7 @@ const { createPerf } = require('./perf.js');
 const { loadConfig, findRepo, roomIssues } = require('./config.js');
 const { localState, diffText } = require('./local.js');
 const { listFiles, readFile } = require('./files.js');
+const { readNotes, saveNotes } = require('./notes.js');
 const { prState, mergePr, rerunFailed } = require('./github.js');
 const { roadmapState } = require('./roadmap.js');
 const { addRepo, removeRepo, setSnoozed, setDismissed, scanFolder } = require('./repos.js');
@@ -84,6 +85,9 @@ const routes = {
   // RP65: the file explorer; the repo comes only from the config by id, the path is validated and matched against git's own listing.
   'GET /api/files': (q) => listFiles(findRepo(q.id)),
   'GET /api/file': (q) => readFile(findRepo(q.id), q.path),
+  // RP93: the notes of a repo, one fixed file (see server/notes.js); the repo comes from the config by id, never a path from the page.
+  'GET /api/notes': (q) => readNotes(findRepo(q.id)),
+  'POST /api/notes': (q, b) => saveNotes(findRepo(b && b.id), b),
   'POST /api/fetch': async (q, b) => {
     const repo = findRepo(b.id);
     const r = await git(repo.path, ['fetch', '--prune', '--quiet']);
