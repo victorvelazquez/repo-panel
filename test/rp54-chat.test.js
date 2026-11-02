@@ -222,16 +222,12 @@ test('a fake Orca records no send during the sessions and chat reads', async () 
 });
 
 // ---------- Part B: pure helpers ----------
-test('chatWidth: 40% by default, 50% under 1100, chat >= 340 and cards >= 360, clamped', () => {
-  assert.equal(R.chatWidth(1390, null), 556);
-  assert.equal(R.chatWidth(1000, null), 500);
-  assert.equal(R.chatWidth(1390, 0.5), 695);
-  assert.equal(R.chatWidth(1390, 0.1), 340);
-  assert.equal(R.chatWidth(1390, 0.9), 1030);
-  assert.equal(R.chatWidth(1390, 5), 1030);
-  assert.equal(R.chatWidth(1390, -1), 556);
-  assert.equal(R.chatWidth(1390, NaN), 556);
-  assert.equal(R.chatWidth(600, null), 340);
+test('blockWidths (RP89, it replaced chatWidth): 25 | 50 | 25 by default, the chat is what is left and never under 340, two blocks without the column', () => {
+  assert.deepEqual(R.blockWidths(1380, null), { list: 345, chat: 690, col: 345 });
+  assert.equal(R.blockWidths(1380, { list: 0.6, col: 0.6 }).chat, 340);
+  assert.deepEqual(R.blockWidths(990, null, { column: false }), { list: 495, chat: 495, col: 0 });
+  assert.equal(R.blockWidths(990, { list: 0.9 }, { column: false }).chat, 340);
+  assert.equal(R.chatWidth, undefined, 'the single chat width is gone');
 });
 
 const card = (o = {}) => ({
@@ -382,14 +378,14 @@ const ADOPTED = { key: 'abc', adopted: { id: 's1', name: 'panel:demo', adoptedAt
 const HIST = { key: 'abc', sessionId: 's1', found: true, items: [{ role: 'user', text: 'hello there', at: null, tools: [] }], truncated: false, updatedAt: null };
 const chatTick = (page) => page.intervals.find((i) => i.ms === 5000).fn;
 
-test('index.html: the static wrapper, the divider, the chat aside and the read-only footer', () => {
+test('index.html: the static wrapper, the dividers, the chat aside, the column and the read-only footer', () => {
   const html = fs.readFileSync(path.join(PUBLIC, 'index.html'), 'utf8');
-  assert.match(html, /<div id="sumLayout" class="chatlayout">\s*<section id="summary"[^>]*><\/section>\s*<div id="split" role="separator" aria-orientation="vertical" tabindex="0" aria-label="Adjust the chat width \(left and right arrows; double click to reset\)" hidden><\/div>\s*<aside id="chat" hidden aria-label="Chat">/);
+  assert.match(html, /<div id="sumLayout" class="chatlayout">\s*<section id="summary"[^>]*><\/section>\s*<div id="split" role="separator" aria-orientation="vertical" tabindex="0" aria-label="Adjust the list width \(left and right arrows; double click to reset\)" hidden><\/div>\s*<aside id="chat" hidden aria-label="Chat">/);
   assert.match(html, /id="chatHead"/);
   assert.match(html, /id="chatBody"[^>]*role="log"[^>]*aria-live="polite"|id="chatBody"[^>]*aria-live="polite"[^>]*role="log"/);
   const aside = /<aside id="chat"[\s\S]*?<\/aside>/.exec(html);
   assert.ok(aside && /id="composer"/.test(aside[0]) && /<textarea[^>]*id="msgBox"/.test(aside[0]) && /id="msgSend"/.test(aside[0]), 'the composer lives inside the aside');
-  assert.match(html, /<\/aside>\s*<\/div>\s*<div id="work"/);
+  assert.match(html, /<\/aside>\s*<\/div>\s*<div id="work"/, 'the layout still closes right before the Work tab');
 });
 
 test('the tab toggles the WRAPPER, not #summary: the chat exists only in Summary', () => {
@@ -587,48 +583,49 @@ test('safety: the chat code never reaches /api/pi or an Orca send, and Summary r
 function withDivider(page, width = 1400) {
   seed(page);
   page.get('#sumLayout').clientWidth = width;
-  page.get('#sumLayout').getBoundingClientRect = () => ({ right: width, width });
+  page.get('#sumLayout').getBoundingClientRect = () => ({ left: 0, right: width, width });
   page.get('#split').offsetWidth = 10;
+  page.get('#split2').offsetWidth = 10;
   page.run("ACTIONS['chat-open']({ dataset: { id: 'abc' } })");
   page.flush();
 }
-const widthOf = (page) => page.get('#chat').style['--chat-w'];
-const ls = (page) => page.store['repo-panel.chatRatio'];
+const listWidth = (page) => page.get('#summary').style['--list-w'];
+const ls = (page) => page.store['repo-panel.layout'];
 const fireOn = (el, type, e = {}) => { for (const fn of el.listeners[type] || []) fn({ type, preventDefault() {}, ...e }); };
 
-test('divider: default width, ArrowLeft/ArrowRight move 24 px and persist the ratio, Enter and double click reset', () => {
+test('divider (RP89: the list separator): default width, the arrows move 24 px and persist the shares, Enter and double click reset', () => {
   const page = loadPage();
   withDivider(page);
   const split = page.get('#split');
-  assert.equal(widthOf(page), '556px');
+  assert.equal(listWidth(page), '345px');
+  fireOn(split, 'keydown', { key: 'ArrowRight' });
+  assert.equal(listWidth(page), '369px');
+  assert.ok(Math.abs(JSON.parse(ls(page)).list - 369 / 1380) < 1e-9);
   fireOn(split, 'keydown', { key: 'ArrowLeft' });
-  assert.equal(widthOf(page), '580px');
-  assert.ok(Math.abs(Number(ls(page)) - 580 / 1390) < 1e-9);
-  fireOn(split, 'keydown', { key: 'ArrowRight' });
-  fireOn(split, 'keydown', { key: 'ArrowRight' });
-  assert.equal(widthOf(page), '532px');
+  fireOn(split, 'keydown', { key: 'ArrowLeft' });
+  assert.equal(listWidth(page), '321px');
   fireOn(split, 'keydown', { key: 'Enter' });
-  assert.equal(widthOf(page), '556px');
+  assert.equal(listWidth(page), '345px');
   assert.equal(ls(page), undefined);
-  fireOn(split, 'keydown', { key: 'ArrowLeft' });
+  fireOn(split, 'keydown', { key: 'ArrowRight' });
   assert.ok(ls(page));
   fireOn(split, 'dblclick');
-  assert.equal(widthOf(page), '556px');
+  assert.equal(listWidth(page), '345px');
   assert.equal(ls(page), undefined);
 });
 
-test('divider: the minimums hold, a stored ratio is used on load, and a resize recomputes', () => {
+test('divider: the minimums hold and a resize recomputes (under 1100 px the list is half)', () => {
   const page = loadPage();
   withDivider(page);
   const split = page.get('#split');
-  for (let i = 0; i < 40; i++) fireOn(split, 'keydown', { key: 'ArrowRight' });
-  assert.equal(widthOf(page), '340px');
   for (let i = 0; i < 80; i++) fireOn(split, 'keydown', { key: 'ArrowLeft' });
-  assert.equal(widthOf(page), `${1390 - 360}px`);
+  assert.equal(listWidth(page), '260px');
+  for (let i = 0; i < 80; i++) fireOn(split, 'keydown', { key: 'ArrowRight' });
+  assert.equal(listWidth(page), `${1380 - 340 - 220}px`, 'the chat keeps 340 and the column 220');
   fireOn(split, 'dblclick');
   page.get('#sumLayout').clientWidth = 1000;
   for (const fn of page.winL.resize || []) fn({ type: 'resize' });
-  assert.equal(widthOf(page), '495px', 'under 1100 px the default is 50/50');
+  assert.equal(listWidth(page), '495px', 'under 1100 px the default is 50/50');
   assert.ok((page.winL.resize || []).length >= 1);
 });
 
@@ -640,14 +637,14 @@ test('divider: pointer drag with capture follows the pointer; without the option
   split.setPointerCapture = (id) => captured.push(id);
   split.releasePointerCapture = () => captured.push('released');
   fireOn(split, 'pointermove', { pointerId: 1, clientX: 500 });
-  assert.equal(widthOf(page), '556px', 'a move without a press does nothing');
+  assert.equal(listWidth(page), '345px', 'a move without a press does nothing');
   fireOn(split, 'pointerdown', { pointerId: 1 });
-  fireOn(split, 'pointermove', { pointerId: 1, clientX: 900 });
-  assert.equal(widthOf(page), '495px');
+  fireOn(split, 'pointermove', { pointerId: 1, clientX: 505 });
+  assert.equal(listWidth(page), '500px');
   fireOn(split, 'pointerup', { pointerId: 1 });
   assert.deepEqual(captured, [1, 'released']);
   fireOn(split, 'pointermove', { pointerId: 1, clientX: 300 });
-  assert.equal(widthOf(page), '495px');
+  assert.equal(listWidth(page), '500px');
   assert.ok(ls(page));
   const bare = loadPage();
   withDivider(bare);

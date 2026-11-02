@@ -142,12 +142,30 @@
 
   // The chat panel (RP54, S48/S53). Pure like the rest: the page passes S.chat ({ id, info, hist, failed, starting }).
   const CHAT_MIN = 340;
-  const CARDS_MIN = 360;
-  // Width of the chat for a layout of `total` px: the stored ratio, or 40% (50% under 1100 px), never under 340 and never leaving the cards under 360.
-  const chatWidth = (total, ratio) => {
-    const r = ratio > 0 ? Math.min(0.9, Math.max(0.1, ratio)) : (total < 1100 ? 0.5 : 0.4);
-    return Math.max(CHAT_MIN, Math.min(Math.round(total * r), total - CARDS_MIN));
-  };
+  const LIST_MIN = 260;
+  const COL_MIN = 220;
+  // RP89 (S4, S10): the widths of the three blocks (list | chat | column) of the Summary with a repo open, for `total` px (the layout without its separators). `ratios` are the saved
+  // shares of the LIST and the COLUMN ({ list, col }, each a number between 0 and 1, else its default: 25% each, the chat is what is left, so 25 | 50 | 25). Minimums: list 260 (what
+  // the narrow card of RP88 needs), chat 340, column 220; when they cannot all fit the list goes first and the column takes what the chat leaves. With `column: false` (under 1100 px)
+  // there are two blocks and the list is half by default, as before. Total: a width that is not a positive number gives zeros; a width too small for the minimums is split 25 | 50 | 25.
+  const share = (v, dflt) => (typeof v === 'number' && Number.isFinite(v) && v > 0 && v < 1 ? v : dflt);
+  const within = (v, lo, hi) => Math.max(lo, Math.min(v, Math.max(lo, hi)));
+  function blockWidths(total, ratios, { column = true } = {}) {
+    if (typeof total !== 'number' || !Number.isFinite(total) || total <= 0) return { list: 0, chat: 0, col: 0 };
+    const t = Math.floor(total);
+    const r = ratios && typeof ratios === 'object' && !Array.isArray(ratios) ? ratios : {};
+    if (!column) {
+      if (t < LIST_MIN + CHAT_MIN) { const list = Math.floor(t / 2); return { list, chat: t - list, col: 0 }; }
+      const list = within(Math.round(t * share(r.list, 0.5)), LIST_MIN, t - CHAT_MIN);
+      return { list, chat: t - list, col: 0 };
+    }
+    if (t < LIST_MIN + CHAT_MIN + COL_MIN) { const list = Math.floor(t * 0.25); const col = Math.floor(t * 0.25); return { list, chat: t - list - col, col }; }
+    const list = within(Math.round(t * share(r.list, 0.25)), LIST_MIN, t - CHAT_MIN - COL_MIN);
+    const col = within(Math.round(t * share(r.col, 0.25)), COL_MIN, t - CHAT_MIN - list);
+    return { list, chat: t - list - col, col };
+  }
+  // RP89: what the right column holds until its cards arrive (RP91, RP92): a small notice with the name of the open repo.
+  const columnNotice = (name) => `<div class="col-card">${name ? `<b class="col-name" title="${esc(name)}">${esc(name)}</b>` : ''}<p class="rs-sub">Tasks and files of this repo will appear here.</p></div>`;
   const liveOf = (c) => (c.info && c.info.live && c.info.live.state) || 'unknown';
   // The state of the adopted session, shown inside the composer frame (RP72). Icon + word, never colour alone.
   const SESS_TITLE = {
@@ -642,5 +660,5 @@
     return `${ctx.failed ? '<div class="rs-note" role="status">⚠ Summary unavailable: showing the last data we have.</div>' : ''}<div class="rs-list">${body}</div>${rows.length ? LEGEND : ''}`;
   }
 
-  return { esc, mdHtml, sessionChip, chatWidth, composerState, actionMenu, actionButtonsHtml, composerNote, chatHead, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, chatBody, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
+  return { esc, mdHtml, sessionChip, blockWidths, columnNotice, composerState, actionMenu, actionButtonsHtml, composerNote, chatHead, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, chatBody, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
 }));

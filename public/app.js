@@ -860,11 +860,17 @@ function drawSummary() {
 // One chat for the whole Summary: the repo card that is open. It only READS (GET /api/sessions, GET /api/chat) and runs the
 // explicit Adopt and Start session buttons; the panel sends no text to any session from here.
 const CHAT_MS = 5000;
-const CHAT_KEY = 'repo-panel.chatRatio';
 const chatUrl = (path, id) => `${path}?id=${encodeURIComponent(id)}`;
 let chatShown = null;
-let chatRatio = null;
-try { const v = parseFloat(localStorage.getItem(CHAT_KEY)); if (v > 0.1 && v < 0.9) chatRatio = v; } catch { /* no storage: default width */ }
+// RP89 (S4): the three blocks of the Summary with a repo open (list | chat | column). The saved shares of the LIST and of the COLUMN ({ list, col }); the chat is what is left. The ratio the
+// old single divider saved measured another thing and is ignored. Under COLUMN_FROM px of layout the column is out (two blocks, as before).
+const LAYOUT_KEY = 'repo-panel.layout';
+const COLUMN_FROM = 1100;
+let layoutRatios = {};
+try {
+  const v = JSON.parse(localStorage.getItem(LAYOUT_KEY));
+  if (v && typeof v === 'object' && !Array.isArray(v)) for (const k of ['list', 'col']) if (typeof v[k] === 'number' && v[k] > 0 && v[k] < 1) layoutRatios[k] = v[k];
+} catch { /* no storage or a broken value: the default widths */ }
 
 // Opening a card reads with priority user and a signal that the next open or close aborts; the periodic poll does neither.
 let chatCtl = null;
@@ -989,37 +995,46 @@ function setChatTab(tab) {
   draw();
 }
 
-function chatWidthNow() {
-  const layout = $('#sumLayout');
-  const total = (layout.clientWidth || 0) - ($('#split').offsetWidth || 0);
-  return total > 0 && R ? { total, width: R.chatWidth(total, chatRatio) } : null;
+// The widths now: the layout without its separators (the column's separator only counts while the column is in), and the three blocks from the saved shares.
+function layoutNow() {
+  const width = $('#sumLayout').clientWidth || 0;
+  const column = width >= COLUMN_FROM;
+  const total = width - ($('#split').offsetWidth || 0) - (column ? ($('#split2').offsetWidth || 0) : 0);
+  return total > 0 && R ? { total, column, ...R.blockWidths(total, layoutRatios, { column }) } : null;
 }
-function applyChatWidth() {
-  const w = chatWidthNow();
+function applyLayout() {
+  const w = layoutNow();
   if (!w) return;
-  if ($('#chat').style.setProperty) $('#chat').style.setProperty('--chat-w', `${w.width}px`);
-  $('#split').setAttribute('aria-valuenow', String(Math.round((w.width / w.total) * 100)));
+  if ($('#summary').style.setProperty) $('#summary').style.setProperty('--list-w', `${w.list}px`);
+  if ($('#col').style.setProperty) $('#col').style.setProperty('--col-w', `${w.col}px`);
+  $('#split').setAttribute('aria-valuenow', String(Math.round((w.list / w.total) * 100)));
+  $('#split2').setAttribute('aria-valuenow', String(Math.round((w.col / w.total) * 100)));
 }
-function setChatWidth(px) {
-  const w = chatWidthNow();
+// Sets the list and/or the column to a width in px (the other keeps the one it has), keeps the minimums and saves the shares.
+function setBlocks({ list, col }) {
+  const w = layoutNow();
   if (!w) return;
-  chatRatio = R.chatWidth(w.total, px / w.total) / w.total;
-  try { localStorage.setItem(CHAT_KEY, String(chatRatio)); } catch { /* not persisted */ }
-  applyChatWidth();
+  const fixed = R.blockWidths(w.total, { list: (list ?? w.list) / w.total, col: (col ?? w.col) / w.total }, { column: w.column });
+  layoutRatios = { list: fixed.list / w.total, col: w.column ? fixed.col / w.total : layoutRatios.col ?? null };
+  try { localStorage.setItem(LAYOUT_KEY, JSON.stringify(layoutRatios)); } catch { /* not persisted */ }
+  applyLayout();
 }
-function resetChatWidth() {
-  chatRatio = null;
-  try { localStorage.removeItem(CHAT_KEY); } catch { /* nothing stored */ }
-  applyChatWidth();
+function resetLayout() {
+  layoutRatios = {};
+  try { localStorage.removeItem(LAYOUT_KEY); } catch { /* nothing stored */ }
+  applyLayout();
 }
 
 function drawChat() {
   const on = !!S.chat.id && !!R;
   $('#chat').hidden = !on;
   $('#split').hidden = !on;
+  $('#split2').hidden = !on;
+  $('#col').hidden = !on;
   if (document.body && document.body.classList) $('#sumLayout').classList.toggle('chat-open', on);
   if (!on) return;
-  applyChatWidth();
+  applyLayout();
+  paint($('#colBody'), R.columnNotice(nameOf(S.chat.id)));
   paint($('#chatHead'), R.chatHead(S.chat, { name: nameOf(S.chat.id) }));
   const tasksTab = S.chat.tab === 'tasks';
   const changesTab = S.chat.tab === 'changes';
@@ -1064,24 +1079,27 @@ function drawChat() {
   paint($('#msgNote'), R.composerNote(S.notes[id]));
 }
 
-const splitEl = $('#split');
-if (splitEl) {
+// One separator: drag it with the pointer, move it with the arrows (24 px) and reset all three blocks with Enter or a double click. `onDrag(clientX, rect, half)` and
+// `onStep(w, dir)` (dir is +1 for the right arrow, -1 for the left one) say what the separator moves.
+function wireSeparator(el, { onDrag, onStep }) {
+  if (!el) return;
   let dragging = false;
-  splitEl.addEventListener('pointerdown', (e) => { dragging = true; if (splitEl.setPointerCapture) splitEl.setPointerCapture(e.pointerId); });
-  splitEl.addEventListener('pointermove', (e) => {
-    if (dragging) setChatWidth($('#sumLayout').getBoundingClientRect().right - e.clientX - (splitEl.offsetWidth || 0) / 2);
+  el.addEventListener('pointerdown', (e) => { dragging = true; if (el.setPointerCapture) el.setPointerCapture(e.pointerId); });
+  el.addEventListener('pointermove', (e) => { if (dragging) onDrag(e.clientX, $('#sumLayout').getBoundingClientRect(), (el.offsetWidth || 0) / 2); });
+  const endDrag = (e) => { if (!dragging) return; dragging = false; if (el.releasePointerCapture) el.releasePointerCapture(e.pointerId); };
+  el.addEventListener('pointerup', endDrag);
+  el.addEventListener('pointercancel', endDrag);
+  el.addEventListener('keydown', (e) => {
+    const w = layoutNow();
+    if (e.key === 'Enter') resetLayout();
+    else if (w && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) { e.preventDefault(); onStep(w, e.key === 'ArrowRight' ? 1 : -1); }
   });
-  const endDrag = (e) => { if (!dragging) return; dragging = false; if (splitEl.releasePointerCapture) splitEl.releasePointerCapture(e.pointerId); };
-  splitEl.addEventListener('pointerup', endDrag);
-  splitEl.addEventListener('pointercancel', endDrag);
-  splitEl.addEventListener('keydown', (e) => {
-    const w = chatWidthNow();
-    if (e.key === 'Enter') resetChatWidth();
-    else if (w && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) { e.preventDefault(); setChatWidth(w.width + (e.key === 'ArrowLeft' ? 24 : -24)); }
-  });
-  splitEl.addEventListener('dblclick', resetChatWidth);
+  el.addEventListener('dblclick', resetLayout);
 }
-if (window.addEventListener) window.addEventListener('resize', applyChatWidth);
+// The list separator moves the list (its right edge follows the pointer); the column separator moves the column (its left edge follows the pointer, so left grows it).
+wireSeparator($('#split'), { onDrag: (x, rect, half) => setBlocks({ list: x - rect.left - half }), onStep: (w, dir) => setBlocks({ list: w.list + dir * 24 }) });
+wireSeparator($('#split2'), { onDrag: (x, rect, half) => setBlocks({ col: rect.right - x - half }), onStep: (w, dir) => setBlocks({ col: w.col - dir * 24 }) });
+if (window.addEventListener) window.addEventListener('resize', applyLayout);
 // ---------- end chat ----------
 
 // ---------- composer (RP68): free text to the adopted session ----------
