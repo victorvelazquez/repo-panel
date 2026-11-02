@@ -71,9 +71,9 @@ test('b6: it is total: a width that is not a positive number gives zeros, and ti
   }
 });
 
-test('b7 (RP91 replaced the single notice by R.columnView): the column always has the small files notice, and the tasks card only when there are tasks to show', () => {
+test('b7 (RP91 replaced the single notice by R.columnView; RP92 filled its files card): the column always has the files card (loading without facts), and the tasks card only when there are tasks to show', () => {
   const none = R.columnView({ name: 'demo' });
-  assert.match(none, /^<div class="col-card col-soon"><p class="rs-sub">Files with changes will appear here\.<\/p><\/div>$/);
+  assert.match(none, /^<section class="col-card col-files" aria-label="Files with changes of demo"><h3 class="col-title">Files<\/h3><p class="rs-sub" role="status">Loading files…<\/p><\/section>$/);
   assert.match(R.columnView({ name: 'a<b>"c', tasksHtml: '<p>T</p>' }), /aria-label="Tasks of a&lt;b&gt;&quot;c"/);
   assert.equal(R.columnNotice, undefined, 'the notice of RP89 is gone');
 });

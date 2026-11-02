@@ -1,7 +1,7 @@
 'use strict';
 // RP91 (S4, S5): the tasks of the open repo are a CARD in the right column (RP89), drawn by the same R.tasksView (done folded, the current one and the pending ones open, with the filter) and
 // read from /api/roadmap when the repo OPENS, not when a tab is chosen. The Tasks tab of the chat only shows where there is no column (under 1100 px of layout), so nobody loses the tasks;
-// with the column in, the tab is gone. Files will fill the second card (RP92): for now a small notice. The Claude usage stays in the header. No network, no timers, no real clock.
+// with the column in, the tab is gone. The files card (RP92) fills the second card. The Claude usage stays in the header. No network, no timers, no real clock.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -14,10 +14,10 @@ const PUBLIC = path.join(__dirname, '..', 'public');
 const css = fs.readFileSync(path.join(PUBLIC, 'style.css'), 'utf8').replace(/\r\n/g, '\n');
 
 // ---------- pure ----------
-test('c1: with the column in, the head has no Tasks tab (Chat, Changes, Files) and a Tasks tab left over reads as the chat; without the flag nothing changes', () => {
+test('c1 (RP92: no Changes tab either): with the column in, the head has no Tasks tab (Chat, Files) and a Tasks tab left over reads as the chat; without the flag nothing changes', () => {
   const h = R.chatHead({ id: 'abc', tab: 'tasks' }, { name: 'demo', column: true });
   const tabs = [...h.matchAll(/data-tab="(\w+)"/g)].map((m) => m[1]);
-  assert.deepEqual(tabs, ['chat', 'changes', 'files']);
+  assert.deepEqual(tabs, ['chat', 'files']);
   assert.match(h, /data-tab="chat"[^>]*aria-selected="true"/);
   const all = [...R.chatHead({ id: 'abc' }, { name: 'demo' }).matchAll(/data-tab="(\w+)"/g)].map((m) => m[1]);
   assert.deepEqual(all, ['chat', 'tasks', 'changes', 'files'], 'no column: the four tabs as before');
@@ -25,18 +25,18 @@ test('c1: with the column in, the head has no Tasks tab (Chat, Changes, Files) a
   assert.match(R.chatHead({ id: 'abc', tab: 'files' }, { name: 'demo', column: true }), /data-tab="files"[^>]*aria-selected="true"/);
 });
 
-test('c2: the column draws the tasks card (a title and the tasks inside) and then the small files notice; the repo name is escaped in the label', () => {
+test('c2: the column draws the tasks card (a title and the tasks inside) and then the files card (RP92); the repo name is escaped in the label', () => {
   const h = R.columnView({ name: 'a<b>"c', tasksHtml: '<p class="t">T</p>' });
   assert.match(h, /^<section class="col-card col-tasks" aria-label="Tasks of a&lt;b&gt;&quot;c"><h3 class="col-title">Tasks<\/h3><p class="t">T<\/p><\/section>/);
-  assert.match(h, /<div class="col-card col-soon"><p class="rs-sub">Files with changes will appear here\.<\/p><\/div>$/);
+  assert.match(h, /<section class="col-card col-files" aria-label="Files with changes of a&lt;b&gt;&quot;c">.*Loading files…<\/p><\/section>$/);
   assert.doesNotMatch(h, /<b>|a<b>/);
 });
 
-test('c3: without tasks to show (none, or empty) only the notice is drawn; it is total for odd input', () => {
+test('c3: without tasks to show (none, or empty) only the files card is drawn; it is total for odd input', () => {
   for (const arg of [{ name: 'x', tasksHtml: '' }, { name: 'x' }, { tasksHtml: undefined }, {}, undefined, null]) {
     const h = R.columnView(arg);
     assert.doesNotMatch(h, /col-tasks/, JSON.stringify(arg));
-    assert.match(h, /col-soon/);
+    assert.match(h, /col-files/);
     assert.doesNotMatch(h, /undefined|null/);
   }
   assert.equal(R.columnNotice, undefined, 'the single notice of RP89 is gone');
@@ -125,7 +125,7 @@ test('p1: with the column in, opening a repo reads its roadmap once and draws th
   assert.doesNotMatch(col(page), /Delivery of A1/, 'the completed one is folded');
   assert.equal(page.run('S.chat.tab || "chat"'), 'chat');
   assert.doesNotMatch(head(page), /data-tab="tasks"/);
-  assert.match(col(page), /col-soon/);
+  assert.match(col(page), /col-files/);
 });
 
 test('p2: the roadmap is read ONCE per opening: redraws, a resize and the filter never ask again', async () => {

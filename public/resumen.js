@@ -164,12 +164,28 @@
     const col = within(Math.round(t * share(r.col, 0.25)), COL_MIN, t - CHAT_MIN - list);
     return { list, chat: t - list - col, col };
   }
-  // RP91 (S4, S5): what the right column holds: the TASKS card of the open repo (`tasksHtml` is R.tasksView's answer, drawn by the page; left out when empty) and, until RP92 fills it, a
-  // small notice where the files card will go. Total.
+  // RP91 (S4, S5), RP92 (S6): what the right column holds: the TASKS card of the open repo (`tasksHtml` is R.tasksView's answer, drawn by the page; left out when empty) and the FILES card:
+  // the files with uncommitted changes (`files`, the board's facts: path, status, added, deleted), each a button that opens it in the diff tab (`selected` marks the one open there). Total.
+  const FILES_MAX = 200;
+  const filesCard = (c) => {
+    const label = `Files with changes${c.name ? ` of ${esc(c.name)}` : ''}`;
+    const frame = (n, body) => `<section class="col-card col-files" aria-label="${label}"><h3 class="col-title">Files${n === null ? '' : ` <span class="col-n">${n}</span>`}</h3>${body}</section>`;
+    if (!Array.isArray(c.files)) return frame(null, `<p class="rs-sub" role="status">${c.failed ? 'Files unavailable' : 'Loading files…'}</p>`);
+    const files = c.files.filter((f) => f && typeof f.path === 'string' && f.path);
+    if (!files.length) return frame(0, '<p class="rs-sub" role="status">No uncommitted changes</p>');
+    const item = (f) => {
+      const on = f.path === c.selected;
+      const name = f.path.split(/[\\/]/).pop() || f.path;
+      const n = f.binary ? 'bin' : `<i class="a">+${Number(f.added) || 0}</i> <i class="d">−${Number(f.deleted) || 0}</i>`;
+      return `<button type="button" class="cf-item${on ? ' cf-on' : ''}" data-act="changes-file" data-path="${esc(f.path)}" aria-pressed="${on}" title="${esc(f.path)}"><span class="cv-st">${esc(f.status ?? '')}</span><span class="cf-name">${esc(name)}</span><span class="cf-n">${n}</span></button>`;
+    };
+    const more = files.length > FILES_MAX ? `<p class="rs-sub" role="status">and ${files.length - FILES_MAX} more</p>` : '';
+    return frame(files.length, `<div class="cf-list" role="group" aria-label="Changed files">${files.slice(0, FILES_MAX).map(item).join('')}</div>${more}`);
+  };
   const columnView = (ctx) => {
     const c = ctx && typeof ctx === 'object' ? ctx : {};
     const tasks = typeof c.tasksHtml === 'string' && c.tasksHtml ? `<section class="col-card col-tasks" aria-label="Tasks${c.name ? ` of ${esc(c.name)}` : ''}"><h3 class="col-title">Tasks</h3>${c.tasksHtml}</section>` : '';
-    return `${tasks}<div class="col-card col-soon"><p class="rs-sub">Files with changes will appear here.</p></div>`;
+    return `${tasks}${filesCard(c)}`;
   };
   const liveOf = (c) => (c.info && c.info.live && c.info.live.state) || 'unknown';
   // The state of the adopted session, shown inside the composer frame (RP72). Icon + word, never colour alone.
@@ -204,10 +220,11 @@
     // RP91: with the right column in (`ctx.column`) the tasks are its card, so the chat has no Tasks tab; where there is no column (under 1100 px) the tab stays.
     // RP90: ONE diff tab, the last one, named after the file open in it (`c.dfile`), with its own close button; without a file there is no tab and a "diff" tab reads as the chat.
     const dfile = typeof c.dfile === 'string' ? c.dfile : '';
-    const cur = dfile && c.tab === 'diff' ? 'diff' : ['tasks', 'changes', 'files'].includes(c.tab) && !(ctx.column && c.tab === 'tasks') ? c.tab : 'chat';
+    // RP92: with the column in, the files card replaces the Changes tab as well.
+    const cur = dfile && c.tab === 'diff' ? 'diff' : ['tasks', 'changes', 'files'].includes(c.tab) && !(ctx.column && (c.tab === 'tasks' || c.tab === 'changes')) ? c.tab : 'chat';
     const dname = dfile.split(/[\\/]/).pop() || dfile;
     const dtab = dfile ? `<span class="ch-dtab"><button type="button" role="tab" class="ch-tab" data-act="chat-tab" data-tab="diff" title="${esc(dfile)}" aria-selected="${cur === 'diff'}">${esc(dname)}</button><button type="button" class="ch-dclose" data-act="diff-close" aria-label="Close the diff of ${esc(dfile)}" title="Close the diff">✕</button></span>` : '';
-    const tabs = [['chat', 'Chat'], ['tasks', 'Tasks'], ['changes', 'Changes'], ['files', 'Files']].filter(([t]) => !(ctx.column && t === 'tasks')).map(([t, label]) => `<button type="button" role="tab" class="ch-tab" data-act="chat-tab" data-tab="${t}" aria-selected="${cur === t}">${label}</button>`).join('');
+    const tabs = [['chat', 'Chat'], ['tasks', 'Tasks'], ['changes', 'Changes'], ['files', 'Files']].filter(([t]) => !(ctx.column && (t === 'tasks' || t === 'changes'))).map(([t, label]) => `<button type="button" role="tab" class="ch-tab" data-act="chat-tab" data-tab="${t}" aria-selected="${cur === t}">${label}</button>`).join('');
     return `<div class="ch-row"><b class="ch-name" title="${esc(tip)}">${esc(ctx.name)}</b><button type="button" class="x" data-act="chat-close" aria-label="Close the chat" title="Close the chat (Esc)">✕</button></div><div class="ch-tabs" role="tablist" aria-label="Panel">${tabs}${dtab}</div>`;
   }
 
