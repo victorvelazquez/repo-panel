@@ -267,7 +267,7 @@ test('d9: a failed read says "Changes unavailable"; a later failure keeps the la
   assert.match(body(page), /new src\/a\.js/, 'the last good answer is kept');
 });
 
-test('d10: changes-file shows one file and an empty path goes back to all; the selection is forgotten when the chat is reopened', async () => {
+test('d10 (RP90): changes-file with a path opens that file in the diff tab (one file, the Changes list keeps every file) and an empty path only redraws; the file is forgotten when the chat is reopened', async () => {
   const { page } = boot();
   serve(page, 'abc', infoOf(FREE), histOf('hi'));
   page.routes[DF('abc')] = () => Promise.resolve(ok({ diff: `${DIFF('one.js')}\n${DIFF('two.js')}`, truncated: false }));
@@ -275,16 +275,21 @@ test('d10: changes-file shows one file and an empty path goes back to all; the s
   await page.tick();
   assert.ok(/new one\.js/.test(body(page)) && /new two\.js/.test(body(page)));
   page.run("ACTIONS['changes-file']({ dataset: { path: 'two.js' } })");
-  page.flush();
-  assert.ok(!/new one\.js/.test(body(page)) && /new two\.js/.test(body(page)));
+  await page.tick();
+  assert.equal(page.run('S.chat.tab'), 'diff');
+  assert.ok(!/new one\.js/.test(body(page)) && /new two\.js/.test(body(page)), 'the diff tab shows only that file');
   page.run("ACTIONS['changes-file']({ dataset: { path: '' } })");
   page.flush();
-  assert.ok(/new one\.js/.test(body(page)) && /new two\.js/.test(body(page)));
+  assert.equal(page.run('S.chat.tab'), 'diff', 'an empty path changes nothing');
+  page.run("ACTIONS['chat-tab']({ dataset: { tab: 'changes' } })");
+  await page.tick();
+  assert.ok(/new one\.js/.test(body(page)) && /new two\.js/.test(body(page)), 'the Changes tab still lists every file');
   page.run("ACTIONS['changes-file']({ dataset: { path: 'two.js' } })");
   close(page);
   diffAct(page, 'abc');
   await page.tick();
-  assert.ok(/new one\.js/.test(body(page)), 'a new opening starts with every file');
+  assert.ok(/new one\.js/.test(body(page)), 'a new opening starts with every file and no diff tab');
+  assert.equal(page.run('S.chat.dfile || ""'), '');
 });
 
 test('d11: nothing is sent anywhere by reading changes (no POST, no chat or session write)', async () => {

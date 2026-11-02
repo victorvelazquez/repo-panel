@@ -412,6 +412,13 @@ body.tab-conformity #viewbar { display: none; }
 /* RP63: the Chat / Tasks tabs of the right panel and the task list. */
 .ch-tabs { display: flex; gap: 2px; padding: 0 10px; }
 .ch-tab { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; padding: 6px 12px; color: var(--muted); }
+/* RP90: the ONE diff tab (named after the file) and its close button; a long name is clipped. */
+.ch-tabs { flex-wrap: wrap; align-items: flex-end; }
+.ch-dtab { display: inline-flex; align-items: center; max-width: 220px; min-width: 0; }
+.ch-dtab .ch-tab { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.ch-dclose { border: 0; background: transparent; color: var(--muted); padding: 2px 6px; border-radius: 4px; font-size: 11px; }
+.ch-dclose:hover { color: var(--text); background: var(--panel2); }
+.ch-dclose:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
 .ch-tab[aria-selected="true"] { color: var(--text); border-bottom-color: var(--blue); }
 .ch-tab:focus-visible, .task-head:focus-visible, .task-filter:focus-visible, .rs-prog[role="button"]:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 .rs-prog[role="button"] { cursor: pointer; }
