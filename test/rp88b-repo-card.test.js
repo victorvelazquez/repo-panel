@@ -134,7 +134,7 @@ test('p4: the lines of the board card keep their order: top, requirements, verdi
   const page = loadPage();
   seed(page, { branch: 'feat/x', files: [{ path: 'a.js', status: 'M' }], added: 1, deleted: 0, ahead: 0, behind: 0, error: undefined }, { prs: [], error: 'rate limited' });
   page.run(`S.req.abc = { state: 'loaded', data: { results: [{ id: 'R1', level: 'required', status: 'fail' }] } };
-    S.state.abc = { available: true, state: 'working', next: 'n', at: new Date().toISOString() };
+    S.state.abc = { available: true, state: 'needs-input', next: 'n', at: new Date().toISOString() }; // RP94b2: a working state next to a roadmap block is left out, needs-input stays
     S.roadmap.abc = { available: true, summary: { kind: 'next', id: 'X1', entrega: 'y', waiting: [], extra: 0, problems: { total: 0 }, done: 1, total: 2, pct: 50, header: {} } };`);
   const h = page.run(`repoCard(${REPO}, false, { state: 'attention', reason: 'failed' })`);
   const at = (s) => { const i = h.indexOf(s); assert.ok(i >= 0, `${s} is on the card`); return i; };
