@@ -939,9 +939,10 @@ async function loadTasks() {
 }
 // RP64 (S62): the Changes tab reads /api/diff each time the person SWITCHES to it (the files change), keeps the last good answer of a repo,
 // and only the latest read of a chat opening counts. A read of a repo the person left is stored for that repo and never paints another.
+// RP90: the opening is identified by the S.chat OBJECT, not by `seq` (loadChat bumps it on every poll, and the diff tab can be left for the chat while a read is on its way).
 async function loadChanges() {
   const chat = S.chat;
-  const { id, seq } = chat;
+  const { id } = chat;
   if (!id) return;
   const req = (chat.changesReq = (chat.changesReq || 0) + 1);
   chat.changesLoading = true;
@@ -950,9 +951,9 @@ async function loadChanges() {
     const d = await api(`/api/diff?id=${id}`);
     if (chat.changesReq === req) S.changes[id] = d;
   } catch {
-    if (chat.changesReq === req && S.chat.seq === seq) chat.changesFailed = true;
+    if (chat.changesReq === req && S.chat === chat) chat.changesFailed = true;
   }
-  if (chat.changesReq === req && S.chat.seq === seq) { chat.changesLoading = false; draw(); }
+  if (chat.changesReq === req && S.chat === chat) { chat.changesLoading = false; draw(); }
 }
 // RP65 (S62): the Files tab reads the tree (/api/files) each time the person SWITCHES to it and the open file again with it; opening a file reads
 // /api/file. Only the latest read of each kind counts and a read for a repo the person left is never painted over another. Nothing is written.
@@ -991,9 +992,9 @@ async function loadFile(p) {
 }
 function setChatTab(tab) {
   const was = S.chat.tab;
-  S.chat.tab = ['tasks', 'changes', 'files'].includes(tab) && !(tab === 'tasks' && columnOn()) ? tab : 'chat'; // RP91: with the column in, the tasks are its card, not a tab
+  S.chat.tab = ['tasks', 'changes', 'files'].includes(tab) && !(tab === 'tasks' && columnOn()) ? tab : tab === 'diff' && S.chat.dfile ? 'diff' : 'chat'; // RP91: with the column in, the tasks are its card, not a tab; RP90: the diff tab needs a file
   if (S.chat.tab === 'tasks') loadTasks();
-  else if (S.chat.tab === 'changes' && was !== 'changes') loadChanges();
+  else if ((S.chat.tab === 'changes' || S.chat.tab === 'diff') && was !== S.chat.tab) loadChanges();
   else if (S.chat.tab === 'files' && was !== 'files') loadFiles();
   draw();
 }
@@ -1052,7 +1053,13 @@ function drawChat() {
   const tasksTab = S.chat.tab === 'tasks' && !column;
   const changesTab = S.chat.tab === 'changes';
   const filesTab = S.chat.tab === 'files';
-  $('#composer').hidden = tasksTab || changesTab || filesTab;
+  const diffTab = S.chat.tab === 'diff' && !!S.chat.dfile; // RP90
+  $('#composer').hidden = tasksTab || changesTab || filesTab || diffTab;
+  if (diffTab) {
+    paint($('#chatBody'), R.changesView(S.changes[S.chat.id] || null, { selected: S.chat.dfile, only: true, loading: !!S.chat.changesLoading, failed: !!S.chat.changesFailed }));
+    chatShown = null;
+    return;
+  }
   if (filesTab) {
     const id = S.chat.id;
     const changed = {};
@@ -1062,7 +1069,7 @@ function drawChat() {
     return;
   }
   if (changesTab) {
-    paint($('#chatBody'), R.changesView(S.changes[S.chat.id] || null, { selected: S.chat.file || '', loading: !!S.chat.changesLoading, failed: !!S.chat.changesFailed }));
+    paint($('#chatBody'), R.changesView(S.changes[S.chat.id] || null, { selected: '', loading: !!S.chat.changesLoading, failed: !!S.chat.changesFailed }));
     chatShown = null;
     return;
   }
@@ -1620,7 +1627,9 @@ const ACTIONS = {
   'fetch-all': async () => { toast('Fetching all repos…'); await Promise.all(allRepos().map((r) => fetchRepo(r.id))); toast('Fetch done', 'ok'); },
   // RP64: the chip opens the single viewer, the Changes tab of the right panel; from the Work tab the page goes to the Summary first.
   'diff': (el) => { const id = el.dataset.id; if (S.tab !== 'summary') setTab('summary'); if (S.chat.id !== id) openChat(id); setChatTab('changes'); },
-  'changes-file': (el) => { S.chat.file = el.dataset.path || ''; draw(); },
+  // RP90: touching a file of the Changes list opens it in the ONE diff tab of the centre (reused for every file); RP92 will open it from the files card.
+  'changes-file': (el) => { const p = el.dataset.path || ''; if (p) { S.chat.dfile = p; setChatTab('diff'); } else draw(); },
+  'diff-close': () => { S.chat.dfile = ''; if (S.chat.tab === 'diff') S.chat.tab = 'chat'; draw(); },
   'files-open': (el) => loadFile(el.dataset.path || ''),
   // The button says what the person SEES (data-open): the default is open only when a changed file is inside, so toggling flips that.
   'files-dir': (el) => { (S.filesOpen[S.chat.id] ||= {})[el.dataset.path || ''] = el.dataset.open !== 'true'; draw(); },

@@ -202,9 +202,13 @@
     const adopted = c.info && c.info.adopted;
     const tip = adopted ? `${ctx.name} · ${adopted.id}` : ctx.name;
     // RP91: with the right column in (`ctx.column`) the tasks are its card, so the chat has no Tasks tab; where there is no column (under 1100 px) the tab stays.
-    const cur = ['tasks', 'changes', 'files'].includes(c.tab) && !(ctx.column && c.tab === 'tasks') ? c.tab : 'chat';
+    // RP90: ONE diff tab, the last one, named after the file open in it (`c.dfile`), with its own close button; without a file there is no tab and a "diff" tab reads as the chat.
+    const dfile = typeof c.dfile === 'string' ? c.dfile : '';
+    const cur = dfile && c.tab === 'diff' ? 'diff' : ['tasks', 'changes', 'files'].includes(c.tab) && !(ctx.column && c.tab === 'tasks') ? c.tab : 'chat';
+    const dname = dfile.split(/[\\/]/).pop() || dfile;
+    const dtab = dfile ? `<span class="ch-dtab"><button type="button" role="tab" class="ch-tab" data-act="chat-tab" data-tab="diff" title="${esc(dfile)}" aria-selected="${cur === 'diff'}">${esc(dname)}</button><button type="button" class="ch-dclose" data-act="diff-close" aria-label="Close the diff of ${esc(dfile)}" title="Close the diff">✕</button></span>` : '';
     const tabs = [['chat', 'Chat'], ['tasks', 'Tasks'], ['changes', 'Changes'], ['files', 'Files']].filter(([t]) => !(ctx.column && t === 'tasks')).map(([t, label]) => `<button type="button" role="tab" class="ch-tab" data-act="chat-tab" data-tab="${t}" aria-selected="${cur === t}">${label}</button>`).join('');
-    return `<div class="ch-row"><b class="ch-name" title="${esc(tip)}">${esc(ctx.name)}</b><button type="button" class="x" data-act="chat-close" aria-label="Close the chat" title="Close the chat (Esc)">✕</button></div><div class="ch-tabs" role="tablist" aria-label="Panel">${tabs}</div>`;
+    return `<div class="ch-row"><b class="ch-name" title="${esc(tip)}">${esc(ctx.name)}</b><button type="button" class="x" data-act="chat-close" aria-label="Close the chat" title="Close the chat (Esc)">✕</button></div><div class="ch-tabs" role="tablist" aria-label="Panel">${tabs}${dtab}</div>`;
   }
 
   // The Tasks tab (RP63, S60): the rows of the repo's ROADMAP (the /api/roadmap answer) grouped by state, the completed ones folded.
@@ -307,9 +311,11 @@
     const files = parseDiff(data.diff);
     if (!files.length) return note('No uncommitted changes');
     const one = ctx.selected ? files.find((x) => x.path === ctx.selected) : null;
+    // RP90: single-file mode (the diff tab): just that file, no list; a file that is not in the diff any more says so instead of showing the others.
+    if (ctx.only && !one) return note(`${esc(ctx.selected ?? '')} has no uncommitted changes`);
     const shown = one ? [one] : files;
     const item = (x) => `<button type="button" class="cv-item${x === one ? ' cv-on' : ''}" data-act="changes-file" data-path="${esc(x.path)}" aria-pressed="${x === one}" title="${esc(x.path)}"><span class="cv-st">${x.status}</span><span class="cv-path">${esc(x.path)}</span>${x.binary ? '<span class="add">bin</span>' : `<span class="add">+${x.added}</span><span class="del">−${x.deleted}</span>`}</button>`;
-    const list = `<div class="cv-list" role="group" aria-label="Changed files">${one ? '<button type="button" class="cv-all" data-act="changes-file" data-path="">All files</button>' : ''}${files.map(item).join('')}</div>`;
+    const list = ctx.only ? '' : `<div class="cv-list" role="group" aria-label="Changed files">${one ? '<button type="button" class="cv-all" data-act="changes-file" data-path="">All files</button>' : ''}${files.map(item).join('')}</div>`;
     let left = CODE_MAX;
     let cut = 0;
     const SIGN = { c: ' ', a: '+', d: '-', h: '', m: '' };
