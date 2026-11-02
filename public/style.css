@@ -303,8 +303,9 @@ details.pop > summary:focus-visible { outline: 2px solid var(--blue); outline-of
 .rs-branch { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1 1 55%; order: 3; }
 .rs-when, .rs-count { white-space: nowrap; }
 .rs-when { order: 4; }
-.rs-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; flex: 1 1 100%; order: 5; }
-.rs-l1 > .rs-stale { order: 6; }
+.rs-commit { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1 1 100%; order: 5; }
+.rs-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; flex: 1 1 100%; order: 6; }
+.rs-l1 > .rs-stale { order: 7; }
 .rs-spacer { display: none; }
 .rs-l2 { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px 12px; align-items: center; }
 .rs-l2 button { padding: 2px 10px; width: 100%; }
@@ -327,13 +328,18 @@ details.pop > summary:focus-visible { outline: 2px solid var(--blue); outline-of
 }
 @container cards (min-width: 640px) {
   .rs-l1 { flex-wrap: nowrap; }
-  .rs-name, .rs-branch, .rs-chips, .rs-when, .rs-l1 > .chip, .rs-l1 > .rs-stale { order: 0; }
+  .rs-name, .rs-branch, .rs-commit, .rs-chips, .rs-when, .rs-l1 > .chip, .rs-l1 > .rs-stale { order: 0; }
+  .rs-commit { flex: 0 1 auto; max-width: 28ch; }
   .rs-name { flex: 0 0 auto; }
   .rs-branch { flex: 0 1 auto; max-width: 26ch; }
   .rs-chips { flex: 0 1 auto; }
   .rs-spacer { display: block; flex: 1; }
   .rs-l2 { grid-template-columns: minmax(110px, 170px) minmax(0, 1fr) auto; }
   .rs-l2 button { width: auto; }
+}
+/* RP94c: between 640 and 959 px the horizontal card has no room for the commit subject without squeezing the chips onto more lines: it stays in the tooltip of the time. */
+@container cards (min-width: 640px) and (max-width: 959px) {
+  .rs-commit { display: none; }
 }
 
 /* ---------- RP67: soft action palette (calm look) ----------

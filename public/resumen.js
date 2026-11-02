@@ -68,6 +68,8 @@
   }
 
   // RP87: the change chips are the board card's too, so they live in view.js (a global in the page, a module in Node) and are looked up when used.
+  // RP94c: the chip of the open pull request(s) with the state of their checks (view.js), looked up the same way.
+  const prChipOf = (prs) => { const v = typeof module === 'object' && module.exports ? require('./view.js') : root.RepoPanelView; return v && v.prChip ? v.prChip(prs) : ''; };
   const chipsOf = (c, id) => { const v = typeof module === 'object' && module.exports ? require('./view.js') : root.RepoPanelView; return v && v.changeChips ? v.changeChips(c, id) : ''; };
 
   // ONE line: the next unit (full entrega and result in the title), or what a blocked repo waits for.
@@ -120,7 +122,7 @@
     const lm = r.lastMovement || {};
     const a = r.error ? null : r.action;
     const cls = r.session && r.session.state === 'waiting' ? ' ask' : !r.error && !r.next && (r.blocking || []).length ? ' block' : '';
-    const chips = r.error ? '' : chipsOf(ctx.changesFor ? ctx.changesFor(r.id) : null, r.id) + (a && a.kind === 'manual' ? '<span class="chip red">▲ manual action</span>' : '');
+    const chips = r.error ? '' : chipsOf(ctx.changesFor ? ctx.changesFor(r.id) : null, r.id) + prChipOf(ctx.prsFor ? ctx.prsFor(r.id) : null) + (a && a.kind === 'manual' ? '<span class="chip red">▲ manual action</span>' : '');
     // RP88b: the frame is V.RepoCard (view.js), shared with the board card; what is specific to the Summary card is built here.
     const view = typeof module === 'object' && module.exports ? require('./view.js') : root.RepoPanelView;
     return view.RepoCard({
@@ -128,6 +130,8 @@
       ...(!r.error && staleFacts(r) ? { title: `Updating: ${staleFacts(r).join(', ')}`, busy: true } : {}),
       identity: `<b class="rs-name" title="${esc(r.name)}">${esc(r.name)}</b>`,
       branch: { text: r.branch ?? '', title: r.branch ?? '' }, chips,
+      // RP94c: the subject of the last commit (the row already had it as the tooltip of the time), on its own small line.
+      commit: !r.error && typeof lm.what === 'string' && lm.what.trim() ? `<span class="rs-sub rs-commit" title="${esc(lm.what.trim())}">${esc(lm.what.trim())}</span>` : '',
       meta: `<span class="rs-sub rs-when" title="${esc(lm.what ?? '')}">${esc(relativeTime(lm.at, ctx.now))}</span>${r.error ? '<span class="chip red">▲ error</span>' : sessionChip(r.session && r.session.state)}`,
       body: `${r.error ? noData : progressHtml(r.progress, r.id)}${nextHtml(r)}${actionButton(r, ctx)}`,
     }, 'summary');
