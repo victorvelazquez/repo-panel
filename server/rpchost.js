@@ -16,6 +16,7 @@ const SESSION_ID = /^[A-Za-z0-9._-]{1,80}$/;
 // Everything but LF and TAB (C0, DEL, C1, line separators, bidi and zero-width controls).
 const CONTROLS = /[\x00-\x08\x0b-\x1f\x7f-\x9f\u2028\u2029\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g;
 const BEHAVIORS = ['steer', 'followUp'];
+const STATES = ['closed', 'starting', 'idle', 'busy', 'asking'];
 
 // Text typed in the browser: CR and CRLF become LF, controls go, ends are trimmed. Too long is refused, never cut; a leading `!` is a
 // shell command for pi, so it is refused too.
@@ -116,7 +117,7 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
       onEvent: (e) => { const w = wire(e); if (w) publish(id, w); },
       onExit: () => { if (live.get(id) === entry) live.delete(id); publish(id, { kind: 'exit' }); },
     });
-    try { await entry.client.start(); } catch (e) {
+    try { await entry.client.start(); entry.up = true; } catch (e) {
       // Fixed messages only: a start that ran out of time is not a failure to launch, and the raw error never reaches the page.
       throw e && e.message === 'The session did not start in time' ? new HttpError(504, 'The session did not start in time') : new HttpError(502, 'The session could not be started');
     }
@@ -140,8 +141,21 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
     return statusOf(live.get(id));
   }
 
+  // RPC2b-1: the state of a repo's session, synchronous and total: it reads memory only, never starts anything and never calls `repoOf`.
+  // No live entry (also an id nobody knows) is closed; an entry that has not finished starting is starting; anything the client says outside the five is closed.
+  function stateOf(id) {
+    try {
+      const entry = live.get(id);
+      if (!entry) return 'closed';
+      if (!entry.up) return 'starting';
+      const state = entry.client.state();
+      return STATES.includes(state) ? state : 'closed';
+    } catch { return 'closed'; }
+  }
+
   return {
     start,
+    stateOf,
     async prompt(id, value, { behavior } = {}) {
       repoOf(id);
       if (behavior !== undefined && !BEHAVIORS.includes(behavior)) throw new HttpError(400, 'behavior must be steer or followUp');

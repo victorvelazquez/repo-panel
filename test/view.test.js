@@ -120,9 +120,9 @@ test('cardMenu: put in conditions only with a gap; the warning toggle only with 
 });
 
 // ---------- rooms ----------
-const { roomOfRepo, roomTag, presenceLabel } = require('../public/view.js');
+const { roomOfRepo, roomTag } = require('../public/view.js');
 const ROOMS = [{ name: 'UPEN', path: '/r/ceo', repos: ['a', 'b'] }, { name: 'TOOLS', path: '/r/tools', repos: ['c'] }];
-const live = (state, extra = {}) => ({ state: 'loaded', data: { rooms: [{ name: 'UPEN', presence: { state, sessions: 1 }, lastCommit: '2026-10-23T18:30:00-05:00', ...extra }] } });
+const live = (state, extra = {}) => ({ state: 'loaded', data: { rooms: [{ name: 'UPEN', presence: state ? { state, sessions: 1 } : undefined, lastCommit: '2026-10-23T18:30:00-05:00', ...extra }] } });
 
 test('roomOfRepo: only repos listed in a room are members', () => {
   assert.equal(roomOfRepo(ROOMS, 'a').name, 'UPEN');
@@ -132,11 +132,11 @@ test('roomOfRepo: only repos listed in a room are members', () => {
   assert.equal(roomOfRepo(undefined, 'a'), null);
 });
 
-test('roomTag: no tag outside a room; the dot is green idle, yellow busy and gray otherwise', () => {
+test('roomTag: no tag outside a room; the dot is gray whatever presence the data carries', () => {
   assert.equal(roomTag(ROOMS, 'z', live('idle')), null);
   assert.equal(roomTag([], 'a', live('idle')), null);
   const dot = (state) => roomTag(ROOMS, 'a', live(state)).dot;
-  assert.deepEqual(['idle', 'busy', 'closed', 'ambiguous', 'unknown'].map(dot), ['green', 'yellow', 'gray', 'gray', 'gray']);
+  assert.deepEqual(['idle', 'busy', 'closed', 'ambiguous', 'unknown', undefined].map(dot), ['gray', 'gray', 'gray', 'gray', 'gray', 'gray']);
   assert.equal(roomTag(ROOMS, 'a', live('idle')).name, 'UPEN');
 });
 
@@ -148,11 +148,9 @@ test('roomTag: while the rooms load or fail the dot is gray and nothing is claim
   }
 });
 
-test('roomTag: the tooltip explains the state and gives the last commit date', () => {
-  assert.equal(roomTag(ROOMS, 'a', live('busy')).title, 'Room UPEN · session open, busy · last commit 2026-10-23');
-  assert.equal(roomTag(ROOMS, 'a', live('closed', { lastCommit: null })).title, 'Room UPEN · no session open in the room folder · last commit unknown');
-  assert.equal(presenceLabel({ state: 'ambiguous', sessions: 3 }), '3 sessions open: close the extra ones');
-  assert.match(presenceLabel({ state: 'unknown', sessions: null }), /Orca unavailable/);
+test('roomTag: the tooltip gives the room and the last commit date, and says nothing about a session', () => {
+  assert.equal(roomTag(ROOMS, 'a', live('busy')).title, 'Room UPEN · last commit 2026-10-23');
+  assert.equal(roomTag(ROOMS, 'a', live('closed', { lastCommit: null })).title, 'Room UPEN · last commit unknown');
 });
 
 const roomsReq = (state, list = []) => ({ prereq: 'loaded', repos: [{ id: 'a', state: 'loaded', ready: true }], rooms: { state, list } });

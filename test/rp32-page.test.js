@@ -79,7 +79,7 @@ const btn = (html, id, cmd) => new RegExp(`<button data-act="pi" data-id="${id}"
 const el = (id, cmd, pr) => ({ dataset: { id, cmd, ...(pr ? { pr } : {}) }, disabled: false });
 
 // ---------- A ----------
-test('A: a repo first seen dirty asks for its live state at once and the commit button waits for the answer', async () => {
+test('A: a repo first seen dirty asks for its live state at once, but the commit button follows S.rpc, not that answer (RPC2b-1)', async () => {
   const status = deferred();
   const page = await loadPage({
     '/api/local': () => ({ json: local() }),
@@ -90,10 +90,12 @@ test('A: a repo first seen dirty asks for its live state at once and the commit 
   page.get('loadLocal')(R.id);
   await flush();
   assert.ok(page.urls().includes(STATUS(R.id)), 'the live state is asked for without waiting for the 10 s tick');
-  assert.match(btn(rendered(page), R.id, 'flow-commit'), /title="checking the session…" disabled>/);
-  status.resolve({ state: 'busy' });
-  await flush();
+  assert.doesNotMatch(btn(rendered(page), R.id, 'flow-commit'), /checking the session/);
+  S.rpc[R.id] = { state: 'busy' };
   assert.match(btn(rendered(page), R.id, 'flow-commit'), /title="the session is still working" disabled>/);
+  status.resolve({ state: 'idle' });
+  await flush();
+  assert.match(btn(rendered(page), R.id, 'flow-commit'), /disabled>/, 'the answer of pi-status does not lift it');
 });
 
 test('A: the first answer ends the checking: idle enables the button, and so does a failed request', async () => {
@@ -111,15 +113,13 @@ test('A: the first answer ends the checking: idle enables the button, and so doe
   }
 });
 
-test('A: the checking hold fails open after LIVE_CHECK_MS without an answer, and a clean repo is never checked', async () => {
+test('A: there is no checking hold any more, and a clean repo is never checked', async () => {
   const never = deferred();
   const page = await loadPage({ '/api/local': () => ({ json: local() }), '/api/pi-status': () => never.promise });
   const S = setup(page);
   delete S.local[R.id];
   page.get('loadLocal')(R.id);
   await flush();
-  assert.match(btn(rendered(page), R.id, 'flow-commit'), /disabled>/);
-  S.dirtyAt[R.id] = Date.now() - 21000;
   assert.doesNotMatch(btn(rendered(page), R.id, 'flow-commit'), /disabled/);
   const clean = await loadPage({ '/api/local': () => ({ json: local({ files: [] }) }) });
   setup(clean);
@@ -142,13 +142,14 @@ test('A: the first loadLocal of a dirty repo asks once; a later one does not ask
   assert.equal(S.dirtyAt[R.id], undefined, 'clean again: the next dirty spell is checked again');
 });
 
-test('A: `Show /flow-commit anyway` lifts the checking hold', async () => {
+test('A: `Show /flow-commit anyway` lifts the hold of a working session', async () => {
   const never = deferred();
   const page = await loadPage({ '/api/local': () => ({ json: local() }), '/api/pi-status': () => never.promise });
   const S = setup(page);
   delete S.local[R.id];
   page.get('loadLocal')(R.id);
   await flush();
+  S.rpc[R.id] = { state: 'busy' };
   S.menu = 'abc|repo'; // the item lives in the card menu
   assert.match(rendered(page), /Show \/flow-commit anyway/);
   S.menu = null;

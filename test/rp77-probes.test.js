@@ -21,7 +21,6 @@ const lib = require('../lib.js');
 const S = require('../server/sessions.js');
 const { listTerminals, scanSessions, clearLiveCache } = require('../server/pi.js');
 const { createWarmer } = require('../server/livewarm.js');
-const { roomsState } = require('../server/rooms.js');
 fs.writeFileSync(process.env.REPO_PANEL_CONFIG, JSON.stringify({ port: 4310, groups: [{ name: 'G', repos: [{ path: repoDir }] }], rooms: [] }));
 
 const IDLE = '▎ ✿ waiting for input\n▎   type, or / for commands\n▎\n~\\proj (main) • panel:demo\n';
@@ -95,17 +94,3 @@ test('X12: the list primed by the warmer is only answered to the orca function t
   assert.deepEqual([a, b], [1, 1]);
 });
 
-test('X18: the presence of a room reads its terminals fresh on every call (rooms never use the cache)', async () => {
-  const room = { name: 'UPEN', path: repoDir, repos: [] };
-  let shows = 0;
-  const orca = async (args) => {
-    if (args[0] === 'list') return { terminals: [{ handle: 'h1', worktreePath: repoDir, connected: true, writable: true, lastOutputAt: 5 }] };
-    if (args[0] === 'show') { shows++; return { terminal: { preview: IDLE } }; }
-    throw new Error('unexpected');
-  };
-  const git = async () => ({ code: 0, stdout: '2026-10-24T10:00:00-05:00\n', stderr: '' });
-  const requirements = async () => ({ available: true, base: 'main', results: [], summary: { ready: true } });
-  await roomsState({ rooms: [room], orca, git, requirements });
-  await roomsState({ rooms: [room], orca, git, requirements });
-  assert.equal(shows, 2, 'the same lastOutputAt twice, and still one screen read per call');
-});

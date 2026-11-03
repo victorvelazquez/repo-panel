@@ -16,7 +16,7 @@ const { orcaTerminal, scanSessions } = require('./pi.js');
 const POOL = 6;
 const CACHE_MS = 10 * 1000;
 const MAX_BLOCKING = 3;
-const SESSION_OF = { closed: 'none', idle: 'free', busy: 'working', asking: 'waiting' };
+const SESSION_OF = { closed: 'none', idle: 'free', busy: 'working', starting: 'working', asking: 'waiting' };
 const ANSWER = 'Answer the question in the session';
 // Urgency for the filter, lower is more urgent: a session asking you 0, failing CI 1, then the workQueue kinds in their own order
 // (lib.QUEUE_RANK plus 2), then a working session, a blocked unit and everything else.
@@ -137,6 +137,11 @@ async function sessionState(repoPath, orca, terminals) {
   } catch { return 'unknown'; }
 }
 
+// The state a getter gives for one repo; a getter that throws is unknown, never closed.
+function stateFrom(getter, id) {
+  try { return getter(id); } catch { return 'unknown'; }
+}
+
 async function lastMovementOf(repo, gitRun) {
   const r = await gitRun(repo.path, ['log', '-1', '--format=%cI%n%s', 'HEAD']).catch(() => null);
   if (!r || r.code !== 0) return null;
@@ -146,11 +151,13 @@ async function lastMovementOf(repo, gitRun) {
 
 async function gather(repo, ctx) {
   const { deps, terminals, cfg } = ctx;
+  // RPC2b-1: with a getter (the RPC host) the session is its state; Orca is only scanned when there is none.
+  const sessionIn = () => (deps.sessionOf ? stateFrom(deps.sessionOf, repo.id) : sessionState(repo.path, ctx.orca, terminals));
   const f = { repo: { id: repo.id, name: path.basename(repo.path), group: repo.group, room: ctx.roomOf.get(repo.id) || null }, snoozed: cfg.snoozed, now: ctx.now };
   try {
     const [local, prs, roadmap, state, session, last] = await Promise.all([
       (deps.local || localState)(repo), (deps.prs || prState)(repo), (deps.roadmap || roadmapState)(repo),
-      (deps.state || readState)(repo), sessionState(repo.path, ctx.orca, terminals), lastMovementOf(repo, deps.git || git),
+      (deps.state || readState)(repo), sessionIn(), lastMovementOf(repo, deps.git || git),
     ]);
     return { ...f, local, prs, roadmap, state, session, last };
   } catch (e) {
@@ -196,7 +203,7 @@ async function build(deps) {
   const orca = deps.orca || orcaTerminal;
   const now = (deps.now || Date.now)();
   let terminals = null;
-  try { const listed = (await orca(['list'])).terminals; if (Array.isArray(listed)) terminals = listed; } catch { /* unknown, not none */ }
+  if (!deps.sessionOf) try { const listed = (await orca(['list'])).terminals; if (Array.isArray(listed)) terminals = listed; } catch { /* unknown, not none */ }
   const roomOf = new Map((cfg.rooms || []).flatMap((r) => r.repos.map((id) => [id, r.name])));
   const repos = cfg.groups.flatMap((g) => g.repos.map((r) => ({ ...r, id: lib.repoId(r.path), group: g.name })));
   return tally(await pool(repos, POOL, async (repo) => safeAnalyse(await gather(repo, { deps, terminals, orca, cfg, roomOf, now }))), now);
@@ -218,4 +225,4 @@ function summaryFor(deps = {}, query = {}) {
   return p;
 }
 
-module.exports = { summarize, summaryFor, safeAnalyse, tally, loadingRow, lastMovementOf, pool };
+module.exports = { stateFrom, summarize, summaryFor, safeAnalyse, tally, loadingRow, lastMovementOf, pool };

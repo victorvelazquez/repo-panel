@@ -147,20 +147,20 @@ test('the default store: the first answer is the loading rows with zero reader c
     assert.equal(fresh.rows[0].loading, undefined);
     assert.equal(fresh.rows[0].error, null);
     assert.equal(fresh.rows[0].branch, 'main');
-    assert.deepEqual(fresh.rows[0].session, { state: 'unknown' }, 'the session comes only from the warmer');
+    assert.deepEqual(fresh.rows[0].session, { state: 'none' }, 'the session comes from the RPC host: none while no session is started');
     assert.deepEqual(fresh.rows[0].lastMovement, { at: '2026-10-28T10:00:00Z', what: 'subject' });
     assert.deepEqual([...deps.calls].sort(), ['git', 'local', 'prs', 'roadmap', 'state']);
   });
 });
 
-test('a server with noSummaryStore keeps the old path: Orca is listed and the rows are built per request', async () => {
+test('a server with noSummaryStore builds the rows per request with the session from the RPC host: Orca is never listed', async () => {
   const deps = fakeDeps();
   deps.orca = async (args) => { deps.calls.push(`orca ${args[0]}`); return { terminals: [] }; };
   await withServer({ ...deps, noSummaryStore: true }, async ({ api }) => {
     const out = JSON.parse((await api('/api/summary?fresh=1')).body);
     assert.equal(out.rows[0].loading, undefined);
     assert.deepEqual(out.rows[0].session, { state: 'none' });
-    assert.equal(deps.calls.filter((c) => c === 'orca list').length, 1);
+    assert.equal(deps.calls.filter((c) => c === 'orca list').length, 0);
   });
 });
 

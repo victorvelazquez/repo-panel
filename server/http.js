@@ -95,7 +95,7 @@ const routes = {
     Promise.resolve().then(() => (b.id === undefined ? store.refreshAll() : store.catchUp(b.id))).catch(() => {});
     return { started: true };
   },
-  'GET /api/sessions': (q, b, d) => sessionsState(q.id, d.orca, d.sessionsDir),
+  'GET /api/sessions': (q, b, d) => sessionsState(q.id, d.orca, d.sessionsDir, d.sessionOf),
   'GET /api/chat': (q, b, d) => chatState(q.id, q.session, q.limit, d.sessionsDir),
   // RP62: the Claude usage file, read on every request (no cache); a missing or broken file is a normal 200 with available false.
   'GET /api/usage': (q, b, d) => readUsage({ file: d.usageFile || usageFile() }),
@@ -135,14 +135,16 @@ const routes = {
   'POST /api/snooze': (q, b) => setSnoozed(b.id, Number(b.number), !!b.on, !!b.wasReady),
   'POST /api/dismiss': (q, b) => setDismissed(b.id, !!b.on),
   'POST /api/pi': (q, b, d) => piSend(findRepo(b.id), b.command, d.rpcHost, d.requirements, { pr: b.pr, prs: d.prs, guard: d.guard }),
-  'POST /api/sessions/adopt': (q, b, d) => adoptSession(b.id, b.session, d.orca, d.sessionsDir),
-  'POST /api/sessions/release': (q, b, d) => releaseSession(b.id, d.orca, d.sessionsDir),
+  'POST /api/sessions/adopt': (q, b, d) => adoptSession(b.id, b.session, d.orca, d.sessionsDir, d.sessionOf),
+  'POST /api/sessions/release': (q, b, d) => releaseSession(b.id, d.orca, d.sessionsDir, d.sessionOf),
   // RPC1b: pi sessions in RPC mode, one per repo; the repo comes from the config by id and no program, folder or argument comes from the page.
   'POST /api/rpc/start': (q, b, d) => rpcApi(d.rpcHost).start(b),
   'POST /api/rpc/prompt': (q, b, d) => rpcApi(d.rpcHost).prompt(b),
   'POST /api/rpc/steer': (q, b, d) => rpcApi(d.rpcHost).steer(b),
   'POST /api/rpc/abort': (q, b, d) => rpcApi(d.rpcHost).abort(b),
   'POST /api/rpc/dialog': (q, b, d) => rpcApi(d.rpcHost).dialog(b),
+  // RPC2b-1: the state of EVERY configured repo (closed by default), from the host's memory: nothing starts and nothing is read.
+  'GET /api/rpc/states': (q, b, d) => ({ states: Object.fromEntries(loadConfig().groups.flatMap((g) => g.repos).map((r) => { const id = lib.repoId(r.path); return [id, d.rpcHost.stateOf(id)]; })) }),
   'GET /api/rpc/status': (q, b, d) => rpcApi(d.rpcHost).status(q),
   'POST /api/queue': (q, b) => queueFor(b),
   'POST /api/conformity': (q, b) => conformityFor(b),
@@ -190,14 +192,16 @@ function isPanelRunning(port) {
 function createServer(port, deps = {}) {
   // One duplicate-send guard per server (tests inject theirs with a fake clock).
   deps = { guard: sendGuard(), ...deps };
-  // RP78: the Summary comes from a store kept in memory (server.js starts it); injected by tests, or off with noSummaryStore.
-  if (!deps.summaryStore && !deps.noSummaryStore) deps.summaryStore = createSummaryStore({ deps, now: deps.now });
   const hostOk = new Set([`127.0.0.1:${port}`, `localhost:${port}`]);
   const perf = createPerf();
   const flights = new Map();
   const hub = deps.hub || createEventHub();
   // RPC1b: the pi sessions live in this process (a restart ends them; they come back with the same --session-id). Their events go to the hub as `rpc`.
   if (!deps.rpcHost) deps.rpcHost = createRpcHost({ resolve: deps.rpcResolve || (() => resolveRuntime(deps.piRuntime)), repoOf: findRepo, publish: (id, payload) => hub.emit('rpc', id, payload), adopt: adoptIfNone, createClient: deps.rpcClient });
+  // RPC2b-1: the session state of every repo is the host's (a synchronous read of memory); an injected host with no stateOf leaves the old Orca path.
+  if (!deps.sessionOf && typeof deps.rpcHost.stateOf === 'function') deps.sessionOf = (id) => deps.rpcHost.stateOf(id);
+  // RP78: the Summary comes from a store kept in memory (server.js starts it); injected by tests, or off with noSummaryStore. Built AFTER the host: it reads its state.
+  if (!deps.summaryStore && !deps.noSummaryStore) deps.summaryStore = createSummaryStore({ deps, now: deps.now, sessionOf: deps.sessionOf });
   const server = http.createServer((req, res) => {
     if (req.method === 'GET' && req.url.split('?')[0] === '/api/events') return openStream(req, res);
     const t0 = Date.now();
