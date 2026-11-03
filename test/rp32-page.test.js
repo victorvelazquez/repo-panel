@@ -3,6 +3,7 @@
 // (S.rpc), and a command being sent disables the repo's flow buttons
 // from the click until the answer, however often the card is redrawn.
 const test = require('node:test');
+const { appSource } = require('./pagesrc.js');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -46,7 +47,7 @@ async function loadPage(extraRoutes = {}) {
   });
   ctx.window = ctx;
   ctx.RepoPanelView = view;
-  vm.runInContext(lf(fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8')), ctx);
+  vm.runInContext(lf(appSource()), ctx);
   for (let i = 0; i < 5; i++) await new Promise((r) => setImmediate(r));
   calls.length = 0;
   return {

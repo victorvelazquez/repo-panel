@@ -3,6 +3,7 @@
 // has a gap now carries a "Put in conditions" button there, the same action as the card's menu (so it keeps the
 // protection against a second click from RP33). Nothing is sent to a session by these tests: the fetch is a stub.
 const test = require('node:test');
+const { appSource } = require('./pagesrc.js');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -44,7 +45,7 @@ async function loadPage(extraRoutes = {}) {
   });
   ctx.window = ctx;
   ctx.RepoPanelView = view;
-  vm.runInContext(lf(fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8')), ctx);
+  vm.runInContext(lf(appSource()), ctx);
   for (let i = 0; i < 5; i++) await new Promise((r) => setImmediate(r));
   calls.length = 0;
   return { get: (name) => vm.runInContext(name, ctx), drawer, calls, posts: () => calls.filter((c) => c.method === 'POST' && c.url === '/api/pi') };

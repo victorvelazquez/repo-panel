@@ -3,6 +3,7 @@
 // read from /api/roadmap when the repo OPENS, not when a tab is chosen. The Tasks tab of the chat only shows where there is no column (under 1100 px of layout), so nobody loses the tasks;
 // with the column in, the tab is gone. The files card (RP92) fills the second card. The Claude usage stays in the header. No network, no timers, no real clock.
 const test = require('node:test');
+const { appSource } = require('./pagesrc.js');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -82,7 +83,7 @@ function loadPage() {
   ctx.addEventListener = (t, fn) => { (winL[t] ||= []).push(fn); };
   ctx.RepoPanelView = V;
   ctx.RepoPanelResumen = R;
-  vm.runInContext(fs.readFileSync(path.join(PUBLIC, 'app.js'), 'utf8'), ctx);
+  vm.runInContext(appSource(), ctx);
   const flush = () => { while (frames.length) frames.shift()(); };
   // Two rounds: the first draw runs at the first flush and starts the read of the tasks; the second lets the answer land and be painted.
   const tick = async (n = 8) => { for (let r = 0; r < 2; r++) { for (let i = 0; i < n; i++) await new Promise((x) => setImmediate(x)); flush(); } };

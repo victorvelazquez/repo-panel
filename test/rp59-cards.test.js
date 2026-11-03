@@ -10,6 +10,7 @@ const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'repo-panel-rp59-'));
 process.env.REPO_PANEL_CONFIG = path.join(dir, 'config.json');
 
 const test = require('node:test');
+const { appSource } = require('./pagesrc.js');
 const assert = require('node:assert/strict');
 const R = require('../public/resumen.js');
 const { summarize } = require('../server/summary.js');
@@ -379,7 +380,7 @@ function loadPage({ doc = {} } = {}) {
   ctx.addEventListener = () => {};
   ctx.RepoPanelView = require('../public/view.js');
   ctx.RepoPanelResumen = R;
-  vm.runInContext(fs.readFileSync(path.join(PUBLIC, 'app.js'), 'utf8'), ctx);
+  vm.runInContext(appSource(), ctx);
   return { ctx, get, frames, run: (code) => vm.runInContext(code, ctx), flush: () => { while (frames.length) frames.shift()(); } };
 }
 
@@ -449,7 +450,7 @@ test('the filter and group buttons update the state, redraw once and do not loop
 });
 
 test('the filter and the collapsed groups are kept in memory only, never persisted', () => {
-  const src = fs.readFileSync(path.join(PUBLIC, 'app.js'), 'utf8');
+  const src = appSource();
   assert.doesNotMatch(src, /setPref\('(sfilter|collapsed)/);
   assert.match(src, /sfilter: 'all', collapsed: \{\}/);
 });
@@ -489,6 +490,6 @@ test('style: compact card rules, the list as a named container with queries by c
 
 test('API_VERSION is still 15 and the page asks for no new route', () => {
   assert.equal(require('../public/view.js').API_VERSION, 15);
-  const src = fs.readFileSync(path.join(PUBLIC, 'app.js'), 'utf8');
+  const src = appSource();
   assert.deepEqual([...src.matchAll(/api\('\/api\/summary[^']*'[,)]/g)].length, 1); // one request to the Summary (RP76 adds an options argument: a comma may follow the url)
 });

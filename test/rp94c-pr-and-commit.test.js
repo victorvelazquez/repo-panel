@@ -4,6 +4,7 @@
 // total: no open PR, no chip. State is never colour alone: the chip says the number, a symbol and the counts. Work is not touched (it has its own PR cards). No new
 // server data: the page already loads the PRs. How it LOOKS is for the person to approve by looking; these tests pin the structure, the rules and what is shown.
 const test = require('node:test');
+const { appSource } = require('./pagesrc.js');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -151,7 +152,7 @@ function loadPage() {
   ctx.addEventListener = () => {};
   ctx.RepoPanelView = V;
   ctx.RepoPanelResumen = R;
-  vm.runInContext(read('app.js'), ctx);
+  vm.runInContext(appSource(), ctx);
   return { run: (c) => vm.runInContext(c, ctx) };
 }
 const REPO = '{ id: "abc", path: "p", name: "demo", group: "Personal" }';
@@ -164,5 +165,5 @@ test('g1: the page gives the Summary the open PRs of the repo from the model it 
   assert.equal(JSON.parse(page.run('JSON.stringify(summaryPrs("abc"))'))[0].number, 12);
   page.run("S.prs.abc = { error: 'rate limited' };");
   assert.deepEqual(JSON.parse(page.run('JSON.stringify(summaryPrs("abc"))')), [], 'a failed read says nothing');
-  assert.match(read('app.js'), /prsFor: summaryPrs/);
+  assert.match(appSource(), /prsFor: summaryPrs/);
 });

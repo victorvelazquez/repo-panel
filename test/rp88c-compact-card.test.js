@@ -4,6 +4,7 @@
 // differs (the "behind" count, the GitHub warning, the actions, the requirements notice and the roadmap block) is passed in as ready HTML by cleanRow. The
 // HTML comes out byte for byte the same as before (checked against the base commit by a differential script, not committed). No network, no real clock.
 const test = require('node:test');
+const { appSource } = require('./pagesrc.js');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -64,7 +65,7 @@ function loadPage(view = V) {
   ctx.addEventListener = () => {};
   ctx.RepoPanelView = view;
   ctx.RepoPanelResumen = R;
-  vm.runInContext(read('app.js'), ctx);
+  vm.runInContext(appSource(), ctx);
   return { run: (c) => vm.runInContext(c, ctx) };
 }
 const REPO = '{ id: "abc", path: "p", name: "demo", group: "Personal" }';
@@ -94,7 +95,7 @@ test('p2: the parts of the row keep their order: identity, branch, behind, GitHu
 });
 
 test('p3: the row markup lives once, in view.js: cleanRow no longer builds the row element or the branch span', () => {
-  const has = (f, s) => read(f).split(s).length - 1;
+  const has = (f, s) => (f === 'app.js' ? appSource().replace(/\r\n/g, '\n') : read(f)).split(s).length - 1; // 'app.js' stands for the whole page code (RPC3)
   assert.equal(has('view.js', '<div class="clean-row">'), 1);
   assert.equal(has('app.js', '<div class="clean-row">'), 0);
   assert.equal(has('app.js', '<span class="branch" title='), 0);

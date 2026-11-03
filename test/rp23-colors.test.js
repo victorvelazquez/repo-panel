@@ -2,6 +2,7 @@
 // RP23 part 3 (S22): colors that follow GitHub. A color per action for the animated progress lines and the pending CI
 // chip, and the top border of the five columns. The text of every line stays: color is never the only cue.
 const test = require('node:test');
+const { appSource } = require('./pagesrc.js');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -80,7 +81,7 @@ async function loadPage() {
   });
   ctx.window = ctx;
   ctx.RepoPanelView = view;
-  vm.runInContext(read('app.js'), ctx);
+  vm.runInContext(appSource(), ctx);
   for (let i = 0; i < 5; i++) await new Promise((r) => setImmediate(r));
   return { get: (name) => vm.runInContext(name, ctx) };
 }
@@ -148,7 +149,7 @@ test('css: top border of the five columns follows GitHub', () => {
 // RP23 left the Merged column out on purpose; RP25 adds it, purple, so this pin now says the opposite.
 test('css: the Merged column (added by RP25) is purple and the existing borders above did not change', () => {
   assert.match(rule('.col-merged'), /border-top-color:\s*var\(--purple\)/);
-  assert.ok(/key: 'merged'/.test(read('app.js')));
+  assert.ok(/key: 'merged'/.test(appSource()));
 });
 
 test('css: the reduced-motion block and the ask line are untouched', () => {

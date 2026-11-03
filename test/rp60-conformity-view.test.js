@@ -3,6 +3,7 @@
 // conform, the duplicate header button is gone, the shared filters (which never apply to the audit) are hidden while it is shown, and
 // a repo name in it filters the board and takes the person back to the tab they came from. No network, no timers, no real clock.
 const test = require('node:test');
+const { appSource } = require('./pagesrc.js');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -41,7 +42,7 @@ function loadPage() {
   ctx.addEventListener = () => {};
   ctx.RepoPanelView = require('../public/view.js');
   ctx.RepoPanelResumen = require('../public/resumen.js');
-  vm.runInContext(read('app.js'), ctx);
+  vm.runInContext(appSource(), ctx);
   return { get, saved, run: (code) => vm.runInContext(code, ctx) };
 }
 
@@ -82,8 +83,8 @@ test('a4: the first Conformity visit from Summary returns to Summary even when W
 });
 
 test('a5: the deep link #conformity opens the tab', () => {
-  assert.match(read('app.js'), /location\.hash === '#conformity'\) openConformity\(\)/);
-  assert.match(read('app.js'), /function openConformity\(\) \{\s*setTab\('conformity'\)/);
+  assert.match(appSource(), /location\.hash === '#conformity'\) openConformity\(\)/);
+  assert.match(appSource(), /function openConformity\(\) \{\s*setTab\('conformity'\)/);
 });
 
 test('b1: index.html has the Conformity tab with its badge, the full-width panel and no drawer or duplicate button', () => {
@@ -103,6 +104,6 @@ test('b2: style.css hides the shared filters on this tab, keeps hidden working a
 });
 
 test('b3: nothing in app.js still talks about the drawer', () => {
-  const app = read('app.js');
+  const app = appSource();
   assert.doesNotMatch(app, /#drawer|confOpen|close-drawer|drawerBody|drawerTitle/);
 });

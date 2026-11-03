@@ -4,6 +4,7 @@
 // on the first line (Up) or the last line (Down) of the box, never with a modifier or during an IME composition, so editing a multi-line
 // message is untouched. Pure helpers in resumen.js and the key handling of app.js, driven here with fake keyboard events. No network.
 const test = require('node:test');
+const { appSource } = require('./pagesrc.js');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -98,7 +99,7 @@ function loadPage() {
   ctx.addEventListener = () => {};
   ctx.RepoPanelView = require('../public/view.js');
   ctx.RepoPanelResumen = R;
-  vm.runInContext(fs.readFileSync(path.join(PUBLIC, 'app.js'), 'utf8').replace(/\r\n/g, '\n'), ctx);
+  vm.runInContext(appSource().replace(/\r\n/g, '\n'), ctx);
   const box = get('#msgBox');
   box.id = 'msgBox'; // a real element knows its id; the stub does not
   // One keydown: returns whether the page stopped the default action (the arrow did not move the cursor).
@@ -208,7 +209,7 @@ test('p8: pending messages (sent, not yet in the history) are recalled too', () 
 });
 
 test('p9: the page wires the history to the box only, and Enter still sends', () => {
-  const app = fs.readFileSync(path.join(PUBLIC, 'app.js'), 'utf8');
+  const app = appSource();
   assert.match(app, /e\.target\.id !== 'msgBox'|t\.id !== 'msgBox'/);
   assert.match(app, /e\.key !== 'Enter' \|\| !e\.target \|\| e\.target\.id !== 'msgBox'/, 'the Enter handler is untouched');
   assert.match(app, /delete S\.recall\[id\];[\s\S]{0,120}\$\('#msgBox'\)\.value = '';|\$\('#msgBox'\)\.value = '';[\s\S]{0,60}delete S\.recall\[id\]/, 'sending ends the browsing');

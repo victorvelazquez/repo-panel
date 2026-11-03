@@ -3,6 +3,7 @@
 // the text is saved ~800 ms after the person stops typing and at once when the tab, the chat or the page is left; one write at a time; a conflict writes nothing; unsaved text is never
 // lost or overwritten by a read. The page runs in a vm with a fake clock (no real timers, no network).
 const test = require('node:test');
+const { appSource } = require('./pagesrc.js');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -114,7 +115,7 @@ function loadPage() {
   ctx.addEventListener = (t, fn) => { (winL[t] ||= []).push(fn); };
   ctx.RepoPanelView = V;
   ctx.RepoPanelResumen = R;
-  vm.runInContext(fs.readFileSync(path.join(PUBLIC, 'app.js'), 'utf8'), ctx);
+  vm.runInContext(appSource(), ctx);
   const flush = () => { while (frames.length) frames.shift()(); };
   const settle = async (n = 8) => { for (let i = 0; i < n; i++) await new Promise((x) => setImmediate(x)); };
   const tick = async (n = 8) => { for (let r = 0; r < 2; r++) { await settle(n); flush(); } };

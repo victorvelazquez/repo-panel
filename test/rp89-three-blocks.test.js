@@ -4,6 +4,7 @@
 // click (or Enter) on either separator resets all three; the arrows move 24 px. Under 1100 px the column goes away (two blocks, as before) and under 720 px everything stacks.
 // Until RP91 the column holds a small notice card. The old `chatRatio` is ignored (it measured another thing). How it LOOKS and the real drag are for the person to try.
 const test = require('node:test');
+const { appSource } = require('./pagesrc.js');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -141,7 +142,7 @@ function loadPage({ stored = {} } = {}) {
   ctx.addEventListener = (t, fn) => { (winL[t] ||= []).push(fn); };
   ctx.RepoPanelView = V;
   ctx.RepoPanelResumen = R;
-  vm.runInContext(read('app.js'), ctx);
+  vm.runInContext(appSource(), ctx);
   const flush = () => { while (frames.length) frames.shift()(); };
   return { get, flush, store, winL, run: (c) => vm.runInContext(c, ctx) };
 }
@@ -296,7 +297,7 @@ test('p10: the separators say their position for assistive technology (percent o
 });
 
 test('p11: the old single-divider code is gone: no --chat-w, no chatRatio key', () => {
-  const src = read('app.js');
+  const src = appSource();
   assert.doesNotMatch(src, /--chat-w|chatRatio|repo-panel\.chatRatio/);
   assert.match(src, /repo-panel\.layout/);
 });

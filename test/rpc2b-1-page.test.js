@@ -3,6 +3,7 @@
 // entry that already exists), sessionOf reads S.rpc only, the chat reason follows S.rpc, and a room shows no session state. The real public/app.js in a vm
 // (fake fetch, a fake event stream, no timers, no network, no pi).
 const test = require('node:test');
+const { appSource } = require('./pagesrc.js');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -67,7 +68,7 @@ function loadPage(answers) {
   ctx.addEventListener = () => {};
   ctx.RepoPanelView = V;
   ctx.RepoPanelResumen = R;
-  vm.runInContext(fs.readFileSync(path.join(PUBLIC, 'app.js'), 'utf8'), ctx);
+  vm.runInContext(appSource(), ctx);
   const flush = () => { while (frames.length) frames.shift()(); };
   const tick = async (n = 8) => { for (let i = 0; i < n; i++) await new Promise((r) => setImmediate(r)); flush(); };
   return { get, fetches, tick, run: (code) => vm.runInContext(code, ctx), flush };

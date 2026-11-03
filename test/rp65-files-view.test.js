@@ -3,6 +3,7 @@
 // file read in the same numbered-lines look as the Changes viewer, with the changed lines highlighted. R.chatHead gains the Files tab.
 // Everything that comes from the repo (names, text, errors) is escaped. Pure and total; the page tests drive the tab with a stubbed fetch.
 const test = require('node:test');
+const { appSource } = require('./pagesrc.js');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -132,7 +133,7 @@ function loadPage() {
   ctx.addEventListener = () => {};
   ctx.RepoPanelView = require('../public/view.js');
   ctx.RepoPanelResumen = R;
-  vm.runInContext(fs.readFileSync(path.join(PUBLIC, 'app.js'), 'utf8').replace(/\r\n/g, '\n'), ctx);
+  vm.runInContext(appSource().replace(/\r\n/g, '\n'), ctx);
   const tick = async () => { for (let i = 0; i < 8; i++) await new Promise((r) => setImmediate(r)); while (frames.length) frames.shift()(); };
   return { get, fetches, methods, routes, tick, run: (c) => vm.runInContext(c, ctx) };
 }
@@ -221,5 +222,5 @@ test('y6: the page only reads: the new tab never sends a POST, and index.html ne
   await page.tick();
   const mine = page.fetches.map((u, i) => [u, page.methods[i]]).filter(([u]) => u.startsWith('/api/file'));
   assert.ok(mine.length >= 2 && mine.every(([, m]) => m === 'GET'), 'the Files tab only reads');
-  assert.match(fs.readFileSync(path.join(PUBLIC, 'app.js'), 'utf8'), /api\(`\/api\/files\?id=/);
+  assert.match(appSource(), /api\(`\/api\/files\?id=/);
 });

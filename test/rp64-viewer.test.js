@@ -3,6 +3,7 @@
 // R.changesView draws the file list and the code with line numbers; R.chatHead gains the third tab, Changes. The old diff drawer
 // (renderDiff / openDiff) is gone, and since RP60 so is the drawer: Conformity is a tab. No network, no timers, no real clock.
 const test = require('node:test');
+const { appSource } = require('./pagesrc.js');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -182,7 +183,7 @@ test('chatHead: Chat, Tasks, Changes and (RP65) Files tabs in that order; Change
 
 // ---------- the old drawer diff is gone ----------
 test('app.js no longer has the diff drawer (renderDiff, openDiff) and Conformity is a tab, not a drawer (RP60)', () => {
-  const app = read('app.js');
+  const app = appSource();
   assert.ok(!/function renderDiff|async function openDiff/.test(app));
   assert.match(app, /function openConformity|openConformity\s*=/);
   assert.doesNotMatch(read('index.html'), /id="drawer"/);

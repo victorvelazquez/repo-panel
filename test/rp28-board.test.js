@@ -2,6 +2,7 @@
 // RP28 points 2 and 3: one «Pull requests» column (ready to merge first, then fixes, then checks still running) and the
 // Clean column back by default (the Idle bar stays as the opt-in layout). view.js plus the real public/app.js in a vm.
 const test = require('node:test');
+const { appSource } = require('./pagesrc.js');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -92,7 +93,7 @@ async function loadPage(stored = {}) {
   });
   ctx.window = ctx;
   ctx.RepoPanelView = view;
-  vm.runInContext(read('public/app.js'), ctx);
+  vm.runInContext(appSource(), ctx);
   for (let i = 0; i < 5; i++) await new Promise((r) => setImmediate(r));
   return { get: (name) => vm.runInContext(name, ctx), app, saved, checkbox: els['#cleanAsColumn'] };
 }
@@ -270,7 +271,7 @@ test('page: the Show as column button in the bar still turns the column on', asy
 });
 
 test('source: every read of the preference goes through the one helper', () => {
-  const app = read('public/app.js');
+  const app = appSource();
   const reads = app.split('\n').filter((l) => /S\.prefs\.cleanAsColumn/.test(l));
   assert.equal(reads.length, 1, 'only the helper reads S.prefs.cleanAsColumn');
   assert.match(app, /const cleanAsColumn = \(\) => S\.prefs\.cleanAsColumn !== false;/);

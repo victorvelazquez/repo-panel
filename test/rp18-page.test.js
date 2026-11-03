@@ -2,6 +2,7 @@
 // RP18 in the real public/app.js (vm with a stubbed DOM): the in-progress state of every command, the disabled
 // buttons, the staging bar, the retry label, and the refresh when a session finishes.
 const test = require('node:test');
+const { appSource } = require('./pagesrc.js');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -36,7 +37,7 @@ function loadPage() {
   });
   ctx.window = ctx;
   ctx.RepoPanelView = require('../public/view.js');
-  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8'), ctx);
+  vm.runInContext(appSource(), ctx);
   return { get: (name) => vm.runInContext(name, ctx), calls, answers };
 }
 

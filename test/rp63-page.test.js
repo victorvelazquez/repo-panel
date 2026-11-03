@@ -3,6 +3,7 @@
 // no timers, no sleeps, no network, no real config). The roadmap is asked from the page, once per chat opening, and never
 // when the tab is not shown; the composer hides on the Tasks tab; nothing here ever sends text to a session.
 const test = require('node:test');
+const { appSource } = require('./pagesrc.js');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -55,7 +56,7 @@ function loadPage() {
   ctx.addEventListener = () => {};
   ctx.RepoPanelView = V;
   ctx.RepoPanelResumen = R;
-  vm.runInContext(fs.readFileSync(path.join(PUBLIC, 'app.js'), 'utf8'), ctx);
+  vm.runInContext(appSource(), ctx);
   const flush = () => { while (frames.length) frames.shift()(); };
   const tick = async (n = 8) => { for (let i = 0; i < n; i++) await new Promise((r) => setImmediate(r)); flush(); };
   return { ctx, get, flush, tick, fetches, routes, run: (code) => vm.runInContext(code, ctx) };

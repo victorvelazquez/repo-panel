@@ -3,6 +3,7 @@
 // the buttons follow S.rpc (idle free, busy working, asking waiting, closed enabled), and the verdict runs from the `rpc` state events with no poll.
 // The real public/app.js in a vm (fake fetch, a fake event stream, no timers, no network, no pi).
 const test = require('node:test');
+const { appSource } = require('./pagesrc.js');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -67,7 +68,7 @@ function loadPage(answers) {
   ctx.addEventListener = () => {};
   ctx.RepoPanelView = V;
   ctx.RepoPanelResumen = R;
-  vm.runInContext(fs.readFileSync(path.join(PUBLIC, 'app.js'), 'utf8'), ctx);
+  vm.runInContext(appSource(), ctx);
   const flush = () => { while (frames.length) frames.shift()(); };
   const tick = async (n = 8) => { for (let i = 0; i < n; i++) await new Promise((r) => setImmediate(r)); flush(); };
   return { get, fetches, tick, run: (code) => vm.runInContext(code, ctx), flush };
@@ -219,7 +220,7 @@ test('g11: state events of a repo with no command sent change nothing but S.rpc'
 });
 
 test('g12: the chat Send and the flow buttons share one start helper (the explicit Start button keeps its own call)', () => {
-  const app = fs.readFileSync(path.join(PUBLIC, 'app.js'), 'utf8');
+  const app = appSource();
   assert.match(app, /async function ensureRpcStarted\(/);
   assert.equal((app.match(/await ensureRpcStarted\(/g) || []).length, 3, 'chat Send, flow button, put-in-conditions');
   assert.equal((app.match(/api\('\/api\/rpc\/start'/g) || []).length, 2, 'the helper and the Start button');

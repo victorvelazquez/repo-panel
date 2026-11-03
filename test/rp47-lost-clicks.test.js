@@ -7,6 +7,7 @@
 //  2. While a press is held, a redraw waits for the release (never longer than PRESS_MAX_MS, so a lost release cannot freeze
 //     the page) and then runs once.
 const test = require('node:test');
+const { appSource } = require('./pagesrc.js');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -43,7 +44,7 @@ function loadPage() {
   ctx.window = ctx;
   ctx.addEventListener = on;
   ctx.RepoPanelView = require('../public/view.js');
-  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8'), ctx);
+  vm.runInContext(appSource(), ctx);
   const fire = (type) => { for (const l of listeners.filter((x) => x.type === type)) l.fn({ type, target: element() }); };
   const flush = () => { while (frames.length) frames.shift()(); };
   return { ctx, els, listeners, get, fire, flush, run: (code) => vm.runInContext(code, ctx), app: () => get('#app'), queue: () => get('#queue'), conformityView: () => get('#conformityView') };

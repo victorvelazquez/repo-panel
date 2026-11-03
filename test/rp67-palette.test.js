@@ -1,6 +1,7 @@
 'use strict';
 // RP67 (S59): soft action palette by effect, calm chrome, and the "Fix with pi" -> "Fix CI" rename.
 const test = require('node:test');
+const { appSource, APP_FILES } = require('./pagesrc.js');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -108,9 +109,9 @@ test('css: the mapping is documented in a comment block', () => {
 
 // ---------- rename ----------
 test('the Fix CI label replaces "Fix with pi" and keeps the data attributes', () => {
-  const app = read('app.js');
+  const app = appSource();
   assert.match(app, /piBtn\(r, 'fix-pr', 'Fix CI', \{ pr: pr\.number, title: hold \|\| FIX_PR_HINT, disabled: !!hold \}\)/);
-  for (const f of ['app.js', 'view.js']) assert.doesNotMatch(read(f), /Fix with pi/, f);
+  for (const f of [...APP_FILES, 'view.js']) assert.doesNotMatch(read(f), /Fix with pi/, f);
   assert.match(read('../README.md'), /Fix CI/);
   assert.equal(read('../README.md').split('Fix with pi').length - 1, 1, 'only the "formerly" mention is left');
   assert.match(read('../README.md'), /formerly `Fix with pi`/);

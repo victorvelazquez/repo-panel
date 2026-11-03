@@ -4,6 +4,7 @@
 // starts hidden (or that the page toggles) and that a rule gives a `display` needs its own `[hidden]` rule. The fake DOM of the
 // other tests cannot see this: it has no CSS, so these tests read the two files.
 const test = require('node:test');
+const { appSource } = require('./pagesrc.js');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -11,7 +12,7 @@ const path = require('node:path');
 const PUBLIC = path.join(__dirname, '..', 'public');
 const css = fs.readFileSync(path.join(PUBLIC, 'style.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
 const html = fs.readFileSync(path.join(PUBLIC, 'index.html'), 'utf8');
-const app = fs.readFileSync(path.join(PUBLIC, 'app.js'), 'utf8');
+const app = appSource();
 
 // Every rule outside @media blocks: { selectors: [..], body }.
 function rules(source) {

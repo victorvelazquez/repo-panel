@@ -3,6 +3,7 @@
 // gates: no timers, no sleeps, no network, no real config). The diff chip opens the Changes tab of the right panel (from the Work
 // tab it first switches to the Summary); /api/diff is read each time the tab is switched to; the composer hides; nothing is ever sent.
 const test = require('node:test');
+const { appSource } = require('./pagesrc.js');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -55,7 +56,7 @@ function loadPage() {
   ctx.addEventListener = () => {};
   ctx.RepoPanelView = V;
   ctx.RepoPanelResumen = R;
-  vm.runInContext(fs.readFileSync(path.join(PUBLIC, 'app.js'), 'utf8'), ctx);
+  vm.runInContext(appSource(), ctx);
   const flush = () => { while (frames.length) frames.shift()(); };
   const tick = async (n = 8) => { for (let i = 0; i < n; i++) await new Promise((r) => setImmediate(r)); flush(); };
   return { ctx, get, flush, tick, fetches, routes, run: (code) => vm.runInContext(code, ctx) };

@@ -3,6 +3,7 @@
 // GET /api/roadmap, no new API) grouped by state with the completed ones folded; R.chatHead gains the Chat/Tasks tablist; the
 // progress bar of a card opens the tab. No network, no timers, no real clock.
 const test = require('node:test');
+const { appSource } = require('./pagesrc.js');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -254,7 +255,7 @@ test('tasksView: the notes of a blocked row are cut to 140 characters', () => {
 // Found in a real browser: the page marks the view tabs (Summary / Work) by selecting every [role=tab][data-tab]; the Chat / Tasks tabs of the
 // right panel share those attributes and were set to aria-selected="false" at every redraw. The view tabs are looked up inside .rs-tabs only.
 test('app.js marks the view tabs inside .rs-tabs only, so the Chat / Tasks tabs keep their own aria-selected', () => {
-  const app = read('app.js');
+  const app = appSource();
   assert.ok(app.includes("querySelectorAll('.rs-tabs [role=tab][data-tab]')"));
   assert.ok(!app.includes("querySelectorAll('[role=tab][data-tab]')"));
   assert.match(read('index.html'), /<nav class="rs-tabs"[^>]*role="tablist"/);

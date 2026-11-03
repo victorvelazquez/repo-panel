@@ -3,6 +3,7 @@
 // that shows how much of the window already ran, and a popover with the detail. usageView keeps everything it returned (RP62) and adds the data
 // for that; usageHtml / usageRemaining are pure. Only the 5h and 7d windows exist in the data: no monthly and no per-model. No network, no clock.
 const test = require('node:test');
+const { appSource } = require('./pagesrc.js');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -172,7 +173,7 @@ function loadPage() {
   ctx.addEventListener = () => {};
   ctx.RepoPanelView = V;
   ctx.RepoPanelResumen = require('../public/resumen.js');
-  vm.runInContext(read('app.js'), ctx);
+  vm.runInContext(appSource(), ctx);
   const esc = (activeIsUsage) => { doc.activeElement = activeIsUsage ? usageEl : null; for (const l of listeners.filter((x) => x.type === 'keydown')) l.fn({ type: 'keydown', key: 'Escape', target: usageEl, preventDefault() {}, stopPropagation() {} }); };
   return { usageEl, esc };
 }

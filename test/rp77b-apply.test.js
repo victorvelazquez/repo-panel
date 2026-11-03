@@ -1,6 +1,7 @@
 'use strict';
 // RP77b (S68, S71, S72) probes for the page wiring in the real public/app.js (vm with a stubbed DOM, like rp32-page): pollSkipped / stopEvents / the visibility handler.
 const test = require('node:test');
+const { appSource } = require('./pagesrc.js');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -35,7 +36,7 @@ async function loadPage({ fetchImpl } = {}) {
   });
   ctx.window = ctx;
   ctx.RepoPanelView = view;
-  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8').replace(/\r\n/g, '\n'), ctx);
+  vm.runInContext(appSource().replace(/\r\n/g, '\n'), ctx);
   for (let i = 0; i < 5; i++) await new Promise((r) => setImmediate(r));
   return { get: (n) => vm.runInContext(n, ctx), calls, state, listeners, timeouts };
 }

@@ -3,6 +3,7 @@
 // Streaming bubble from `rpc` frames, one history reload when a run settles, Send that starts the session first, Stop, a failed send, the resync on
 // open and on every (re)connect of the stream, and the Cancel line of a pending dialog.
 const test = require('node:test');
+const { appSource } = require('./pagesrc.js');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -67,7 +68,7 @@ function loadPage(answers) {
   ctx.addEventListener = () => {};
   ctx.RepoPanelView = V;
   ctx.RepoPanelResumen = R;
-  vm.runInContext(fs.readFileSync(path.join(PUBLIC, 'app.js'), 'utf8'), ctx);
+  vm.runInContext(appSource(), ctx);
   const flush = () => { while (frames.length) frames.shift()(); };
   const tick = async (n = 8) => { for (let i = 0; i < n; i++) await new Promise((r) => setImmediate(r)); flush(); };
   return { get, fetches, tick, run: (code) => vm.runInContext(code, ctx), flush };
@@ -294,7 +295,7 @@ test('p15: with a pending dialog the composer is off and the card shows; Deny po
 });
 
 test('p16: the old send is gone from the page: no chat/send, chat/clear, sessions/start, msgBusy or Clear button', () => {
-  const app = fs.readFileSync(path.join(PUBLIC, 'app.js'), 'utf8');
+  const app = appSource();
   const res = fs.readFileSync(path.join(PUBLIC, 'resumen.js'), 'utf8');
   for (const gone of ['/api/chat/send', '/api/chat/clear', '/api/sessions/start', 'msgBusy', "'chat-clear'"]) assert.equal(app.includes(gone), false, gone);
   assert.equal(res.includes('chat-clear'), false);
