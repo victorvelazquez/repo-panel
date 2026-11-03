@@ -56,7 +56,7 @@ test('style.css keeps no class of the cards deleted by the series (RP95)', () =>
 });
 
 test('the README says where the page code lives: every page script, in load order', () => {
-  const readme = fs.readFileSync(path.join(ROOT, 'README.md'), 'utf8');
+  const readme = fs.readFileSync(path.join(ROOT, 'README.md'), 'utf8').replace(/\r\n/g, '\n'); // a Windows checkout has \r\n
   const section = (readme.match(/^## Page code\n([\s\S]*?)(?=^## )/m) || [])[1];
   assert.ok(section, 'the README has a "Page code" section');
   for (const f of ['view.js', 'resumen.js', ...APP_FILES]) assert.ok(section.includes(`public/${f}`), `the section names public/${f}`);
