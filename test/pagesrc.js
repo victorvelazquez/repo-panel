@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const PUBLIC = path.join(__dirname, '..', 'public');
-const APP_FILES = ['data.js', 'feed.js', 'tabs.js', 'chat.js', 'app.js'];
+const APP_FILES = ['data.js', 'feed.js', 'tabs.js', 'chat.js', 'board.js', 'app.js'];
 const appSource = () => APP_FILES.map((f) => fs.readFileSync(path.join(PUBLIC, f), 'utf8')).join('\n').replace(/\r\n/g, '\n');
 
 module.exports = { PUBLIC, APP_FILES, appSource };

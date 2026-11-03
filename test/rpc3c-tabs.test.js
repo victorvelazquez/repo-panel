@@ -24,7 +24,7 @@ test('tabs.js defines the derived state, the queue and the two tabs, and app.js 
   for (const n of MOVED) assert.equal(defines(tabs, n), true, `tabs.js defines ${n}`);
   const app = read('app.js');
   for (const n of MOVED) assert.equal(defines(app, n), false, `app.js no longer defines ${n}`);
-  for (const n of ['S', 'TOKEN', 'paint', 'draw']) assert.equal(defines(app, n), true, `app.js keeps ${n}`);
+  for (const n of ['S', 'TOKEN', 'paint']) assert.equal(defines(app, n), true, `app.js keeps ${n}`);
   assert.equal(defines(read('data.js'), 'api'), true, 'data.js keeps its own layer');
   assert.equal(defines(read('feed.js'), 'loadBoard'), true, 'feed.js keeps its own feed');
 });
