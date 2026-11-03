@@ -228,10 +228,8 @@ test('chatFromCache does not touch the entry it reads', () => {
   assert.equal(entry.info.adopted.id, 's1', 'not even deep');
 });
 
-test('painted by the real chat view, the cached chat shows its messages, no question card and no answer buttons', () => {
+test('painted by the real chat view, the cached chat shows its messages and no question card', () => {
   const entry = { info: { ...infoOf(1), live: ASK }, hist: histOf('cached hello'), key: 'k' };
-  const live = R.chatBody({ id: 'abc', ...entry, answer: undefined }, { now: 0 });
-  assert.ok(live.includes('data-act="dialog-answer"'), 'control: the same data painted as it came shows the buttons');
   const html = R.chatBody({ id: 'abc', ...V.chatFromCache(entry) }, { now: 0 });
   assert.ok(html.includes('cached hello'));
   assert.ok(!html.includes('data-act="dialog-answer"'));

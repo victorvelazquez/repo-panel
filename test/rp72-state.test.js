@@ -100,7 +100,7 @@ async function ready(extra = {}) {
 }
 const live = (state, o = {}) => ({ ...ADOPTED, live: { state, count: state === 'none' ? 0 : 1 }, ...o });
 const WORKING = 'The session is working: wait until it is idle, or press Stop';
-const WAITING_TITLE = 'pi is asking something; answering from the panel comes next';
+const WAITING_TITLE = 'pi is asking something: answer it in the card of the chat';
 const text = (html) => html.replace(/<[^>]*>/g, '');
 const classes = (html) => new Set((/^<span[^>]*\sclass="([^"]*)"/.exec(html) || [, ''])[1].split(/\s+/).filter(Boolean));
 

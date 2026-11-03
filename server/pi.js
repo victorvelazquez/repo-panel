@@ -13,9 +13,6 @@ const INSTALL_PATH = path.join(__dirname, '..', 'requirements', 'INSTALL.md');
 const PUT_IN_CONDITIONS = 'put-in-conditions';
 const FIX_PR = 'fix-pr';
 
-// Only server/dialoganswer.js still takes this lock; RPC2-3 removes it together with that file. piSend no longer uses it.
-const piBusy = new Set();
-
 // The same command key is not accepted twice for one repo within this window after a confirmed send: a pi screen
 // that reads idle while a subagent still works would otherwise let a second /flow-pr through.
 const DUPLICATE_MS = 45 * 1000;
@@ -277,4 +274,4 @@ async function piStatus(repo, orca = orcaTerminal, { tail = false } = {}) {
   } catch { return out('unknown'); }
 }
 
-module.exports = { piSend, piStatus, piStateOf, piSessions, scanSessions, clearLiveCache, liveCacheStats, listTerminals, primeList, conditionsOrder, fixPrOrder, orcaTerminal, readScreen, sendGuard, rpcPiStatus, setCaseRecorder, caseRecorderInstalled, piBusy };
+module.exports = { piSend, piStatus, piStateOf, piSessions, scanSessions, clearLiveCache, liveCacheStats, listTerminals, primeList, conditionsOrder, fixPrOrder, orcaTerminal, readScreen, sendGuard, rpcPiStatus, setCaseRecorder, caseRecorderInstalled };

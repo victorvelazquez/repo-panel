@@ -577,13 +577,28 @@
     try { body = JSON.parse(frame.data); } catch { return null; }
     return isObject(body) && typeof body.id === 'string' && /^[0-9a-f]{10}$/.test(body.id) && RPC_KINDS.includes(body.kind) ? body : null;
   }
-  // What the chat shows of one session: { state, text, blocks, error, startedAt } plus `streaming` (a run is on) and `asks` (pending dialog ids). The text is
+  // What the chat shows of one session: { state, text, blocks, error, startedAt } plus `streaming` (a run is on) and `asks` (the pending dialogs, see rpcAskOf). The text is
   // the blocks in order (the index is the `contentIndex` of pi; thinking and tool blocks leave theirs empty), capped.
   const RPC_BLOCKS = 64;
   const RPC_TEXT_MAX = 200000;
   const rpcBlank = () => ({ state: 'closed', text: '', blocks: [], error: '', startedAt: 0, streaming: false, asks: [] });
   const rpcText = (blocks) => blocks.filter(Boolean).join('\n\n').slice(0, RPC_TEXT_MAX);
-  const rpcAsks = (a, add, remove) => [...(Array.isArray(a) ? a : []).filter((x) => x !== remove), ...(add && !(a || []).includes(add) ? [add] : [])].slice(0, 20);
+  // One pending dialog as the card needs it (RPC2-3), or null when it is not well formed. The server already caps what it sends; what is still
+  // too long here is cut and counts as truncated, so the card never offers to approve text it did not get whole.
+  const ASK_METHODS = ['select', 'confirm', 'input', 'editor'];
+  const str = (v, max) => (typeof v === 'string' ? v.slice(0, max) : '');
+  function rpcAskOf(d) {
+    if (!isObject(d) || typeof d.requestId !== 'string' || !d.requestId || d.requestId.length > 200 || !ASK_METHODS.includes(d.method)) return null;
+    const raw = Array.isArray(d.options) ? d.options : [];
+    const cut = (typeof d.title === 'string' && d.title.length > 300) || (typeof d.message === 'string' && d.message.length > 4000) || raw.length > 20 || raw.some((o) => typeof o === 'string' && o.length > 200);
+    return { requestId: d.requestId, method: d.method, title: str(d.title, 300), message: str(d.message, 4000), options: raw.slice(0, 20).map((o) => str(o, 200)), truncated: d.truncated === true || cut, expiresAt: Number.isFinite(d.expiresAt) ? d.expiresAt : null };
+  }
+  // A dialog already there keeps its place (the same requestId is never added twice).
+  const rpcAsks = (a, add, remove) => {
+    const list = (Array.isArray(a) ? a : []).filter((x) => isObject(x) && x.requestId !== remove);
+    if (add) { const at = list.findIndex((x) => x.requestId === add.requestId); if (at >= 0) list[at] = add; else list.push(add); }
+    return list.slice(0, 20);
+  };
   // A pure reducer: (entry, payload of rpcEvent, now) -> { entry, reload }. `reload` is true when a run settled and the history must be read ONCE.
   function rpcReduce(prev, p, now = 0) {
     const e = { ...rpcBlank(), ...(isObject(prev) ? prev : {}) };
@@ -592,7 +607,7 @@
     if (!isObject(p)) return { entry: e, reload };
     if (p.kind === 'state' && RPC_STATES.includes(p.state)) { e.state = p.state; if (p.state === 'busy') e.streaming = true; }
     else if (p.kind === 'exit') Object.assign(e, { state: 'closed', blocks: [], text: '', streaming: false, asks: [] });
-    else if (p.kind === 'dialog' && typeof p.requestId === 'string') e.asks = rpcAsks(e.asks, p.requestId);
+    else if (p.kind === 'dialog') e.asks = rpcAsks(e.asks, rpcAskOf(p));
     else if (p.kind === 'dialog-closed' && typeof p.requestId === 'string') e.asks = rpcAsks(e.asks, null, p.requestId);
     else if (p.kind === 'event' && isObject(p.record)) {
       const r = p.record;
@@ -613,7 +628,7 @@
     const e = { ...rpcBlank(), ...(isObject(prev) ? prev : {}) };
     if (!isObject(st) || !RPC_STATES.includes(st.state)) return e;
     e.state = st.state;
-    e.asks = (Array.isArray(st.pendingDialogs) ? st.pendingDialogs : []).map((d) => (isObject(d) ? d.requestId : null)).filter((x) => typeof x === 'string').slice(0, 20);
+    e.asks = (Array.isArray(st.pendingDialogs) ? st.pendingDialogs : []).map(rpcAskOf).filter(Boolean).slice(0, 20);
     e.streaming = st.state === 'busy' || st.state === 'asking';
     if (!e.streaming) Object.assign(e, { blocks: [], text: '' });
     return e;

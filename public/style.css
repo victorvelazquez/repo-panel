@@ -559,6 +559,7 @@ body.tab-conformity #viewbar { display: none; }
 .ch-ask-sending, .ch-ask-done { margin-top: 4px; font-size: 12px; color: var(--yellow); }
 .ch-ask-error { margin-top: 4px; font-size: 12px; color: var(--red); }
 
+.ask-field { display: block; width: 100%; margin: 6px 0; box-sizing: border-box; font: inherit; font-size: 12px; }
 .ch-ask-warn { margin: 6px 0 2px; font-size: 12px; font-weight: 600; color: var(--yellow); }
 /* RP93b: the Notes tab. The textarea fills the block; the status line stays below it. */
 .notes { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; }

@@ -86,10 +86,10 @@ test('r6: state sets the state, busy marks the run as streaming; exit closes and
 
 test('r7: dialogs add and remove their requestId; the state of an unknown entry starts closed', () => {
   let r = V.rpcReduce(undefined, { id: ID, kind: 'dialog', requestId: 'd1', method: 'confirm' });
-  r = V.rpcReduce(r.entry, { id: ID, kind: 'dialog', requestId: 'd2' });
-  assert.deepEqual(r.entry.asks, ['d1', 'd2']);
+  r = V.rpcReduce(r.entry, { id: ID, kind: 'dialog', requestId: 'd2', method: 'select' });
+  assert.deepEqual(r.entry.asks.map((a) => a.requestId), ['d1', 'd2']); // RPC2-3: the entries are dialog objects (see rpc2-3-view.test.js)
   r = V.rpcReduce(r.entry, { id: ID, kind: 'dialog-closed', requestId: 'd1' });
-  assert.deepEqual(r.entry.asks, ['d2']);
+  assert.deepEqual(r.entry.asks.map((a) => a.requestId), ['d2']);
   assert.equal(V.rpcReduce(undefined, ev({ type: 'agent_end' })).entry.state, 'closed');
 });
 
@@ -106,9 +106,9 @@ test('r8: the reducer is total and never mutates its input; bad indexes and size
 });
 
 test('s1: rpcFromStatus takes the state and the pending dialogs (requestId) of a status answer; a bad answer changes nothing', () => {
-  const e = V.rpcFromStatus(undefined, { state: 'asking', pendingDialogs: [{ requestId: 'd1' }, { id: 'old' }, null], sessionId: 'panel-x' });
+  const e = V.rpcFromStatus(undefined, { state: 'asking', pendingDialogs: [{ requestId: 'd1', method: 'confirm' }, { id: 'old' }, null], sessionId: 'panel-x' });
   assert.equal(e.state, 'asking');
-  assert.deepEqual(e.asks, ['d1']);
+  assert.deepEqual(e.asks.map((a) => a.requestId), ['d1']);
   const busy = V.rpcFromStatus(e, { state: 'busy', pendingDialogs: [] });
   assert.deepEqual([busy.state, busy.streaming, busy.asks], ['busy', true, []]);
   const idle = V.rpcFromStatus({ ...busy, text: 'x', blocks: ['x'] }, { state: 'idle', pendingDialogs: [] });

@@ -280,18 +280,17 @@ test('p14: an exit frame closes the session: the label says so and the streaming
   assert.equal(page.get('#msgStop').hidden, true);
 });
 
-test('p15: with a pending dialog the composer is off and one line with a Cancel button shows; Cancel posts the dialog cancel', async () => {
-  const { page, stream } = await chatPage({ '/api/rpc/status': status('asking', [{ requestId: 'd1', method: 'confirm' }]) });
+test('p15: with a pending dialog the composer is off and the card shows; Deny posts the dialog answer and the dialog-closed frame removes it', async () => {
+  const { page, stream } = await chatPage({ '/api/rpc/status': status('asking', [{ requestId: 'd1', method: 'confirm', title: 'Allow?', message: 'git push', options: [], expiresAt: null, truncated: false }]) });
   assert.equal(page.get('#msgSend').disabled, true);
-  assert.match(body(page), /pi is asking something; answering from the panel comes next/);
-  assert.match(body(page), /data-act="rpc-cancel"/);
-  page.run("ACTIONS['rpc-cancel']({ dataset: { id: '" + ID + "', request: 'd1' } })");
+  assert.match(body(page), /data-act="rpc-answer"/);
+  page.run("ACTIONS['rpc-answer']({ dataset: { id: '" + ID + "', request: 'd1', kind: 'deny' } })");
   await page.tick();
-  assert.deepEqual(JSON.parse(urls(page, '/api/rpc/dialog', 'POST')[0].body), { id: ID, requestId: 'd1', cancelled: true });
+  assert.deepEqual(JSON.parse(urls(page, '/api/rpc/dialog', 'POST')[0].body), { id: ID, requestId: 'd1', confirmed: false });
   page.run('startEvents()');
   await page.tick();
   await feed(page, stream, { kind: 'dialog-closed', requestId: 'd1' }, { kind: 'state', state: 'busy' });
-  assert.doesNotMatch(body(page), /pi is asking something/);
+  assert.doesNotMatch(body(page), /ch-ask/);
 });
 
 test('p16: the old Orca send is gone from the page: no chat/send, chat/clear, sessions/start, msgBusy or Clear button', () => {

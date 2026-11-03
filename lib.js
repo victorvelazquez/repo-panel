@@ -532,8 +532,7 @@ function piScreenDialog(preview) {
 // past the marker (a description layout has deeper rows, so it is not recognised). Between 2 and 8 options (1 to 8 with
 // `allowSingle`, for reads after the marker moved), each 1 to 80 characters. Returns { fingerprint, options: [{ label, tone }],
 // complete, markerRow, questionRows } or null. `complete` is false when a question row or a label is cut (ends with an ellipsis,
-// or the row is over 200 characters) or there is no question row. The non-enumerable block, footerRow, blockStart and norm serve
-// piDialogMovedDown and never reach JSON. Pure.
+// or the row is over 200 characters) or there is no question row. The non-enumerable block, footerRow, blockStart and norm never reach JSON. Pure.
 // A refusal is a plain, short one: a refusing word, optionally "this time", "once", "it" or "that". Anything else counts as an approval
 // and needs a question the panel can see whole ("No problem, go ahead" or "Skip all permission checks" must never pass as a refusal).
 const DIALOG_NEGATIVE = /^(no|deny|cancel|skip|decline|reject|never|stop)( this time| once| it| that)?[.!]?$/i;
@@ -584,18 +583,6 @@ function piDialogChoices(screen, { allowSingle = false } = {}) {
   });
 }
 
-// Whether `now` (a later piDialogChoices read of the same terminal) is `first` after `steps` down arrows: the footer on the same
-// row, the marker exactly `steps` rows lower, the labels from it down the first ones minus the first `steps`, and every row of the
-// dialog block of `first` (taken over the same rows of `now`) equal. Rows outside that range (a timer above, the usage widget
-// below) do not count. Pure.
-function piDialogMovedDown(first, now, steps = 1) {
-  if (!first || !now || !first.block || !now.norm || now.footerRow !== first.footerRow || now.markerRow !== first.markerRow + steps) return false;
-  const want = first.options.slice(steps);
-  if (want.length !== now.options.length || want.some((o, i) => o.label !== now.options[i].label)) return false;
-  const seen = now.norm.slice(first.blockStart, first.footerRow + 1);
-  return seen.length === first.block.length && seen.every((r, i) => r === first.block[i]);
-}
-
 // The last `n` non-empty lines of a screen (control characters replaced by a space, 200 characters per line). The Claude usage
 // widget under the screen (`5h 15% ↻lun 01:50 · 7d 37% ↻jue 11:00`) is not part of it: it says nothing about a question, it holds the
 // user's consumption, and it must not take one of the lines. Observation only; a non-string gives [].
@@ -629,7 +616,7 @@ function piPromptState(preview) {
 }
 
 module.exports = {
-  PI_COMMANDS, normPath, terminalsOfWorktree, piScreenState, piScreenAsk, piScreenDialog, piDialogChoices, piDialogMovedDown, piScreenTail, piScreenQuestionish, piPromptState,
+  PI_COMMANDS, normPath, terminalsOfWorktree, piScreenState, piScreenAsk, piScreenDialog, piDialogChoices, piScreenTail, piScreenQuestionish, piPromptState,
   repoId, parseStatus, parseNumstat, parseGoneBranches, parseBaseBranch, staleBranch, statusLetter,
   summarizeChecks, blockedReason, enrichPr, encodeRef, parseRoadmap, safeRelPath, roadmapSummary,
   matchesUnitId, deriveUnitStates, nextUnit, workQueue, QUEUE_RANK, conformityReport, RM_REQUIRED,

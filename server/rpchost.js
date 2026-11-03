@@ -157,7 +157,12 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
     async abort(id) { repoOf(id); return ask(running(id), 'abort', {}); },
     async answer(id, requestId, answer) {
       repoOf(id);
-      if (!running(id).client.answerDialog(requestId, answer)) throw new HttpError(409, 'That question is not waiting for an answer');
+      const { client } = running(id);
+      if (!client.answerDialog(requestId, answer)) {
+        // Still pending after a refusal: the SHAPE was wrong (nothing was written); otherwise the question is gone.
+        if (client.pendingDialogs().some((d) => d.id === requestId)) throw new HttpError(400, 'Invalid answer');
+        throw new HttpError(409, 'That question is not waiting for an answer');
+      }
       return { ok: true };
     },
     async status(id) { repoOf(id); return statusOf(live.get(id)); },
@@ -174,7 +179,9 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
 const bodyOf = (b) => { if (!b || typeof b !== 'object' || Array.isArray(b)) throw new HttpError(400, 'Invalid request'); return b; };
 const idOf = (b) => { if (typeof b.id !== 'string' || !b.id || b.id.length > 100) throw new HttpError(400, 'Invalid request'); return b.id; };
 
+const ANSWER_KEYS = new Set(['id', 'requestId', 'value', 'confirmed', 'cancelled']);
 function answerOf(b) {
+  if (Object.keys(b).some((k) => !ANSWER_KEYS.has(k))) throw new HttpError(400, 'Invalid answer');
   const given = ['value', 'confirmed', 'cancelled'].filter((k) => b[k] !== undefined);
   if (given.length !== 1) throw new HttpError(400, 'Send exactly one of value, confirmed or cancelled');
   if (given[0] === 'value') {

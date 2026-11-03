@@ -190,7 +190,7 @@
   // The state of the session (RPC2-1), shown inside the composer frame. Icon + word, never colour alone. c = { info, rpc } (rpc: what V.rpcReduce keeps).
   const SESS_TITLE = {
     loading: 'Loading the session', unknown: 'The session state is unknown', none: 'The session is not started: sending a message starts it', starting: 'The session is starting; this can take half a minute',
-    free: 'The session is idle: you can write to it', working: 'The session is working', waiting: 'pi is asking something; answering from the panel comes next',
+    free: 'The session is idle: you can write to it', working: 'The session is working', waiting: 'pi is asking something: answer it in the card of the chat',
   };
   const SESS_VIEW = {
     loading: ['gray', '○', 'Loading…'], unknown: ['gray', '?', 'Unknown'], none: ['gray', '○', 'Not started'], starting: ['yellow', '◌', 'Starting…'], free: ['gray', '○', 'Idle'],
@@ -432,12 +432,12 @@
   // The composer: can the person send free text now, and if not, why. c = { info, rpc, sending }. A session that is not started can be written to
   // (sending starts it); one that is starting, working or asking cannot. REASON words the same cases for the command menu (actionMenu).
   const REASON = {
-    working: 'The session is working: wait until it is free', waiting: 'The session is asking you something: answer it in its terminal',
+    working: 'The session is working: wait until it is free', waiting: 'The session is asking you something: answer it in the card of the chat',
     none: 'No open session of this repo', unknown: 'The session state is unknown',
   };
   const COMPOSER_WAIT = {
     starting: 'The session is starting…', busy: 'The session is working: wait until it is idle, or press Stop',
-    asking: 'pi is asking something; answering from the panel comes next',
+    asking: 'pi is asking something: answer it in the card of the chat',
   };
   const rpcWait = (c) => (c.rpc && COMPOSER_WAIT[c.rpc.state]) || (!c.rpc ? REASON.unknown : '');
   function composerState(c, ctx = {}) {
@@ -607,15 +607,54 @@
   const pendingHtml = (pending, items) => (pending || []).filter((p) => userCount(items, p.text) <= p.base)
     .map((p) => `<div class="m me pending"><span class="who">You · ${PENDING_WHO[p.state] || PENDING_WHO.sending}</span>${mdHtml(p.text)}</div>`).join('');
 
-  // RPC2-1: what the live session adds under the history: the answer being written (escaped like every message) and, while pi waits for a dialog, one line
-  // with a Cancel button (answering from the panel is RPC2-3).
-  const ASK_LINE = 'pi is asking something; answering from the panel comes next';
+  // What the live session adds under the history: the answer being written (escaped like every message) and one card per dialog pi waits for (RPC2-3).
+  // The card is how the person answers a PERMISSION, so: everything is escaped, the message (the FULL command) is shown whole, Deny comes first, and
+  // the Allow of a confirm (or an option of an «Allow…» select) is NOT offered when the text may be cut or is not shown (RP81): then only the
+  // refusing answers remain. There is no «Allow always» and no key that answers; every answer is a click.
+  const CUT_NOTE = 'The command is cut or not shown: answer it in the terminal';
+  // Only what the person can SEE counts: letters, numbers, punctuation, symbols, spaces and spacing marks, plus LF and TAB. Everything else (controls, zero-width,
+  // bidi, combining marks and variation selectors, unassigned and private-use characters) is hidden: a whitelist by category, so no list of "bad characters"
+  // has to be complete. A hidden character is SHOWN as a marker (⟦U+200B⟧) and a text that has one is never approved: what is read is not what the agent
+  // runs. The blank fillers are letters or symbols by category and are listed on their own.
+  const HIDDEN = /[^\p{L}\p{N}\p{P}\p{S} \p{Mc}\n\t]|[\u115f\u1160\u3164\uffa0\u2800\u{1d159}\ufffc]/gu;
+  const hasHidden = (t) => typeof t === 'string' && t.search(HIDDEN) >= 0;
+  const visible = (t) => String(t == null ? '' : t).replace(HIDDEN, (ch) => `⟦U+${ch.codePointAt(0).toString(16).toUpperCase().padStart(4, '0')}⟧`);
+  // «Allow…» read through invisibles and width (NFKC): a title that only looks different is still a permission.
+  const allowTitle = (d) => d.method === 'select' && /^\s*allow/i.test(String(d.title == null ? '' : d.title).normalize('NFKC').replace(HIDDEN, ''));
+  // The text is whole when it has something visible, no hidden character, and does not end in an ellipsis or dots (also the lookalikes and spaced dots:
+  // «. . .»). A command that really ends in «..» is refused too: the safe answer is to read it in the terminal.
+  function wholeText(m) {
+    if (typeof m !== 'string' || hasHidden(m)) return false;
+    const t = m.replace(/[\s\p{Mc}]+/gu, '');
+    return t !== '' && !/[\u2026\u2025\u22ef\ufe19\u22ee\u205d\u2d48\u1365]$|[.\uff0e\u2024\u3002\u00b7]{2,}$/u.test(t);
+  }
+  // Whether the card may offer an approval. A confirm needs the server not to have cut it and the whole text. A select is never answerable when it is cut or
+  // shows hidden characters; an «Allow…» select also needs the whole text; any other select is a plain question.
+  function askAllowed(d) {
+    if (!d || typeof d !== 'object') return false;
+    if (d.method === 'confirm') return d.truncated !== true && wholeText(d.message);
+    if (d.method === 'select') {
+      if (d.truncated === true || hasHidden(d.title) || (Array.isArray(d.options) ? d.options : []).some((o) => hasHidden(o))) return false;
+      return allowTitle(d) ? wholeText(d.message) : true;
+    }
+    return true;
+  }
+  function askCard(d, repo, busy) {
+    const at = `data-act="rpc-answer" data-id="${esc(repo)}" data-request="${esc(d.requestId)}"`;
+    const btn = (label, extra, tone) => `<button type="button" class="ask-btn ask-${tone}" ${at} ${extra}${busy ? ' disabled' : ''}>${esc(label)}</button>`;
+    const ok = askAllowed(d);
+    const field = d.method === 'editor' ? '<textarea class="ask-field" rows="5" maxlength="4000"></textarea>' : '<input type="text" class="ask-field" maxlength="4000">';
+    let controls;
+    if (d.method === 'confirm') controls = btn('Deny', 'data-kind="deny"', 'negative') + (ok ? btn('Allow', 'data-kind="allow"', 'affirmative') : '');
+    else if (d.method === 'select') controls = (ok ? (Array.isArray(d.options) ? d.options : []).map((o, i) => btn(visible(o), `data-kind="option" data-index="${i}"`, 'affirmative')).join('') : '') + btn('Cancel', 'data-kind="cancel"', 'negative');
+    else controls = field + btn('Send', 'data-kind="send"', 'affirmative') + btn('Cancel', 'data-kind="cancel"', 'negative');
+    return `<div class="ch-ask" role="alert"><div class="ch-ask-title">${esc(visible(d.title) || 'The session is asking')}</div>${d.message ? `<pre class="ch-ask-text">${esc(visible(d.message))}</pre>` : ''}<div class="ch-ask-btns">${controls}</div>${ok ? '' : `<div class="ch-ask-warn" role="status">${CUT_NOTE}</div>`}</div>`;
+  }
   function rpcTail(c, who) {
     const r = c.rpc && typeof c.rpc === 'object' ? c.rpc : {};
     const streaming = r.text ? `<div class="m streaming"><span class="who">${esc(who)}</span>${mdHtml(r.text)}</div>` : r.streaming ? '<div class="m working">working…</div>' : '';
-    const first = Array.isArray(r.asks) && typeof r.asks[0] === 'string' ? r.asks[0] : '';
-    const ask = r.state === 'asking' ? `<div class="rs-note ch-asking" role="status">${ASK_LINE}${first ? ` <button type="button" class="btn-sm" data-act="rpc-cancel" data-id="${esc(c.id)}" data-request="${esc(first)}">Cancel</button>` : ''}</div>` : '';
-    return streaming + ask;
+    const asks = (Array.isArray(r.asks) ? r.asks : []).filter((d) => d && typeof d.requestId === 'string').map((d) => askCard(d, c.id, !!(c.askBusy && c.askBusy[d.requestId]))).join('');
+    return streaming + asks;
   }
 
   function chatBody(c, ctx = {}) {
@@ -630,30 +669,8 @@
     const who = info.adopted.name || info.adopted.id;
     if (!info.adoptedFound) return `${note}<div class="ch-state" role="status"><p>The session is loading. The history appears with its first message.</p></div>${pendingHtml(c.pending, [])}${rpcTail(c, who)}`;
     const items = (c.hist && c.hist.items) || [];
-    // The question the session shows on its screen, pinned after the bubbles; read-only.
-    const d = info.live && info.live.state === 'waiting' ? info.live.dialog || {} : null;
-    const shown = d && Array.isArray(d.lines) ? d.lines.map((l, i) => (i === d.selected ? `<mark class="ask-sel">${esc(l)}</mark>` : esc(l))).join('\n') : '';
-    const card = d ? `<div class="ch-ask" role="alert"><div class="ch-ask-title">The session is asking</div>${shown ? `<pre class="ch-ask-text">${shown}</pre>` : ''}${askAnswers(d.choices, c.answer)}</div>` : '';
     const pending = pendingHtml(c.pending, items);
-    return `${note}${c.hist && c.hist.truncated ? '<div class="rs-sub ch-older">Older messages are not shown</div>' : ''}${items.map((it) => bubble(it, who)).join('') || (pending ? '' : '<div class="empty">No messages yet.</div>')}${pending}${rpcTail(c, who)}${card}`;
-  }
-
-  // The answer buttons of the pinned question (RP73): one per option the server could read (dialog.choices), or the old note when there
-  // is none. `answer` is what this page did with the question ({ fp, state: sending | ok | error, text }) and counts only for the same fingerprint.
-  // An affirmative option of a cut-off question is disabled; every label and the fingerprint go through esc.
-  function askAnswers(ch, answer) {
-    if (!ch || !Array.isArray(ch.options) || !ch.options.length) return '<div class="ch-ask-note">Answer it in the terminal of the session: the panel does not answer yet.</div>';
-    const mine = answer && answer.fp === ch.fingerprint ? answer : null;
-    const locked = !!mine && mine.state !== 'error';
-    const buttons = ch.options.map((o, i) => {
-      const cut = !ch.complete && o.tone !== 'negative';
-      const title = cut ? ' title="The question is cut off, so the panel will not approve it: use the terminal"' : '';
-      return `<button type="button" class="ask-btn ${o.tone === 'negative' ? 'ask-negative' : 'ask-affirmative'}" data-act="dialog-answer" data-index="${i}" data-fp="${esc(ch.fingerprint)}"${locked || cut ? ' disabled' : ''}${title}>${esc(o.label)}</button>`;
-    }).join('');
-    const status = !mine ? '' : mine.state === 'sending' ? '<div class="ch-ask-sending" role="status">Sending the answer…</div>'
-      : mine.state === 'ok' ? `<div class="ch-ask-done" role="status">Answered: ${esc(mine.text)}</div>` : `<div class="ch-ask-error" role="status">${esc(mine.text)}</div>`;
-    const warn = ch.options.some((o) => !ch.complete && o.tone !== 'negative') ? '<div class="ch-ask-warn" role="status">The question is cut off, so only the answers that refuse are offered. To approve it, use the terminal.</div>' : '';
-    return `<div class="ch-ask-btns">${buttons}</div>${warn}<div class="ch-ask-note">Pick an answer, or answer it in the terminal.</div>${status}`;
+    return `${note}${c.hist && c.hist.truncated ? '<div class="rs-sub ch-older">Older messages are not shown</div>' : ''}${items.map((it) => bubble(it, who)).join('') || (pending ? '' : '<div class="empty">No messages yet.</div>')}${pending}${rpcTail(c, who)}`;
   }
 
   // Pinned room card (not clickable yet): the aggregate of its member rows and the room session.
@@ -713,5 +730,5 @@
     return `${ctx.failed ? '<div class="rs-note" role="status">⚠ Summary unavailable: showing the last data we have.</div>' : ''}<div class="rs-list">${body}</div>${rows.length ? LEGEND : ''}`;
   }
 
-  return { esc, mdHtml, sessionChip, blockWidths, columnView, composerState, actionMenu, actionButtonsHtml, composerNote, chatHead, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, chatBody, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
+  return { esc, mdHtml, sessionChip, blockWidths, columnView, composerState, askAllowed, actionMenu, actionButtonsHtml, composerNote, chatHead, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, chatBody, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
 }));

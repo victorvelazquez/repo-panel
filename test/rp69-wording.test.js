@@ -43,7 +43,7 @@ test('the README talks about "the session", never "the pi session", and names Ge
 
 test('the guard itself catches what it must and lets the internal names through', () => {
   for (const bad of ["'The pi session is working'", '`Sent ${x} to pi`', "'Message the pi session of repo'", '/The pi session closed/', "'Gentle Shell pi screen'"]) assert.ok(FORBIDDEN.test(bad), bad);
-  for (const ok of ["'/api/pi'", "'/api/pi-status'", 'PI_COMMANDS', 'piSend(repo)', "'pi': async (el) => {", "const piBusy = new Set();", "'Waiting for the session'"]) assert.ok(!FORBIDDEN.test(ok), ok);
+  for (const ok of ["'/api/pi'", "'/api/pi-status'", 'PI_COMMANDS', 'piSend(repo)', "'pi': async (el) => {", "const busyRepos = new Set();", "'Waiting for the session'"]) assert.ok(!FORBIDDEN.test(ok), ok);
   assert.equal(code('  // the pi session of the repo'), '');
   assert.equal(code("const a = 1; // a pi session here").trim(), 'const a = 1;');
 });
