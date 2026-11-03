@@ -16,7 +16,7 @@ const { roadmapState } = require('./roadmap.js');
 const { readState } = require('./state.js');
 const { requirementsFor } = require('./requirements.js');
 const view = require('../public/view.js');
-const { safeAnalyse, tally, loadingRow, lastMovementOf, pool } = require('./summary.js');
+const { stateFrom, safeAnalyse, tally, loadingRow, lastMovementOf, pool } = require('./summary.js');
 
 const KINDS = ['local', 'prs', 'roadmap', 'state', 'last', 'req'];
 const SUMMARY_KINDS = KINDS.filter((k) => k !== 'req'); // the Summary never shows req, so it is never one of its stale marks
@@ -52,7 +52,7 @@ function withTimeout(promise, ms) {
 }
 
 function createSummaryStore({
-  deps = {}, now = Date.now, loadCfg = loadConfig, setTimer = setTimeout, clearTimer = clearTimeout, intervals, idleAfterMs = IDLE_AFTER_MS, pool: poolSize = POOL, waitForClient = true, timeout = withTimeout, catchUpDelayMs = CATCH_UP_DELAY_MS,
+  deps = {}, now = Date.now, loadCfg = loadConfig, setTimer = setTimeout, clearTimer = clearTimeout, intervals, idleAfterMs = IDLE_AFTER_MS, pool: poolSize = POOL, waitForClient = true, timeout = withTimeout, catchUpDelayMs = CATCH_UP_DELAY_MS, sessionOf,
 } = {}) {
   const iv = { ...INTERVALS, ...intervals };
   const facts = new Map(); // repo id -> { [kind]: { value, at (last success), tried (last attempt), failed, error } }
@@ -206,8 +206,9 @@ const outcome = (fact) => JSON.stringify([fact.failed, fact.error, fact.value ==
       const f = facts.get(repo.id);
       if (!f || NEEDED.some((k) => f[k].tried === null)) return { row: loadingRow(info), why: [] };
       const last = f.last.value || null;
+      // RPC2b-1: with a getter (the RPC host) the session is its live state, read now; the stored word is the old path (RPC2b-2 removes it).
       const word = sessions.get(repo.id);
-      const session = word && t - word.at < SESSION_TTL_MS ? word.state : 'unknown';
+      const session = sessionOf ? stateFrom(sessionOf, repo.id) : word && t - word.at < SESSION_TTL_MS ? word.state : 'unknown';
       const broken = NEEDED.find((k) => f[k].value === undefined);
       if (broken) return safeAnalyse({ repo: info, last, session, error: f[broken].error });
       const out = safeAnalyse({ repo: info, snoozed: cfg.snoozed, now: t, local: f.local.value, prs: f.prs.value, roadmap: f.roadmap.value, state: f.state.value, session, last });

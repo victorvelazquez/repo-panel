@@ -145,14 +145,12 @@ function noteLocal(id) {
   setTimeout(draw, (V ? V.LIVE_CHECK_MS : 20000) + 50); // the hold ends by itself: redraw once it has
 }
 
-// The session state the buttons of a repo see (S.sent has its own verdict). RPC2-2: the live session (S.rpc) rules once it is known: idle, busy
-// (a session that is starting works), asking or closed (a closed one is not a hold: the click starts it). Before that, the live answer, or 'checking'.
+// The session state the buttons of a repo see (S.sent has its own verdict). RPC2b-1: only the live session (S.rpc) says: idle, busy (a session that is
+// starting works), asking or closed (a closed one is not a hold: the click starts it). rpcSeed gives every repo a state, so it is not undefined for long.
 const rpcSession = (id) => { const r = S.rpc[id]; return r && r.state ? (r.state === 'starting' ? 'busy' : r.state) : undefined; };
 function sessionOf(id) {
   if (S.sent[id]) return undefined;
-  const known = rpcSession(id);
-  if (known) return known;
-  return V ? V.liveSession({ live: S.live[id], answered: S.liveAnswered[id], dirtyAt: S.dirtyAt[id] }) : S.live[id];
+  return rpcSession(id);
 }
 const loadPrs = (id) => track(id, pooled(() => api(`/api/prs?id=${id}`)).then((d) => { setFact('prs', id, d); stamp(id, 'prs'); wakeReady(id, d); releaseMerged(id, d); }, (e) => { setFact('prs', id, { error: e.message }); }));
 
@@ -292,12 +290,27 @@ async function settled(id) {
 async function rpcSync(id) {
   try { S.rpc[id] = V.rpcFromStatus(S.rpc[id], await api(`/api/rpc/status?id=${encodeURIComponent(id)}`)); draw(); } catch { if (!S.rpc[id]) S.rpc[id] = V.rpcFromStatus(undefined, null); } // the stream keeps it up to date; with no answer at all it reads as not started, never stuck on unknown
 }
-const rpcSyncAll = () => new Set([S.chat.id, ...Object.keys(S.rpc)].filter((id) => id && !String(id).startsWith('room:'))).forEach(rpcSync);
+// The open chat and the repos that have something going on; a closed one has nothing to read (rpcSeed already tells it).
+const rpcSyncAll = () => new Set([S.chat.id, ...Object.keys(S.rpc).filter((id) => S.rpc[id].state !== 'closed')].filter((id) => id && !String(id).startsWith('room:'))).forEach(rpcSync);
+// RPC2b-1: the state of EVERY repo in one read, on startup and on every (re)connect. An entry that exists only takes the new `state` (its streaming text and
+// questions are the stream's); a new one starts blank. A failed read keeps what the page knew.
+const RPC_STATE_NAMES = ['starting', 'idle', 'busy', 'asking', 'closed'];
+async function rpcSeed() {
+  let r;
+  try { r = await api('/api/rpc/states'); } catch { return; }
+  if (!r || !r.states || typeof r.states !== 'object') return;
+  for (const [id, state] of Object.entries(r.states)) {
+    if (!RPC_STATE_NAMES.includes(state)) continue;
+    S.rpc[id] = S.rpc[id] ? { ...S.rpc[id], state } : V.rpcFromStatus(undefined, { state, pendingDialogs: [] });
+  }
+  draw();
+}
 
 async function readEvents(ctl) {
   const res = await fetch('/api/events', { headers: { 'x-token': TOKEN }, signal: ctl.signal });
   if (!res.ok || !res.body) throw new Error('No event stream');
-  rpcSyncAll(); // what happened while the stream was down is read from the status
+  rpcSeed(); // every repo gets its state; what happened while the stream was down is read from the status
+  rpcSyncAll();
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let rest = '';
@@ -752,13 +765,14 @@ function reqBlock(r) {
   return `<div class="conf-item">${name}${put}${reqResults(r.id, e.data)}</div>`;
 }
 
-// A room: its folder, whether a pi session is open there, its own requirements and the repos assigned to it.
+// A room: its folder, its own requirements and the repos assigned to it.
+const REASON_OF = { idle: 'free', busy: 'working', starting: 'working', asking: 'waiting', closed: 'none' };
 function roomBlock(m) {
   const last = m.lastCommit ? m.lastCommit.slice(0, 10) : 'unknown';
   const members = m.repos.length ? m.repos.map((id) => (allRepos().some((r) => r.id === id) ? nameOf(id) : `${id} (not in the panel)`)).join(', ') : 'none yet';
-  return `<div class="conf-item"><div class="conf-title"><span class="dot dot-${V.presenceDot(m.presence)}"></span> ${esc(m.name)}<button data-act="remove-room" data-name="${esc(m.name)}" title="Only removes the room from the panel; its folder and repos are not touched">Remove room</button></div>
+  return `<div class="conf-item"><div class="conf-title"><span class="dot dot-gray"></span> ${esc(m.name)}<button data-act="remove-room" data-name="${esc(m.name)}" title="Only removes the room from the panel; its folder and repos are not touched">Remove room</button></div>
     <div class="conf-line">${esc(m.path)}</div>
-    <div class="conf-line">Session: ${esc(V.presenceLabel(m.presence))} · last commit ${esc(last)}</div>
+    <div class="conf-line">Last commit ${esc(last)}</div>
     ${m.available ? '' : '<div class="conf-line">The room folder is not a repository with a base branch</div>'}
     ${reqResults(`room:${m.name}`, m)}
     <div class="conf-line">Members: ${esc(members)}</div></div>`;
@@ -1215,7 +1229,7 @@ function drawChat() {
   $('#msgBox').placeholder = cs.placeholder;
   $('#msgStop').hidden = !(S.rpc[id] && S.rpc[id].state === 'busy');
   const row = S.summary && Array.isArray(S.summary.rows) ? S.summary.rows.find((r) => r.id === id) : null;
-  const live = (S.chat.info && S.chat.info.live && S.chat.info.live.state) || 'unknown';
+  const live = REASON_OF[S.rpc[id] && S.rpc[id].state] || 'unknown'; // RPC2b-1: the reason follows the session of the host, not Orca
   paint($('#chatActions'), R.actionButtonsHtml(R.actionMenu(row, { live, changes: summaryChanges(id), flow: summaryFlow(id) }), id, { sending: !!S.sending[id] }));
   paint($('#msgNote'), R.composerNote(S.notes[id] || (S.rpc[id] && S.rpc[id].error ? { text: S.rpc[id].error } : null)));
 }
@@ -2069,6 +2083,7 @@ document.addEventListener('visibilitychange', () => {
   draw();
   if (location.hash === '#conformity') openConformity(); // deep link
   refreshAll();
+  rpcSeed();
   startEvents();
   if (V) scheduleBoard();
 })();

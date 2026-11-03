@@ -5,7 +5,6 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const lib = require('../lib.js');
 const { piStatus, piSend, scanSessions } = require('../server/pi.js');
-const { roomsState } = require('../server/rooms.js');
 
 const DIALOG = [
   'rdd running · start',
@@ -140,19 +139,6 @@ test('piSend: an idle session still gets its command, a busy one still refuses',
   assert.deepEqual(b.sent, []);
 });
 
-// ---------- rooms presence ----------
-test('rooms presence: a session that is asking counts as busy, and idle stays idle', async () => {
-  const room = { name: 'UPEN', path: 'C:\\dev\\repo', repos: ['a'] };
-  const req = async () => ({ available: true, base: 'main', results: [{ id: 'room-base-branch', status: 'pass' }], summary: { ready: true } });
-  const git = async () => ({ code: 0, stdout: '2026-10-24T10:00:00-05:00\n', stderr: '' });
-  const presence = async (preview) => {
-    const out = await roomsState({ rooms: [room], orca: fakeOrca({ preview }).orca, git, requirements: req });
-    return out.rooms[0].presence.state;
-  };
-  assert.equal(await presence(DIALOG), 'busy');
-  assert.equal(await presence(DIALOG + IDLE_BAR), 'busy');
-  assert.equal(await presence(IDLE_PI), 'idle');
-});
 
 // ---------- verdict, strip, API version ----------
 const view = require('../public/view.js');

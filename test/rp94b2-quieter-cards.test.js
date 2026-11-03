@@ -91,12 +91,12 @@ const ROADMAP = "S.roadmap.abc = { available: true, summary: { kind: 'next', id:
 const stateJs = (state) => `S.state.abc = { available: true, state: '${state}', next: 'do the next thing', at: new Date().toISOString() };`;
 
 // ---------- the room tag ----------
-test('t1: with ONE room the tag is only its dot: no name text, and the name, the state and the last commit are in the tooltip and the aria-label', () => {
+test('t1: with ONE room the tag is only its dot: no name text, and the name and the last commit are in the tooltip and the aria-label', () => {
   const page = loadPage();
   seed(page);
-  page.run("S.rooms = [{ name: 'UPEN', repos: ['abc'] }]; S.roomData = { state: 'loaded', data: { rooms: [{ name: 'UPEN', repos: ['abc'], presence: { state: 'idle' }, lastCommit: '2026-04-30T10:00:00Z' }] } };");
+  page.run("S.rooms = [{ name: 'UPEN', repos: ['abc'] }]; S.roomData = { state: 'loaded', data: { rooms: [{ name: 'UPEN', repos: ['abc'], lastCommit: '2026-04-30T10:00:00Z' }] } };");
   const h = page.run(`roomTag(${REPO})`);
-  assert.match(h, /^<span class="tag room-tag room-dot" role="img" title="Room UPEN · [^"]*last commit 2026-04-30" aria-label="Room UPEN · [^"]*last commit 2026-04-30"><span class="dot dot-green"><\/span><\/span>$/);
+  assert.match(h, /^<span class="tag room-tag room-dot" role="img" title="Room UPEN · last commit 2026-04-30" aria-label="Room UPEN · last commit 2026-04-30"><span class="dot dot-gray"><\/span><\/span>$/);
   assert.doesNotMatch(h, />UPEN</);
 });
 

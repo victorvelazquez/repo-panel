@@ -262,8 +262,8 @@ test('scope filters the cards and the counts; the scope bar keeps its buttons an
 
 // ---------- room card ----------
 const ROOMS = { rooms: [
-  { name: 'UPEN', repos: ['a', 'b', 'c'], presence: { state: 'idle' }, lastCommit: '2026-05-01T09:00:00Z' },
-  { name: 'H2O', repos: ['d'], presence: { state: 'busy' }, lastCommit: null },
+  { name: 'UPEN', repos: ['a', 'b', 'c'], lastCommit: '2026-05-01T09:00:00Z' },
+  { name: 'H2O', repos: ['d'], lastCommit: null },
 ] };
 const RROWS = [
   row({ id: 'a', name: 'ra', room: 'UPEN', progress: progress({ total: 10, completada: 4 }), needs: true, rank: 1 }),
@@ -274,29 +274,30 @@ const RROWS = [
 ];
 const roomCtx = { roomData: ROOMS, rooms: [{ name: 'UPEN', repos: ['a', 'b', 'c'] }, { name: 'H2O', repos: ['d'] }] };
 
-test('room cards come first, in config order, with name, room chip, session chip, aggregate bar, counts and last commit; no button', () => {
+test('room cards come first, in config order, with name, room chip, no session chip, aggregate bar, counts and last commit; no button', () => {
   const html = view(RROWS, roomCtx);
   const first = html.indexOf('rs-room');
   assert.ok(first > -1 && first < html.indexOf('data-id="a"'));
   assert.ok(html.indexOf('★ UPEN') < html.indexOf('★ H2O'));
   const card = html.slice(html.indexOf('★ UPEN') - 80, html.indexOf('★ H2O'));
   assert.match(card, /<span class="chip purple">room<\/span>/);
-  assert.match(card, /○ free/);
+  assert.doesNotMatch(card, /\u25cb|\u25cf|free|working|unknown/, 'RPC2b-1: a room shows no session state');
   assert.doesNotMatch(card, /6\/15|rs-count/, 'RP94: no count next to the bar');
   assert.match(card, /3 projects · 1 need attention/);
   assert.match(card, /3 h ago/);
   assert.doesNotMatch(card, /<button/);
   const h2o = html.slice(html.indexOf('★ H2O'), html.indexOf('data-id="a"') > html.indexOf('★ H2O') ? undefined : html.indexOf('data-id="a"'));
-  assert.match(h2o, /● working/);
+  assert.doesNotMatch(h2o, /\u25cf|working/);
   assert.match(h2o, /1 project · 0 need attention/);
 });
 
-test('room session chip: idle free, busy working, closed no session, anything else unknown', () => {
-  const of = (state) => view(RROWS, { ...roomCtx, roomData: { rooms: [{ name: 'UPEN', repos: [], presence: { state }, lastCommit: null }] }, scope: { kind: 'room', name: 'UPEN' } });
-  assert.match(of('idle'), /rs-room[\s\S]*○ free/);
-  assert.match(of('busy'), /rs-room[\s\S]*● working/);
-  assert.match(of('closed'), /rs-room[\s\S]*○ no session/);
-  assert.match(of('weird'), /rs-room[\s\S]*\? unknown/);
+test('room card: no session chip whatever the room data carries (a stale presence field is ignored)', () => {
+  const of = (presence) => view(RROWS, { ...roomCtx, roomData: { rooms: [{ name: 'UPEN', repos: [], presence, lastCommit: null }] }, scope: { kind: 'room', name: 'UPEN' } });
+  for (const presence of [{ state: 'idle' }, { state: 'busy' }, { state: 'closed' }, { state: 'weird' }, undefined]) {
+    const html = of(presence);
+    assert.match(html, /rs-room/);
+    assert.doesNotMatch(html.slice(html.indexOf('rs-room'), html.indexOf('</article>', html.indexOf('rs-room'))), /\u25cb|\u25cf|\? unknown|no session/);
+  }
 });
 
 test('room cards: every room in All, only its own in a room scope, none in No room, none without room data', () => {

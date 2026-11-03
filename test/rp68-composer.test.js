@@ -449,10 +449,10 @@ test('actions: with the session working nothing is drawn, and it comes back when
   page.run("ACTIONS['chat-open']({ dataset: { id: 'abc' } })");
   await page.tick();
   assert.match(page.get('#chatActions').html, /data-cmd="flow-commit"/);
-  page.run("S.chat.info = { ...S.chat.info, live: { state: 'working', count: 1 } }; draw();");
+  page.run("S.rpc.abc = { ...S.rpc.abc, state: 'busy' }; draw();"); // RPC2b-1: the reason follows S.rpc, not the live answer
   await page.tick();
   assert.equal(page.get('#chatActions').html, '');
-  page.run("S.chat.info = { ...S.chat.info, live: { state: 'free', count: 1 } }; draw();");
+  page.run("S.rpc.abc = { ...S.rpc.abc, state: 'idle' }; draw();");
   await page.tick();
   assert.match(page.get('#chatActions').html, /data-cmd="flow-commit"/);
 });

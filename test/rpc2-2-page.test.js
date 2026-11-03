@@ -132,12 +132,12 @@ test('g2: the commit button is enabled with an idle or a closed session and disa
   }
 });
 
-test('g3: with S.rpc unknown the old checking window is kept, then the live answer rules', async () => {
+test('g3: with S.rpc unknown sessionOf is undefined: the Orca live answer and the checking window no longer count (RPC2b-1)', async () => {
   const { page } = await pagePlus();
   page.run(`delete S.rpc['${ID}']; S.dirtyAt['${ID}'] = Date.now(); delete S.liveAnswered['${ID}']`);
-  assert.equal(page.run(`sessionOf('${ID}')`), 'checking');
+  assert.equal(page.run(`sessionOf('${ID}')`), undefined);
   page.run(`S.liveAnswered['${ID}'] = true; S.live['${ID}'] = 'busy'`);
-  assert.equal(page.run(`sessionOf('${ID}')`), 'busy');
+  assert.equal(page.run(`sessionOf('${ID}')`), undefined);
 });
 
 test('g4: S.rpc takes precedence over the live (Orca) state of the warmer', async () => {

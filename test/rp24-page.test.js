@@ -56,33 +56,23 @@ function setup(page, l) {
 const card = (page) => page.get('repoCard')(R, false, null);
 const commitBtn = (html) => /<button data-act="pi" data-id="abc" data-cmd="flow-commit"[^>]*>/.exec(html)[0];
 
+// RPC2b-1: the buttons follow S.rpc (the live session of the host); the polled Orca state S.live no longer counts.
 test('page: a dirty repo with a busy session shows /flow-commit disabled with the reason, and enables it when the session is idle', async () => {
   const page = await loadPage();
   const S = setup(page, local());
-  page.answers[URL_STATUS] = { state: 'busy' };
-  page.get('pollLive')();
-  await flush(); await flush();
-  assert.deepEqual(page.calls, [URL_STATUS]);
-  assert.equal(S.live[R.id], 'busy');
+  S.rpc[R.id] = { state: 'busy' };
   assert.match(commitBtn(card(page)), /title="the session is still working" disabled>/);
-  page.answers[URL_STATUS] = { state: 'idle' };
-  page.get('pollLive')();
-  await flush(); await flush();
-  assert.equal(S.live[R.id], 'idle');
-  assert.doesNotMatch(commitBtn(card(page)), /disabled/);
+  S.rpc[R.id] = { state: 'idle' };
+  S.live[R.id] = 'busy';
+  assert.doesNotMatch(commitBtn(card(page)), /disabled/, 'the old live answer is ignored');
 });
 
-test('page: asking has its own reason, and a failed request never blocks', async () => {
+test('page: asking has its own reason, and a repo with no session state never blocks', async () => {
   const page = await loadPage();
   const S = setup(page, local());
-  page.answers[URL_STATUS] = { state: 'asking' };
-  page.get('pollLive')();
-  await flush(); await flush();
+  S.rpc[R.id] = { state: 'asking' };
   assert.match(commitBtn(card(page)), /title="waiting for your answer in the session" disabled>/);
-  delete page.answers[URL_STATUS];
-  page.get('pollLive')();
-  await flush(); await flush();
-  assert.equal(S.live[R.id], undefined);
+  delete S.rpc[R.id];
   assert.doesNotMatch(commitBtn(card(page)), /disabled/);
 });
 

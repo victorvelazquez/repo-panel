@@ -673,8 +673,7 @@
     return `${note}${c.hist && c.hist.truncated ? '<div class="rs-sub ch-older">Older messages are not shown</div>' : ''}${items.map((it) => bubble(it, who)).join('') || (pending ? '' : '<div class="empty">No messages yet.</div>')}${pending}${rpcTail(c, who)}`;
   }
 
-  // Pinned room card (not clickable yet): the aggregate of its member rows and the room session.
-  const ROOM_SESSION = { idle: 'free', busy: 'working', closed: 'none' };
+  // Pinned room card (not clickable yet): the aggregate of its member rows (a room has no session state any more).
   function roomCard(room, rows, ctx) {
     const mine = rows.filter((r) => r.room === room.name);
     const sum = { total: null, completada: 0, enRevision: 0, bloqueada: 0, pendiente: 0, enCurso: 0 };
@@ -686,7 +685,7 @@
     }
     const need = mine.filter((r) => r.needs).length;
     return `<article class="rs-card rs-room" aria-label="Room ${esc(room.name)}">
-      <div class="rs-l1"><b class="rs-name" title="${esc(room.name)}">★ ${esc(room.name)}</b><span class="chip purple">room</span><span class="rs-spacer"></span><span class="rs-sub">last commit ${esc(relativeTime(room.lastCommit, ctx.now))}</span>${sessionChip(ROOM_SESSION[room.presence && room.presence.state] || 'unknown')}</div>
+      <div class="rs-l1"><b class="rs-name" title="${esc(room.name)}">★ ${esc(room.name)}</b><span class="chip purple">room</span><span class="rs-spacer"></span><span class="rs-sub">last commit ${esc(relativeTime(room.lastCommit, ctx.now))}</span></div>
       <div class="rs-l2">${progressHtml(sum)}<div class="rs-next"><span class="rs-sub">${plural(mine.length, 'project')} · ${need} need attention</span></div></div>
     </article>`;
   }

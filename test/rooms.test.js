@@ -45,56 +45,11 @@ test('roomsState: no rooms answers an empty list without touching Orca or Git', 
   assert.deepEqual([f.calls.length, g.calls.length], [0, 0]);
 });
 
-test('roomsState: a room reports its config, requirements, presence and last commit', async () => {
+test('roomsState: a room reports its config, requirements and last commit, and no presence', async () => {
   const { room } = await state({ terminals: [piTerm()] });
-  assert.deepEqual(Object.keys(room).sort(), ['available', 'base', 'lastCommit', 'name', 'path', 'presence', 'repos', 'results', 'summary']);
+  assert.deepEqual(Object.keys(room).sort(), ['available', 'base', 'lastCommit', 'name', 'path', 'repos', 'results', 'summary']);
   assert.deepEqual([room.name, room.path, room.repos], ['UPEN', 'C:\\dev\\ceo', ['a', 'b']]);
   assert.deepEqual([room.available, room.base, room.results, room.summary], [true, 'main', REQ.results, REQ.summary]);
-  assert.deepEqual(room.presence, { state: 'idle', sessions: 1 });
-});
-
-test('presence: closed when Orca answers and no pi screen is open in the room folder', async () => {
-  for (const terminals of [[], [piTerm({ worktreePath: 'C:/dev/other' })], [piTerm({ connected: false })]]) {
-    assert.deepEqual((await state({ terminals })).room.presence, { state: 'closed', sessions: 0 });
-  }
-  // the screen decides, not the title: a π title over a plain PowerShell is no session
-  assert.deepEqual((await state({ terminals: [piTerm({ title: 'π - ceo' })], preview: PLAIN_PS })).room.presence, { state: 'closed', sessions: 0 });
-});
-
-test('presence: a session titled Terminal 1 is seen, idle or busy, and a failing terminal is ignored when another is a session', async () => {
-  for (const title of ['Terminal 1', 'Windows PowerShell', 'pi']) {
-    assert.equal((await state({ terminals: [piTerm({ title })] })).room.presence.state, 'idle');
-  }
-  assert.deepEqual((await state({ terminals: [piTerm()], preview: BUSY_PI })).room.presence, { state: 'busy', sessions: 1 });
-  const mixed = await state({ terminals: [piTerm({ handle: 'bad' }), piTerm({ handle: 'ps' }), piTerm({ handle: 'pi' })], screens: { ps: PLAIN_PS, pi: IDLE_PI }, failShow: ['bad'] });
-  assert.deepEqual(mixed.room.presence, { state: 'idle', sessions: 1 });
-});
-
-test('presence: idle and busy come from a fresh `show` of the one session; typed text still counts as idle', async () => {
-  const idle = await state({ terminals: [piTerm()] });
-  assert.equal(idle.room.presence.state, 'idle');
-  assert.deepEqual(idle.calls, [['list'], ['show', '--terminal', 'h1']]);
-  assert.equal((await state({ terminals: [piTerm()], preview: TYPED_PI })).room.presence.state, 'idle');
-  assert.equal((await state({ terminals: [piTerm()], preview: BUSY_PI })).room.presence.state, 'busy');
-});
-
-test('presence: two or more pi screens are ambiguous', async () => {
-  const { room, calls } = await state({ terminals: [piTerm(), piTerm({ handle: 'h2' })] });
-  assert.deepEqual(room.presence, { state: 'ambiguous', sessions: 2 });
-  assert.deepEqual(calls.map((c) => c.join(' ')).sort(), ['list', 'show --terminal h1', 'show --terminal h2']);
-});
-
-test('presence: when Orca fails it is unknown, never closed', async () => {
-  for (const opts of [{ fail: 'all' }, { fail: 'list' }, { terminals: [piTerm()], fail: 'show' }, { terminals: () => ({}) }, { terminals: () => ({ terminals: 'x' }) }]) {
-    const { room } = await state(opts);
-    assert.equal(room.presence.state, 'unknown', JSON.stringify(opts));
-    assert.equal(room.presence.sessions, null);
-  }
-});
-
-test('roomsState only reads from Orca: it never sends', async () => {
-  const { calls } = await state({ terminals: [piTerm()] });
-  assert.ok(calls.every((c) => c[0] === 'list' || c[0] === 'show'));
 });
 
 test('lastCommit: the ISO date of the room HEAD, or null when Git cannot say', async () => {
@@ -109,10 +64,10 @@ test('lastCommit: the ISO date of the room HEAD, or null when Git cannot say', a
   }
 });
 
-test('roomsState: each room has its own presence and requirements; Orca is listed once', async () => {
-  const other = { name: 'TOOLS', path: 'C:\\dev\\tools', repos: [] };
-  const f = fakeOrca({ terminals: [piTerm(), piTerm({ handle: 'h2', worktreePath: 'C:/dev/tools' }), piTerm({ handle: 'h3', worktreePath: 'C:/dev/tools' })] });
+test('roomsState: each room has its own requirements and last commit; Orca is never called', async () => {
+  const other = { name: 'TOOLS', path: 'C:\dev\tools', repos: [] };
+  const f = fakeOrca({ terminals: [piTerm()] });
   const out = await roomsState({ rooms: [ROOM, other], orca: f.orca, git: gitAt(), requirements });
-  assert.deepEqual(out.rooms.map((r) => [r.name, r.presence.state]), [['UPEN', 'idle'], ['TOOLS', 'ambiguous']]);
-  assert.equal(f.calls.filter((c) => c[0] === 'list').length, 1);
+  assert.deepEqual(out.rooms.map((r) => [r.name, r.available, 'presence' in r]), [['UPEN', true, false], ['TOOLS', true, false]]);
+  assert.deepEqual(f.calls, []);
 });

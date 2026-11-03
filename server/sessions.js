@@ -196,7 +196,15 @@ async function liveOf(folder, orca, { fresh = false } = {}) {
   } catch { return { state: 'unknown', count: 0 }; }
 }
 
-async function sessionsState(id, orca = orcaTerminal, base = baseDir()) {
+// RPC2b-1: the live state from the RPC host's state; a room has no session of its own.
+const HOST_LIVE = { idle: 'free', busy: 'working', starting: 'working', asking: 'waiting' };
+const liveFromHost = (key, hostState) => {
+  let state;
+  try { state = key.startsWith('room:') ? 'closed' : hostState(key); } catch { state = 'closed'; }
+  return HOST_LIVE[state] ? { state: HOST_LIVE[state], count: 1 } : { state: 'none', count: 0 };
+};
+
+async function sessionsState(id, orca = orcaTerminal, base = baseDir(), hostState) {
   const { key, folder } = sessionKeyFor(id);
   const stored = (loadConfig().sessions || {})[key];
   return {
@@ -204,7 +212,7 @@ async function sessionsState(id, orca = orcaTerminal, base = baseDir()) {
     adopted: stored ? { id: stored.id, name: stored.name, adoptedAt: stored.adoptedAt } : null,
     adoptedFound: stored ? hasSession(folder, stored.id, base) : false,
     sessions: listSessions(folder, { base }),
-    live: await liveOf(folder, orca),
+    live: hostState ? liveFromHost(key, hostState) : await liveOf(folder, orca),
   };
 }
 
@@ -215,18 +223,18 @@ function store(key, entry) {
   saveConfig({ ...cfg, sessions });
 }
 
-async function adoptSession(id, session, orca = orcaTerminal, base = baseDir()) {
+async function adoptSession(id, session, orca = orcaTerminal, base = baseDir(), hostState) {
   const { key, folder } = sessionKeyFor(id);
   const found = listSessions(folder, { base }).find((s) => s.id === session);
   if (!found) throw new HttpError(400, 'That session is not one of the sessions listed for this folder');
   store(key, { id: found.id, name: found.name || found.id, adoptedAt: new Date().toISOString() });
-  return sessionsState(id, orca, base);
+  return sessionsState(id, orca, base, hostState);
 }
 
-async function releaseSession(id, orca = orcaTerminal, base = baseDir()) {
+async function releaseSession(id, orca = orcaTerminal, base = baseDir(), hostState) {
   const { key } = sessionKeyFor(id);
   if ((loadConfig().sessions || {})[key]) store(key, null);
-  return sessionsState(id, orca, base);
+  return sessionsState(id, orca, base, hostState);
 }
 
 // RPC2-1: `rpc/start` adopts the id it runs under when the repo has none, so the history (read from the adopted id) shows what the session writes.

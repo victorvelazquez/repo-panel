@@ -105,23 +105,9 @@
     return { message, reasons };
   }
 
-  const PRESENCE_TEXT = {
-    closed: () => 'no session open in the room folder',
-    idle: () => 'session open, idle',
-    busy: () => 'session open, busy',
-    ambiguous: (p) => `${p.sessions} sessions open: close the extra ones`,
-    unknown: () => 'Orca unavailable: session state unknown',
-  };
-
-  function presenceLabel(presence) {
-    const make = presence && PRESENCE_TEXT[presence.state];
-    return make ? make(presence) : 'session state unknown';
-  }
-
-  // Green idle, yellow busy; closed, ambiguous, unknown and anything not loaded are gray.
-  const ROOM_DOT = { idle: 'green', busy: 'yellow' };
-
-  const presenceDot = (presence) => ROOM_DOT[presence && presence.state] || 'gray';
+  // RPC2b-1: a room has no session state any more (RPC2b-3 deletes these two): always neutral.
+  const presenceLabel = () => '';
+  const presenceDot = () => 'gray';
 
   // The card's room tag: { name, dot, title }, or null for a repo that is not in a room. `entry` is the page's record
   // of /api/rooms: { state: 'loading' | 'loaded' | 'failed', data: { rooms } }; nothing is claimed until it loaded.
@@ -132,7 +118,7 @@
     const live = list && list.find((r) => r.name === room.name);
     if (!live) return { name: room.name, dot: 'gray', title: `Room ${room.name} · ${entry && entry.state === 'failed' ? 'could not read the room state' : 'checking the room…'}` };
     const last = typeof live.lastCommit === 'string' && live.lastCommit ? live.lastCommit.slice(0, 10) : 'unknown';
-    return { name: room.name, dot: presenceDot(live.presence), title: `Room ${room.name} · ${presenceLabel(live.presence)} · last commit ${last}` };
+    return { name: room.name, dot: 'gray', title: `Room ${room.name} · last commit ${last}` };
   }
 
   // The state an agent declared (the answer of /api/state), or null when it cannot be relied on: not available
