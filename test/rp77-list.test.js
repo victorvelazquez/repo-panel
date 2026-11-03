@@ -28,7 +28,6 @@ const lib = require('../lib.js');
 const S = require('../server/sessions.js');
 const P = require('../server/pi.js');
 const { createWarmer } = require('../server/livewarm.js');
-const { answerDialog } = require('../server/dialoganswer.js');
 const { scanSessions, piStatus, piSessions, clearLiveCache, liveCacheStats } = P;
 
 const REPO_ID = lib.repoId(repoDir);
@@ -347,15 +346,13 @@ test('piStatus: a failed list or a non-array terminals is unknown for everyone a
 });
 
 // ---------- the writers always list fresh, even with the shared list warm ----------
-test('piSessions and the dialog answer each make their own list call although the shared one is warm', async () => {
+test('piSessions makes its own list call although the shared one is warm', async () => {
   const f = fakeOrca(idleWorld());
   await piStatus(REPO, f.orca);
   assert.equal(f.lists(), 1);
   await piSessions(REPO, f.orca);
   await piSessions(REPO, f.orca);
   assert.equal(f.lists(), 3, 'piSessions, twice');
-  await assert.rejects(answerDialog(REPO_ID, { fingerprint: '0123456789abcdef', index: 0 }, { orca: f.orca, wait: async () => {}, now }), (e) => e.status === 409);
-  assert.equal(f.lists(), 4, 'the dialog answer');
   assert.equal(f.sends(), 0, 'nothing was sent');
 });
 

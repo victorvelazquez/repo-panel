@@ -88,21 +88,6 @@ test('applyLive does not set S.live for a repo the view does not poll (clean tre
   assert.deepEqual(S.chat.info.live, NONE);
 });
 
-test('applyLive: an answered question is forgotten when the dialog goes away or changes, kept for the same fingerprint, and never while sending', async () => {
-  for (const [answer, live, kept] of [
-    [{ fp: 'f1', state: 'ok', text: 'Yes' }, NONE, false],
-    [{ fp: 'f1', state: 'ok', text: 'Yes' }, { ...ASK, dialog: { ...ASK.dialog, choices: { ...ASK.dialog.choices, fingerprint: 'f2' } } }, false],
-    [{ fp: 'f1', state: 'ok', text: 'Yes' }, { ...ASK, count: 1, dialog: { ...ASK.dialog, lines: ['ok? (again)'] } }, true],
-    [{ fp: 'f1', state: 'sending' }, NONE, true],
-  ]) {
-    const page = await loadPage();
-    const S = setup(page);
-    S.answer[R.id] = answer;
-    applyLive(page, live);
-    assert.equal(!!S.answer[R.id], kept, JSON.stringify([answer, live.state]));
-  }
-});
-
 test('pollSkipped: with the stream connected a poller that ran a moment ago is skipped; without it, never; stopEvents forgets the last words', async () => {
   const page = await loadPage();
   const ev = page.get('ev');

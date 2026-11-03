@@ -24,7 +24,6 @@ const { roomsState, createRoom, removeRoom, assignRoom } = require('./rooms.js')
 const { queueFor, conformityFor } = require('./queue.js');
 const { summaryFor } = require('./summary.js');
 const { createSummaryStore } = require('./summarystore.js');
-const { answerDialog } = require('./dialoganswer.js');
 const { createEventHub } = require('./events.js');
 const { createRpcHost, rpcApi } = require('./rpchost.js');
 const { readUsage, usageFile } = require('./usage.js');
@@ -138,7 +137,6 @@ const routes = {
   'POST /api/pi': (q, b, d) => piSend(findRepo(b.id), b.command, d.rpcHost, d.requirements, { pr: b.pr, prs: d.prs, guard: d.guard }),
   'POST /api/sessions/adopt': (q, b, d) => adoptSession(b.id, b.session, d.orca, d.sessionsDir),
   'POST /api/sessions/release': (q, b, d) => releaseSession(b.id, d.orca, d.sessionsDir),
-  'POST /api/dialog/answer': (q, b, d) => answerDialog(b && b.id, b, { orca: d.orca, wait: d.wait, now: d.now }),
   // RPC1b: pi sessions in RPC mode, one per repo; the repo comes from the config by id and no program, folder or argument comes from the page.
   'POST /api/rpc/start': (q, b, d) => rpcApi(d.rpcHost).start(b),
   'POST /api/rpc/prompt': (q, b, d) => rpcApi(d.rpcHost).prompt(b),

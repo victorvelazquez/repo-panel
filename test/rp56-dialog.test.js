@@ -1,14 +1,12 @@
 'use strict';
-// RP56 (S50, S67): when the live session of a repo is asking a question (a dialog with a footer of keys), the chat shows
-// the question as it is on the session's screen, with the highlighted option marked. Read-only: NO key is ever sent to a
-// terminal (answering is RP73). Pure part (lib.piScreenDialog), the scan and /api/sessions with a fake Orca that records
-// every call, the card of chatBody, and the page (app.js in vm). The real Orca and the real sessions are never touched.
+// RP56 (S50, S67): the screen parser behind the question of a session (lib.piScreenDialog), the scan and /api/sessions with a fake Orca that
+// records every call. Read-only: NO key is ever sent to a terminal. The card of the chat and the page parts went with RPC2-3 (the card now comes
+// from the RPC dialogs, see rpc2-3-*.test.js). The real Orca and the real sessions are never touched.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const vm = require('node:vm');
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'rp56-'));
 const sessionsBase = path.join(scratch, 'sessions');
@@ -23,9 +21,7 @@ test.after(() => fs.rmSync(scratch, { recursive: true, force: true, maxRetries: 
 const lib = require('../lib.js');
 const S = require('../server/sessions.js');
 const { scanSessions } = require('../server/pi.js');
-const R = require('../public/resumen.js');
 
-const PUBLIC = path.join(__dirname, '..', 'public');
 const REPO_ID = lib.repoId(repoDir);
 const writeConfig = () => fs.writeFileSync(configFile, JSON.stringify({ port: 4310, groups: [{ name: 'G', repos: [{ path: repoDir }] }], rooms: [] }));
 
@@ -190,185 +186,3 @@ test('sessionsState: an Orca failure stays unknown with no dialog, and nothing i
   assert.deepEqual(blind.sends(), []);
 });
 
-// ---------- 4. chatBody: the pinned card ----------
-const info = (live, o = {}) => ({ key: 'r1', adopted: { id: 's1', name: 'panel:alpha' }, adoptedFound: true, sessions: [], live, ...o });
-const HIST = { found: true, truncated: false, items: [{ role: 'user', text: 'hello there', at: null, tools: [] }, { role: 'assistant', text: 'Taking it.', at: null, tools: [] }] };
-const body = (c) => R.chatBody({ id: 'r1', hist: HIST, ...c }, { now: Date.parse('2026-05-01T12:00:00Z') });
-const dlg = (lines, selected) => ({ text: lines.join('\n'), lines, selected });
-const cardOf = (html) => (/<div class="ch-ask" role="alert">[\s\S]*$/.exec(html) || [''])[0];
-const TITLE = /class="ch-ask-title"[^>]*>The session is asking</;
-const NOTE = /class="ch-ask-note"[^>]*>Answer it in the terminal of the session: the panel does not answer yet\.</;
-
-test('chatBody: waiting with a dialog appends AFTER the bubbles one card with title, the lines (selected one in a mark) and the note', () => {
-  const lines = ['Run a guarded command?', '→ Allow once', 'Allow for this session', 'Deny', NAV];
-  const html = body({ info: info({ state: 'waiting', count: 1, dialog: dlg(lines, 1) }) });
-  const card = cardOf(html);
-  assert.notEqual(card, '');
-  assert.equal((html.match(/class="ch-ask"/g) || []).length, 1);
-  assert.ok(html.indexOf('hello there') < html.indexOf('class="ch-ask"') && html.indexOf('Taking it.') < html.indexOf('class="ch-ask"'));
-  assert.match(card, TITLE);
-  assert.match(card, NOTE);
-  const pre = /<pre class="ch-ask-text">([\s\S]*?)<\/pre>/.exec(card);
-  assert.ok(pre, 'a pre with the lines');
-  assert.equal(pre[1], ['Run a guarded command?', '<mark class="ask-sel">→ Allow once</mark>', 'Allow for this session', 'Deny', R.esc(NAV)].join('\n'));
-  assert.equal((card.match(/<mark/g) || []).length, 1);
-});
-
-test('chatBody: no selected line means no mark; waiting without a dialog shows the title and the note but no pre', () => {
-  const plain = cardOf(body({ info: info({ state: 'waiting', count: 1, dialog: dlg(['Pick one', NAV], null) }) }));
-  assert.match(plain, /<pre class="ch-ask-text">Pick one\n/);
-  assert.doesNotMatch(plain, /<mark/);
-  const bare = cardOf(body({ info: info({ state: 'waiting', count: 1 }) }));
-  assert.match(bare, /^<div class="ch-ask" role="alert">/);
-  assert.match(bare, TITLE);
-  assert.match(bare, NOTE);
-  assert.doesNotMatch(bare, /<pre|<mark/);
-});
-
-test('chatBody: any other state shows no card, even when a dialog is present', () => {
-  for (const state of ['free', 'working', 'none', 'unknown']) {
-    assert.doesNotMatch(body({ info: info({ state, count: 1, dialog: dlg(['x', NAV], null) }) }), /ch-ask/, state);
-  }
-  assert.doesNotMatch(body({ info: info({ state: 'free', count: 1 }) }), /ch-ask/);
-});
-
-test('chatBody: the card is also shown when there are no messages yet', () => {
-  const html = body({ hist: { found: true, truncated: false, items: [] }, info: info({ state: 'waiting', count: 1, dialog: dlg(['Q?', NAV], null) }) });
-  assert.match(html, /No messages yet/);
-  assert.match(cardOf(html), TITLE);
-});
-
-test('chatBody: a hostile dialog never produces raw tags; the text appears escaped', () => {
-  const lines = ['<script>alert(1)</script>', '→ <img src=x onerror=alert(1)>', 'say "hi" & \'bye\'', `<b>${'q'.repeat(200)}</b>`, NAV];
-  const card = cardOf(body({ info: info({ state: 'waiting', count: 1, dialog: dlg(lines, 1) }) }));
-  assert.notEqual(card, '');
-  const tags = new Set([...card.matchAll(/<\/?([a-zA-Z][a-zA-Z0-9]*)/g)].map((m) => m[1].toLowerCase()));
-  for (const t of tags) assert.ok(['div', 'span', 'pre', 'mark'].includes(t), `unexpected tag ${t}`);
-  assert.doesNotMatch(card, /<script|<img|<b>/);
-  assert.ok(card.includes('&lt;script&gt;alert(1)&lt;/script&gt;'));
-  assert.ok(card.includes('<mark class="ask-sel">→ &lt;img src=x onerror=alert(1)&gt;</mark>'));
-  assert.ok(card.includes('say &quot;hi&quot; &amp; &#39;bye&#39;'));
-  assert.ok(card.includes(`&lt;b&gt;${'q'.repeat(200)}&lt;/b&gt;`));
-});
-
-// ---------- 7. the real fixtures end to end: screen -> dialog -> card ----------
-test('fixtures A-E: dialog found, footer is the last line, selected points at the arrow, the card holds the escaped question', () => {
-  for (const [name, screenText, question, footerLine, selected] of DIALOGS) {
-    const d = lib.piScreenDialog(screenText);
-    assert.notEqual(d, null, name);
-    assert.equal(d.lines[d.lines.length - 1], footerLine, `${name}: footer last`);
-    assert.equal(d.lines.includes(SEP), false, `${name}: separator dropped`);
-    assert.equal(d.selected, selected, name);
-    assert.ok(/^(→|>) /.test(d.lines[d.selected]), `${name}: arrow line`);
-    assert.equal(d.lines[0], question, name);
-    const card = cardOf(body({ info: info({ state: 'waiting', count: 1, dialog: d }) }));
-    assert.ok(card.includes(R.esc(question)), `${name}: question in the card`);
-    assert.ok(card.includes(`<mark class="ask-sel">${R.esc(d.lines[d.selected])}</mark>`), `${name}: marked line`);
-  }
-  assert.equal(lib.piScreenDialog(A).lines[2], '→ Yes');
-  assert.equal(lib.piScreenDialog(D).lines[1], '→ Allow once');
-  assert.equal(lib.piScreenDialog(E).lines[1], '→ 1. Review this change');
-  assert.match(cardOf(body({ info: info({ state: 'waiting', count: 1, dialog: lib.piScreenDialog(A) }) })), /fetch origin --prune &amp;&amp; git log/);
-  assert.equal(lib.piScreenDialog(B_NO_ARROW).selected, null);
-  assert.equal(lib.piScreenDialog(B_NO_ARROW).lines.at(-1), FOOT_B);
-});
-
-// ---------- 5. the page ----------
-function element(extra = {}) {
-  const el = {
-    writes: 0, html: '', hidden: false, dataset: {}, disabled: false, value: '', checked: false, textContent: '', title: '', attrs: {}, listeners: {}, children: [], open: false,
-    classList: { add() {}, remove() {}, toggle() {}, contains: () => false },
-    style: { setProperty(k, v) { el.style[k] = v; } },
-    addEventListener(t, fn) { (el.listeners[t] ||= []).push(fn); }, setAttribute(k, v) { el.attrs[k] = v; }, querySelector: () => null, querySelectorAll: () => [], closest: () => null,
-    showModal() {}, close() {}, focus() {}, append(c) { el.children.push(c); },
-    get innerHTML() { return el.html; },
-    set innerHTML(v) { el.html = String(v); el.writes++; },
-    ...extra,
-  };
-  return el;
-}
-
-function loadPage({ answers = {} } = {}) {
-  const els = {};
-  const frames = [];
-  const docL = {};
-  const intervals = [];
-  const store = {};
-  const fetches = [];
-  const tabEls = ['summary', 'work', 'conformity'].map((t) => element({ dataset: { tab: t } }));
-  const get = (sel) => (els[sel] ||= (sel === 'meta[name=token]' ? element({ content: 'token' }) : element()));
-  const doc = {
-    hidden: false, querySelector: get, querySelectorAll: (s) => (String(s).includes('data-tab') ? tabEls : []),
-    addEventListener(t, fn) { (docL[t] ||= []).push(fn); }, createElement: () => element(), body: element(), activeElement: null,
-  };
-  const ctx = vm.createContext({
-    console, document: doc, location: { hash: '' },
-    localStorage: { getItem: (k) => (k in store ? store[k] : null), setItem(k, v) { store[k] = String(v); }, removeItem(k) { delete store[k]; } },
-    requestAnimationFrame: (cb) => { frames.push(cb); return frames.length; },
-    setInterval: (fn, ms) => { intervals.push({ fn, ms }); return intervals.length; }, setTimeout: () => 0, clearTimeout: () => {}, AbortController, confirm: () => true,
-    fetch: (url, opts = {}) => {
-      fetches.push({ url, method: opts.method || 'GET', body: opts.body });
-      const a = Object.entries(answers).find(([k]) => url.startsWith(k));
-      if (!a) return new Promise(() => {});
-      return typeof a[1] === 'function' ? a[1](url, opts) : Promise.resolve({ ok: true, json: async () => a[1] });
-    },
-  });
-  ctx.window = ctx;
-  ctx.addEventListener = () => {};
-  ctx.RepoPanelView = require('../public/view.js');
-  ctx.RepoPanelResumen = R;
-  vm.runInContext(fs.readFileSync(path.join(PUBLIC, 'app.js'), 'utf8'), ctx);
-  const flush = () => { while (frames.length) frames.shift()(); };
-  const tick = async (n = 6) => { for (let i = 0; i < n; i++) await new Promise((r) => setImmediate(r)); flush(); };
-  return { ctx, get, tick, fetches, intervals, run: (code) => vm.runInContext(code, ctx) };
-}
-const row = (o = {}) => ({
-  id: 'r1', name: 'alpha', group: 'G', room: null, branch: 'main', progress: { total: 4, completada: 1, enRevision: 0, bloqueada: 0, pendiente: 3, enCurso: 0 }, session: { state: 'free' },
-  next: null, blocking: [], lastMovement: { at: '2026-05-01T11:48:00Z', what: 'x' }, action: null, error: null, needs: false, rank: 9, ...o,
-});
-const seed = (page) => {
-  const S2 = page.run('S');
-  S2.groups = [{ name: 'G', repos: [{ id: 'abc', name: 'demo', path: 'p' }] }];
-  S2.summary = { rows: [row({ id: 'abc', name: 'demo' })], generatedAt: 'x' };
-};
-
-test('page: the card appears with the dialog, disappears when the next poll has none, #sessState is unchanged, and nothing is POSTed', async () => {
-  let live = { state: 'waiting', count: 1, dialog: D_DIALOG };
-  const sessions = () => ({ key: 'abc', adopted: { id: 's1', name: 'panel:demo', adoptedAt: 'x' }, adoptedFound: true, sessions: [], live });
-  const histAnswer = { key: 'abc', sessionId: 's1', found: true, items: [{ role: 'user', text: 'hello there', at: null, tools: [] }], truncated: false, updatedAt: null };
-  const page = loadPage({ answers: { '/api/sessions': () => Promise.resolve({ ok: true, json: async () => sessions() }), '/api/chat': histAnswer } });
-  seed(page);
-  page.run("ACTIONS['chat-open']({ dataset: { id: 'abc' } })");
-  await page.tick();
-  const html = page.get('#chatBody').html;
-  assert.match(html, /hello there/);
-  assert.match(cardOf(html), TITLE);
-  assert.match(cardOf(html), /<mark class="ask-sel">→ Allow once<\/mark>/);
-  const label = page.get('#sessState').html;
-  live = { state: 'free', count: 1 };
-  page.intervals.find((i) => i.ms === 5000).fn();
-  await page.tick();
-  assert.doesNotMatch(page.get('#chatBody').html, /ch-ask/);
-  assert.match(page.get('#chatBody').html, /hello there/);
-  assert.equal(page.get('#sessState').html, label, 'the label follows the rpc state (RPC2-1), not the screen the card was read from');
-  assert.ok(page.fetches.length >= 4, 'it did poll');
-  // The board POSTs its own read-only queries (/api/queue, /api/conformity); what must never happen is an order or a message to a session.
-  assert.deepEqual(page.fetches.filter((f) => /^\/api\/(pi|chat\/send|chat\/clear)\b/.test(String(f.url))), []);
-});
-
-// ---------- 6. safety source guard ----------
-test('safety: the new function and the chat card code never reference send, orca or key bytes', () => {
-  assert.equal(typeof lib.piScreenDialog, 'function');
-  const src = lib.piScreenDialog.toString();
-  assert.doesNotMatch(src, /send/i);
-  assert.doesNotMatch(src, /orca/i);
-  assert.equal(src.includes('\\x1b'), false);
-  assert.equal(src.includes('\u001b'), false);
-  const chat = R.chatBody.toString();
-  assert.match(chat, /ch-ask/);
-  assert.doesNotMatch(chat, /send|orca|\/api\/pi|\\x1b/i);
-  const app = fs.readFileSync(path.join(PUBLIC, 'app.js'), 'utf8');
-  const region = app.slice(app.indexOf('// ---------- chat (RP54)'), app.indexOf('// ---------- end chat ----------'));
-  assert.ok(region.length > 500);
-  assert.doesNotMatch(region, /\/api\/pi|piSend|\bsend\b|'send'/);
-});

@@ -34,7 +34,7 @@ const S = {
   tab: 'summary', scope: { kind: 'all' }, summary: null, summaryKey: '', summaryFailed: false, sfilter: 'all', collapsed: {},
   timeouts: { get: 25000, post: 70000 },
   tasks: {}, tasksFilter: '', tasksOpenDone: false, changes: {}, files: {}, filesOpen: {}, fileData: {}, pad: {},
-  chat: { id: null, seq: 0 }, chatCache: {}, drafts: {}, recall: {}, notes: {}, answer: {}, rpc: {},
+  chat: { id: null, seq: 0 }, chatCache: {}, drafts: {}, recall: {}, notes: {}, askBusy: {}, rpc: {},
 };
 S.tab = S.prefs.tab === 'work' ? 'work' : 'summary';
 S.backTab = S.tab; // the tab Conformity returns to (it is never saved as the preference)
@@ -262,8 +262,6 @@ function applyLive(entries) {
       S.chat.info = { ...info, live: e.live };
       S.chat.key = JSON.stringify([S.chat.info, S.chat.hist]);
       if (V) V.chatCachePut(S.chatCache, e.id, S.chat); // RP79
-      const ch = e.live.dialog && e.live.dialog.choices;
-      if (S.answer[e.id] && S.answer[e.id].state !== 'sending' && (!ch || ch.fingerprint !== S.answer[e.id].fp)) delete S.answer[e.id]; // that question is over
       changed = true;
     }
   }
@@ -875,7 +873,7 @@ const summaryShown = () => (S.summary && Array.isArray(S.summary.rows)
 // The chat as the label and the body see it: the pending messages and the live session (S.rpc) of the open repo.
 function chatView() {
   const id = S.chat.id;
-  return { ...S.chat, pending: S.pending[id], answer: S.answer[id], rpc: S.rpc[id] };
+  return { ...S.chat, pending: S.pending[id], askBusy: S.askBusy, rpc: S.rpc[id] };
 }
 
 function drawSummary() {
@@ -933,8 +931,6 @@ async function loadChat(id, { user = false, signal } = {}) {
     S.chat.cached = false;
     if (key === S.chat.key && !recovered) return;
     Object.assign(S.chat, { info, hist, key });
-    const ch = info.live && info.live.dialog && info.live.dialog.choices;
-    if (S.answer[id] && S.answer[id].state !== 'sending' && (!ch || ch.fingerprint !== S.answer[id].fp)) delete S.answer[id]; // that question is over
     draw();
   } catch {
     if (signal && signal.aborted) return; // cancelled on purpose: neither a failure nor a toast
@@ -1790,31 +1786,40 @@ const ACTIONS = {
   'tasks-filter': (el) => { S.tasksFilter = String((el && el.value) || ''); draw(); },
   'chat-close': () => closeChat(),
   'chat-send': () => sendChatMessage(),
-  // RP73: answer the question of the open chat. The server presses the keys; this only posts { id, fingerprint, index } and draws the
-  // outcome in the card. Optimistic like the composer: the buttons lock in the same tick, an error unlocks them with the server's message.
-  'dialog-answer': async (el) => {
-    const id = S.chat.id;
-    const { index, fp } = el.dataset;
-    const mine = id && S.answer[id];
-    if (!R || !id || !/^[0-7]$/.test(String(index)) || !/^[0-9a-f]{16}$/.test(String(fp)) || (mine && mine.state !== 'error')) return;
-    S.answer[id] = { fp, state: 'sending' };
-    draw();
-    try {
-      const d = await api('/api/dialog/answer', { id, fingerprint: fp, index: Number(index) });
-      S.answer[id] = { fp, state: 'ok', text: d.option };
-    } catch (e) { S.answer[id] = { fp, state: 'error', text: e.message }; }
-    draw();
-  },
   'chat-stop': async () => {
     const id = S.chat.id;
     if (!id) return;
     try { await api('/api/rpc/abort', { id }); } catch (e) { toast(e.message, 'bad'); }
   },
-  // RPC2-1: a dialog pi is waiting for can only be cancelled from here; answering it is RPC2-3.
-  'rpc-cancel': async (el) => {
-    const { id, request } = el.dataset;
-    if (!id || !request) return;
-    try { await api('/api/rpc/dialog', { id, requestId: request, cancelled: true }); } catch (e) { toast(e.message, 'bad'); }
+  // RPC2-3: answer a dialog pi is waiting for. The answer is built HERE from the dialog the page holds (S.rpc), never from the text of the button: the
+  // click names the request and the kind, the option is the one at that index and the typed text is read from the card's own field. Posted ONCE: the
+  // card locks at the click and only a refusal unlocks it; a 409 (the question is gone) resyncs the status, which takes the card away.
+  'rpc-answer': async (el) => {
+    const { id, request, kind } = el.dataset;
+    const ask = id && S.rpc[id] && (S.rpc[id].asks || []).find((d) => d.requestId === request);
+    if (!R || !ask || S.askBusy[request]) return;
+    let answer = null;
+    if (kind === 'cancel') answer = { cancelled: true };
+    else if (kind === 'deny' && ask.method === 'confirm') answer = { confirmed: false };
+    else if (kind === 'allow' && ask.method === 'confirm' && R.askAllowed(ask)) answer = { confirmed: true };
+    else if (kind === 'option' && ask.method === 'select' && R.askAllowed(ask) && typeof ask.options[Number(el.dataset.index)] === 'string') answer = { value: ask.options[Number(el.dataset.index)] };
+    else if (kind === 'send' && (ask.method === 'input' || ask.method === 'editor')) {
+      const box = typeof el.closest === 'function' ? el.closest('.ch-ask') : null;
+      const field = box && box.querySelector('.ask-field');
+      if (field && typeof field.value === 'string') answer = { value: field.value };
+    }
+    if (!answer) return;
+    S.askBusy[request] = true;
+    draw();
+    try {
+      await api('/api/rpc/dialog', { id, requestId: request, ...answer });
+      await rpcSync(id);
+      delete S.askBusy[request];
+    } catch (e) {
+      delete S.askBusy[request];
+      if (e.status === 409) await rpcSync(id); else toast(e.message, 'bad');
+    }
+    draw();
   },
   'chat-adopt': async (el) => {
     const { id, session } = el.dataset;

@@ -155,7 +155,7 @@ test('composerState: one distinct, non-empty reason per blocked case and a non-e
   }
   assert.equal(new Set(Object.values(cases).map((v) => v.reason)).size, 5);
   assert.equal(cases.working.reason, WORKING);
-  assert.equal(cases.asking.reason, 'pi is asking something; answering from the panel comes next');
+  assert.equal(cases.asking.reason, 'pi is asking something: answer it in the card of the chat');
   assert.equal(cases.sending.reason, 'Sending…');
   assert.ok(cs({ info: adoptedInfo(), rpc: { state: 'idle' } }).placeholder.length > 0);
 });
@@ -213,7 +213,7 @@ test('actionMenu: flow-next reasons (changes first, then no unit), and a repo wi
 });
 
 test('actionMenu: when the session is not free all four are unavailable with the reason of that state', () => {
-  const REASONS = { working: 'The session is working: wait until it is free', waiting: 'The session is asking you something: answer it in its terminal', none: 'No open session of this repo', unknown: 'The session state is unknown' };
+  const REASONS = { working: 'The session is working: wait until it is free', waiting: 'The session is asking you something: answer it in the card of the chat', none: 'No open session of this repo', unknown: 'The session state is unknown' };
   for (const [live, reason] of Object.entries(REASONS)) {
     const m = menuOf(card({ action: { kind: 'start' }, next: NEXT }), { live });
     assert.deepEqual(avail(m), [false, false, false, false], live);

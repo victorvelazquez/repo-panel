@@ -76,55 +76,7 @@ test('the marker on the last option leaves a single option: null by default, one
   assert.equal(lib.piDialogChoices(text({ labels: ['Yes'] }), { allowSingle: false }), null);
 });
 
-// ---------- piDialogMovedDown(first, now, steps = 1): the closed-loop check after each down arrow ----------
-const FOURL = ['Allow once', 'Allow for this session', 'Always allow in this repo', 'Deny'];
-const read = (o, allowSingle = true) => lib.piDialogChoices(text(o), { allowSingle });
-const moved = (before, after, steps) => lib.piDialogMovedDown(read(before, false), read(after), steps);
-
-test('piDialogMovedDown: moved exactly one row is true; the timer above and the widget below the dialog do not count', () => {
-  assert.equal(typeof lib.piDialogMovedDown, 'function');
-  assert.equal(moved({ labels: FOURL, marker: 0 }, { labels: FOURL, marker: 1 }), true);
-  assert.equal(moved({ labels: FOURL, marker: 0 }, { labels: FOURL, marker: 1 }, 1), true);
-  assert.equal(moved({ labels: FOURL, marker: 0 }, { labels: FOURL, marker: 3 }, 3), true, 'steps counts the arrows sent');
-  const talk = ['earlier', 'elapsed 00:01', ''];
-  const tail = [SEP, `${' '.repeat(40)}5h 14% ↻11:20 · 7d 6% ↻jue 11:00`, 'tokens 100'];
-  assert.equal(moved({ talk, labels: FOURL, marker: 0, tail }, { talk: ['earlier', 'elapsed 00:02', ''], labels: FOURL, marker: 1, tail: [SEP, WIDGET, 'tokens 7000'] }), true);
-});
-
-test('piDialogMovedDown: moved two rows, did not move, or moved back is false', () => {
-  assert.equal(moved({ labels: FOURL, marker: 0 }, { labels: FOURL, marker: 2 }), false);
-  assert.equal(moved({ labels: FOURL, marker: 0 }, { labels: FOURL, marker: 0 }), false);
-  assert.equal(moved({ labels: FOURL, marker: 1 }, { labels: FOURL, marker: 0 }), false);
-  assert.equal(moved({ labels: FOURL, marker: 0 }, { labels: FOURL, marker: 1 }, 2), false, 'one arrow seen, two expected');
-});
-
-test('piDialogMovedDown: a changed question, footer row, label or option count is false', () => {
-  const base = { labels: FOURL, marker: 0 };
-  const after = { labels: FOURL, marker: 1 };
-  assert.equal(moved(base, { ...after, question: [TITLE, CMD.replace('demo-branch', 'other-branch')] }), false, 'question text changed');
-  assert.equal(moved(base, { ...after, question: ['Run another guarded command?', 'rm x'] }), false);
-  assert.equal(moved(base, { ...after, question: [TITLE] }), false, 'a question row less moves the block');
-  assert.equal(moved(base, { ...after, talk: ['one more row'] }), false, 'the dialog sits one row lower: a different footer row');
-  assert.equal(moved(base, { ...after, labels: ['Allow once', 'Allow for this session', 'Always allow in this repo', 'Deny'].map((l, i) => (i === 2 ? 'Always allow everywhere' : l)) }), false, 'a label below the marker changed');
-  assert.equal(moved(base, { ...after, labels: ['Allow one', ...FOURL.slice(1)] }), false, 'the label of the option the marker left changed');
-  assert.equal(moved(base, { ...after, labels: FOURL.slice(0, 3) }), false, 'an option disappeared');
-  assert.equal(moved(base, { ...after, footer: 'enter select  escape cancel' }), false, 'the footer row changed');
-});
-
-test('piDialogMovedDown: nulls and other values are false, never a throw', () => {
-  const ok = read({ labels: FOURL, marker: 0 }, false);
-  for (const bad of [null, undefined, {}, 5, 'x']) {
-    assert.equal(lib.piDialogMovedDown(bad, ok), false);
-    assert.equal(lib.piDialogMovedDown(ok, bad), false);
-  }
-});
-
-test('piDialogMovedDown: the block of a 12-row question (the cap) is still compared over the rows of the first read', () => {
-  const question = Array.from({ length: 12 }, (_, i) => `question row ${i}`);
-  assert.equal(moved({ question, labels: FOURL, marker: 0 }, { question, labels: FOURL, marker: 1 }), true);
-  const changed = question.map((q, i) => (i === 0 ? 'question row X' : q));
-  assert.equal(moved({ question, labels: FOURL, marker: 0 }, { question: changed, labels: FOURL, marker: 1 }), false, 'the first row of the block changed');
-});
+// ---------- the block and the extras of piDialogChoices (piDialogMovedDown left with RPC2-3) ----------
 
 test('the block and the extras are not enumerable: the result keeps its five keys and JSON does not carry them', () => {
   const got = parse({});
@@ -372,14 +324,6 @@ test('real shape: the topmost question-mark row wins, so a question mark inside 
   const got = lib.piDialogChoices([TITLE, 'node -e "x ? 1 : 2; console.log(a?)"', 'continues here', '→ Yes', '  No', NAV].join('\n'));
   assert.deepEqual(got.questionRows, [TITLE, 'node -e "x ? 1 : 2; console.log(a?)"', 'continues here']);
   assert.equal(got.complete, true);
-});
-
-test('real shape: moving down one row keeps the same block (movedDown) when the rows have no blank row either', () => {
-  const screen = (marker) => [...Array.from({ length: 20 }, (_, i) => `conversation line ${i + 1}`), TITLE, CMD, marker === 0 ? '→ Yes' : '  Yes', marker === 1 ? '→ No' : '  No', NAV].join('\n');
-  const a = lib.piDialogChoices(screen(0));
-  const b = lib.piDialogChoices(screen(1), { allowSingle: true });
-  assert.equal(lib.piDialogMovedDown(a, b, 1), true);
-  assert.equal(lib.piDialogMovedDown(a, a, 1), false);
 });
 
 // ---------- hardening after the independent verification of RP73 ----------

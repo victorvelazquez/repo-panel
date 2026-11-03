@@ -249,7 +249,7 @@ test('c: opening a cached repo still asks for both reads with priority user and 
   assert.deepEqual(page.fetches.filter((x) => /^\/api\/(sessions|chat)\?/.test(x.url)).map((f) => f.signal.aborted), [true, true], 'the same abort signal as today');
 });
 
-test('c: when the refresh answers, cached goes away, the live state and the question card come with their buttons and the messages are the fresh ones', async () => {
+test('c: when the refresh answers, cached goes away, the live state comes and the messages are the fresh ones', async () => {
   const { page } = await warm('abc', infoOf(FREE), histOf('old message'));
   const held = hold(page, 'abc');
   open(page, 'abc');
@@ -262,7 +262,6 @@ test('c: when the refresh answers, cached goes away, the live state and the ques
   await page.tick();
   const html = body(page);
   assert.ok(html.includes('old message') && html.includes('fresh message'), html);
-  assert.ok(html.includes('data-act="dialog-answer"') && html.includes('Proceed?'), 'the fresh question has its buttons');
   const c = chatState(page);
   assert.ok(!c.cached, 'no longer cached');
   assert.deepEqual(c.info, info);
@@ -272,7 +271,7 @@ test('c: when the refresh answers, cached goes away, the live state and the ques
   assert.deepEqual(plain(page.run('S.chatCache.abc')).hist, hist, 'the cache holds the fresh answer');
 });
 
-test('c: a fresh answer IDENTICAL to the cached one (same key) still ends the cached state and paints the live question', async () => {
+test('c: a fresh answer IDENTICAL to the cached one (same key) still ends the cached state and stores the live state', async () => {
   const { page } = await warm('abc', infoOf(ASK), histOf('same message'));
   const held = hold(page, 'abc');
   open(page, 'abc');
@@ -283,7 +282,6 @@ test('c: a fresh answer IDENTICAL to the cached one (same key) still ends the ca
   await page.tick();
   assert.ok(!chatState(page).cached);
   assert.deepEqual(chatState(page).info.live, ASK);
-  assert.ok(body(page).includes('data-act="dialog-answer"'), body(page));
 });
 
 test('c: when the refresh FAILS, the cached messages stay, S.chat.failed is set, and still no question or buttons', async () => {

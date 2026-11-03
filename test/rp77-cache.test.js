@@ -28,7 +28,6 @@ const lib = require('../lib.js');
 const S = require('../server/sessions.js');
 const P = require('../server/pi.js');
 const { summaryFor } = require('../server/summary.js');
-const { answerDialog } = require('../server/dialoganswer.js');
 const { scanSessions, piStatus, piSessions, clearLiveCache } = P;
 
 const REPO_ID = lib.repoId(repoDir);
@@ -494,17 +493,6 @@ test('piSessions (the writers\' scan) makes a show per terminal on every call, w
   const before = f.calls.length;
   for (let i = 0; i < 3; i++) assert.deepEqual(await piSessions(REPO, f.orca), [{ handle: 't1', state: 'idle' }, { handle: 't2', state: 'busy' }]);
   assert.equal(showsOf(f, before), 6);
-});
-
-test('the dialog answer reads fresh: a warm cache that says idle does not hide a question that is open now', async () => {
-  const f = fakeOrca({ t1: term(IDLE, 5) });
-  await warm(f);
-  Object.assign(f.world.t1, asking(5)); // same lastOutputAt: only a fresh read can see the question
-  const before = f.calls.length;
-  await assert.rejects(answerDialog(REPO_ID, { fingerprint: '0123456789abcdef', index: 0 }, { orca: f.orca, wait: async () => {}, now }),
-    (e) => e.status === 409 && e.message === 'The question changed: look at the card again');
-  assert.equal(showsOf(f, before), 1);
-  assert.equal(f.sends(), 0);
 });
 
 test('the writers reading fresh do not poison the cache: a read-only call afterwards still answers from what it stored', async () => {

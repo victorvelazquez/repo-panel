@@ -180,9 +180,3 @@ test('s8: GET /api/pi-status maps the five session states, ignores tail and fres
   }, { started: false });
 });
 
-test('s9: piBusy is no longer used by piSend: sending while the lock of the dialog answer is held still works', async () => {
-  await withServer(async ({ post }) => {
-    pi.piBusy.add(REPO);
-    try { assert.equal((await pre(post, 'flow-pr')).status, 200); } finally { pi.piBusy.delete(REPO); }
-  });
-});

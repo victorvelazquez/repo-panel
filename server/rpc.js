@@ -21,6 +21,28 @@ const FAILURES = { timeout: 'The session did not start in time', error: 'The ses
 class RpcError extends Error { constructor(message) { super(message); this.name = 'RpcError'; } }
 const fail = (message) => new RpcError(message);
 const text = (v, max) => (typeof v === 'string' ? v.slice(0, max) : '');
+// What the page may see of a dialog (RPC2-3): the caps below; anything cut sets `truncated`, and the page then offers no way to approve it.
+const TITLE_MAX = 300;
+const MESSAGE_MAX = 4000;
+const OPTIONS_MAX = 20;
+const OPTION_MAX = 200;
+const ANSWER_MAX = 4000;
+// Everything but LF and TAB (C0, DEL, C1).
+const CONTROLS = /[\x00-\x08\x0b-\x1f\x7f-\x9f]/;
+const over = (v, max) => typeof v === 'string' && v.length > max;
+
+// The body for the agent, or null: the shape must fit the METHOD of the dialog, with no extra key. A select value must be strictly one of
+// the options the page was shown (never any other string); `d.sure` holds the options that were not cut.
+function answerBody(d, a) {
+  if (!a || typeof a !== 'object' || Array.isArray(a)) return null;
+  const keys = Object.keys(a);
+  if (keys.length !== 1) return null;
+  if (keys[0] === 'cancelled') return a.cancelled === true ? { cancelled: true } : null;
+  if (d.method === 'confirm') return keys[0] === 'confirmed' && typeof a.confirmed === 'boolean' ? { confirmed: a.confirmed } : null;
+  if (keys[0] !== 'value' || typeof a.value !== 'string') return null;
+  if (d.method === 'select') return d.sure.includes(a.value) ? { value: a.value } : null;
+  return a.value.length <= ANSWER_MAX && !CONTROLS.test(a.value) ? { value: a.value } : null;
+}
 
 function createRpcClient({ command, args = [], cwd, env, spawn = cp.spawn, platform = process.platform, kill = process.kill, startTimeoutMs = START_MS, requestTimeoutMs = 120000, onEvent = () => {}, onExit = () => {} }) {
   const pending = new Map(); // id -> { type, resolve, reject, timer, ends }
@@ -106,16 +128,19 @@ function createRpcClient({ command, args = [], cwd, env, spawn = cp.spawn, platf
     notify();
     return true;
   }
-  const publicDialog = (d) => ({ id: d.id, method: d.method, title: d.title, options: d.options, message: d.message, expiresAt: d.expiresAt });
+  const publicDialog = (d) => ({ id: d.id, method: d.method, title: d.title, options: d.options, message: d.message, expiresAt: d.expiresAt, truncated: d.truncated });
 
   function onUi(rec) {
     // Notices (setStatus, setWidget, notify...) need no answer and are dropped; only the four dialog methods block the agent.
     if (!DIALOGS.has(rec.method) || typeof rec.id !== 'string' || !rec.id || rec.id.length > 200) return;
     if (dialogs.has(rec.id) || dialogs.size >= MAX_DIALOGS) return;
     const wait = Number(rec.timeout) > 0 ? Math.min(Number(rec.timeout), 2147483647) : 0;
+    const raw = Array.isArray(rec.options) ? rec.options.slice(0, OPTIONS_MAX) : [];
+    const options = raw.map((o) => text(o, OPTION_MAX));
     const d = {
-      id: rec.id, method: rec.method, title: text(rec.title, 500), message: text(rec.message, 4000),
-      options: Array.isArray(rec.options) ? rec.options.slice(0, 50).map((o) => text(o, 500)) : [],
+      id: rec.id, method: rec.method, title: text(rec.title, TITLE_MAX), message: text(rec.message, MESSAGE_MAX), options,
+      sure: options.filter((o, i) => o === raw[i]),
+      truncated: over(rec.title, TITLE_MAX) || over(rec.message, MESSAGE_MAX) || (Array.isArray(rec.options) && rec.options.length > OPTIONS_MAX) || raw.some((o) => over(o, OPTION_MAX)),
       expiresAt: wait ? Date.now() + wait : null, timer: null,
     };
     if (wait) { d.timer = setTimeout(() => dropDialog(d.id, 'expired'), wait); if (d.timer.unref) d.timer.unref(); }
@@ -232,12 +257,8 @@ function createRpcClient({ command, args = [], cwd, env, spawn = cp.spawn, platf
     const d = typeof id === 'string' ? dialogs.get(id) : undefined;
     if (closed || !d) return false; // only a dialog that is pending right now can be answered
     if (d.expiresAt && Date.now() >= d.expiresAt) { dropDialog(id, 'expired'); return false; }
-    const a = answer && typeof answer === 'object' ? answer : {};
-    let body;
-    if (a.cancelled === true) body = { cancelled: true };
-    else if (d.method === 'confirm' && typeof a.confirmed === 'boolean') body = { confirmed: a.confirmed };
-    else if (d.method !== 'confirm' && typeof a.value === 'string') body = { value: a.value };
-    else return false;
+    const body = answerBody(d, answer);
+    if (!body) return false; // a refused answer writes nothing and the dialog stays pending
     write({ type: 'extension_ui_response', id, ...body });
     dropDialog(id, 'answered');
     return true;
