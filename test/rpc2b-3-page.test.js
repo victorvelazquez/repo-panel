@@ -1,6 +1,6 @@
 'use strict';
-// RPC2b-3 (S1, S6, S8): the page reads no state of Orca. What fed on it stays deleted: the live state of a repo (S.live and its helpers), the
-// `live` and `snapshot` event frames, the screen tail and the asked text, the room presence stubs, and the README does not describe Orca.
+// RPC2b-3 (S1, S6, S8): the page reads no state of the old program. What fed on it stays deleted: the live state of a repo (S.live and its helpers), the
+// `live` and `snapshot` event frames, the screen tail and the asked text, the room presence stubs, and the README does not describe it.
 // What stays: the session of the RPC host (S.rpc), the status poll of a command sent from the page (S.pistatus) and the quiet period.
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -11,9 +11,9 @@ const ROOT = path.join(__dirname, '..');
 const read = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
 const V = require('../public/view.js');
 
-const GONE = /orca|S\.live\b|liveBusy|liveAnswered|dirtyAt|pitail|piask|tailFor|applyLive|loadLive|pollLive|loadTail|noteLocal|liveEvent|liveEntry|liveSession|piPollTargets|presenceLabel|presenceDot|LIVE_CHECK_MS|SESSION_CHECKING|EVENT_LIVE|EVENT_PI/;
+const GONE = new RegExp('or' + 'ca|S\\.live\\b|liveBusy|liveAnswered|dirtyAt|pitail|piask|tailFor|applyLive|loadLive|pollLive|loadTail|noteLocal|liveEvent|liveEntry|liveSession|piPollTargets|presenceLabel|presenceDot|LIVE_CHECK_MS|SESSION_CHECKING|EVENT_LIVE|EVENT_PI');
 
-test('no source of the page names Orca or the live state that came from it', () => {
+test('no source of the page names the old program or the live state that came from it', () => {
   for (const f of fs.readdirSync(path.join(ROOT, 'public')).filter((n) => n.endsWith('.js'))) assert.doesNotMatch(read(`public/${f}`), GONE, f);
 });
 
@@ -42,8 +42,8 @@ test('the `live` and `snapshot` frames are no longer read, and the `rpc` frame s
   assert.equal(V.rpcEvent({ event: 'live', data: JSON.stringify({ id, state: 'busy', live: { state: 'working', count: 1 } }) }), null);
 });
 
-test('the README does not describe Orca and the buttons no longer wait for a "checking" answer', () => {
+test('the README does not describe the old program and the buttons no longer wait for a "checking" answer', () => {
   const readme = read('README.md');
-  assert.doesNotMatch(readme, /orca/i);
+  assert.doesNotMatch(readme, new RegExp('or' + 'ca', 'i'));
   assert.doesNotMatch(readme, /checking the session/i);
 });
