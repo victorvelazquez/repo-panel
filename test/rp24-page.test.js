@@ -2,6 +2,7 @@
 // RP24 (S21) in the real public/app.js (vm with a stubbed DOM): the commit button is disabled while the RPC session
 // of the repo is busy or asking, and the quiet tick only redraws.
 const test = require('node:test');
+const { appSource } = require('./pagesrc.js');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -34,7 +35,7 @@ async function loadPage({ hidden = false } = {}) {
   });
   ctx.window = ctx;
   ctx.RepoPanelView = require('../public/view.js');
-  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8'), ctx);
+  vm.runInContext(appSource(), ctx);
   for (let i = 0; i < 5; i++) await new Promise((r) => setImmediate(r)); // let the startup refresh settle
   calls.length = 0;
   return { get: (name) => vm.runInContext(name, ctx), calls, answers };

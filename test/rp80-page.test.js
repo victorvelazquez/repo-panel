@@ -2,6 +2,7 @@
 // RP80 (S68, S75), design points 5-6: view.js boardApply / boardWait (pure) and the real public/app.js in a vm (stubbed DOM, fake clock, fake fetch
 // with queued answers and gates: no timers, no sleeps, no network, no real config, git or gh) reading the board from the server's memory.
 const test = require('node:test');
+const { appSource } = require('./pagesrc.js');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -83,7 +84,7 @@ function loadPage({ auto = false, boardDefault = null } = {}) {
   ctx.addEventListener = () => {};
   ctx.RepoPanelView = V;
   ctx.RepoPanelResumen = R;
-  vm.runInContext(fs.readFileSync(path.join(PUBLIC, 'app.js'), 'utf8'), ctx);
+  vm.runInContext(appSource(), ctx);
   const realDraw = ctx.draw;
   ctx.draw = (...a) => { counter.draws++; return realDraw(...a); };
   const flush = () => { while (frames.length) frames.shift()(); };

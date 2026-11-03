@@ -5,6 +5,7 @@
 // new data: three ADDITIVE, optional fields of every PR (`additions`, `deletions`, `changedFiles`), null when GitHub does not say. Work is not touched. How it LOOKS is for the
 // person to approve by looking; these tests pin the rules, the thresholds and the data. No network, no real clock.
 const test = require('node:test');
+const { appSource } = require('./pagesrc.js');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -159,7 +160,7 @@ function loadPage() {
   ctx.addEventListener = () => {};
   ctx.RepoPanelView = V;
   ctx.RepoPanelResumen = R;
-  vm.runInContext(read('public/app.js'), ctx);
+  vm.runInContext(appSource(), ctx);
   return { run: (c) => vm.runInContext(c, ctx) };
 }
 const REPO = '{ id: "abc", path: "p", name: "demo", group: "Personal" }';
@@ -174,5 +175,5 @@ test('g1: the page gives the time of the newest uncommitted change only for a re
   assert.equal(page.run('summaryIdle("abc")'), 1234);
   page.run("S.local.abc = { branch: 'main', files: [{ path: 'a', status: 'M' }], ahead: 0, behind: 0 };");
   assert.equal(page.run('summaryIdle("abc")'), null, 'no time reported');
-  assert.match(read('public/app.js'), /idleFor: summaryIdle/);
+  assert.match(appSource(), /idleFor: summaryIdle/);
 });

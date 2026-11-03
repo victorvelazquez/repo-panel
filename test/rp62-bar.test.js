@@ -3,6 +3,7 @@
 // the page (the real public/app.js in a vm with a stubbed DOM, a fake fetch and a fake clock). No network, no timers, no sleeps, no real clock
 // and no real usage file: the page only ever talks to the fake fetch.
 const test = require('node:test');
+const { appSource } = require('./pagesrc.js');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -170,7 +171,7 @@ test('index.html has <span|div id="usage" class="usage" role="status" hidden> in
 
 test('style.css defines .usage and every usage-* class the page uses (tones warn, error, dim)', () => {
   const css = read('style.css');
-  const used = new Set(read('app.js').match(/\busage-[a-z]+\b/g) || []);
+  const used = new Set(appSource().match(/\busage-[a-z]+\b/g) || []);
   assert.match(css, /(^|[\s,}])\.usage\b(?!-)/m, '.usage');
   for (const c of new Set(['usage-warn', 'usage-error', 'usage-dim', ...used])) assert.ok(new RegExp(`\\.${c}\\b`).test(css), `style.css defines .${c}`);
 });
@@ -230,7 +231,7 @@ async function loadPage(routes = {}) {
   ctx.addEventListener = () => {};
   ctx.RepoPanelView = V;
   ctx.RepoPanelResumen = R;
-  vm.runInContext(read('app.js'), ctx);
+  vm.runInContext(appSource(), ctx);
   await page.tick();
   return page;
 }

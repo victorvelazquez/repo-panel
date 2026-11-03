@@ -3,6 +3,7 @@
 // (composerState, actionMenu, actionButtonsHtml, composerNote, chatHead), the page wiring in app.js (vm harness, fake fetch,
 // no real timers, no network) and the readChat file-name match. Temp dirs only.
 const test = require('node:test');
+const { appSource } = require('./pagesrc.js');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -71,7 +72,7 @@ function loadPage({ answers = {} } = {}) {
   ctx.addEventListener = () => {};
   ctx.RepoPanelView = require('../public/view.js');
   ctx.RepoPanelResumen = R;
-  vm.runInContext(fs.readFileSync(path.join(PUBLIC, 'app.js'), 'utf8'), ctx);
+  vm.runInContext(appSource(), ctx);
   const flush = () => { while (frames.length) frames.shift()(); };
   const tick = async (n = 6) => { for (let i = 0; i < n; i++) await new Promise((r) => setImmediate(r)); flush(); };
   const fire = (type, e = {}) => { for (const fn of docL[type] || []) fn({ type, preventDefault() {}, target: element(), ...e }); };
@@ -413,7 +414,7 @@ const composerTarget = (page, { act: name = null, inside = false, dataset = {} }
 };
 
 test('actions: no trace of the old menu is left in the page (no / Actions button, chat-menu act, actionsOpen state or #actionsPop)', () => {
-  const app = fs.readFileSync(path.join(PUBLIC, 'app.js'), 'utf8');
+  const app = appSource();
   assert.doesNotMatch(app, /chat-menu|actionsOpen|closeActions|actionsPop/);
   assert.doesNotMatch(fs.readFileSync(path.join(PUBLIC, 'index.html'), 'utf8'), /chat-menu|actionsPop|\/ Actions/);
   assert.doesNotMatch(fs.readFileSync(path.join(PUBLIC, 'style.css'), 'utf8'), /#actionsPop/);

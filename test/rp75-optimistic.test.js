@@ -5,6 +5,7 @@
 // and the state BEFORE it resolves the fake fetch promises (manual gates). Pure helpers (view.js, resumen.js) plus the real
 // public/app.js in a vm (fake fetch, no timers, no network, no real config).
 const test = require('node:test');
+const { appSource } = require('./pagesrc.js');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -60,7 +61,7 @@ function loadPage({ answers = {} } = {}) {
   ctx.addEventListener = () => {};
   ctx.RepoPanelView = V;
   ctx.RepoPanelResumen = R;
-  vm.runInContext(fs.readFileSync(path.join(PUBLIC, 'app.js'), 'utf8'), ctx);
+  vm.runInContext(appSource(), ctx);
   // The clock of the page moves only when a test says so: Date.now() inside the page is the real one plus an offset.
   vm.runInContext('globalThis.__offset = 0; { const real = Date.now.bind(Date); Date.now = () => real() + globalThis.__offset; }', ctx);
   const flush = () => { while (frames.length) frames.shift()(); };

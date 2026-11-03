@@ -2,6 +2,7 @@
 // Renders the real public/app.js in a vm with a stubbed DOM, to check the markup of the flow buttons and the
 // request the pi buttons send. Nothing here touches the network or a browser.
 const test = require('node:test');
+const { appSource } = require('./pagesrc.js');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -37,7 +38,7 @@ function loadPage() {
   });
   ctx.window = ctx;
   ctx.RepoPanelView = require('../public/view.js');
-  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8'), ctx);
+  vm.runInContext(appSource(), ctx);
   const get = (name) => vm.runInContext(name, ctx);
   return { get, calls, answers };
 }

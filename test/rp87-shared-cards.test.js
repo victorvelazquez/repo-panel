@@ -4,6 +4,7 @@
 // (identityHtml) for the board card and the clean row; the branch text is one (branchLabel). No visible change: the HTML comes out the same. What stays
 // different on purpose (the Summary header, the PR card body, the compact clean row) is not touched. No network, no real clock.
 const test = require('node:test');
+const { appSource, APP_FILES } = require('./pagesrc.js');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -71,7 +72,7 @@ function loadPage() {
   ctx.addEventListener = () => {};
   ctx.RepoPanelView = V;
   ctx.RepoPanelResumen = R;
-  vm.runInContext(read('app.js'), ctx);
+  vm.runInContext(appSource(), ctx);
   return { run: (c) => vm.runInContext(c, ctx) };
 }
 const REPO = '{ id: "abc", path: "p", name: "demo", group: "Personal" }';
@@ -129,8 +130,8 @@ test('p5: identityHtml is group tag, room tag and repo name, and both the board 
 
 // ---------- the code ----------
 test('s1: the chip markup exists once in the page code (view.js) and resumen.js uses it from there', () => {
-  const marks = ['view.js', 'resumen.js', 'app.js'].map((f) => [f, (read(f).match(/chip yellow chip-btn/g) || []).length]);
-  assert.deepEqual(marks, [['view.js', 1], ['resumen.js', 0], ['app.js', 0]]);
+  const marks = ['view.js', 'resumen.js', ...APP_FILES].map((f) => [f, (read(f).match(/chip yellow chip-btn/g) || []).length]);
+  assert.deepEqual(marks, [['view.js', 1], ['resumen.js', 0], ...APP_FILES.map((f) => [f, 0])]);
   assert.doesNotMatch(read('resumen.js'), /function changeChips/);
   assert.match(read('resumen.js'), /changeChips/);
 });

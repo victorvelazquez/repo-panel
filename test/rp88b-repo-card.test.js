@@ -5,6 +5,7 @@
 // buttons of the board card. The HTML comes out byte for byte the same as before (checked against the base commit by a differential script, not committed).
 // The PR card body and the clean row are not touched here (the clean row is RP88c). No network, no real clock.
 const test = require('node:test');
+const { appSource } = require('./pagesrc.js');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -92,7 +93,7 @@ function loadPage(view = V) {
   ctx.addEventListener = () => {};
   ctx.RepoPanelView = view;
   ctx.RepoPanelResumen = R;
-  vm.runInContext(read('app.js'), ctx);
+  vm.runInContext(appSource(), ctx);
   return { run: (c) => vm.runInContext(c, ctx) };
 }
 const REPO = '{ id: "abc", path: "p", name: "demo", group: "Personal" }';
@@ -122,7 +123,7 @@ test('p2: the Summary card is drawn by RepoCard in summary mode', () => {
 });
 
 test('p3: the frame markup lives once, in view.js: repoCard and cardHtml no longer carry the card or the Summary card element (the PR card keeps its own)', () => {
-  const has = (f, s) => read(f).split(s).length - 1;
+  const has = (f, s) => (f === 'app.js' ? appSource().replace(/\r\n/g, '\n') : read(f)).split(s).length - 1; // 'app.js' stands for the whole page code (RPC3)
   assert.equal(has('view.js', '<article class="rs-card'), 1);
   assert.equal(has('resumen.js', '<article class="rs-card$' + '{'), 0, 'cardHtml no longer builds the article');
   assert.equal(has('app.js', '<div class="card $' + '{attn'), 0, 'repoCard no longer builds the card div');

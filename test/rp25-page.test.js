@@ -2,6 +2,7 @@
 // RP25 (S23): the board of the page. A Merged column, a collapsible Idle bar instead of the Clean column, a Needs
 // attention column that exists only while it has cards, and a preference that brings the Clean column back.
 const test = require('node:test');
+const { appSource } = require('./pagesrc.js');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -39,7 +40,7 @@ async function loadPage(stored = {}) {
   });
   ctx.window = ctx;
   ctx.RepoPanelView = view;
-  vm.runInContext(read('public/app.js'), ctx);
+  vm.runInContext(appSource(), ctx);
   for (let i = 0; i < 5; i++) await new Promise((r) => setImmediate(r));
   return { get: (name) => vm.runInContext(name, ctx), app, saved };
 }
@@ -222,7 +223,7 @@ test('page: the clean-as-column action and the header checkbox set the same pref
   assert.equal(JSON.parse(page.saved.prefs).cleanAsColumn, true);
   assert.match(read('public/index.html'), /<input[^>]*type="checkbox"[^>]*data-pref="cleanAsColumn"/, 'the always-visible header toggle');
   assert.match(read('public/index.html'), /id="cleanAsColumn"[^>]*data-pref="cleanAsColumn"|data-pref="cleanAsColumn"[^>]*id="cleanAsColumn"/);
-  assert.match(read('public/app.js'), /\$\('#cleanAsColumn'\)\.checked = cleanAsColumn\(\)/, 'the checkbox reflects the stored preference on load');
+  assert.match(appSource(), /\$\('#cleanAsColumn'\)\.checked = cleanAsColumn\(\)/, 'the checkbox reflects the stored preference on load');
 });
 
 test('page: the problems filter hides the idle bar and keeps the attention cards', async () => {

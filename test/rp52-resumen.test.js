@@ -2,6 +2,7 @@
 // RP52 (S46): the Summary tab. public/resumen.js is pure (payload of /api/summary in, HTML out); the page tests load the
 // real public/app.js in a vm with a recording DOM (same approach as rp47) and check the tabs, the scope and the painting.
 const test = require('node:test');
+const { appSource } = require('./pagesrc.js');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -252,7 +253,7 @@ function loadPage({ resumen = true } = {}) {
   ctx.addEventListener = () => {};
   ctx.RepoPanelView = require('../public/view.js');
   if (resumen) ctx.RepoPanelResumen = R;
-  vm.runInContext(fs.readFileSync(path.join(PUBLIC, 'app.js'), 'utf8'), ctx);
+  vm.runInContext(appSource(), ctx);
   const calls = [];
   // Only /api/summary is answered; every other read (queue, config...) stays pending like in the other page tests.
   const only = (fn) => (url) => (url === '/api/summary' ? (calls.push(url), fn()) : new Promise(() => {}));
@@ -393,7 +394,7 @@ test('the 20 s tick asks only while the Summary tab is shown and the document is
 });
 
 test('refreshAll loads the summary too (source check of the 60 s cycle)', () => {
-  const src = fs.readFileSync(path.join(PUBLIC, 'app.js'), 'utf8');
+  const src = appSource();
   assert.match(src, /async function refreshAll\([^)]*\)[\s\S]*?loadSummary\(\)/); // RP80: refreshAll({ force }) takes an option now
   assert.match(src, /setInterval\([^)]*summaryTick/);
 });

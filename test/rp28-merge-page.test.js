@@ -2,6 +2,7 @@
 // RP28 point 1A/1C: the Merge button stays disabled («Merged ✓») from the merge answer until the refresh of the repo
 // has finished, so it never comes back to life for a second before the card moves. Real public/app.js in a vm.
 const test = require('node:test');
+const { appSource } = require('./pagesrc.js');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -39,7 +40,7 @@ async function loadPage(routes) {
   });
   ctx.window = ctx;
   ctx.RepoPanelView = view;
-  vm.runInContext(lf(fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8')), ctx);
+  vm.runInContext(lf(appSource()), ctx);
   for (let i = 0; i < 5; i++) await new Promise((r) => setImmediate(r));
   calls.length = 0;
   return { get: (name) => vm.runInContext(name, ctx), app, calls };

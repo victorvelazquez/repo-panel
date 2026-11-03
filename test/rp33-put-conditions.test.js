@@ -2,6 +2,7 @@
 // RP33: the "Put in conditions" button (its own click handler) behaves like the /flow-* buttons since RP32: from the
 // click until the server answers the repo is marked as sending, a second click is ignored, and nothing is left behind.
 const test = require('node:test');
+const { appSource } = require('./pagesrc.js');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -44,7 +45,7 @@ async function loadPage(extraRoutes = {}) {
   });
   ctx.window = ctx;
   ctx.RepoPanelView = view;
-  vm.runInContext(lf(fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8')), ctx);
+  vm.runInContext(lf(appSource()), ctx);
   for (let i = 0; i < 5; i++) await new Promise((r) => setImmediate(r));
   calls.length = 0;
   return {

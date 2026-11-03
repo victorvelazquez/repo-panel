@@ -2,6 +2,7 @@
 // RP80 (S68, S75), extra cases of the page: a restarted server (lower rev), the catch-up POST after a command sent from the page, and the stale guard
 // judged per fact. Same harness as rp80-page.test.js (real public/app.js in a vm; stubbed DOM, fake clock, fake fetch): no timers, no network, no real git or gh.
 const test = require('node:test');
+const { appSource } = require('./pagesrc.js');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -72,7 +73,7 @@ function loadPage() {
   ctx.addEventListener = () => {};
   ctx.RepoPanelView = V;
   ctx.RepoPanelResumen = R;
-  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8'), ctx);
+  vm.runInContext(appSource(), ctx);
   const realDraw = ctx.draw;
   ctx.draw = (...a) => { counter.draws++; return realDraw(...a); };
   const run = (code) => vm.runInContext(code, ctx);

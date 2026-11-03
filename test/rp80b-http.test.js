@@ -4,6 +4,7 @@
 // the other POSTs and every GET do not; and the page's doRerun asks the server to catch up too. A fake store, fake gh/git (mocked before
 // http.js loads) and a temp config only: the real config, git and gh are never used. The page runs in a vm with a stubbed DOM and fetch.
 const test = require('node:test');
+const { appSource } = require('./pagesrc.js');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const http = require('node:http');
@@ -346,7 +347,7 @@ function loadPage() {
   ctx.addEventListener = () => {};
   ctx.RepoPanelView = V;
   ctx.RepoPanelResumen = R;
-  vm.runInContext(fs.readFileSync(path.join(PUBLIC, 'app.js'), 'utf8'), ctx);
+  vm.runInContext(appSource(), ctx);
   const run = (code) => vm.runInContext(code, ctx);
   const tick = async () => { for (let i = 0; i < 20; i++) await new Promise((r) => setImmediate(r)); while (frames.length) frames.shift()(); };
   // The short timers of the action (a delay of the person's own re-run): fired by hand, the long ones (request limits, toasts, redraws) are left alone.

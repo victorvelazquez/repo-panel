@@ -4,6 +4,7 @@
 // gone when the person changes repo. It draws the SAME diff viewer of RP64 (R.changesView) for one file, from the /api/diff answer the page already reads: the server does not change. The
 // read is not dropped when the chat polls meanwhile (it was identified by S.chat.seq, which loadChat bumps). No network, no timers, no real clock.
 const test = require('node:test');
+const { appSource } = require('./pagesrc.js');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -116,7 +117,7 @@ function loadPage() {
   ctx.addEventListener = () => {};
   ctx.RepoPanelView = V;
   ctx.RepoPanelResumen = R;
-  vm.runInContext(fs.readFileSync(path.join(PUBLIC, 'app.js'), 'utf8'), ctx);
+  vm.runInContext(appSource(), ctx);
   const flush = () => { while (frames.length) frames.shift()(); };
   const tick = async (n = 8) => { for (let r = 0; r < 2; r++) { for (let i = 0; i < n; i++) await new Promise((x) => setImmediate(x)); flush(); } };
   return { get, flush, tick, fetches, routes, intervals, run: (c) => vm.runInContext(c, ctx) };

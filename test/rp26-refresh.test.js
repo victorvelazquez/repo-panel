@@ -2,6 +2,7 @@
 // RP26: one refresh signal. The per-card spinning arrow is gone; the icon of the top "Refresh" button spins while ANY
 // repo is refreshing. Repos keep refreshing exactly as before (S.loading is still counted per repo).
 const test = require('node:test');
+const { appSource } = require('./pagesrc.js');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -38,7 +39,7 @@ async function loadPage() {
   });
   ctx.window = ctx;
   ctx.RepoPanelView = view;
-  vm.runInContext(read('app.js'), ctx);
+  vm.runInContext(appSource(), ctx);
   for (let i = 0; i < 5; i++) await new Promise((r) => setImmediate(r));
   return { get: (name) => vm.runInContext(name, ctx), toggles };
 }
@@ -89,7 +90,7 @@ test('page: the top Refresh icon is switched on while any repo is refreshing and
 });
 
 test('page: render keeps the top icon in step with the loading count', () => {
-  const src = read('app.js');
+  const src = appSource();
   const render = renderBody(src);
   assert.ok(render && /syncRefreshIcon\(\)/.test(render[0]), 'render() calls syncRefreshIcon()');
   assert.ok(!/class="spin"/.test(src), 'no spinner markup is left in app.js');
@@ -111,7 +112,7 @@ test('the spin respects prefers-reduced-motion', () => {
 });
 
 test('the checks that read the page source also work on a CRLF checkout (Windows runners)', () => {
-  const crlf = read('app.js').replace(/\n/g, '\r\n');
+  const crlf = appSource().replace(/\n/g, '\r\n');
   const body = renderBody(crlf);
   assert.ok(body && /syncRefreshIcon\(\)/.test(body[0]), 'render() is found and calls syncRefreshIcon() with CRLF line endings');
   assert.ok(!/class="spin"/.test(lf(crlf)));

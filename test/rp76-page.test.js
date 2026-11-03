@@ -3,6 +3,7 @@
 // (S.timeouts, 25 s for a GET and 70 s for a POST) with an AbortSignal, and the chat of the card that was just opened is cancelled when the
 // person switches card or closes it. The real public/app.js in a vm with a fake fetch, fake timers and no network.
 const test = require('node:test');
+const { appSource } = require('./pagesrc.js');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -59,7 +60,7 @@ function loadPage({ answers = {} } = {}) {
   ctx.addEventListener = () => {};
   ctx.RepoPanelView = V;
   ctx.RepoPanelResumen = R;
-  vm.runInContext(fs.readFileSync(path.join(PUBLIC, 'app.js'), 'utf8'), ctx);
+  vm.runInContext(appSource(), ctx);
   const flush = () => { while (frames.length) frames.shift()(); };
   const tick = async (n = 6) => { for (let i = 0; i < n; i++) await new Promise((r) => setImmediate(r)); flush(); };
   return { ctx, get, flush, tick, fetches, timers, run: (code) => vm.runInContext(code, ctx) };

@@ -2,6 +2,7 @@
 // RP20 part A: CSS-only animated progress lines and the verifying chip. The page re-renders #app on every draw, so
 // each animated element carries an inline negative animation-delay computed from the clock to stay continuous.
 const test = require('node:test');
+const { appSource } = require('./pagesrc.js');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -95,7 +96,7 @@ function loadPage() {
   });
   ctx.window = ctx;
   ctx.RepoPanelView = view;
-  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8'), ctx);
+  vm.runInContext(appSource(), ctx);
   return (name) => vm.runInContext(name, ctx);
 }
 const R = { id: 'abc', name: 'demo' };

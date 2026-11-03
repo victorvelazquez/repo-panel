@@ -2,6 +2,7 @@
 // RP20 part B: a pi session that waits for the user's answer to a dialog. The panel only shows a notice;
 // it never sends anything to a session that is asking (the state comes from the RPC host).
 const test = require('node:test');
+const { appSource } = require('./pagesrc.js');
 const assert = require('node:assert/strict');
 const lib = require('../lib.js');
 const { piSend } = require('../server/pi.js');
@@ -112,7 +113,7 @@ function loadPage() {
   });
   ctx.window = ctx;
   ctx.RepoPanelView = view;
-  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8'), ctx);
+  vm.runInContext(appSource(), ctx);
   return { get: (name) => vm.runInContext(name, ctx), calls, answers };
 }
 const R = { id: 'abc', name: 'demo' };

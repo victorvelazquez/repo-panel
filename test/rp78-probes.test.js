@@ -1,6 +1,7 @@
 'use strict';
 // RP78 verifier probes (S68, S73): gaps the mutation round found (survivors) and two defects.
 const test = require('node:test');
+const { appSource } = require('./pagesrc.js');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -100,7 +101,7 @@ test('server.close() stops the summary store', async () => {
 });
 
 test('the page asks the summary again while rows load (app.js keeps the 2 s re-ask)', () => {
-  const src = fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8');
+  const src = appSource();
   assert.match(src, /rows\.some\(\(r\) => r\.loading\)\) setTimeout\(summaryTick, SUMMARY_LOADING_MS\)/);
 });
 

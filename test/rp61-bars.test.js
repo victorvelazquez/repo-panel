@@ -10,6 +10,7 @@ const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'repo-panel-rp61-'));
 process.env.REPO_PANEL_CONFIG = path.join(dir, 'config.json');
 
 const test = require('node:test');
+const { appSource } = require('./pagesrc.js');
 const assert = require('node:assert/strict');
 const R = require('../public/resumen.js');
 const { summarize } = require('../server/summary.js');
@@ -206,7 +207,7 @@ function loadPage({ resumen = true } = {}) {
   ctx.addEventListener = () => {};
   ctx.RepoPanelView = require('../public/view.js');
   if (resumen) ctx.RepoPanelResumen = R;
-  vm.runInContext(read('public/app.js'), ctx);
+  vm.runInContext(appSource(), ctx);
   return { ctx, get, handlers, frames, flush: () => { while (frames.length) frames.shift()(); }, run: (code) => vm.runInContext(code, ctx) };
 }
 
@@ -341,7 +342,7 @@ test('the Merge menu handlers tolerate a closed menu and stubs without contains'
 });
 
 test('the method and delete-branch controls keep their ids and prefs (change listener and load values)', () => {
-  const src = read('public/app.js');
+  const src = appSource();
   assert.match(src, /\$\('#method'\)\.value = S\.prefs\.method/);
   assert.match(src, /\$\('#delBranch'\)\.checked = S\.prefs\.del/);
   assert.match(src, /\$\('#cleanAsColumn'\)\.checked = cleanAsColumn\(\)/);

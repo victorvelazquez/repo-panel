@@ -5,6 +5,7 @@
 // a roadmap block. needs-input, blocked, ready-to-commit and ready-to-pr always stay: they say something the roadmap does not and ask something of the person.
 // How it LOOKS is for the person to approve by looking; these tests pin the rules. No network, no real clock.
 const test = require('node:test');
+const { appSource } = require('./pagesrc.js');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -81,7 +82,7 @@ function loadPage() {
   ctx.addEventListener = () => {};
   ctx.RepoPanelView = V;
   ctx.RepoPanelResumen = R;
-  vm.runInContext(read('app.js'), ctx);
+  vm.runInContext(appSource(), ctx);
   return { run: (c) => vm.runInContext(c, ctx) };
 }
 const REPO = '{ id: "abc", path: "p", name: "demo", group: "Personal" }';
@@ -174,7 +175,7 @@ test('s4: the clean row never had a status line and still has none', () => {
 });
 
 test('s5: the page decides with the model it already has: stateRow asks V.stateLineHidden and the roadmap block', () => {
-  const src = read('app.js');
+  const src = appSource();
   assert.match(src, /V\.stateLineHidden\(/);
   assert.equal((src.match(/class="state-line"/g) || []).length, 2, 'the state line is built in one function (two shapes)');
 });

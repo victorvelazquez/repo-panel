@@ -3,6 +3,7 @@
 // read-only). Client: the divider math, the card as chat selector, the panel states, polling, and the guarantee that
 // nothing here ever sends text to a session. Temp dirs and fake deps only: the real sessions are never touched.
 const test = require('node:test');
+const { appSource } = require('./pagesrc.js');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -345,7 +346,7 @@ function loadPage({ answers = {}, resumen = true } = {}) {
   ctx.addEventListener = (t, fn) => { (winL[t] ||= []).push(fn); };
   ctx.RepoPanelView = require('../public/view.js');
   if (resumen) ctx.RepoPanelResumen = R;
-  vm.runInContext(fs.readFileSync(path.join(PUBLIC, 'app.js'), 'utf8'), ctx);
+  vm.runInContext(appSource(), ctx);
   const flush = () => { while (frames.length) frames.shift()(); };
   const tick = async (n = 6) => { for (let i = 0; i < n; i++) await new Promise((r) => setImmediate(r)); flush(); };
   const fire = (type, e = {}) => { for (const fn of docL[type] || []) fn({ type, preventDefault() {}, target: element(), ...e }); };
@@ -551,7 +552,7 @@ test('Adopt posts to /api/sessions/adopt and reloads; Start posts to /api/rpc/st
 });
 
 test('safety: the chat code never reaches /api/pi or a send, and Summary rendering touches no session', () => {
-  const app = fs.readFileSync(path.join(PUBLIC, 'app.js'), 'utf8');
+  const app = appSource();
   const region = app.slice(app.indexOf('// ---------- chat (RP54)'), app.indexOf('// ---------- end chat ----------'));
   assert.ok(region.length > 500, 'chat region found');
   assert.doesNotMatch(region, /\/api\/pi|piSend|\bsend\b|'send'/);

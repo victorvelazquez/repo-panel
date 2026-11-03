@@ -2,6 +2,7 @@
 // RP23 parts 1 and 2 (S22): a smarter refresh. Local data every ~10 s, GitHub data about every 20 s for "hot" repos and
 // every 60 s for all of them; a "no merged PR" answer is cached for 15 s instead of 60 s. Pure decisions live in view.js.
 const test = require('node:test');
+const { appSource } = require('./pagesrc.js');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -9,7 +10,7 @@ const vm = require('node:vm');
 const view = require('../public/view.js');
 
 const lf = (text) => text.replace(/\r\n/g, '\n');
-const APP = lf(fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8'));
+const APP = lf(appSource());
 
 const loc = (branch = 'task') => ({ branch, detached: false, files: [], ahead: 0, behind: 0 });
 const pr = (head, over = {}) => ({ number: 1, head, isCrossRepository: false, ...over });

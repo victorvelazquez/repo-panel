@@ -5,6 +5,7 @@
 // channels that feed a Summary card: when a fact of a repo CHANGES (board or direct read) the page asks for /api/summary soon, grouped, instead of
 // waiting for the 20 s tick. No network, no real clock: timers and fetch are the test's.
 const test = require('node:test');
+const { appSource } = require('./pagesrc.js');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -105,7 +106,7 @@ function loadPage() {
   ctx.addEventListener = () => {};
   ctx.RepoPanelView = V;
   ctx.RepoPanelResumen = R;
-  vm.runInContext(read('app.js'), ctx);
+  vm.runInContext(appSource(), ctx);
   const run = (c) => vm.runInContext(c, ctx);
   const tick = async () => { for (let i = 0; i < 10; i++) await new Promise((r) => setImmediate(r)); while (frames.length) frames.shift()(); };
   const summaryCalls = () => calls.filter((u) => u === '/api/summary').length;
@@ -193,7 +194,7 @@ test('p5: an unchanged fact, another tab, a page that has not loaded the Summary
 });
 
 test('p6: every writer of a fact that feeds the row goes through setFact: the loaders, the roadmap read and the board', () => {
-  const app = read('app.js');
+  const app = appSource();
   assert.doesNotMatch(app, /S\.(local|prs|roadmap|state)\[id\] = (d|f\.\w+);/, 'no raw write of a fact from an answer');
   for (const kind of ['local', 'prs', 'roadmap', 'state']) assert.match(app, new RegExp(`setFact\\('${kind}', id,`));
 });

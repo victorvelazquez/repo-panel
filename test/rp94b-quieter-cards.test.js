@@ -4,6 +4,7 @@
 // busy); the group tag appears only when several groups are visible. The room tag and the status line that repeats the roadmap wait for RP94b2. How it LOOKS is for the
 // person to approve by looking; these tests pin the structure, the rules and what is still shown. No network, no real clock.
 const test = require('node:test');
+const { appSource } = require('./pagesrc.js');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -45,7 +46,7 @@ function loadPage() {
   ctx.addEventListener = () => {};
   ctx.RepoPanelView = V;
   ctx.RepoPanelResumen = R;
-  vm.runInContext(read('app.js'), ctx);
+  vm.runInContext(appSource(), ctx);
   return { run: (c) => vm.runInContext(c, ctx) };
 }
 const REPO = '{ id: "abc", path: "p", name: "demo", group: "Personal" }';

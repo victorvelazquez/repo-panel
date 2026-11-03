@@ -4,6 +4,7 @@
 // and the Summary card) and the "no GitHub remote" chip. The clean row keeps its own "↓N". Nothing else changes: the other chips, the menu items and the roadmap
 // block stay. How it LOOKS is for the person to approve by looking; these tests pin the structure and what is still shown. No network, no real clock.
 const test = require('node:test');
+const { appSource } = require('./pagesrc.js');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -38,7 +39,7 @@ function loadPage() {
   ctx.addEventListener = () => {};
   ctx.RepoPanelView = V;
   ctx.RepoPanelResumen = R;
-  vm.runInContext(read('app.js'), ctx);
+  vm.runInContext(appSource(), ctx);
   return { run: (c) => vm.runInContext(c, ctx) };
 }
 const REPO = '{ id: "abc", path: "p", name: "demo", group: "Personal" }';
@@ -76,7 +77,7 @@ test('x3: the item comes after the others (the room choices, the requirement ite
 });
 
 test('x4: removing still asks first and removes by id (the handler is the same one, now reached from the menu)', () => {
-  const src = read('app.js');
+  const src = appSource();
   assert.match(src, /'remove': async \(el\) => \{\s*const id = el\.dataset\.id;\s*if \(!confirm\(/);
   assert.equal((src.match(/data-act="remove"/g) || []).length, 1, 'one place builds the remove button');
 });
