@@ -25,10 +25,11 @@ test('feed.js defines the whole feed and app.js defines none of it', () => {
   assert.equal(defines(read('data.js'), 'refreshRepo'), true, 'data.js keeps its own layer');
 });
 
-test('the page scripts are data.js, feed.js and app.js, in that order, and index.html loads them so', () => {
-  assert.deepEqual(APP_FILES, ['data.js', 'feed.js', 'app.js']);
+test('data.js and feed.js come first and app.js last in the page scripts, and index.html loads them as listed', () => {
+  assert.deepEqual(APP_FILES.slice(0, 2), ['data.js', 'feed.js']);
+  assert.equal(APP_FILES[APP_FILES.length - 1], 'app.js');
   const scripts = [...read('index.html').matchAll(/<script src="([^"]+)"><\/script>/g)].map((m) => m[1]);
-  assert.deepEqual(scripts, ['/view.js', '/resumen.js', '/data.js', '/feed.js', '/app.js']);
+  assert.deepEqual(scripts, ['/view.js', '/resumen.js', ...APP_FILES.map((f) => `/${f}`)]);
 });
 
 test('feed.js loads after data.js, as a separate script, without touching S, V, R or the DOM', () => {

@@ -161,6 +161,7 @@ const STATIC = {
   '/resumen.js': ['resumen.js', 'text/javascript; charset=utf-8'],
   '/data.js': ['data.js', 'text/javascript; charset=utf-8'],
   '/feed.js': ['feed.js', 'text/javascript; charset=utf-8'],
+  '/tabs.js': ['tabs.js', 'text/javascript; charset=utf-8'],
   '/app.js': ['app.js', 'text/javascript; charset=utf-8'],
   '/style.css': ['style.css', 'text/css; charset=utf-8'],
 };
