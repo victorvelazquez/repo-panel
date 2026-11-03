@@ -22,7 +22,7 @@ test('data.js defines the whole data layer and app.js defines none of it', () =>
   for (const n of MOVED) assert.equal(defines(data, n), true, `data.js defines ${n}`);
   const app = read('app.js');
   for (const n of MOVED) assert.equal(defines(app, n), false, `app.js no longer defines ${n}`);
-  for (const n of ['S', 'TOKEN', 'paint', 'draw']) assert.equal(defines(app, n), true, `app.js keeps ${n}`);
+  for (const n of ['S', 'TOKEN', 'paint']) assert.equal(defines(app, n), true, `app.js keeps ${n}`);
 });
 
 test('the page list is the one index.html loads, in order, after view.js and resumen.js', () => {

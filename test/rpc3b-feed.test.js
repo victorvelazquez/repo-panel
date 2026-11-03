@@ -21,7 +21,7 @@ test('feed.js defines the whole feed and app.js defines none of it', () => {
   for (const n of MOVED) assert.equal(defines(feed, n), true, `feed.js defines ${n}`);
   const app = read('app.js');
   for (const n of MOVED) assert.equal(defines(app, n), false, `app.js no longer defines ${n}`);
-  for (const n of ['S', 'TOKEN', 'paint', 'draw']) assert.equal(defines(app, n), true, `app.js keeps ${n}`);
+  for (const n of ['S', 'TOKEN', 'paint']) assert.equal(defines(app, n), true, `app.js keeps ${n}`);
   assert.equal(defines(read('data.js'), 'refreshRepo'), true, 'data.js keeps its own layer');
 });
 

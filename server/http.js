@@ -163,6 +163,7 @@ const STATIC = {
   '/feed.js': ['feed.js', 'text/javascript; charset=utf-8'],
   '/tabs.js': ['tabs.js', 'text/javascript; charset=utf-8'],
   '/chat.js': ['chat.js', 'text/javascript; charset=utf-8'],
+  '/board.js': ['board.js', 'text/javascript; charset=utf-8'],
   '/app.js': ['app.js', 'text/javascript; charset=utf-8'],
   '/style.css': ['style.css', 'text/css; charset=utf-8'],
 };
