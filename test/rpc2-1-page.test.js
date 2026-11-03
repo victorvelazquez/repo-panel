@@ -293,7 +293,7 @@ test('p15: with a pending dialog the composer is off and the card shows; Deny po
   assert.doesNotMatch(body(page), /ch-ask/);
 });
 
-test('p16: the old Orca send is gone from the page: no chat/send, chat/clear, sessions/start, msgBusy or Clear button', () => {
+test('p16: the old send is gone from the page: no chat/send, chat/clear, sessions/start, msgBusy or Clear button', () => {
   const app = fs.readFileSync(path.join(PUBLIC, 'app.js'), 'utf8');
   const res = fs.readFileSync(path.join(PUBLIC, 'resumen.js'), 'utf8');
   for (const gone of ['/api/chat/send', '/api/chat/clear', '/api/sessions/start', 'msgBusy', "'chat-clear'"]) assert.equal(app.includes(gone), false, gone);

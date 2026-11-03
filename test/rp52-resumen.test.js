@@ -415,8 +415,6 @@ test('the deliver button on the page is disabled until the repo local state is l
   assert.doesNotMatch(page.get('#summary').html, /data-act="pi"/);
   S.local.abc = { branch: 'feat', detached: false, upstream: 'origin/feat', noUpstream: false, ahead: 0, behind: 0, files: [{ path: 'a.txt', status: 'M', untracked: false }], added: 1, deleted: 0, head: 'h', inProgress: null, base: 'main', stagedCount: 0 };
   S.state.abc = { state: 'ready-to-commit', next: 'x', at: new Date().toISOString() };
-  S.live.abc = 'idle';
-  S.liveAnswered.abc = true;
   page.run('render()');
   assert.match(page.get('#summary').html, /data-act="pi" data-id="abc" data-cmd="flow-commit"/);
 });

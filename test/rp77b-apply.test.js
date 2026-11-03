@@ -1,6 +1,5 @@
 'use strict';
-// RP77b (S68, S71, S72) probes for the page wiring in the real public/app.js (vm with a stubbed DOM, like rp32-page): applyLive never touches a repo
-// with a command in flight, keeps the answer rules of loadChat, only feeds repos the view polls; pollSkipped / stopEvents / the visibility handler.
+// RP77b (S68, S71, S72) probes for the page wiring in the real public/app.js (vm with a stubbed DOM, like rp32-page): pollSkipped / stopEvents / the visibility handler.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -42,69 +41,17 @@ async function loadPage({ fetchImpl } = {}) {
 }
 const flush = async () => { for (let i = 0; i < 8; i++) await new Promise((r) => setImmediate(r)); };
 
-const R = { id: '0123456789', name: 'demo', path: 'x', group: 'g' };
-const file = { path: 'a.txt', status: 'M', untracked: false };
-const dirty = { branch: 't', detached: false, upstream: 'origin/t', noUpstream: false, ahead: 0, behind: 0, files: [file], added: 1, deleted: 0, head: 'h', inProgress: null, base: 'main', stagedCount: 0, stagedPaths: [] };
-const ASK = { state: 'waiting', count: 1, dialog: { lines: ['ok?'], selected: 0, choices: { fingerprint: 'f1', complete: true, options: [{ label: 'Yes', tone: 'affirmative' }] } } };
-const NONE = { state: 'none', count: 0 };
-
-function setup(page) {
-  const S = page.get('S');
-  S.groups = [{ name: 'g', repos: [R] }];
-  S.local[R.id] = dirty;
-  S.prs[R.id] = { prs: [], stale: null, repo: { url: 'https://github.com/o/demo' } };
-  S.chat = { id: R.id, seq: 1, info: { adopted: { id: 's' }, adoptedFound: true, live: ASK }, hist: null };
-  S.chat.key = JSON.stringify([S.chat.info, S.chat.hist]);
-  return S;
-}
-const applyLive = (page, live, state = 'idle') => page.get('applyLive')([{ id: R.id, state, live }]);
-
-test('applyLive feeds S.live of a polled repo (control for the probes below)', async () => {
-  const page = await loadPage();
-  const S = setup(page);
-  applyLive(page, NONE, 'busy');
-  assert.equal(S.live[R.id], 'busy');
-  assert.deepEqual(S.chat.info.live, NONE);
-});
-
-test('applyLive does nothing for a repo with a command in flight (S.sent): neither S.live nor the chat card', async () => {
-  const page = await loadPage();
-  const S = setup(page);
-  S.live[R.id] = 'busy';
-  S.sent[R.id] = { busySeen: false };
-  applyLive(page, NONE, 'idle');
-  assert.equal(S.live[R.id], 'busy');
-  assert.deepEqual(S.chat.info.live, ASK, 'the question card is left to the poller of that repo');
-  assert.deepEqual(JSON.parse(JSON.stringify(page.get('ev').last[R.id].live)), NONE, 'but the last word is remembered');
-});
-
-test('applyLive does not set S.live for a repo the view does not poll (clean tree), yet still updates its chat card', async () => {
-  const page = await loadPage();
-  const S = setup(page);
-  S.local[R.id] = { ...dirty, files: [] };
-  applyLive(page, NONE, 'busy');
-  assert.equal(S.live[R.id], undefined);
-  assert.equal(S.liveAnswered[R.id], undefined);
-  assert.deepEqual(S.chat.info.live, NONE);
-});
-
-test('pollSkipped: with the stream connected a poller that ran a moment ago is skipped; without it, never; stopEvents forgets the last words', async () => {
+test('pollSkipped: with the stream connected the chat poller that ran a moment ago is skipped; without it, never; stopEvents disconnects', async () => {
   const page = await loadPage();
   const ev = page.get('ev');
   ev.connected = true;
-  ev.ran.live = Date.now();
-  assert.equal(page.get('pollSkipped')('live'), true);
-  ev.ran.live = Date.now() - 61000;
-  assert.equal(page.get('pollSkipped')('live'), false, 'the safety net runs after 60 s');
   ev.ran.chat = Date.now() - 29000;
   assert.equal(page.get('pollSkipped')('chat'), true);
   ev.connected = false;
-  ev.ran.live = Date.now();
-  assert.equal(page.get('pollSkipped')('live'), false, 'not connected: the poller always runs');
-  ev.last = { a: 1 };
+  ev.ran.chat = Date.now();
+  assert.equal(page.get('pollSkipped')('chat'), false, 'not connected: the poller always runs');
   ev.connected = true;
   page.get('stopEvents')();
-  assert.deepEqual(Object.keys(ev.last), []);
   assert.equal(ev.connected, false);
 });
 

@@ -1,5 +1,5 @@
 'use strict';
-// RPC2-1 (S1, S6, S8), the pure part of the page: V.rpcEvent parses a frame of the `rpc` SSE event (total, 64 KB like liveEvent), V.rpcReduce
+// RPC2-1 (S1, S6, S8), the pure part of the page: V.rpcEvent parses a frame of the `rpc` SSE event (total, 64 KB), V.rpcReduce
 // keeps what the chat shows of one session, V.rpcFromStatus reads GET /api/rpc/status.
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -28,16 +28,14 @@ test('e2: rpcEvent is total: other events, garbage, bad ids and unknown kinds ar
   for (const f of bad) assert.equal(V.rpcEvent(f), null, JSON.stringify(f));
 });
 
-test('e3: rpcEvent respects the 64 KB limit of liveEvent', () => {
+test('e3: rpcEvent respects the 64 KB limit', () => {
   const pad = (n) => frame({ id: ID, kind: 'event', record: { type: 'x', pad: 'p'.repeat(n) } });
   assert.notEqual(V.rpcEvent(pad(60 * 1024)), null);
   assert.equal(V.rpcEvent(pad(65 * 1024)), null);
 });
 
-test('e4: the live and snapshot parsers do not read rpc frames, and rpcEvent does not read theirs', () => {
-  assert.equal(V.liveEvent(frame({ id: ID, kind: 'state', state: 'idle' })), null);
+test('e4: rpcEvent does not read a `live` frame', () => {
   assert.equal(V.rpcEvent({ event: 'live', data: JSON.stringify({ id: ID, state: 'idle', live: { state: 'free' } }) }), null);
-  assert.deepEqual(V.liveEvent({ event: 'live', data: JSON.stringify({ id: ID, state: 'idle', live: { state: 'free' } }) }), { id: ID, state: 'idle', ask: undefined, live: { state: 'free' } });
 });
 
 test('r1: text_delta appends to the block of its contentIndex; two blocks read in order, separated by a blank line', () => {

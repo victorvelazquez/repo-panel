@@ -116,7 +116,6 @@ function loadPage() {
   return { get: (name) => vm.runInContext(name, ctx), calls, answers };
 }
 const R = { id: 'abc', name: 'demo' };
-const ASK_TEXT = 'Review consent\n<b onmouseover="x()">1. Review this change</b>\nEnter confirm · Esc cancel';
 function asking(page) {
   const S = page.get('S');
   S.local[R.id] = lcl({ files: [{ path: 'a.txt', status: 'M', untracked: false }] });
@@ -125,15 +124,14 @@ function asking(page) {
   return S;
 }
 
-test('page: polling an asking session keeps the record, stores the ask text and only ever reads', async () => {
+test('page: polling an asking session keeps the record and only ever reads', async () => {
   const page = loadPage();
   await new Promise((r) => setImmediate(r));
   page.calls.length = 0;
   const S = asking(page);
-  page.answers['/api/pi-status?id=abc'] = { state: 'asking', ask: ASK_TEXT };
+  page.answers['/api/pi-status?id=abc'] = { state: 'asking' };
   await page.get('loadPiStatus')('abc');
   assert.equal(S.pistatus.abc, 'asking');
-  assert.equal(S.piask.abc, ASK_TEXT);
   assert.ok(S.sent.abc, 'the record is kept');
   const v = page.get('verdictOf')(R);
   assert.deepEqual([v.state, v.asking], ['running', true]);
@@ -141,19 +139,16 @@ test('page: polling an asking session keeps the record, stores the ask text and 
   assert.equal(page.calls.some((c) => c.url === '/api/pi'), false);
   page.answers['/api/pi-status?id=abc'] = { state: 'idle' };
   await page.get('loadPiStatus')('abc');
-  assert.equal(S.piask.abc, undefined, 'the ask text goes away with the dialog');
+  assert.equal(S.pistatus.abc, 'idle');
 });
 
-test('page: the card of an asking session shows a static highlighted line with the escaped ask text as tooltip', () => {
+test('page: the card of an asking session shows a static highlighted line whose tooltip is the verdict reason', () => {
   const page = loadPage();
   const S = asking(page);
   S.pistatus.abc = 'asking';
-  S.piask.abc = ASK_TEXT;
   const v = page.get('verdictOf')(R);
   const row = page.get('verdictRow')(R, v);
-  assert.match(row, /^<div class="ask-line" role="status" aria-live="polite" title="[^"<>]*">waiting for your answer in the session<\/div>$/);
-  assert.equal(row.includes('<b'), false, 'never HTML');
-  assert.ok(row.includes('&lt;b onmouseover=&quot;x()&quot;&gt;'));
+  assert.equal(row, `<div class="ask-line" role="status" aria-live="polite" title="${v.reason}">waiting for your answer in the session</div>`);
   assert.equal(/pulse-dot|class="ell"|animation|committing/.test(row), false);
   const card = page.get('repoCard')(R, false, v);
   assert.ok(card.includes(row));
@@ -162,7 +157,7 @@ test('page: the card of an asking session shows a static highlighted line with t
   assert.equal(card.includes('Needs attention'), false);
 });
 
-test('page: an asking verdict without ask text still shows the line, with a plain tooltip', () => {
+test('page: an asking verdict shows the static line', () => {
   const page = loadPage();
   asking(page);
   const row = page.get('verdictRow')(R, view.flowVerdict(sentOf('flow-pr'), lcl(), 'asking', { prs: [] }, NOW));
@@ -175,12 +170,4 @@ test('page: a normal busy verdict is still the animated running line, not the as
   const row = page.get('verdictRow')(R, view.flowVerdict(sentOf('flow-pr'), lcl({ ahead: 1 }), 'busy', { prs: [] }, NOW));
   assert.match(row, /class="verdict-line"/);
   assert.equal(row.includes('ask-line'), false);
-});
-
-test('page: dismissing or restarting a record forgets the ask text', () => {
-  const page = loadPage();
-  const S = asking(page);
-  S.piask.abc = ASK_TEXT;
-  page.get('clearSent')('abc');
-  assert.equal(S.piask.abc, undefined);
 });

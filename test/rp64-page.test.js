@@ -1,6 +1,6 @@
 'use strict';
 // RP64 (S62, S78): the page side of the single code viewer, in the real public/app.js loaded in a vm (stubbed DOM, fake fetch with manual
-// gates: no timers, no sleeps, no network, no Orca, no real config). The diff chip opens the Changes tab of the right panel (from the Work
+// gates: no timers, no sleeps, no network, no real config). The diff chip opens the Changes tab of the right panel (from the Work
 // tab it first switches to the Summary); /api/diff is read each time the tab is switched to; the composer hides; nothing is ever sent.
 const test = require('node:test');
 const assert = require('node:assert/strict');

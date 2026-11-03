@@ -1,6 +1,6 @@
 'use strict';
 // RP63 (S60, S77): the page side of the Tasks tab, in the real public/app.js loaded in a vm (stubbed DOM, fake fetch with manual gates:
-// no timers, no sleeps, no network, no Orca, no real config). The roadmap is asked from the page, once per chat opening, and never
+// no timers, no sleeps, no network, no real config). The roadmap is asked from the page, once per chat opening, and never
 // when the tab is not shown; the composer hides on the Tasks tab; nothing here ever sends text to a session.
 const test = require('node:test');
 const assert = require('node:assert/strict');

@@ -638,7 +638,7 @@ test('GET /api/prerequisites needs the token and answers git, gh and pi without 
     assert.equal((await getApi('/api/prerequisites', false)).status, 401);
     const r = await getApi('/api/prerequisites');
     assert.equal(r.status, 200);
-    assert.deepEqual(r.json.items.map((i) => i.id), ['git', 'gh', 'pi']); // RPC1a added pi; Orca is no longer a prerequisite
+    assert.deepEqual(r.json.items.map((i) => i.id), ['git', 'gh', 'pi']); // RPC1a added pi
     for (const i of r.json.items) { assert.equal(typeof i.ok, 'boolean'); assert.equal(typeof i.detail, 'string'); }
   });
 });

@@ -105,10 +105,6 @@
     return { message, reasons };
   }
 
-  // RPC2b-1: a room has no session state any more (RPC2b-3 deletes these two): always neutral.
-  const presenceLabel = () => '';
-  const presenceDot = () => 'gray';
-
   // The card's room tag: { name, dot, title }, or null for a repo that is not in a room. `entry` is the page's record
   // of /api/rooms: { state: 'loading' | 'loaded' | 'failed', data: { rooms } }; nothing is claimed until it loaded.
   function roomTag(rooms, id, entry) {
@@ -143,31 +139,15 @@
   }
 
   // Why the commit buttons are disabled while the work is still going on, or null. `session` is the state of
-  // GET /api/pi-status for a repo with changes: busy, asking and 'checking' (see liveSession) hold; idle, closed,
-  // ambiguous, unknown and a failed request never do (fail open, a flaky Orca must not hold a repo hostage).
+  // the RPC host for a repo with changes: busy and asking hold; idle, closed, unknown and no state never do (fail open).
   const SESSION_BUSY = 'the session is still working';
   const SESSION_ASKING = 'waiting for your answer in the session';
-  const SESSION_CHECKING = 'checking the session…';
-  // How long a dirty repo, seen by the page for the first time, keeps its commit buttons disabled while the first
-  // answer of the live session state is still on its way.
-  const LIVE_CHECK_MS = 20 * 1000;
   const QUIET_MS = 20 * 1000; // files changed more recently than this: more changes are probably coming
   const QUIET_SKEW_MS = 5 * 1000; // a time further in the future than this is a clock problem, not activity
   const QUIET_REASON = 'files changed a few seconds ago';
 
   function sessionHold(session) {
-    return session === 'busy' ? SESSION_BUSY : session === 'asking' ? SESSION_ASKING : session === 'checking' ? SESSION_CHECKING : null;
-  }
-
-  // The `session` of a repo with changes as the buttons see it. A command of this page in flight has its own verdict
-  // (undefined). Once the live state was asked for, its answer rules: a state, or undefined after a failed request.
-  // Before the first answer the repo is 'checking' until LIVE_CHECK_MS after it was first seen dirty (`dirtyAt`), then
-  // the normal rules apply (fail open).
-  function liveSession({ sent, live, answered = false, dirtyAt, now = Date.now() } = {}) {
-    if (sent) return undefined;
-    if (answered) return live;
-    const age = now - dirtyAt;
-    return typeof dirtyAt === 'number' && age >= 0 && age < LIVE_CHECK_MS ? 'checking' : undefined;
+    return session === 'busy' ? SESSION_BUSY : session === 'asking' ? SESSION_ASKING : null;
   }
 
   // Whether the newest changed file is younger than QUIET_MS. A missing or non-finite value never blocks.
@@ -215,9 +195,9 @@
     return out;
   }
 
-  // The repos whose live session state the page polls: loaded, with uncommitted changes, and no command of the panel
-  // in flight (loadPiStatus already polls those). Nothing while the tab is hidden.
-  function piPollTargets({ ids = [], local = {}, sent = {}, hidden = false } = {}) {
+  // The repos the quiet-period tick watches: loaded, with uncommitted changes, and no command of the panel in flight
+  // (loadPiStatus already polls those). Nothing while the tab is hidden.
+  function dirtyRepos({ ids = [], local = {}, sent = {}, hidden = false } = {}) {
     if (hidden) return [];
     return ids.filter((id) => hasLocal(local[id]) && local[id].files.length > 0 && !sent[id]);
   }
@@ -538,23 +518,8 @@
   }
 
   const EVENT_MAX = 64 * 1024;
-  const EVENT_PI = ['closed', 'idle', 'busy', 'asking', 'ambiguous', 'unknown'];
-  const EVENT_LIVE = ['none', 'free', 'working', 'waiting', 'unknown'];
   const isObject = (x) => !!x && typeof x === 'object' && !Array.isArray(x);
-  function liveEntry(x) {
-    if (!isObject(x) || typeof x.id !== 'string' || !/^[0-9a-f]{10}$/.test(x.id)) return null;
-    if (!EVENT_PI.includes(x.state) || !isObject(x.live) || !EVENT_LIVE.includes(x.live.state)) return null;
-    return { id: x.id, state: x.state, ask: typeof x.ask === 'string' ? x.ask : undefined, live: x.live };
-  }
-  // A `live` frame as { id, state, ask, live }; a `snapshot` frame as an array of those (bad entries dropped); anything else, null.
-  function liveEvent(frame) {
-    if (!frame || (frame.event !== 'live' && frame.event !== 'snapshot') || typeof frame.data !== 'string' || frame.data.length > EVENT_MAX) return null;
-    let body;
-    try { body = JSON.parse(frame.data); } catch { return null; }
-    if (frame.event === 'live') return liveEntry(body);
-    return Array.isArray(body) ? body.map(liveEntry).filter(Boolean) : null;
-  }
-  // RPC2-1 (S1): the `rpc` event carries what one pi session does ({ id, kind, ... }; the id is a repo id like the live ones). Same limit as liveEvent.
+  // RPC2-1 (S1): the `rpc` event carries what one pi session does ({ id, kind, ... }; the id is a repo id). Frames over EVENT_MAX are dropped.
   const RPC_KINDS = ['event', 'state', 'dialog', 'dialog-closed', 'exit'];
   const RPC_STATES = ['starting', 'idle', 'busy', 'asking', 'closed'];
   function rpcEvent(frame) {
@@ -641,8 +606,8 @@
   }
   const chatFromCache = (entry) => (entry ? { info: { ...plainCopy(entry.info), live: { state: 'unknown', count: 0 } }, hist: plainCopy(entry.hist), key: entry.key, cached: true } : null);
 
-  // With the stream open the polls are only a safety net; without it they keep today's 10 s and 5 s.
-  const eventsPlan = ({ connected }) => (connected ? { pollLiveMs: 60000, chatMs: 30000 } : { pollLiveMs: 10000, chatMs: 5000 });
+  // With the stream open the chat poll is only a safety net; without it it keeps 5 s.
+  const eventsPlan = ({ connected }) => (connected ? { chatMs: 30000 } : { chatMs: 5000 });
   const eventsRetryMs = (attempt) => Math.min(30000, 1000 * 2 ** attempt);
   // The server sends a heartbeat every 15 s: three missed beats mean the stream is dead (a server that vanished without closing it).
   const eventsStale = ({ connected, lastByteAt, now }) => connected === true && Number.isFinite(lastByteAt) && Number.isFinite(now) && now - lastByteAt >= 45000;
@@ -891,5 +856,5 @@
     return `${meters.join('')}${age}<div class="usage-pop" role="group" aria-label="Claude usage details">${details.join('')}${note}${foot}</div>`;
   }
 
-  return { repoModel, changeChips, prChip, idleChip, conflictChip, sizeChip, RepoCard, stateLineHidden, usageView, usageHtml, usageRemaining, boardApply, boardWait, chatCachePut, chatCacheGet, chatFromCache, API_VERSION, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, piPollTargets, LIVE_CHECK_MS, liveSession, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, presenceLabel, presenceDot, parseSse, liveEvent, rpcEvent, rpcReduce, rpcFromStatus, eventsPlan, eventsRetryMs, eventsStale };
+  return { repoModel, changeChips, prChip, idleChip, conflictChip, sizeChip, RepoCard, stateLineHidden, usageView, usageHtml, usageRemaining, boardApply, boardWait, chatCachePut, chatCacheGet, chatFromCache, API_VERSION, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, dirtyRepos, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, parseSse, rpcEvent, rpcReduce, rpcFromStatus, eventsPlan, eventsRetryMs, eventsStale };
 }));

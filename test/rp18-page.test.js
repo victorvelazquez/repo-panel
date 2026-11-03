@@ -1,6 +1,6 @@
 'use strict';
 // RP18 in the real public/app.js (vm with a stubbed DOM): the in-progress state of every command, the disabled
-// buttons, the staging bar, the retry label, the escaped tail, and the refresh when a session finishes.
+// buttons, the staging bar, the retry label, and the refresh when a session finishes.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -133,17 +133,6 @@ test('page: a failed /flow-commit labels the button "Retry /flow-commit" and sho
   assert.ok(cardOf(page).includes('>Retry /flow-commit --unstage</button>'));
 });
 
-test('page: the tail of the session screen is shown escaped, small, with the full text as a tooltip', () => {
-  const page = loadPage();
-  const S = setup(page, local({ files: [file] }), { sent: { cmd: 'flow-commit', files: 1 }, session: 'idle' });
-  S.pitail[R.id] = 'Index is not empty <img src=x onerror="alert(1)">\nrun "git reset"';
-  const html = cardOf(page);
-  assert.equal(html.includes('<img'), false);
-  assert.match(html, /<div class="attn-tail" title="Index is not empty &lt;img src=x onerror=&quot;alert\(1\)&quot;&gt;\nrun &quot;git reset&quot;">Index is not empty &lt;img src=x onerror=&quot;alert\(1\)&quot;&gt;\nrun &quot;git reset&quot;<\/div>/);
-  S.pitail[R.id] = '';
-  assert.equal(cardOf(page).includes('attn-tail'), false);
-});
-
 test('page: a failed /flow-pr or /flow-base shows its reason and keeps its normal button (no Retry label)', () => {
   const page = loadPage();
   setup(page, local({ ahead: 1 }), { sent: { cmd: 'flow-pr', ahead: 1 }, session: 'idle' });
@@ -189,12 +178,11 @@ test('page: fix-pr and put-in-conditions record only { cmd, at } and read no bas
   assert.deepEqual(Object.keys(failed.get('S').sent), []);
 });
 
-test('page: dismissing an attention bar clears the record, the session state and the tail', () => {
+test('page: dismissing an attention bar clears the record and the session state', () => {
   const page = loadPage();
   const S = setup(page, local({ files: [file] }), { sent: { cmd: 'flow-commit' }, session: 'idle' });
-  S.pitail[R.id] = 'x';
   page.get('ACTIONS')['dismiss-sent']({ dataset: { id: 'abc' } });
-  assert.deepEqual([S.sent.abc, S.pistatus.abc, S.pitail.abc], [undefined, undefined, undefined]);
+  assert.deepEqual([S.sent.abc, S.pistatus.abc], [undefined, undefined]);
 });
 
 // ---------- when the session finishes ----------
@@ -260,22 +248,4 @@ test('page: fix-pr is dropped once its session is idle after the refresh, with n
   await page.get('loadPiStatus')('abc');
   assert.equal(page.get('verdictOf')(R), null);
   assert.equal(S.sent.abc, undefined);
-});
-
-test('page: the screen tail is fetched once, and only when the verdict is attention', async () => {
-  const page = loadPage();
-  await quiet(page);
-  const S = setup(page, local({ files: [file] }), { sent: { cmd: 'flow-commit', files: 1 }, session: 'idle' });
-  page.answers['/api/pi-status?id=abc'] = { state: 'idle' };
-  page.answers['/api/pi-status?id=abc&tail=1'] = { state: 'idle', tail: 'Index is not empty' };
-  await page.get('loadPiStatus')('abc');
-  assert.equal(S.pitail.abc, 'Index is not empty');
-  await page.get('loadPiStatus')('abc');
-  assert.equal(urls(page).filter((u) => u.endsWith('tail=1')).length, 1);
-  const calm = loadPage();
-  await quiet(calm);
-  setup(calm, local({ files: [file] }), { sent: { cmd: 'flow-commit', files: 1, at: Date.now() }, session: 'idle' });
-  calm.answers['/api/pi-status?id=abc'] = { state: 'busy' };
-  await calm.get('loadPiStatus')('abc');
-  assert.equal(urls(calm).some((u) => u.endsWith('tail=1')), false); // running: nothing to explain
 });
