@@ -154,7 +154,7 @@ const call = (port, method, p, { token, body } = {}) => new Promise((resolve, re
 async function withServer(fn) {
   const f = fakeFactory();
   const port = await freePort();
-  const server = createServer(port, { noSummaryStore: true, hub: createEventHub(), rpcResolve: async () => ({ active: ACTIVE }), rpcClient: f.createClient, orca: async () => { throw new Error('no orca'); } });
+  const server = createServer(port, { noSummaryStore: true, hub: createEventHub(), rpcResolve: async () => ({ active: ACTIVE }), rpcClient: f.createClient });
   await new Promise((r) => server.listen(port, '127.0.0.1', r));
   try {
     const token = /name="?token"? content="([0-9a-f]+)"/.exec((await call(port, 'GET', '/')).body)[1];

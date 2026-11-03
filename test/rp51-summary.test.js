@@ -1,6 +1,6 @@
 'use strict';
 // RP51 (S46): GET /api/summary. `summarize(facts)` turns the facts of one repo into one row; `summaryFor(deps, query)`
-// gathers every configured repo with injected Orca and PR providers, isolating failures per repo.
+// gathers every configured repo with injected session and PR providers, isolating failures per repo.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -23,9 +23,9 @@ g('commit', '-q', '-m', 'first subject');
 const configFile = path.join(scratch, 'config.json');
 fs.writeFileSync(configFile, JSON.stringify({ groups: [{ name: 'G', repos: [{ path: goodRepo }, { path: missingRepo }] }] }));
 process.env.REPO_PANEL_CONFIG = configFile;
-process.env.REPO_PANEL_CASES_FILE = 'off';
 test.after(() => fs.rmSync(scratch, { recursive: true, force: true }));
 
+const lib = require('../lib.js');
 const { summarize, summaryFor } = require('../server/summary.js');
 
 const unit = (id, estado, extra = {}) => ({ id, entrega: `deliver ${id}`, resultadoVisible: `see ${id}`, dependsOn: [], externalDeps: [], estado, ...extra });
@@ -136,26 +136,20 @@ test('a repo whose local or PR read failed is an error row with nulls', () => {
 });
 
 // ---------- summaryFor ----------
-const IDLE_PI = '▎ ✿ waiting for input\n▎   type, or / for commands\n▎\n';
-function fakeOrca({ preview = IDLE_PI, fail = false } = {}) {
+// The session getter the RPC host gives: only the good repo has a session; `reads` counts how often it was asked.
+const hostOf = (state = 'idle') => {
   const calls = [];
-  const orca = async (args) => {
-    calls.push(args);
-    if (fail) throw new Error('Orca CLI is unavailable');
-    if (args[0] === 'list') return { terminals: [{ handle: 'h1', title: 'T', worktreePath: goodRepo.replace(/\\/g, '/'), connected: true, writable: true }] };
-    if (args[0] === 'show') return { terminal: { preview } };
-    throw new Error(`unexpected orca verb ${args[0]}`);
-  };
-  return { orca, calls };
-}
+  const sessionOf = (id) => { calls.push(id); return id === lib.repoId(goodRepo) ? state : 'closed'; };
+  return { sessionOf, calls };
+};
 const prs = async (repo) => {
   if (repo.path === missingRepo) throw new Error('gh exploded');
   return { prs: [], stale: null };
 };
 
-test('summaryFor: one failing repo does not break the other, and orca list runs once', async () => {
-  const f = fakeOrca();
-  const out = await summaryFor({ orca: f.orca, prs }, { fresh: '1' });
+test('summaryFor: one failing repo does not break the other, and the session is read once per repo', async () => {
+  const f = hostOf();
+  const out = await summaryFor({ sessionOf: f.sessionOf, prs }, { fresh: '1' });
   assert.equal(out.rows.length, 2);
   const [good, bad] = out.rows;
   assert.equal(good.error, null);
@@ -166,20 +160,24 @@ test('summaryFor: one failing repo does not break the other, and orca list runs 
   assert.equal(good.group, 'G');
   assert.ok(bad.error);
   assert.equal(bad.action, null);
-  assert.equal(f.calls.filter((c) => c[0] === 'list').length, 1);
+  assert.equal(f.calls.length, 2);
   assert.deepEqual(Object.keys(out), ['rows', 'counts', 'attention', 'generatedAt']);
   assert.deepEqual(out.counts, { working: 0, waiting: 0, blocked: 0, idle: 1 });
   assert.match(out.generatedAt, /^\d{4}-\d\d-\d\dT/);
 });
 
-test('summaryFor: an Orca failure makes every session unknown, never none', async () => {
-  const out = await summaryFor({ orca: fakeOrca({ fail: true }).orca, prs }, { fresh: '1' });
+test('summaryFor: a session getter that throws makes every session unknown, never none', async () => {
+  const out = await summaryFor({ sessionOf: () => { throw new Error('host down'); }, prs }, { fresh: '1' });
+  assert.deepEqual(out.rows.map((r) => r.session.state), ['unknown', 'unknown']);
+});
+
+test('summaryFor: without a session getter every session is unknown', async () => {
+  const out = await summaryFor({ prs }, { fresh: '1' });
   assert.deepEqual(out.rows.map((r) => r.session.state), ['unknown', 'unknown']);
 });
 
 test('summaryFor: an asking session counts as waiting and appears in attention', async () => {
-  const ask = '▎ ✿ waiting for input\nAllow guarded git operation?\n  ↑↓ navigate  enter select  escape/ctrl+c cancel\n';
-  const out = await summaryFor({ orca: fakeOrca({ preview: ask }).orca, prs }, { fresh: '1' });
+  const out = await summaryFor({ sessionOf: hostOf('asking').sessionOf, prs }, { fresh: '1' });
   assert.equal(out.rows[0].session.state, 'waiting');
   assert.equal(out.rows[0].action.kind, 'answer');
   assert.equal(out.counts.waiting, 1);
@@ -189,24 +187,24 @@ test('summaryFor: an asking session counts as waiting and appears in attention',
 
 test('summaryFor: failing CI on a PR is an attention reason', async () => {
   const failing = async () => ({ prs: [{ number: 3, title: 'T', ready: false, checks: { state: 'failed' } }], stale: null });
-  const out = await summaryFor({ orca: fakeOrca().orca, prs: failing }, { fresh: '1' });
+  const out = await summaryFor({ sessionOf: hostOf().sessionOf, prs: failing }, { fresh: '1' });
   assert.match(out.attention[0].why, /#3/);
 });
 
 test('summaryFor: the response is cached for 10 s and ?fresh=1 bypasses the cache', async () => {
   let t = 1000000;
-  const f = fakeOrca();
-  const deps = { orca: f.orca, prs, now: () => t };
+  const f = hostOf();
+  const deps = { sessionOf: f.sessionOf, prs, now: () => t };
   const a = await summaryFor(deps, {});
   const b = await summaryFor(deps, {});
   assert.equal(a, b);
-  assert.equal(f.calls.filter((c) => c[0] === 'list').length, 1);
+  assert.equal(f.calls.length, 2);
   const c = await summaryFor(deps, { fresh: '1' });
   assert.notEqual(c, a);
-  assert.equal(f.calls.filter((x) => x[0] === 'list').length, 2);
+  assert.equal(f.calls.length, 4);
   t += 10001;
   assert.notEqual(await summaryFor(deps, {}), c);
-  assert.equal(f.calls.filter((x) => x[0] === 'list').length, 3);
+  assert.equal(f.calls.length, 6);
 });
 
 test('GET /api/summary is a registered route that needs the token', async () => {
@@ -217,7 +215,7 @@ test('GET /api/summary is a registered route that needs the token', async () => 
   await new Promise((r) => probe.listen(0, '127.0.0.1', r));
   const port = probe.address().port;
   await new Promise((r) => probe.close(r));
-  const real = createServer(port, { orca: fakeOrca().orca, prs });
+  const real = createServer(port, { prs });
   await new Promise((r) => real.listen(port, '127.0.0.1', r));
   try {
     const status = await new Promise((resolve, reject) => {
@@ -230,7 +228,7 @@ test('GET /api/summary is a registered route that needs the token', async () => 
 // ---------- RP58: follow-ups of the review ----------
 test('summaryFor: an exception while analysing one repo gives an error row for it only and never rejects', async () => {
   const local = async (repo) => (repo.path === goodRepo ? { branch: 'main', files: null, ahead: 0 } : { branch: 'main', files: [], ahead: 0, behind: 0, base: 'main' });
-  const out = await summaryFor({ orca: fakeOrca().orca, prs: async () => ({ prs: [], stale: null }), local }, { fresh: '1' });
+  const out = await summaryFor({ sessionOf: hostOf().sessionOf, prs: async () => ({ prs: [], stale: null }), local }, { fresh: '1' });
   assert.equal(out.rows.length, 2);
   const [bad, ok] = out.rows;
   assert.ok(bad.error);
@@ -242,10 +240,10 @@ test('summaryFor: an exception while analysing one repo gives an error row for i
 
 test('summaryFor: the 10 s cache counts from when the build finished, not from when it started', async () => {
   let t = 1000000;
-  const f = fakeOrca();
+  const f = hostOf();
   let slowed = false;
   const slow = async () => { if (!slowed) { slowed = true; t += 8000; } return { prs: [], stale: null }; };
-  const deps = { orca: f.orca, prs: slow, now: () => t };
+  const deps = { sessionOf: f.sessionOf, prs: slow, now: () => t };
   const a = await summaryFor(deps, {});
   assert.equal(t, 1000000 + 8000);
   t += 5000; // 13 s after the start, 5 s after the end
@@ -258,9 +256,8 @@ const blockedRoadmap = async () => ({ available: true, rows: [unit('B', 'Bloquea
 const cleanLocal = async () => ({ branch: 'main', files: [], ahead: 0, behind: 0, base: 'main' });
 
 test('summaryFor: counts and attention come from the rows (waiting session, failing CI, blocked unit)', async () => {
-  const ask = '▎ ✿ waiting for input\nAllow guarded git operation?\n  ↑↓ navigate  enter select  escape/ctrl+c cancel\n';
   const failing = async (repo) => (repo.path === goodRepo ? { prs: [{ number: 3, title: 'T', ready: false, checks: { state: 'failed' } }], stale: null } : { prs: [], stale: null });
-  const out = await summaryFor({ orca: fakeOrca({ preview: ask }).orca, prs: failing, local: cleanLocal, roadmap: blockedRoadmap, state: async () => ({ available: false }) }, { fresh: '1' });
+  const out = await summaryFor({ sessionOf: hostOf('asking').sessionOf, prs: failing, local: cleanLocal, roadmap: blockedRoadmap, state: async () => ({ available: false }) }, { fresh: '1' });
   const [waiting, blocked] = out.rows;
   assert.deepEqual([waiting.session.state, blocked.session.state], ['waiting', 'none']);
   assert.deepEqual(blocked.blocking, [{ unit: 'B', waitsFor: [], external: [] }]);
@@ -278,7 +275,7 @@ test('GET /api/summary with a valid token answers 200 with the summary keys', as
   await new Promise((r) => probe.listen(0, '127.0.0.1', r));
   const port = probe.address().port;
   await new Promise((r) => probe.close(r));
-  const real = createServer(port, { orca: fakeOrca().orca, prs });
+  const real = createServer(port, { prs });
   await new Promise((r) => real.listen(port, '127.0.0.1', r));
   const get = (p, headers = {}) => new Promise((resolve, reject) => {
     http.get({ host: '127.0.0.1', port, path: p, headers }, (res) => {

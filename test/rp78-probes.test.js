@@ -8,7 +8,6 @@ const path = require('node:path');
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'rp78v-'));
 process.env.REPO_PANEL_CONFIG = path.join(scratch, 'config.json');
-process.env.REPO_PANEL_CASES_FILE = 'off';
 test.after(() => fs.rmSync(scratch, { recursive: true, force: true, maxRetries: 5 }));
 
 const lib = require('../lib.js');
@@ -53,7 +52,7 @@ test('the snoozed PRs of the config reach the row, like summarize does (no Merge
 test('a repo removed from the config and added again starts from nothing: loading row, session unknown', async () => {
   let c = cfgOf(['a']);
   const store = createSummaryStore({ deps: readers(), waitForClient: false, loadCfg: () => c });
-  await store.refreshAll(); store.setSession(idOf('a'), 'asking');
+  await store.refreshAll();
   c = cfgOf([]); store.snapshot(); c = cfgOf(['a']);
   const row = store.snapshot().rows[0];
   assert.equal(row.loading, true);

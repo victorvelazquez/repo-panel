@@ -611,55 +611,6 @@ test('conformityReport is defensive about its input', () => {
   assert.deepEqual(lib.conformityReport([null, 5, 'a', { roadmap: GOOD }, { id: 'i', name: 3, roadmap: GOOD }]), { ok: 0, items: [] });
 });
 
-const IDLE = 'earlier output\n▎ ✿ waiting for input\n▎   type, or / for commands\n▎\n5h 78% ↻12:40';
-const term = (o = {}) => ({ handle: 'h1', title: 'π - repo', worktreePath: 'C:/dev/repo', connected: true, writable: true, orphaned: false, ...o });
-
-test('normPath ignores separator style, trailing slash and case', () => {
-  assert.equal(lib.normPath('C:\\Dev\\Repo\\'), 'c:/dev/repo');
-  assert.equal(lib.normPath('C:/dev/repo'), 'c:/dev/repo');
-});
-
-test('terminalsOfWorktree keeps the live, writable terminals of exactly that worktree, whatever their title', () => {
-  const list = [
-    term(), term({ handle: 'h2', worktreePath: 'C:\\DEV\\repo\\' }), term({ handle: 'other', worktreePath: 'C:/dev/repo2' }),
-    term({ handle: 'plain', title: 'Terminal 1' }), term({ handle: 'untitled', title: undefined }), term({ handle: 'dead', connected: false }),
-    term({ handle: 'ro', writable: false }), term({ handle: 'orphan', orphaned: true }), null, { title: 'π' },
-  ];
-  assert.deepEqual(lib.terminalsOfWorktree(list, 'c:\\dev\\repo').map((t) => t.handle), ['h1', 'h2', 'plain', 'untitled']);
-  assert.deepEqual(lib.terminalsOfWorktree('x', 'C:/dev/repo'), []);
-  assert.equal(lib.piTerminalsFor, undefined);
-});
-
-const BUSY = '$ sleep 20 (timeout 30s)\nElapsed 7.2s\n▎ ❁ working…\n▎   type, or / for commands\n▎\nfooter';
-
-test('piScreenState reads a Gentle Shell pi screen: idle, busy with either glyph, or typed', () => {
-  assert.equal(lib.piScreenState(IDLE), 'idle');
-  assert.equal(lib.piScreenState(BUSY), 'busy');
-  assert.equal(lib.piScreenState(BUSY.replace('❁', '✿')), 'busy');
-  assert.equal(lib.piScreenState(IDLE.replace('✿', '★')), 'idle');
-  assert.equal(lib.piScreenState(IDLE.replace('type, or / for commands', 'half a sentence')), 'typed');
-  assert.equal(lib.piScreenState('▎ ✿ waiting for input\n'), 'typed');
-});
-
-test('piScreenState is null for anything that is not a pi screen', () => {
-  assert.equal(lib.piScreenState('PS C:\\Users\\victor> git status\nnothing to commit'), null);
-  assert.equal(lib.piScreenState('waiting for input'), null);
-  for (const v of ['', '\n\n', 'garbage ▎', null, undefined, 7, {}]) assert.equal(lib.piScreenState(v), null);
-});
-
-test('piScreenState still sees the prompt below long output and ignores one scrolled far above', () => {
-  const long = Array.from({ length: 200 }, (_, i) => `output ${i}`).join('\n');
-  assert.equal(lib.piScreenState(`${long}\n${IDLE}`), 'idle');
-  assert.equal(lib.piScreenState(`${IDLE}\n${long}`), null);
-});
-
-test('piPromptState is idle only for an empty prompt and fails closed otherwise', () => {
-  assert.equal(lib.piPromptState(IDLE), 'idle');
-  assert.equal(lib.piPromptState(IDLE.replace('type, or / for commands', 'half a sentence')), 'typed');
-  assert.equal(lib.piPromptState('thinking…\n▎ working'), 'busy');
-  assert.equal(lib.piPromptState(`${IDLE}\nnew output`.replace('waiting for input', 'busy')), 'busy');
-  for (const v of ['', null, undefined, 7]) assert.equal(lib.piPromptState(v), 'busy');
-});
 
 test('PI_COMMANDS only offers the flow commands', () => {
   assert.deepEqual(lib.PI_COMMANDS, { 'flow-commit': '/flow-commit', 'flow-commit-unstage': '/flow-commit --unstage', 'flow-pr': '/flow-pr', 'flow-base': '/flow-base', 'flow-base-stash': '/flow-base --stash', 'flow-next': '/flow-next' });

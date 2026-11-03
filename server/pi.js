@@ -1,11 +1,9 @@
 'use strict';
 // Sends a fixed command to the repo's pi session over RPC (RPC2-2): the text is built here, the session must be started and idle, and the
-// same text is not accepted twice within a window (sendGuard). It fails closed: not started, busy or asking all refuse. The Orca scan below
-// is still read by the warmer, the watcher and the rooms until RPC2b.
+// same text is not accepted twice within a window (sendGuard). It fails closed: not started, busy or asking all refuse.
 const path = require('node:path');
 const lib = require('../lib.js');
 const { HttpError } = require('./errors.js');
-const { run } = require('./exec.js');
 const { requirementsFor, padronVersion } = require('./requirements.js');
 const { prState } = require('./github.js');
 
@@ -33,14 +31,6 @@ function sendGuard(now = Date.now) {
 
 // Appended to the orders that make a session edit files: /flow-commit refuses to start when the index is not empty.
 const INDEX_RULE = 'Never use git mv or git add; keep the git index empty (/flow-commit refuses to start with staged files).';
-
-async function orcaTerminal(args) {
-  const r = await run('orca', ['terminal', ...args, '--json'], { timeout: 15000 });
-  let out = null;
-  try { out = JSON.parse(r.stdout); } catch { /* not JSON */ }
-  if (r.code !== 0 || !out || out.ok === false) throw new HttpError(503, 'Orca CLI is unavailable or Orca is not running');
-  return out.result || {};
-}
 
 // The one-line order that sends the agent to requirements/INSTALL.md. Built here from the requirement results
 // (non-pass ids, required first); the browser never supplies text or ids.
@@ -91,120 +81,6 @@ async function orderText(repo, key, requirements, extra) {
   return Object.hasOwn(lib.PI_COMMANDS, key) ? lib.PI_COMMANDS[key] : null;
 }
 
-// Passive recorder of question-like screens (server/casos.js). A no-op until server.js installs one in its entry block;
-// no module and no test installs it by itself. It only observes: its result is never used and it can never fail a scan.
-const NO_RECORDER = () => {};
-let caseRecorder = NO_RECORDER;
-const setCaseRecorder = (fn) => { caseRecorder = typeof fn === 'function' ? fn : NO_RECORDER; };
-const caseRecorderInstalled = () => caseRecorder !== NO_RECORDER;
-function observe(folder, handle, state, preview) {
-  try { const r = caseRecorder({ folder, handle, state, preview }); if (r && typeof r.catch === 'function') r.catch(() => {}); } catch { /* observing never changes a scan */ }
-}
-
-// The whole rendered screen of a terminal (`orca terminal read --screen`) as text, or null when the read fails or its rows
-// are unusable. Read-only; a failure only means the caller falls back to the preview of `show`.
-async function readScreen(orca, handle) {
-  try {
-    const tail = ((await orca(['read', '--terminal', handle, '--screen', '--limit', '80'])).terminal || {}).tail;
-    return Array.isArray(tail) && tail.length && tail.every((r) => typeof r === 'string') ? tail.join('\n') : null;
-  } catch { return null; }
-}
-
-// Opt-in cache of the per-terminal read (RP77), for the read-only callers only. An entry is the whole result of one terminal, keyed
-// `${handle}|${withPreview}|${askAware}`, answered with no Orca call while the terminal's `lastOutputAt` (a finite number) is the same
-// and it was stored less than 30 s ago. A failed read and an 'asking' screen are never stored; a terminal missing in `listed` is dropped.
-const LIVE_MAX_AGE_MS = 30000;
-const liveCache = new Map();
-const liveCounts = { hits: 0, misses: 0, listHits: 0, listMisses: 0 };
-
-// The shared terminal list (RP77) for the read-only callers: callers that arrive while a `list` is in flight share it, and an answer is
-// reused for LIST_MAX_AGE_MS counted from when it RESOLVED (`opts.now`, default Date.now). A rejection or a non-array answer is never stored.
-// Answers are copies. listMisses = `list` calls made; listHits = callers answered with no call of their own. Writers and the warmer list fresh.
-// A list is only answered to callers of the SAME `orca` function (there is one in production), except one primed without it.
-const LIST_MAX_AGE_MS = 1000;
-let sharedList = null;
-let listFlight = null;
-let listEpoch = 0;
-function clearLiveCache() {
-  liveCache.clear();
-  sharedList = null;
-  listFlight = null;
-  listEpoch++;
-  liveCounts.hits = 0; liveCounts.misses = 0; liveCounts.listHits = 0; liveCounts.listMisses = 0;
-}
-const liveCacheStats = () => ({ hits: liveCounts.hits, misses: liveCounts.misses, size: liveCache.size, listHits: liveCounts.listHits, listMisses: liveCounts.listMisses });
-function primeList(terminals, opts = {}) {
-  if (!Array.isArray(terminals)) return;
-  const now = (opts && opts.now) || Date.now;
-  sharedList = { at: now(), terminals: structuredClone(terminals), orca: opts && opts.orca };
-}
-async function listTerminals(orca, opts = {}) {
-  const now = (opts && opts.now) || Date.now;
-  if (sharedList && (!sharedList.orca || sharedList.orca === orca) && now() - sharedList.at < LIST_MAX_AGE_MS) { liveCounts.listHits++; return structuredClone(sharedList.terminals); }
-  if (listFlight && listFlight.orca === orca) { liveCounts.listHits++; return structuredClone(await listFlight); }
-  liveCounts.listMisses++;
-  const epoch = listEpoch;
-  const flight = (async () => {
-    try {
-      const terminals = (await orca(['list'])).terminals;
-      if (Array.isArray(terminals) && epoch === listEpoch) sharedList = { at: now(), terminals: structuredClone(terminals), orca };
-      return terminals;
-    } finally { if (listFlight === flight) listFlight = null; }
-  })();
-  flight.orca = orca;
-  listFlight = flight;
-  return structuredClone(await flight);
-}
-
-// Looks at every terminal of the folder's worktree with a fresh `show` (the `list` preview is truncated), in
-// parallel. `sessions` are the ones whose screen is a pi screen; `failed` counts the terminals whose `show`
-// failed: those are unknown, not sessions. `listed` is an already fetched `list` result (rooms list once). A
-// terminal showing a selection dialog (lib.piScreenAsk) IS a session and that wins over idle/busy/typed: it is
-// reported as 'asking' (with its `ask` text) only when `askAware`; other callers (rooms) keep seeing 'busy'.
-// `opts.cached` (with a `listed` array) turns the cache above on; `opts.now` is the clock.
-async function scanSessions(folder, orca, listed, withPreview = false, askAware = false, opts = {}) {
-  const useCache = !!(opts && opts.cached) && listed !== undefined;
-  const now = (opts && opts.now) || Date.now;
-  if (useCache) {
-    const handles = new Set((Array.isArray(listed) ? listed : []).filter((t) => t && typeof t.handle === 'string').map((t) => t.handle));
-    for (const [key, e] of [...liveCache]) if (!handles.has(e.item.handle)) liveCache.delete(key);
-  }
-  const terminals = lib.terminalsOfWorktree(listed === undefined ? (await orca(['list'])).terminals : listed, folder);
-  const readOne = async ({ handle }) => {
-    try {
-      const preview = ((await orca(['show', '--terminal', handle])).terminal || {}).preview;
-      const ask = lib.piScreenAsk(preview);
-      if (!ask) observe(folder, handle, lib.piScreenState(preview), preview);
-      else if (!askAware) { observe(folder, handle, 'asking', preview); return { handle, state: 'busy', preview }; }
-      else {
-        const full = await readScreen(orca, handle);
-        observe(folder, handle, 'asking', full ?? preview);
-        // `choices` (RP73): the options the panel could press, null when the full screen is missing or is not a list it recognises.
-        const dialog = (full !== null && lib.piScreenDialog(full)) || lib.piScreenDialog(preview);
-        return { handle, state: 'asking', ask: ask.text, dialog: dialog && { ...dialog, choices: full === null ? null : lib.piDialogChoices(full) }, preview };
-      }
-      return { handle, state: lib.piScreenState(preview), preview };
-    } catch { return { handle, state: null, failed: true }; }
-  };
-  const seen = await Promise.all(terminals.map(async (t) => {
-    if (!useCache) return readOne(t);
-    const key = `${t.handle}|${withPreview}|${askAware}`;
-    const at = t.lastOutputAt;
-    const hit = liveCache.get(key);
-    if (hit && Number.isFinite(at) && hit.at === at && now() - hit.storedAt < LIVE_MAX_AGE_MS) { liveCounts.hits++; return structuredClone(hit.item); }
-    liveCounts.misses++;
-    const item = await readOne(t);
-    if (Number.isFinite(at) && !item.failed && item.state !== 'asking') liveCache.set(key, { at, storedAt: now(), item: structuredClone(item) });
-    else liveCache.delete(key);
-    return item;
-  }));
-  const sessions = seen.filter((t) => t.state).map(({ handle, state, ask, dialog, preview }) => ({ handle, state, ...(ask ? { ask, dialog } : {}), ...(withPreview ? { preview } : {}) }));
-  return { sessions, failed: seen.filter((t) => t.failed).length };
-}
-
-// The pi sessions of the repo: [{ handle, state }] with state idle | typed | busy | asking.
-const piSessions = async (repo, orca = orcaTerminal) => (await scanSessions(repo.path, orca, undefined, false, true)).sessions;
-
 // The fixed refusal for each session state that cannot take a command; a session that is still starting counts as busy.
 const REFUSALS = { closed: 'The session is not started', starting: 'The session is busy', busy: 'The session is busy', asking: 'The session is waiting for an answer' };
 
@@ -222,56 +98,10 @@ async function piSend(repo, key, host, requirements = requirementsFor, { pr, prs
   return { sent: true, confirmed: true };
 }
 
-// The session state for the commit verdict and the buttons, from the host: closed | idle | busy | asking (starting reads as busy). Never Orca.
+// The session state for the commit verdict and the buttons, from the host: closed | idle | busy | asking (starting reads as busy).
 async function rpcPiStatus(repo, host) {
   const { state } = await host.status(repo.id);
   return { state: state === 'starting' ? 'busy' : state };
 }
 
-const TAIL_LINES = 6;
-const TAIL_LINE_MAX = 200;
-const TAIL_MAX = 800;
-
-// The last non-empty lines of a pi screen ABOVE its prompt bars (the `▎` lines and the footer below them), made
-// safe to show: control characters become a space and the lengths are capped. '' when the screen has no prompt bar.
-// Informational only: nothing is ever decided from it.
-function screenTail(preview) {
-  if (typeof preview !== 'string') return '';
-  const lines = preview.split(/\r?\n/);
-  const at = lines.reduce((last, l, i) => (/^▎\s*\S+\s+(waiting for input|working…)/.test(l.trim()) ? i : last), -1);
-  if (at < 0) return '';
-  let start = at;
-  while (start > 0 && lines[start - 1].trim().startsWith('▎')) start--;
-  const above = lines.slice(0, start)
-    .map((l) => l.replace(/[\x00-\x1f\x7f-\x9f\u2028\u2029]/g, ' ').trim().slice(0, TAIL_LINE_MAX))
-    .filter(Boolean);
-  return above.slice(-TAIL_LINES).join('\n').slice(0, TAIL_MAX);
-}
-
-// The pure part of piStatus (RP77b): the state of one scan, shared with the warmer's event stream.
-function piStateOf(sessions, failed) {
-  if (!sessions.length) return { state: failed ? 'unknown' : 'closed' };
-  if (sessions.length > 1) return { state: 'ambiguous' };
-  const [one] = sessions;
-  if (one.state === 'asking') return { state: 'asking', ...(one.ask ? { ask: one.ask } : {}) };
-  return { state: one.state === 'busy' ? 'busy' : 'idle' };
-}
-
-// The state of the repo's pi session for the commit verdict: closed | idle | busy | ambiguous | unknown. Read-only
-// (`list` and a fresh `show` per terminal, never `send`), as the room presence does. An Orca failure is unknown,
-// never closed; a prompt with text typed in it is still a session waiting for input, so it counts as idle. If a
-// `show` failed and no pi screen was seen, the failed terminal could be the session, so that is unknown too.
-// With `tail` the answer also carries the end of the screen above the prompt (screenTail), '' when unreadable. A
-// session showing a selection dialog is 'asking' and the answer carries `ask`, its sanitized text (only then).
-async function piStatus(repo, orca = orcaTerminal, { tail = false } = {}) {
-  const out = (state, screen = '', ask) => ({ state, ...(tail ? { tail: screen } : {}), ...(ask ? { ask } : {}) });
-  try {
-    const listed = await listTerminals(orca);
-    if (!Array.isArray(listed)) return out('unknown');
-    const { sessions, failed } = await scanSessions(repo.path, orca, listed, tail, true, { cached: true });
-    const { state, ask } = piStateOf(sessions, failed);
-    return out(state, ['idle', 'busy', 'asking'].includes(state) ? screenTail(sessions[0].preview) : '', ask);
-  } catch { return out('unknown'); }
-}
-
-module.exports = { piSend, piStatus, piStateOf, piSessions, scanSessions, clearLiveCache, liveCacheStats, listTerminals, primeList, conditionsOrder, fixPrOrder, orcaTerminal, readScreen, sendGuard, rpcPiStatus, setCaseRecorder, caseRecorderInstalled };
+module.exports = { piSend, conditionsOrder, fixPrOrder, sendGuard, rpcPiStatus };

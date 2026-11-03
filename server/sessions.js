@@ -7,7 +7,6 @@ const os = require('node:os');
 const path = require('node:path');
 const { HttpError } = require('./errors.js');
 const { loadConfig, saveConfig, findRepo } = require('./config.js');
-const { orcaTerminal, scanSessions, listTerminals } = require('./pi.js');
 const { chooseRuntime, findCached } = require('./piruntime.js');
 
 const CHUNK = 64 * 1024;
@@ -18,8 +17,6 @@ const CHAT_DEFAULT = 30;
 const BLOCK_GAP = '\n\n';
 const CHAT_MAX = 100;
 const SESSION_ID = /^[A-Za-z0-9._-]{1,80}$/;
-const LIVE_OF = { idle: 'free', typed: 'free', busy: 'working', asking: 'waiting' };
-const RANK = { free: 1, working: 2, waiting: 3 };
 
 // REPO_PANEL_SESSIONS_DIR wins; else the folder of the ACTIVE pi (<agentDir>/sessions); with none active, or when detection fails, the
 // old default (Gentle Shell's). The detection is sync and spawns nothing (files and PATH only), and `findCached` keeps it for 30 s.
@@ -176,27 +173,7 @@ function sessionKeyFor(id) {
   return { key: id, folder: repo.path, prefix: 'panel', label: path.basename(repo.path) };
 }
 
-// Orca is listed ONCE; the folder's screens are then read with `scanSessions`. An Orca failure is unknown, never none.
-// A read-only caller shares the 1 s list and the cached screens (RP77); `fresh` (a caller that DECIDES, like startSession) lists and reads itself.
-// The pure part of liveOf (RP77b): the live state of one scan, shared with the warmer's event stream.
-function liveFromSessions(sessions, failed) {
-  if (!sessions.length) return { state: failed ? 'unknown' : 'none', count: 0 };
-  const state = sessions.map((s) => LIVE_OF[s.state] || 'free').reduce((a, b) => (RANK[b] > RANK[a] ? b : a));
-  // The question as it is on the screen, only when it is unambiguous whose it is (one session). Read-only.
-  if (state === 'waiting' && sessions.length === 1 && sessions[0].dialog) return { state, count: 1, dialog: sessions[0].dialog };
-  return { state, count: sessions.length };
-}
-
-async function liveOf(folder, orca, { fresh = false } = {}) {
-  try {
-    const terminals = fresh ? (await orca(['list'])).terminals : await listTerminals(orca);
-    if (!Array.isArray(terminals)) return { state: 'unknown', count: 0 };
-    const { sessions, failed } = await scanSessions(folder, orca, terminals, false, true, fresh ? {} : { cached: true });
-    return liveFromSessions(sessions, failed);
-  } catch { return { state: 'unknown', count: 0 }; }
-}
-
-// RPC2b-1: the live state from the RPC host's state; a room has no session of its own.
+// The live state from the RPC host's state; a room has no session of its own.
 const HOST_LIVE = { idle: 'free', busy: 'working', starting: 'working', asking: 'waiting' };
 const liveFromHost = (key, hostState) => {
   let state;
@@ -204,7 +181,7 @@ const liveFromHost = (key, hostState) => {
   return HOST_LIVE[state] ? { state: HOST_LIVE[state], count: 1 } : { state: 'none', count: 0 };
 };
 
-async function sessionsState(id, orca = orcaTerminal, base = baseDir(), hostState) {
+async function sessionsState(id, base = baseDir(), hostState) {
   const { key, folder } = sessionKeyFor(id);
   const stored = (loadConfig().sessions || {})[key];
   return {
@@ -212,7 +189,7 @@ async function sessionsState(id, orca = orcaTerminal, base = baseDir(), hostStat
     adopted: stored ? { id: stored.id, name: stored.name, adoptedAt: stored.adoptedAt } : null,
     adoptedFound: stored ? hasSession(folder, stored.id, base) : false,
     sessions: listSessions(folder, { base }),
-    live: hostState ? liveFromHost(key, hostState) : await liveOf(folder, orca),
+    live: liveFromHost(key, hostState),
   };
 }
 
@@ -223,26 +200,26 @@ function store(key, entry) {
   saveConfig({ ...cfg, sessions });
 }
 
-async function adoptSession(id, session, orca = orcaTerminal, base = baseDir(), hostState) {
+async function adoptSession(id, session, base = baseDir(), hostState) {
   const { key, folder } = sessionKeyFor(id);
   const found = listSessions(folder, { base }).find((s) => s.id === session);
   if (!found) throw new HttpError(400, 'That session is not one of the sessions listed for this folder');
   store(key, { id: found.id, name: found.name || found.id, adoptedAt: new Date().toISOString() });
-  return sessionsState(id, orca, base, hostState);
+  return sessionsState(id, base, hostState);
 }
 
-async function releaseSession(id, orca = orcaTerminal, base = baseDir(), hostState) {
+async function releaseSession(id, base = baseDir(), hostState) {
   const { key } = sessionKeyFor(id);
   if ((loadConfig().sessions || {})[key]) store(key, null);
-  return sessionsState(id, orca, base, hostState);
+  return sessionsState(id, base, hostState);
 }
 
 // RPC2-1: `rpc/start` adopts the id it runs under when the repo has none, so the history (read from the adopted id) shows what the session writes.
-// Same entry as `adoptSession` stores, without Orca; an adopted session is never replaced and an id that is not a session id is never written.
+// Same entry as `adoptSession` stores; an adopted session is never replaced and an id that is not a session id is never written.
 function adoptIfNone(key, sid) {
   if (typeof sid !== 'string' || !SESSION_ID.test(sid) || (loadConfig().sessions || {})[key]) return false;
   store(key, { id: sid, name: sid, adoptedAt: new Date().toISOString() });
   return true;
 }
 
-module.exports = { baseDir, liveFromSessions, sessionsDirFor, listSessions, readChat, chatState, sessionKeyFor, sessionsState, adoptSession, releaseSession, adoptIfNone, SESSION_ID };
+module.exports = { baseDir, sessionsDirFor, listSessions, readChat, chatState, sessionKeyFor, sessionsState, adoptSession, releaseSession, adoptIfNone, SESSION_ID };

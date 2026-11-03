@@ -35,7 +35,7 @@ async function main() {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'measure-'));
   const file = path.join(tmp, 'config.json');
   fs.writeFileSync(file, JSON.stringify(cfg, null, 2));
-  const server = spawn(process.execPath, [path.join(ROOT, 'server.js')], { cwd: ROOT, env: { ...process.env, REPO_PANEL_CONFIG: file, REPO_PANEL_CASES_FILE: 'off' }, stdio: 'ignore' });
+  const server = spawn(process.execPath, [path.join(ROOT, 'server.js')], { cwd: ROOT, env: { ...process.env, REPO_PANEL_CONFIG: file }, stdio: 'ignore' });
   const stop = () => { try { server.kill(); } catch { /* already gone */ } };
   process.on('exit', stop);
   const out = { repos: ids.length };

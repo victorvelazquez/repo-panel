@@ -1,7 +1,7 @@
 'use strict';
 // RP53 (S47): the panel keeps ONE adopted pi session per repo and per room. Pure parts (folder mapping, head/tail
-// reading of .jsonl, config validation), the adopt/release/start logic with a fake Orca, and the token-protected routes.
-// The real Orca CLI and the real sessions folder are never touched.
+// reading of .jsonl, config validation), the adopt/release logic, and the token-protected routes.
+// The real sessions folder is never touched.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -20,7 +20,6 @@ fs.mkdirSync(roomDir);
 const configFile = path.join(scratch, 'config.json');
 process.env.REPO_PANEL_CONFIG = configFile;
 process.env.REPO_PANEL_SESSIONS_DIR = sessionsBase;
-process.env.REPO_PANEL_CASES_FILE = 'off';
 test.after(() => fs.rmSync(scratch, { recursive: true, force: true, maxRetries: 5 }));
 
 const lib = require('../lib.js');
@@ -51,19 +50,6 @@ function putSession(folder, id, lines, mtimeSec = 1000, stamp = '2026-10-28T10-0
   return file;
 }
 const resetDisk = () => { fs.rmSync(sessionsBase, { recursive: true, force: true }); fs.mkdirSync(sessionsBase); };
-
-// A fake Orca recording every call; `terminals` is what `list` answers, `previews` the `show` previews by handle.
-function fakeOrca({ terminals = [], previews = {}, failList = false, failCreate = false } = {}) {
-  const calls = [];
-  const orca = async (args) => {
-    calls.push(args);
-    if (args[0] === 'list') { if (failList) throw new Error('down'); return { terminals }; }
-    if (args[0] === 'show') return { terminal: { preview: previews[args[2]] || '' } };
-    if (args[0] === 'create') { if (failCreate) throw new Error('nope'); return { terminal: { handle: 'term_new' } }; }
-    throw new Error(`unexpected ${args[0]}`);
-  };
-  return { orca, calls };
-}
 
 test('sessionsDirFor maps the folder with : \\ and / each turned into a dash; dots and spaces are kept', () => {
   const base = path.join('B', 'sessions');
@@ -171,21 +157,20 @@ test('adoptSession stores a listed session, release clears it, and an id not on 
   resetDisk();
   writeConfig(baseConfig());
   putSession(repoDir, 'live-1', [header('live-1', repoDir), JSON.stringify({ type: 'session_info', name: 'My session' }), msg('user', 'hi')]);
-  const { orca } = fakeOrca();
-  await assert.rejects(() => S.adoptSession(REPO_ID, 'ghost', orca), (e) => e.status === 400);
+  await assert.rejects(() => S.adoptSession(REPO_ID, 'ghost'), (e) => e.status === 400);
   assert.equal(readConfig().sessions, undefined);
-  const st = await S.adoptSession(REPO_ID, 'live-1', orca);
+  const st = await S.adoptSession(REPO_ID, 'live-1');
   assert.equal(st.key, REPO_ID);
   assert.equal(st.adopted.id, 'live-1');
   assert.equal(st.adopted.name, 'My session');
   assert.equal(st.adoptedFound, true);
   assert.equal(readConfig().sessions[REPO_ID].id, 'live-1');
-  const gone = await S.releaseSession(REPO_ID, orca);
+  const gone = await S.releaseSession(REPO_ID);
   assert.equal(gone.adopted, null);
   assert.equal(gone.adoptedFound, false);
   assert.deepEqual(readConfig().sessions, {});
-  await assert.rejects(() => S.adoptSession('nonexistent01', 'live-1', orca), (e) => e.status === 404);
-  await assert.rejects(() => S.adoptSession('room:No Such', 'live-1', orca), (e) => e.status === 404);
+  await assert.rejects(() => S.adoptSession('nonexistent01', 'live-1'), (e) => e.status === 404);
+  await assert.rejects(() => S.adoptSession('room:No Such', 'live-1'), (e) => e.status === 404);
 });
 
 test('a room key resolves to the room folder', async () => {
@@ -193,31 +178,14 @@ test('a room key resolves to the room folder', async () => {
   writeConfig(baseConfig());
   putSession(roomDir, 'room-1', [header('room-1', roomDir), msg('user', 'hi')]);
   putSession(repoDir, 'repo-1', [header('repo-1', repoDir), msg('user', 'hi')]);
-  const { orca } = fakeOrca();
-  const st = await S.adoptSession('room:Sala Uno', 'room-1', orca);
+  const st = await S.adoptSession('room:Sala Uno', 'room-1');
   assert.equal(st.key, 'room:Sala Uno');
   assert.deepEqual(st.sessions.map((s) => s.id), ['room-1']);
   assert.equal(readConfig().sessions['room:Sala Uno'].id, 'room-1');
-  await assert.rejects(() => S.adoptSession('room:Sala Uno', 'repo-1', orca), (e) => e.status === 400);
+  await assert.rejects(() => S.adoptSession('room:Sala Uno', 'repo-1'), (e) => e.status === 400);
 });
 
-test('sessionsState: live comes from ONE list; free, working, waiting, none; an Orca failure is unknown, never none', async () => {
-  resetDisk();
-  writeConfig(baseConfig());
-  const wt = [{ handle: 't1', worktreePath: repoDir, connected: true, writable: true }];
-  const idle = '▎ repo waiting for input';
-  const none = fakeOrca();
-  assert.deepEqual((await S.sessionsState(REPO_ID, none.orca)).live, { state: 'none', count: 0 });
-  assert.equal(none.calls.filter((c) => c[0] === 'list').length, 1);
-  assert.deepEqual((await S.sessionsState(REPO_ID, fakeOrca({ failList: true }).orca)).live, { state: 'unknown', count: 0 });
-  const st = await S.sessionsState(REPO_ID, fakeOrca({ terminals: wt, previews: { t1: idle } }).orca);
-  assert.equal(st.live.count, 1);
-  assert.ok(['free', 'working', 'waiting', 'unknown'].includes(st.live.state));
-  assert.equal(st.adopted, null);
-  assert.equal(st.adoptedFound, false);
-});
-
-// ---- routes (in-process server with an injected fake Orca) ----
+// ---- routes (in-process server) ----
 const freePort = () => new Promise((resolve) => {
   const s = net.createServer().listen(0, '127.0.0.1', () => { const { port } = s.address(); s.close(() => resolve(port)); });
 });
@@ -244,12 +212,10 @@ test('routes answer 401 without the token and work with it', async () => {
   resetDisk();
   writeConfig(baseConfig());
   putSession(repoDir, 'route-1', [header('route-1', repoDir), msg('user', 'hi')]);
-  const f = fakeOrca();
-  await withServer({ orca: f.orca }, async ({ call, token }) => {
+  await withServer({}, async ({ call, token }) => {
     for (const [m, p] of [['GET', `/api/sessions?id=${REPO_ID}`], ['POST', '/api/sessions/adopt'], ['POST', '/api/sessions/release']]) {
       assert.equal((await call(m, p, null, m === 'POST' ? {} : undefined)).status, 401, `${m} ${p}`);
     }
-    assert.equal(f.calls.length, 0);
     const got = await call('GET', `/api/sessions?id=${REPO_ID}`, token);
     assert.equal(got.status, 200);
     const j = JSON.parse(got.text);
@@ -267,7 +233,7 @@ test('existing behaviour: another config write keeps the sessions key and GET /a
   resetDisk();
   const entry = { id: 'keep-1', name: 'n', adoptedAt: '2026-10-28T10:00:00.000Z' };
   writeConfig(baseConfig({ sessions: { [REPO_ID]: entry } }));
-  await withServer({ orca: fakeOrca().orca }, async ({ call, token }) => {
+  await withServer({}, async ({ call, token }) => {
     assert.equal((await call('POST', '/api/dismiss', token, { id: REPO_ID, on: true })).status, 200);
     const cfg = JSON.parse((await call('GET', '/api/config', token)).text);
     assert.deepEqual(Object.keys(cfg).sort(), ['dismissed', 'groups', 'roomIssues', 'rooms', 'snoozed']);

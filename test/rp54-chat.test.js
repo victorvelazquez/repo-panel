@@ -1,7 +1,7 @@
 'use strict';
 // RP54 (S48, S53, S56): the chat panel of the Summary. Server: readChat + GET /api/chat (last 64 KB of the adopted session,
 // read-only). Client: the divider math, the card as chat selector, the panel states, polling, and the guarantee that
-// nothing here ever sends text to a session. Temp dirs and fake deps only: the real Orca and the real sessions are never touched.
+// nothing here ever sends text to a session. Temp dirs and fake deps only: the real sessions are never touched.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -19,7 +19,6 @@ for (const d of [sessionsBase, repoDir, roomDir]) fs.mkdirSync(d);
 const configFile = path.join(scratch, 'config.json');
 process.env.REPO_PANEL_CONFIG = configFile;
 process.env.REPO_PANEL_SESSIONS_DIR = sessionsBase;
-process.env.REPO_PANEL_CASES_FILE = 'off';
 test.after(() => fs.rmSync(scratch, { recursive: true, force: true, maxRetries: 5 }));
 
 const lib = require('../lib.js');
@@ -179,17 +178,14 @@ async function withServer(deps, fn) {
     await fn({ get, token });
   } finally { server.close(); server.closeAllConnections(); }
 }
-const recordingOrca = () => { const calls = []; return { calls, orca: async (a) => { calls.push(a); if (a[0] === 'list') return { terminals: [] }; throw new Error(`unexpected ${a[0]}`); } }; };
-
-test('GET /api/chat: token, adopted default, explicit session, 400/404, nothing adopted, and it never talks to Orca or writes', async () => {
+test('GET /api/chat: token, adopted default, explicit session, 400/404, nothing adopted, and it never writes', async () => {
   resetDisk();
   writeConfig({ sessions: { [REPO_ID]: { id: 'a-1', name: 'panel:x', adoptedAt: '2026-10-28T10:00:00.000Z' }, 'room:Sala Uno': { id: 'r-1', name: 'sala', adoptedAt: '2026-10-28T10:00:00.000Z' } } });
   putSession(repoDir, 'a-1', [header('a-1', repoDir), msg('user', [text('adopted one')])], 3000);
   putSession(repoDir, 'b-2', [header('b-2', repoDir), msg('user', [text('other one')])], 1000);
   putSession(roomDir, 'r-1', [header('r-1', roomDir), msg('user', [text('room one')])]);
   const before = fs.readFileSync(configFile, 'utf8');
-  const f = recordingOrca();
-  await withServer({ orca: f.orca }, async ({ get, token }) => {
+  await withServer({}, async ({ get, token }) => {
     assert.equal((await get(`/api/chat?id=${REPO_ID}`)).status, 401);
     const def = JSON.parse((await get(`/api/chat?id=${REPO_ID}`, token)).text);
     assert.deepEqual([def.key, def.sessionId, def.found, def.items.map((i) => i.text)], [REPO_ID, 'a-1', true, ['adopted one']]);
@@ -205,23 +201,9 @@ test('GET /api/chat: token, adopted default, explicit session, 400/404, nothing 
     writeConfig();
     assert.deepEqual(JSON.parse((await get(`/api/chat?id=${REPO_ID}`, token)).text), { key: REPO_ID, sessionId: null, found: false, items: [], truncated: false, updatedAt: null });
   });
-  assert.deepEqual(f.calls, [], 'the chat route never calls Orca');
   assert.notEqual(before, '');
 });
 
-test('a fake Orca records no send during the sessions and chat reads', async () => {
-  resetDisk();
-  writeConfig();
-  putSession(repoDir, 'a-1', [header('a-1', repoDir), msg('user', [text('hi')])]);
-  const f = recordingOrca();
-  await withServer({ orca: f.orca }, async ({ get, token }) => {
-    await get(`/api/sessions?id=${REPO_ID}`, token);
-    await get(`/api/chat?id=${REPO_ID}&session=a-1`, token);
-  });
-  assert.equal(f.calls.some((c) => c[0] === 'send'), false);
-});
-
-// ---------- Part B: pure helpers ----------
 test('blockWidths (RP89, it replaced chatWidth): 25 | 50 | 25 by default, the chat is what is left and never under 340, two blocks without the column', () => {
   assert.deepEqual(R.blockWidths(1380, null), { list: 345, chat: 690, col: 345 });
   assert.equal(R.blockWidths(1380, { list: 0.6, col: 0.6 }).chat, 340);
@@ -568,7 +550,7 @@ test('Adopt posts to /api/sessions/adopt and reloads; Start posts to /api/rpc/st
   assert.equal(page.fetches.some((f) => f.url === '/api/pi'), false);
 });
 
-test('safety: the chat code never reaches /api/pi or an Orca send, and Summary rendering touches no session', () => {
+test('safety: the chat code never reaches /api/pi or a send, and Summary rendering touches no session', () => {
   const app = fs.readFileSync(path.join(PUBLIC, 'app.js'), 'utf8');
   const region = app.slice(app.indexOf('// ---------- chat (RP54)'), app.indexOf('// ---------- end chat ----------'));
   assert.ok(region.length > 500, 'chat region found');
@@ -578,7 +560,7 @@ test('safety: the chat code never reaches /api/pi or an Orca send, and Summary r
   assert.doesNotMatch(res.slice(res.indexOf('function chatHead')), /\/api\/pi|piSend/);
   const srv = fs.readFileSync(path.join(__dirname, '..', 'server', 'sessions.js'), 'utf8');
   const chatSrv = srv.slice(srv.indexOf('function readChat'), srv.indexOf('function sessionKeyFor'));
-  assert.doesNotMatch(chatSrv, /orca\(|writeFile|saveConfig|appendFile/);
+  assert.doesNotMatch(chatSrv, /writeFile|saveConfig|appendFile/);
 });
 
 // ---------- the divider ----------

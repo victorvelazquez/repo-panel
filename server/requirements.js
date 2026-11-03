@@ -72,7 +72,6 @@ function roomRequirementsFor(room) {
 const TOOLS = [
   { id: 'git', cmd: 'git', args: ['--version'] },
   { id: 'gh', cmd: 'gh', args: ['auth', 'status'] },
-  { id: 'orca', cmd: 'orca', args: ['--version'] },
 ];
 
 // RPC1a: the pi item says which runtime the panel uses, its version and how it was chosen (or why none can be).

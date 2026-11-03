@@ -1,6 +1,6 @@
 'use strict';
-// RP18 server side of POST /api/pi: the unstage key, the duplicate-send guard, the screen tail of piStatus (kept until RPC2b), and the
-// "keep the index empty" sentence of the orders. RPC2-2: the commands go to the session through the rpc host, not through Orca.
+// RP18 server side of POST /api/pi: the unstage key, the duplicate-send guard, and the
+// "keep the index empty" sentence of the orders. RPC2-2: the commands go to the session through the rpc host.
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -16,31 +16,16 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const lib = require('../lib.js');
 const { createServer } = require('../server/http.js');
-const { piSend, piStatus, fixPrOrder, conditionsOrder, sendGuard } = require('../server/pi.js');
+const { piSend, fixPrOrder, conditionsOrder, sendGuard } = require('../server/pi.js');
 
 test.after(() => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5 }));
 
-const IDLE_PI = '▎ ✿ waiting for input\n▎   type, or / for commands\n▎\n';
-const BUSY_PI = '$ sleep 20 (timeout 30s)\nElapsed 7.2s\n▎ ❁ working…\n▎   type, or / for commands\n▎\n';
-const piTerm = (o = {}) => ({ handle: 'h1', title: 'Terminal 1', worktreePath: 'C:/dev/repo', connected: true, writable: true, ...o });
-function fakeOrca({ terminals = [piTerm()], previews = [IDLE_PI, IDLE_PI, 'working'] } = {}) {
-  const calls = [];
-  let n = 0;
-  const orca = async (args) => {
-    calls.push(args);
-    if (args[0] === 'list') return { terminals };
-    if (args[0] === 'show') return { terminal: { preview: previews[Math.min(n++, previews.length - 1)] } };
-    return { send: { accepted: true } };
-  };
-  return { orca, calls, sends: () => calls.filter((c) => c[0] === 'send') };
-}
 const REPO = { id: 'r1', path: REPO_PATH };
 // The rpc host's side of a send: the session state it reports and the prompts it received.
 function fakeHost(state = 'idle') {
   const sent = [];
   return { sent, status: async () => ({ state }), prompt: async (id, text) => { sent.push(text); return { disposition: 'started' }; } };
 }
-const noWait = async () => {};
 const NEVER = async () => { throw new Error('must not be read'); };
 const refuses = (p, status, re) => assert.rejects(p, (e) => e.status === status && re.test(e.message));
 const failing = { number: 7, title: 'Fix the thing', head: 'task', base: 'main', checks: { state: 'failed', items: [{ name: 'test', state: 'failed' }] } };
@@ -161,46 +146,9 @@ test('POST /api/pi: each server keeps its own guard, so a second server starts w
   }
 });
 
-// ---------- the screen tail ----------
-const screen = (above, bars = IDLE_PI, footer = '  ~/repo  main  42%\n') => `${above}${bars}${footer}`;
-
-test('piStatus: without tail the answer is exactly { state }', async () => {
-  assert.deepEqual(await piStatus(REPO, fakeOrca({ previews: [screen('boom\n')] }).orca), { state: 'idle' });
-  assert.deepEqual(await piStatus(REPO, fakeOrca({ previews: [screen('boom\n')] }).orca, { tail: false }), { state: 'idle' });
-});
-
-test('piStatus tail: the last 6 non-empty lines above the prompt bars, without the bars or the footer', async () => {
-  const above = Array.from({ length: 9 }, (_, i) => `line ${i + 1}`).join('\n\n') + '\n\n';
-  const s = await piStatus(REPO, fakeOrca({ previews: [screen(above)] }).orca, { tail: true });
-  assert.equal(s.state, 'idle');
-  assert.equal(s.tail, 'line 4\nline 5\nline 6\nline 7\nline 8\nline 9');
-  const busy = await piStatus(REPO, fakeOrca({ previews: [screen('Index is not empty: run git reset\n', BUSY_PI.slice(BUSY_PI.indexOf('▎')))] }).orca, { tail: true });
-  assert.equal(busy.state, 'busy');
-  assert.equal(busy.tail, 'Index is not empty: run git reset');
-});
-
-test('piStatus tail: control characters become spaces, a line is capped at 200 and the whole at 800', async () => {
-  const messy = await piStatus(REPO, fakeOrca({ previews: [screen('a\x07b\x1b[31mc\td\n')] }).orca, { tail: true });
-  assert.equal(/[\x00-\x1f\x7f]/.test(messy.tail), false);
-  assert.equal(messy.tail, 'a b [31mc d');
-  const long = await piStatus(REPO, fakeOrca({ previews: [screen(`${'x'.repeat(500)}\n`)] }).orca, { tail: true });
-  assert.equal(long.tail.length, 200);
-  const many = Array.from({ length: 6 }, (_, i) => `${i}${'y'.repeat(199)}`).join('\n') + '\n';
-  const capped = await piStatus(REPO, fakeOrca({ previews: [screen(many)] }).orca, { tail: true });
-  assert.equal(capped.tail.length, 800);
-});
-
-test('piStatus tail: an unreadable screen, no session or an Orca failure give an empty tail and the usual state', async () => {
-  assert.deepEqual(await piStatus(REPO, fakeOrca({ previews: [IDLE_PI] }).orca, { tail: true }), { state: 'idle', tail: '' });
-  assert.deepEqual(await piStatus(REPO, fakeOrca({ terminals: [] }).orca, { tail: true }), { state: 'closed', tail: '' });
-  assert.deepEqual(await piStatus(REPO, fakeOrca({ terminals: [piTerm(), piTerm({ handle: 'h2' })] }).orca, { tail: true }), { state: 'ambiguous', tail: '' });
-  const boom = async () => { throw new Error('Orca CLI is unavailable'); };
-  assert.deepEqual(await piStatus(REPO, boom, { tail: true }), { state: 'unknown', tail: '' });
-});
-
 test('GET /api/pi-status: the token and the 404 still apply, tail is ignored and the answer is { state } from the host (RPC2-2)', async () => {
   const host = { status: async () => ({ state: 'idle' }), closeAll() {} };
-  await withServer({ rpcHost: host, orca: async () => { throw new Error('Orca must not be called'); } }, async ({ get }) => {
+  await withServer({ rpcHost: host }, async ({ get }) => {
     assert.equal((await get(`/api/pi-status?id=${ID}&tail=1`, false)).status, 401);
     assert.equal((await get('/api/pi-status?id=nope&tail=1')).status, 404);
     assert.equal((await get('/api/pi-status?tail=1')).status, 404);

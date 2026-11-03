@@ -1,8 +1,8 @@
 'use strict';
-// RP77b (S68, S71, S72), GET /api/events. A long-lived route handled before the normal ones, outside singleFlight and perf: host check (403),
-// token ONLY in the `x-token` header (401; a `?token=` never authenticates), 200 text/event-stream, then the hub preamble and snapshot; more than
+// GET /api/events. A long-lived route handled before the normal ones, outside singleFlight and perf: host check (403),
+// token ONLY in the `x-token` header (401; a `?token=` never authenticates), 200 text/event-stream, then the bare hub preamble (no snapshot); more than
 // maxClients get 503 JSON; a disconnect removes the client; closing the server ends every stream. Real http server on an ephemeral port and
-// a real client; the tests wait for BYTES (the stream's own data events), never for time. Fake Orca that counts calls; temp config.
+// a real client; the tests wait for BYTES (the stream's own data events), never for time. Temp config.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -14,7 +14,6 @@ const path = require('node:path');
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'rp77bh-'));
 const configFile = path.join(scratch, 'config.json');
 process.env.REPO_PANEL_CONFIG = configFile;
-process.env.REPO_PANEL_CASES_FILE = 'off';
 fs.writeFileSync(configFile, JSON.stringify({ port: 4310, groups: [], rooms: [] }));
 test.after(() => fs.rmSync(scratch, { recursive: true, force: true, maxRetries: 5 }));
 
@@ -22,9 +21,8 @@ const { createServer } = require('../server/http.js');
 const events = () => require('../server/events.js');
 
 const PREAMBLE = 'retry: 3000\n\n';
-const EMPTY_SNAPSHOT = 'event: snapshot\ndata: []\n\n';
 const P1 = { state: 'busy', live: { state: 'working', count: 1 } };
-const frame = (id, payload) => `event: live\ndata: ${JSON.stringify({ id, ...payload })}\n\n`;
+const frame = (id, payload) => `event: rpc\ndata: ${JSON.stringify({ ...payload, id })}\n\n`;
 
 const freePort = () => new Promise((resolve) => {
   const s = net.createServer().listen(0, '127.0.0.1', () => { const { port } = s.address(); s.close(() => resolve(port)); });
@@ -56,17 +54,16 @@ function open(port, { token, p = '/api/events', host = `127.0.0.1:${port}`, meth
   });
 }
 
-// A server on an ephemeral port with an injected hub and a fake Orca that must never be called by the events route.
+// A server on an ephemeral port with an injected hub.
 async function withServer(fn, { hub = events().createEventHub() } = {}) {
   const port = await freePort();
-  const orcaCalls = [];
-  const server = createServer(port, { hub, orca: async (args) => { orcaCalls.push(args); throw new Error('orca must not be called'); } });
+  const server = createServer(port, { hub });
   await new Promise((r) => server.listen(port, '127.0.0.1', r));
   const page = await open(port, { p: '/' });
   await page.ending;
   const token = /name="?token"? content="([0-9a-f]+)"/.exec(page.text())[1];
   const json = async (p, tk = token) => { const r = await open(port, { token: tk, p }); await r.ending; return JSON.parse(r.text()); };
-  try { await fn({ port, token, server, hub, orcaCalls, json }); } finally { try { hub.closeAll(); server.close(); server.closeAllConnections(); } catch { /* already closed */ } }
+  try { await fn({ port, token, server, hub, json }); } finally { try { hub.closeAll(); server.close(); server.closeAllConnections(); } catch { /* already closed */ } }
 }
 
 test('createServer exposes the hub it was given as server.hub, and makes its own when none is given', async () => {
@@ -75,39 +72,39 @@ test('createServer exposes the hub it was given as server.hub, and makes its own
   assert.equal(own.hub, hub);
   const dflt = createServer(1, {});
   assert.equal(typeof dflt.hub.add, 'function');
-  assert.equal(typeof dflt.hub.publish, 'function');
+  assert.equal(typeof dflt.hub.emit, 'function');
+  assert.equal('publish' in dflt.hub, false);
   assert.equal(dflt.hub.size(), 0);
   assert.notEqual(dflt.hub, createServer(1, {}).hub, 'one hub per server');
 });
 
-test('with the token: 200, text/event-stream, no-cache, keep-alive, then the preamble and an empty snapshot', async () => {
+test('with the token: 200, text/event-stream, no-cache, keep-alive, then only the preamble', async () => {
   await withServer(async ({ port, token, hub }) => {
     const c = await open(port, { token });
     assert.equal(c.status, 200);
     assert.equal(c.headers['content-type'], 'text/event-stream');
     assert.equal(c.headers['cache-control'], 'no-cache');
     assert.equal(c.headers.connection, 'keep-alive');
-    await c.until(PREAMBLE + EMPTY_SNAPSHOT);
-    assert.equal(c.text(), PREAMBLE + EMPTY_SNAPSHOT, 'exactly the preamble and the snapshot, nothing else');
+    await c.until(PREAMBLE);
+    assert.equal(c.text(), PREAMBLE, 'exactly the preamble, nothing else');
     assert.equal(hub.size(), 1);
     c.close();
   });
 });
 
-test('a publish reaches every open stream as one live frame; a late client gets it in its snapshot', async () => {
+test('an emit reaches every open stream as one rpc frame; a late client gets nothing of it (no snapshot)', async () => {
   await withServer(async ({ port, token, hub }) => {
     const a = await open(port, { token });
     const b = await open(port, { token });
-    await a.until(EMPTY_SNAPSHOT);
-    await b.until(EMPTY_SNAPSHOT);
-    hub.publish('0123456789', P1);
+    await a.until(PREAMBLE);
+    await b.until(PREAMBLE);
+    hub.emit('rpc', '0123456789', P1);
     await a.until(frame('0123456789', P1));
     await b.until(frame('0123456789', P1));
-    assert.equal(a.text(), PREAMBLE + EMPTY_SNAPSHOT + frame('0123456789', P1));
+    assert.equal(a.text(), PREAMBLE + frame('0123456789', P1));
     const late = await open(port, { token });
-    const snap = `event: snapshot\ndata: ${JSON.stringify([{ id: '0123456789', ...P1 }])}\n\n`;
-    await late.until(snap);
-    assert.equal(late.text(), PREAMBLE + snap);
+    await late.until(PREAMBLE);
+    assert.equal(late.text(), PREAMBLE);
     [a, b, late].forEach((c) => c.close());
   });
 });
@@ -139,7 +136,7 @@ test('the header still works with a query string present (the query is ignored)'
   await withServer(async ({ port, token }) => {
     const c = await open(port, { token, p: '/api/events?x=1' });
     assert.equal(c.status, 200);
-    await c.until(EMPTY_SNAPSHOT);
+    await c.until(PREAMBLE);
     c.close();
   });
 });
@@ -162,8 +159,8 @@ test('more than maxClients: the extra one gets 503 JSON {error} and the hub keep
   await withServer(async ({ port, token, hub }) => {
     const a = await open(port, { token });
     const b = await open(port, { token });
-    await a.until(EMPTY_SNAPSHOT);
-    await b.until(EMPTY_SNAPSHOT);
+    await a.until(PREAMBLE);
+    await b.until(PREAMBLE);
     assert.equal(hub.size(), 2, 'exactly maxClients is accepted');
     const c = await open(port, { token });
     await c.ending;
@@ -186,28 +183,27 @@ test('a client that disconnects is removed from the hub and its slot is free aga
   const hub = { ...real, add(res) { const ok = real.add(res); if (ok) res.on('close', gone); return ok; } };
   await withServer(async ({ port, token }) => {
     const a = await open(port, { token });
-    await a.until(EMPTY_SNAPSHOT);
+    await a.until(PREAMBLE);
     assert.equal(real.size(), 1);
     a.close();
     await closed;
     assert.equal(real.size(), 0);
     const b = await open(port, { token });
     assert.equal(b.status, 200, 'the slot was freed');
-    await b.until(EMPTY_SNAPSHOT);
+    await b.until(PREAMBLE);
     b.close();
   }, { hub });
 });
 
-test('the events route is not a perf route and never touches Orca', async () => {
-  await withServer(async ({ port, token, json, orcaCalls }) => {
+test('the events route is not a perf route', async () => {
+  await withServer(async ({ port, token, json }) => {
     const c = await open(port, { token });
-    await c.until(EMPTY_SNAPSHOT);
+    await c.until(PREAMBLE);
     const denied = await open(port, {});
     await denied.ending;
     const perf = await json('/api/perf');
     assert.deepEqual(Object.keys(perf.routes).filter((k) => /events/.test(k)), []);
     assert.equal(perf.routes['GET (other)'], undefined);
-    assert.deepEqual(orcaCalls, []);
     c.close();
   });
 });
@@ -216,8 +212,8 @@ test('closing the http server ends every open stream, so server.close() resolves
   await withServer(async ({ port, token, server, hub }) => {
     const a = await open(port, { token });
     const b = await open(port, { token });
-    await a.until(EMPTY_SNAPSHOT);
-    await b.until(EMPTY_SNAPSHOT);
+    await a.until(PREAMBLE);
+    await b.until(PREAMBLE);
     assert.equal(hub.size(), 2);
     await new Promise((resolve, reject) => { server.close((e) => (e ? reject(e) : resolve())); });
     await a.ending;
@@ -230,7 +226,7 @@ test('closing the http server ends every open stream, so server.close() resolves
 test('the normal routes are unchanged next to the stream: /health and an unknown route', async () => {
   await withServer(async ({ port, token, json }) => {
     const c = await open(port, { token });
-    await c.until(EMPTY_SNAPSHOT);
+    await c.until(PREAMBLE);
     assert.equal((await json('/health')).app, 'repo-panel');
     const missing = await open(port, { token, p: '/api/eventz' });
     await missing.ending;

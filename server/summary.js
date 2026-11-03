@@ -1,7 +1,6 @@
 'use strict';
 // GET /api/summary: one read-only row per configured repo (progress, session, next unit, what blocks it, last movement and
-// the one main action). It only reuses what the other routes already read; Orca is listed once and only shown (never sent
-// to). A repo whose git or gh read fails gets an error row and the others are unaffected.
+// the one main action). It only reuses what the other routes already read; the session comes from the RPC host. A repo whose git or gh read fails gets an error row and the others are unaffected.
 const path = require('node:path');
 const lib = require('../lib.js');
 const V = require('../public/view.js');
@@ -11,7 +10,6 @@ const { localState } = require('./local.js');
 const { prState } = require('./github.js');
 const { roadmapState } = require('./roadmap.js');
 const { readState } = require('./state.js');
-const { orcaTerminal, scanSessions } = require('./pi.js');
 
 const POOL = 6;
 const CACHE_MS = 10 * 1000;
@@ -125,18 +123,6 @@ function safeAnalyse(f) {
   try { return analyse(f); } catch (e) { return analyse({ repo: f.repo, last: f.last, session: f.session, error: e.message || 'Analysis failed' }); }
 }
 
-// The pi state of a repo (closed | idle | busy | asking | ambiguous | unknown) from the one `list` already fetched; null
-// terminals (Orca could not be listed) is unknown, never closed. Same reading as piStatus.
-async function sessionState(repoPath, orca, terminals) {
-  if (!terminals) return 'unknown';
-  try {
-    const { sessions, failed } = await scanSessions(repoPath, orca, terminals, false, true, { cached: true });
-    if (!sessions.length) return failed ? 'unknown' : 'closed';
-    if (sessions.length > 1) return 'ambiguous';
-    return sessions[0].state === 'idle' || sessions[0].state === 'typed' ? 'idle' : sessions[0].state;
-  } catch { return 'unknown'; }
-}
-
 // The state a getter gives for one repo; a getter that throws is unknown, never closed.
 function stateFrom(getter, id) {
   try { return getter(id); } catch { return 'unknown'; }
@@ -150,9 +136,9 @@ async function lastMovementOf(repo, gitRun) {
 }
 
 async function gather(repo, ctx) {
-  const { deps, terminals, cfg } = ctx;
-  // RPC2b-1: with a getter (the RPC host) the session is its state; Orca is only scanned when there is none.
-  const sessionIn = () => (deps.sessionOf ? stateFrom(deps.sessionOf, repo.id) : sessionState(repo.path, ctx.orca, terminals));
+  const { deps, cfg } = ctx;
+  // The session is the RPC host's state; without a getter it is unknown.
+  const sessionIn = () => (deps.sessionOf ? stateFrom(deps.sessionOf, repo.id) : 'unknown');
   const f = { repo: { id: repo.id, name: path.basename(repo.path), group: repo.group, room: ctx.roomOf.get(repo.id) || null }, snoozed: cfg.snoozed, now: ctx.now };
   try {
     const [local, prs, roadmap, state, session, last] = await Promise.all([
@@ -200,16 +186,13 @@ const loadingRow = ({ id, name, group, room }) => ({
 
 async function build(deps) {
   const cfg = loadConfig();
-  const orca = deps.orca || orcaTerminal;
   const now = (deps.now || Date.now)();
-  let terminals = null;
-  if (!deps.sessionOf) try { const listed = (await orca(['list'])).terminals; if (Array.isArray(listed)) terminals = listed; } catch { /* unknown, not none */ }
   const roomOf = new Map((cfg.rooms || []).flatMap((r) => r.repos.map((id) => [id, r.name])));
   const repos = cfg.groups.flatMap((g) => g.repos.map((r) => ({ ...r, id: lib.repoId(r.path), group: g.name })));
-  return tally(await pool(repos, POOL, async (repo) => safeAnalyse(await gather(repo, { deps, terminals, orca, cfg, roomOf, now }))), now);
+  return tally(await pool(repos, POOL, async (repo) => safeAnalyse(await gather(repo, { deps, cfg, roomOf, now }))), now);
 }
 
-// `deps` replaces what the route talks to ({ orca, prs, local, roadmap, state, git, now, summaryStore }); the cache lives with `deps`.
+// `deps` replaces what the route talks to ({ sessionOf, prs, local, roadmap, state, git, now, summaryStore }); the cache lives with `deps`.
 function summaryFor(deps = {}, query = {}) {
   // RP78: with a store the answer is its snapshot, at once; ?fresh=1 reads everything again first.
   const store = deps.summaryStore;

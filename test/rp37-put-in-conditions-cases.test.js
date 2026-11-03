@@ -1,7 +1,7 @@
 'use strict';
 // RP37: "Put in conditions" end to end up to the agent's door, on real Git (a bare origin and a clone in a temporary
 // folder): the files on the base branch decide which requirements fail, and those ids are what the order sent to the
-// agent names. Nothing here talks to Orca or to a pi session, and nothing reads the real config. What the agent does
+// agent names. Nothing here talks to a pi session, and nothing reads the real config. What the agent does
 // once it has the order cannot be tested here: docs/PRUEBAS-put-in-conditions.md is the checklist for that part.
 const test = require('node:test');
 const assert = require('node:assert/strict');

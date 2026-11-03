@@ -440,44 +440,10 @@ test('a top-level priority survives a config save; without it none is written', 
 
 // ---------- pi sessions ----------
 const { piSend } = require('../server.js');
-const { piSessions } = require('../server/pi.js');
-const IDLE_PI = '▎ ✿ waiting for input\n▎   type, or / for commands\n▎\n';
-const BUSY_PI = '$ sleep 20 (timeout 30s)\nElapsed 7.2s\n▎ ❁ working…\n▎   type, or / for commands\n▎\n';
-const PLAIN_PS = 'PS C:\\dev\\repo> git status\nnothing to commit, working tree clean\nPS C:\\dev\\repo> ';
-// The title of the same live session changes (`pi`, `Terminal 1`, `π - x`...): the panel must not care.
-const piTerm = (o = {}) => ({ handle: 'h1', title: 'Terminal 1', worktreePath: 'C:/dev/repo', connected: true, writable: true, ...o });
-
-// A fake Orca: `terminals` is what `list` returns, `previews` the successive `show` previews (the last one repeats).
-// `screens` answers a `show` by handle instead (a string, or a list whose last entry repeats); a handle in
-// `failShow` makes its `show` throw.
-function fakeOrca({ terminals = [piTerm()], previews = [IDLE_PI, IDLE_PI, 'working'], screens = null, failShow = [] } = {}) {
-  const calls = [];
-  let n = 0;
-  const seen = {};
-  const orca = async (args) => {
-    calls.push(args);
-    if (args[0] === 'list') return { terminals };
-    if (args[0] === 'show' && failShow.includes(args[2])) throw new Error('Orca could not show that terminal');
-    if (args[0] === 'show' && screens) {
-      const s = [].concat(screens[args[2]] ?? '');
-      return { terminal: { preview: s[Math.min(seen[args[2]] = (seen[args[2]] ?? -1) + 1, s.length - 1)] } };
-    }
-    if (args[0] === 'show') return { terminal: { preview: previews[Math.min(n++, previews.length - 1)] } };
-    return { send: { accepted: true } };
-  };
-  return { orca, calls, sends: () => calls.filter((c) => c[0] === 'send') };
-}
 const REPO = { id: 'r1', path: 'C:\\dev\\repo' };
-// RPC2-2: the commands go to the session through the rpc host (status + prompt); the Orca fake above stays for piSessions.
+// RPC2-2: the commands go to the session through the rpc host (status + prompt).
 const fakeHost = (state = 'idle') => { const sent = []; return { sent, status: async () => ({ state }), prompt: async (id, text) => { sent.push(text); return {}; } }; };
 const refuses = (p, status, re) => assert.rejects(p, (e) => e.status === status && re.test(e.message));
-
-test('piSessions lists only the terminals of the worktree whose screen is a pi screen, with their state', async () => {
-  const terminals = [piTerm({ handle: 'a' }), piTerm({ handle: 'b' }), piTerm({ handle: 'c' }), piTerm({ handle: 'd' }), piTerm({ handle: 'e', worktreePath: 'C:/dev/else' })];
-  const f = fakeOrca({ terminals, screens: { a: IDLE_PI, b: BUSY_PI, c: PLAIN_PS, d: IDLE_PI.replace('type, or / for commands', 'half typed'), e: IDLE_PI } });
-  assert.deepEqual(await piSessions(REPO, f.orca), [{ handle: 'a', state: 'idle' }, { handle: 'b', state: 'busy' }, { handle: 'd', state: 'typed' }]);
-  assert.deepEqual(f.calls.map((c) => c.join(' ')).sort(), ['list', 'show --terminal a', 'show --terminal b', 'show --terminal c', 'show --terminal d']);
-});
 
 test('POST /api/pi needs the token and rejects an unknown command or repo', async () => {
   await withPanel({ groups: [{ name: 'g', repos: [{ path: '/x/a' }] }] }, async ({ post, port }) => {
@@ -493,51 +459,6 @@ test('POST /api/pi needs the token and rejects an unknown command or repo', asyn
 });
 
 // ---------- RP12b: GET /api/pi-status ----------
-const { piStatus } = require('../server/pi.js');
-
-test('piStatus: closed with no pi terminal in the repo folder, from a list only', async () => {
-  for (const terminals of [[], [piTerm({ worktreePath: 'C:/dev/elsewhere' })]]) {
-    const f = fakeOrca({ terminals });
-    assert.deepEqual(await piStatus(REPO, f.orca), { state: 'closed' });
-    assert.deepEqual(f.calls, [['list']]);
-  }
-});
-
-test('piStatus: idle, busy (a fresh show of the one session) and ambiguous with several sessions', async () => {
-  const idle = fakeOrca({ previews: [IDLE_PI] });
-  assert.deepEqual(await piStatus(REPO, idle.orca), { state: 'idle' });
-  assert.deepEqual(idle.calls, [['list'], ['show', '--terminal', 'h1']]);
-  assert.deepEqual(await piStatus(REPO, fakeOrca({ previews: [BUSY_PI] }).orca), { state: 'busy' });
-  assert.deepEqual(await piStatus(REPO, fakeOrca({ previews: [IDLE_PI.replace('type, or / for commands', 'half typed')] }).orca), { state: 'idle' });
-  const two = fakeOrca({ terminals: [piTerm(), piTerm({ handle: 'h2' })] });
-  assert.deepEqual(await piStatus(REPO, two.orca), { state: 'ambiguous' });
-  assert.deepEqual(two.calls.map((c) => c.join(' ')).sort(), ['list', 'show --terminal h1', 'show --terminal h2']);
-});
-
-test('piStatus reads the screen, not the title: Terminal 1 is a session, a π title over PowerShell is closed', async () => {
-  assert.deepEqual(await piStatus(REPO, fakeOrca({ terminals: [piTerm({ title: 'Terminal 1' })], previews: [IDLE_PI] }).orca), { state: 'idle' });
-  assert.deepEqual(await piStatus(REPO, fakeOrca({ terminals: [piTerm({ title: 'π - x' })], previews: [PLAIN_PS] }).orca), { state: 'closed' });
-  const mixed = fakeOrca({ terminals: [piTerm({ handle: 'ps' }), piTerm({ handle: 'pi' })], screens: { ps: PLAIN_PS, pi: BUSY_PI } });
-  assert.deepEqual(await piStatus(REPO, mixed.orca), { state: 'busy' });
-  const partial = fakeOrca({ terminals: [piTerm({ handle: 'bad' }), piTerm({ handle: 'pi' })], screens: { pi: IDLE_PI }, failShow: ['bad'] });
-  assert.deepEqual(await piStatus(REPO, partial.orca), { state: 'idle' });
-  const twoPi = fakeOrca({ terminals: [piTerm({ handle: 'a' }), piTerm({ handle: 'b' })], screens: { a: IDLE_PI, b: BUSY_PI } });
-  assert.deepEqual(await piStatus(REPO, twoPi.orca), { state: 'ambiguous' });
-});
-
-test('piStatus: an Orca failure is unknown, never closed, and nothing is ever sent', async () => {
-  const boom = async () => { throw new Error('Orca CLI is unavailable'); };
-  assert.deepEqual(await piStatus(REPO, boom), { state: 'unknown' });
-  const oneFailsNoPi = fakeOrca({ terminals: [piTerm({ handle: 'bad' }), piTerm({ handle: 'ps' })], screens: { ps: PLAIN_PS }, failShow: ['bad'] });
-  assert.deepEqual(await piStatus(REPO, oneFailsNoPi.orca), { state: 'unknown' }); // a failed show could hide the session
-  const showFails = async (args) => { if (args[0] === 'show') throw new Error('nope'); return { terminals: [piTerm()] }; };
-  assert.deepEqual(await piStatus(REPO, showFails), { state: 'unknown' });
-  assert.deepEqual(await piStatus(REPO, async () => ({})), { state: 'unknown' });
-  const f = fakeOrca();
-  await piStatus(REPO, f.orca);
-  assert.equal(f.sends().length, 0);
-});
-
 test('GET /api/pi-status needs the token, answers 404 for an unknown repo and one of the known states otherwise', async () => {
   const repo = originAndClone({});
   await withRepoPanel(repo, async ({ getApi, id }) => {
@@ -712,17 +633,17 @@ test('GET /api/requirements: an unknown base branch makes the dependent checks u
   });
 });
 
-test('GET /api/prerequisites needs the token and answers git, gh, orca and pi without failing', async () => {
+test('GET /api/prerequisites needs the token and answers git, gh and pi without failing', async () => {
   await withPanel({}, async ({ getApi }) => {
     assert.equal((await getApi('/api/prerequisites', false)).status, 401);
     const r = await getApi('/api/prerequisites');
     assert.equal(r.status, 200);
-    assert.deepEqual(r.json.items.map((i) => i.id), ['git', 'gh', 'orca', 'pi']); // RPC1a added pi
+    assert.deepEqual(r.json.items.map((i) => i.id), ['git', 'gh', 'pi']); // RPC1a added pi; Orca is no longer a prerequisite
     for (const i of r.json.items) { assert.equal(typeof i.ok, 'boolean'); assert.equal(typeof i.detail, 'string'); }
   });
 });
 
-test('prerequisites: runs the three fixed commands (pi is detected apart); a missing tool is ok false, never a throw', async () => {
+test('prerequisites: runs the two fixed commands (pi is detected apart); a missing tool is ok false, never a throw', async () => {
   const { prerequisites } = require('../server/requirements.js');
   const calls = [];
   const runner = async (cmd, args) => {
@@ -732,11 +653,10 @@ test('prerequisites: runs the three fixed commands (pi is detected apart); a mis
     return { code: -1, stdout: '', stderr: '' };
   };
   const { items } = await prerequisites(runner, async () => ({ active: null, mode: 'auto', problem: 'none' })); // RPC1a: a fake detection, nothing real runs
-  assert.deepEqual(calls, ['git --version', 'gh auth status', 'orca --version']);
+  assert.deepEqual(calls, ['git --version', 'gh auth status']);
   assert.deepEqual(items, [
     { id: 'git', ok: true, detail: 'git version 2.50.0' },
     { id: 'gh', ok: false, detail: 'You are not logged into any GitHub hosts.' },
-    { id: 'orca', ok: false, detail: 'not available' },
     { id: 'pi', ok: false, detail: 'none' },
   ]);
 });

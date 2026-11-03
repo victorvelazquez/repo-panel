@@ -19,7 +19,7 @@ const { piSend, fixPrOrder, sendGuard } = require('../server/pi.js');
 
 test.after(() => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5 }));
 
-// RPC2-2: the order goes to the session through the rpc host (status + prompt), not through Orca.
+// RPC2-2: the order goes to the session through the rpc host (status + prompt).
 function fakeHost(state = 'idle') {
   const sent = [];
   let calls = 0;

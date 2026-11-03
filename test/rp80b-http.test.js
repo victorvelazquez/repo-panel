@@ -1,8 +1,8 @@
 'use strict';
 // RP80b (S68, S76), design points 3 and 4: after POST /api/merge, /rerun, /fetch and /pi end (success or failure of the action) the
 // server calls deps.summaryStore.catchUp(body.id) fire-and-forget, never changing the reply; POST /api/board/refresh with an id uses catchUp(id);
-// the other POSTs and every GET do not; and the page's doRerun asks the server to catch up too. A fake store, fake gh/git/Orca (mocked before
-// http.js loads) and a temp config only: the real config, Orca, git and gh are never used. The page runs in a vm with a stubbed DOM and fetch.
+// the other POSTs and every GET do not; and the page's doRerun asks the server to catch up too. A fake store, fake gh/git (mocked before
+// http.js loads) and a temp config only: the real config, git and gh are never used. The page runs in a vm with a stubbed DOM and fetch.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -16,8 +16,6 @@ const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'rp80bt-'));
 const repoDir = path.join(scratch, 'RepoOne');
 fs.mkdirSync(repoDir);
 process.env.REPO_PANEL_CONFIG = path.join(scratch, 'config.json');
-process.env.REPO_PANEL_CASES_FILE = 'off';
-// The repo has an adopted (unnamed) session, so a chat message can reach the fake Orca.
 fs.writeFileSync(process.env.REPO_PANEL_CONFIG, JSON.stringify({ port: 4311, groups: [{ name: 'G', repos: [{ path: repoDir }] }], rooms: [], sessions: { [require('../lib.js').repoId(repoDir)]: { id: 's1', name: 's1', adoptedAt: '2026-10-28T10:00:00.000Z' } } }));
 const { mock } = test;
 test.after(() => { mock.restoreAll(); fs.rmSync(scratch, { recursive: true, force: true, maxRetries: 5 }); });
@@ -30,7 +28,7 @@ const V = require('../public/view.js');
 // gh and git are replaced BEFORE http.js (and github.js) take them: the routes run against these fakes, in this order of events.
 const events = [];
 const world = {};
-const resetWorld = () => Object.assign(world, { fetchCode: 0, pr: {}, rollup: [], terminals: [], shows: 0 });
+const resetWorld = () => Object.assign(world, { fetchCode: 0, pr: {}, rollup: [] });
 const prView = () => ({ code: 0, stderr: '', stdout: JSON.stringify({ number: 5, title: 'T', url: 'u', headRefName: 'feat', baseRefName: 'main', headRefOid: 'abc', isDraft: false, isCrossRepository: false, mergeable: 'MERGEABLE', mergeStateStatus: 'CLEAN', reviewDecision: null, statusCheckRollup: world.rollup, author: { login: 'x' }, state: 'OPEN', ...world.pr }) });
 mock.method(exec, 'gh', async (cwd, args) => {
   events.push(`gh ${args.slice(0, 2).join(' ')}`);
@@ -54,7 +52,7 @@ function fakeStore() {
     log: [], held: null, failWith: null, throwSync: null,
     board: () => ({ rev: 0, repos: {}, refreshing: [] }),
     snapshot: () => ({ rows: [], counts: {}, attention: [], generatedAt: 'x' }),
-    setSession() {}, touch() {}, start() {}, stop() {}, tick: async () => {},
+    touch() {}, start() {}, stop() {}, tick: async () => {},
     catchUp(...args) {
       s.log.push(['catchUp', ...args]);
       events.push('catchUp');
@@ -66,19 +64,12 @@ function fakeStore() {
   return s;
 }
 
-const IDLE_PI = '▎ ✿ waiting for input\n▎   type, or / for commands\n▎\n';
-const fakeOrca = () => async (args) => {
-  events.push(`orca ${args[0]}`);
-  if (args[0] === 'list') return { terminals: world.terminals };
-  if (args[0] === 'show') return { terminal: { preview: [IDLE_PI, IDLE_PI, 'working'][Math.min(world.shows++, 2)] } };
-  return { send: { accepted: true } };
-};
 // A clock that moves 10 s per read: the duplicate-message guard of the chat never refuses the same text twice.
 let clock = 0;
-// RPC2-2: POST /api/pi talks to the rpc host (an idle session that takes any prompt), not to Orca.
+// RPC2-2: POST /api/pi talks to the rpc host (an idle session that takes any prompt).
 const fakeHost = () => ({ status: async () => ({ state: 'idle' }), prompt: async () => ({}), closeAll() {} });
-const baseDeps = () => ({ now: () => (clock += 10000), rpcHost: fakeHost(), orca: fakeOrca(), wait: async () => {}, sessionsDir: path.join(scratch, 'sessions'), requirements: async () => ({ available: false }) });
-const withTerminal = () => { world.terminals = [{ handle: 'h1', title: 'T1', worktreePath: repoDir.replace(/\\/g, '/'), connected: true, writable: true }]; };
+const baseDeps = () => ({ now: () => (clock += 10000), rpcHost: fakeHost(), wait: async () => {}, sessionsDir: path.join(scratch, 'sessions'), requirements: async () => ({ available: false }) });
+
 
 const freePort = () => new Promise((resolve) => {
   const s = net.createServer().listen(0, '127.0.0.1', () => { const { port } = s.address(); s.close(() => resolve(port)); });
@@ -115,7 +106,7 @@ const ACTIONS = {
   fetch: { path: '/api/fetch', body: {}, good: () => {}, ok: { ok: true }, bad: () => { world.fetchCode = 1; }, fail: [502, { error: 'boom' }] },
   merge: { path: '/api/merge', body: { number: 5, method: 'squash', deleteBranch: false }, good: () => {}, ok: { merged: true, branch: 'auto' }, bad: () => { world.pr = { state: 'CLOSED' }; }, fail: [409, { error: 'PR is CLOSED' }] },
   rerun: { path: '/api/rerun', body: { number: 5 }, good: () => { world.rollup = [{ name: 'ci', status: 'COMPLETED', conclusion: 'FAILURE', detailsUrl: 'https://x/actions/runs/123/job/1' }]; }, ok: { rerun: 1 }, bad: () => {}, fail: [409, { error: 'No failed GitHub Actions runs to re-run' }] },
-  pi: { path: '/api/pi', body: { command: 'flow-commit-unstage' }, good: withTerminal, ok: { sent: true, confirmed: true }, bad: () => {}, fail: [400, { error: 'Unknown command' }], failBody: { command: 'rm -rf' } },
+  pi: { path: '/api/pi', body: { command: 'flow-commit-unstage' }, good: () => {}, ok: { sent: true, confirmed: true }, bad: () => {}, fail: [400, { error: 'Unknown command' }], failBody: { command: 'rm -rf' } },
 };
 const names = Object.keys(ACTIONS);
 
@@ -236,7 +227,6 @@ test('no handler ran, no catch-up: a missing token, a foreign host and a body th
 
 test('the other POSTs and the GETs do NOT catch up', async () => {
   resetWorld();
-  withTerminal();
   const store = fakeStore();
   await withServer({ summaryStore: store }, async ({ get, post }) => {
     await post('/api/snooze', { id: ID, number: 1, on: true });
@@ -415,7 +405,6 @@ test('the hook skips a store that says it is not awake, and calls one that is (a
     if (awake) store.awake = awake;
     await withServer({ summaryStore: store }, async ({ post }) => {
       resetWorld();
-      withTerminal();
       await post('/api/pi', { id: ID, command: 'flow-commit-unstage' });
       await flush();
       assert.equal(store.log.filter((l) => l[0] === 'catchUp').length, expected, String(awake));
@@ -440,7 +429,6 @@ test('a real server with a real store nobody has asked reads NOTHING after a com
   const deps = { ...readers, git: async () => { calls.push('git'); return { code: 1, stdout: '', stderr: 'fake' }; } };
   await withServer(deps, async ({ post, get }) => {
     resetWorld();
-    withTerminal();
     await post('/api/pi', { id: ID, command: 'flow-commit-unstage' });
     await flush();
     assert.deepEqual(calls, [], 'nobody asked: no read of any kind');

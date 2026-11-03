@@ -223,17 +223,17 @@ test('p6: ?check=1 is reused for 5 s (ok or failed) and spawns again after that'
 });
 
 // ---------- prerequisites ----------
-test('q1: prerequisites keeps git, gh and orca as they were and adds `pi` with the runtime, its version and the mode', async () => {
+test('q1: prerequisites keeps git and gh as they were and adds `pi` with the runtime, its version and the mode', async () => {
   const runner = async (cmd) => (cmd === 'git' ? { code: 0, stdout: 'git version 2.50.0\n', stderr: '' } : { code: -1, stdout: '', stderr: '' });
   const rt = { active: { id: 'gentle-shell', label: 'Gentle Shell', version: '4.5.1-1.4.0' }, mode: 'auto', candidates: [] };
   const { items } = await prerequisites(runner, async () => rt);
-  assert.deepEqual(items.map((i) => i.id), ['git', 'gh', 'orca', 'pi']);
+  assert.deepEqual(items.map((i) => i.id), ['git', 'gh', 'pi']);
   assert.deepEqual(items[0], { id: 'git', ok: true, detail: 'git version 2.50.0' });
-  assert.deepEqual(items[3], { id: 'pi', ok: true, detail: 'Gentle Shell 4.5.1-1.4.0 (auto)' });
+  assert.deepEqual(items[2], { id: 'pi', ok: true, detail: 'Gentle Shell 4.5.1-1.4.0 (auto)' });
   const none = await prerequisites(runner, async () => ({ active: null, mode: 'auto', problem: 'No pi found. Install one.', candidates: [] }));
-  assert.deepEqual(none.items[3], { id: 'pi', ok: false, detail: 'No pi found. Install one.' });
+  assert.deepEqual(none.items[2], { id: 'pi', ok: false, detail: 'No pi found. Install one.' });
   const broke = await prerequisites(runner, async () => { throw new Error('x'); });
-  assert.equal(broke.items[3].ok, false, 'a detection failure is ok:false, never a throw');
+  assert.equal(broke.items[2].ok, false, 'a detection failure is ok:false, never a throw');
 });
 
 // ---------- sessions folder ----------

@@ -53,7 +53,7 @@ function tempConfig(config) {
 async function withPanel(config, fn) {
   const port = await freePort();
   const file = tempConfig({ port, ...config });
-  const child = spawn(process.execPath, [SERVER], { env: { ...process.env, REPO_PANEL_CONFIG: file, REPO_PANEL_CASES_FILE: 'off' }, stdio: 'pipe' });
+  const child = spawn(process.execPath, [SERVER], { env: { ...process.env, REPO_PANEL_CONFIG: file }, stdio: 'pipe' });
   const request = (method, p, token, body) => new Promise((resolve, reject) => {
     const headers = token ? { 'x-token': token, 'content-type': 'application/json' } : {};
     const req = http.request({ host: '127.0.0.1', port, path: p, method, headers }, (res) => {

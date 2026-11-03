@@ -4,7 +4,7 @@
 // read keeps the last good value and marks it `stale`; a repo whose facts were not all read yet is a calm `loading` row.
 // RP80: a sixth fact, `req` (requirementsFor, slow), is kept for the board only (the Summary never needs it), and every read that changes an
 // outcome bumps a revision counter, so board(since) answers from memory, reading nothing, only what moved after `since`.
-// The session state is never read here: setSession feeds it (the live warmer, RP77). Nothing is started by creating the store.
+// The session state is read from `sessionOf` (the RPC host) at snapshot time. Nothing is started by creating the store.
 const path = require('node:path');
 const lib = require('../lib.js');
 const exec = require('./exec.js');
@@ -28,7 +28,6 @@ const INTERVALS = { fast: 15000, slow: 60000, idleFast: 30000, idleSlow: 300000,
 const HOT_KEY = { prs: 'hotPrs', local: 'hotLocal' }; // RP80b: a hot repo (V.isHotRepo) reads these two faster while a client is active
 const CATCH_UP_DELAY_MS = 5000;
 const READ_TIMEOUT_MS = 90000; // a reader that hangs outside exec must not pin its repo for ever
-const SESSION_TTL_MS = 30000; // the warmer publishes every 3 s: a state older than this is no longer being fed (it stopped, or Orca is down)
 const STALE_FACTOR = 3;
 const IDLE_AFTER_MS = 60000;
 const POOL = 3;
@@ -58,7 +57,6 @@ function createSummaryStore({
   const facts = new Map(); // repo id -> { [kind]: { value, at (last success), tried (last attempt), failed, error } }
   const revOf = new Map(); // repo id -> the revision of its last changed read
   let rev = 0;
-  const sessions = new Map(); // repo id -> pi state, as the warmer publishes it
   const flights = new Map(); // repo id -> the read cycle in flight (ticks and refreshes of one repo coalesce)
   let lastTouch = -Infinity;
   let ticking = null;
@@ -80,7 +78,7 @@ function createSummaryStore({
     const roomOf = new Map((cfg.rooms || []).flatMap((r) => r.repos.map((id) => [id, r.name])));
     const repos = cfg.groups.flatMap((g) => g.repos.map((r) => ({ ...r, id: lib.repoId(r.path), group: g.name, room: roomOf.get(lib.repoId(r.path)) || null })));
     const ids = new Set(repos.map((r) => r.id));
-    for (const map of [facts, sessions, revOf]) for (const id of map.keys()) if (!ids.has(id)) map.delete(id);
+    for (const map of [facts, revOf]) for (const id of map.keys()) if (!ids.has(id)) map.delete(id);
     return repos;
   }
   const factsOf = (id) => {
@@ -160,8 +158,6 @@ const outcome = (fact) => JSON.stringify([fact.failed, fact.error, fact.value ==
     return ticking;
   }
 
-  function setSession(id, state) { sessions.set(id, { state, at: now() }); }
-
   // Facts that failed their last read, or whose last success is older than 3 times their (active) interval.
   const staleOf = (f, t, kinds = SUMMARY_KINDS) => {
     const hot = isHot(f);
@@ -206,9 +202,8 @@ const outcome = (fact) => JSON.stringify([fact.failed, fact.error, fact.value ==
       const f = facts.get(repo.id);
       if (!f || NEEDED.some((k) => f[k].tried === null)) return { row: loadingRow(info), why: [] };
       const last = f.last.value || null;
-      // RPC2b-1: with a getter (the RPC host) the session is its live state, read now; the stored word is the old path (RPC2b-2 removes it).
-      const word = sessions.get(repo.id);
-      const session = sessionOf ? stateFrom(sessionOf, repo.id) : word && t - word.at < SESSION_TTL_MS ? word.state : 'unknown';
+      // The session is the RPC host's live state, read now; without a getter it is unknown.
+      const session = sessionOf ? stateFrom(sessionOf, repo.id) : 'unknown';
       const broken = NEEDED.find((k) => f[k].value === undefined);
       if (broken) return safeAnalyse({ repo: info, last, session, error: f[broken].error });
       const out = safeAnalyse({ repo: info, snoozed: cfg.snoozed, now: t, local: f.local.value, prs: f.prs.value, roadmap: f.roadmap.value, state: f.state.value, session, last });
@@ -229,7 +224,7 @@ const outcome = (fact) => JSON.stringify([fact.failed, fact.error, fact.value ==
   function start() { if (started) return; started = true; arm(FIRST_DELAY_MS); }
   function stop() { started = false; if (timer) { clearTimer(timer); timer = null; } for (const t of catching.values()) clearTimer(t); catching.clear(); }
 
-  return { snapshot, board, refreshRepo, catchUp, refreshAll, setSession, touch, awake, start, stop, tick };
+  return { snapshot, board, refreshRepo, catchUp, refreshAll, touch, awake, start, stop, tick };
 }
 
 module.exports = { createSummaryStore };

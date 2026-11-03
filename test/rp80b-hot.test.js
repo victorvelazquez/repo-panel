@@ -2,7 +2,7 @@
 // RP80b (S68, S76), design point 1: the store refreshes a HOT repo (its current branch, not detached, has an open PR whose head is that branch,
 // judged by V.isHotRepo of public/view.js on the facts held NOW) faster while a client is active: prs every `hotPrs` (15000 ms) and local every
 // `hotLocal` (10000 ms). Every other repo and fact keeps today's intervals; idle mode is unchanged; `stale` follows the hot interval.
-// Injected readers, a fake clock and no timers: nothing of the real config, Orca, git or gh is used.
+// Injected readers, a fake clock and no timers: nothing of the real config, git or gh is used.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -11,7 +11,6 @@ const path = require('node:path');
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'rp80bh-'));
 process.env.REPO_PANEL_CONFIG = path.join(scratch, 'config.json');
-process.env.REPO_PANEL_CASES_FILE = 'off';
 const { mock } = test;
 test.after(() => { mock.restoreAll(); fs.rmSync(scratch, { recursive: true, force: true, maxRetries: 5 }); });
 
