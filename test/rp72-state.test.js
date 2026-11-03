@@ -116,7 +116,7 @@ const STATES = [
   ['busy', { info: adoptedInfo(), rpc: { state: 'busy' } }, { key: 'working', tone: 'green', icon: '●', word: 'Working…', animate: true }],
   ['asking', { info: adoptedInfo(), rpc: { state: 'asking' } }, { key: 'waiting', tone: 'yellow', icon: '◐', word: 'Asking you something', animate: false }],
   ['an unknown rpc state', { info: adoptedInfo(), rpc: { state: 'bogus' } }, { key: 'unknown', tone: 'gray', icon: '?', word: 'Unknown', animate: false }],
-  ['the Orca live state is ignored', { info: adoptedInfo('working'), rpc: { state: 'idle' } }, { key: 'free', tone: 'gray', icon: '○', word: 'Idle', animate: false }],
+  ['the polled live state is ignored', { info: adoptedInfo('working'), rpc: { state: 'idle' } }, { key: 'free', tone: 'gray', icon: '○', word: 'Idle', animate: false }],
 ];
 
 test('sessionState: key, tone, icon, word and animate for every case', () => {

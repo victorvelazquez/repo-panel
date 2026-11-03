@@ -3,7 +3,7 @@
 // resolves): the Summary chip says working, Merge stays disabled until GitHub no longer lists the PR (or 90 s), the chat
 // message leaves the box and shows as a pending bubble, and a sent command is polled every 3 s. Every page test checks the DOM
 // and the state BEFORE it resolves the fake fetch promises (manual gates). Pure helpers (view.js, resumen.js) plus the real
-// public/app.js in a vm (fake fetch, no timers, no network, no Orca, no real config).
+// public/app.js in a vm (fake fetch, no timers, no network, no real config).
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -479,11 +479,11 @@ test('C9: a network failure also removes the bubble and gives the text back', as
   typeAndSend(page);
   page.flush();
   assert.ok(body(page).includes('sending…') && page.get('#msgBox').value === '', 'precondition: optimistic state');
-  post.resolve(fail(500, { error: 'Orca is not answering' }));
+  post.resolve(fail(500, { error: 'The session is not answering' }));
   await page.tick();
   assert.equal(page.get('#msgBox').value, 'hello team');
   assert.ok(!body(page).includes('hello team'));
-  assert.ok(page.get('#msgNote').html.includes('Orca is not answering'));
+  assert.ok(page.get('#msgNote').html.includes('The session is not answering'));
 });
 
 test('C10: pending bubbles are kept per repo: another card hides it and coming back shows it again', async () => {

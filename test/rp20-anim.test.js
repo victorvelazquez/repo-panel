@@ -138,7 +138,6 @@ test('page: the success, failed and none check chips keep their exact markup', (
 
 test('page: the attention bar keeps its markup and gets no animation', () => {
   const get = loadPage();
-  get('S').pitail[R.id] = '';
   const html = get('verdictRow')(R, { state: 'attention', reason: 'No new commit', cmd: 'flow-commit' });
   assert.equal(html, '<div class="attn-bar"><span>⚠ Needs attention: No new commit</span><button data-act="dismiss-sent" data-id="abc" title="Dismiss">✕</button></div>');
   assert.equal(get('verdictRow')(R, null), '');

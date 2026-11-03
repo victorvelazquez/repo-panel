@@ -1,7 +1,7 @@
 'use strict';
 // RP68 (S49, S54): the composer of the chat (free text to the adopted pi session) and (until RP85) the "/ Actions" menu, now direct buttons. Pure helpers
 // (composerState, actionMenu, actionButtonsHtml, composerNote, chatHead), the page wiring in app.js (vm harness, fake fetch,
-// no real timers, no network, no Orca) and the readChat file-name match. Temp dirs only.
+// no real timers, no network) and the readChat file-name match. Temp dirs only.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -257,7 +257,7 @@ test('the menu helpers are gone: no actionMenuHtml export', () => {
 });
 
 // ---------- composerNote + chatHead ----------
-test('composerNote: empty for null; escaped text in a span; never a Clear button (the Orca prompt box is gone)', () => {
+test('composerNote: empty for null; escaped text in a span; never a Clear button (the old prompt box is gone)', () => {
   assert.equal(R.composerNote(null), '');
   const plain = R.composerNote({ text: 'Sent <b>x</b>', id: 'abc' });
   assert.match(plain, /<span[^>]*>Sent &lt;b&gt;x&lt;\/b&gt;<\/span>/);

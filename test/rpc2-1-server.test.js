@@ -176,7 +176,7 @@ test('a4: POST /api/rpc/start adopts the session id of a repo with none; with on
 });
 
 // ---------- removed ----------
-test('r1: the Orca send routes and the session start are gone (404) and chatsend.js no longer exists', async () => {
+test('r1: the old send routes and the session start are gone (404) and chatsend.js no longer exists', async () => {
   writeConfig();
   assert.equal(fs.existsSync(path.join(__dirname, '..', 'server', 'chatsend.js')), false);
   assert.equal(typeof require('../server/sessions.js').startSession, 'undefined');

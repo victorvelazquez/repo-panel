@@ -26,7 +26,7 @@ const S = {
   dismissed: new Set(), menu: null, reqPassOpen: {},
   group: '', q: '', queue: [], queueKey: '', queueSeq: 0,
   conf: { items: [], ok: 0, loaded: false, failed: false, key: '', seq: 0 },
-  req: {}, reqSeq: {}, state: {}, stateSeq: {}, sent: {}, pistatus: {}, pistatusSeq: {}, live: {}, liveBusy: {}, liveAnswered: {}, dirtyAt: {}, sending: {}, merged: {}, pending: {}, pitail: {}, piask: {}, tailFor: {}, finishing: {}, showCommit: new Set(), prereq: { state: 'loading', items: [], seq: 0, pi: null },
+  req: {}, reqSeq: {}, state: {}, stateSeq: {}, sent: {}, pistatus: {}, pistatusSeq: {}, sending: {}, merged: {}, pending: {}, finishing: {}, showCommit: new Set(), prereq: { state: 'loading', items: [], seq: 0, pi: null },
   rooms: [], roomIssues: [], roomData: { state: 'loading', data: null }, roomSeq: 0,
   prefs: store('prefs', { method: 'squash', del: true }),
   lastRefresh: 0, lastAt: {}, scan: [],
@@ -130,20 +130,7 @@ function setFact(kind, id, value) {
 }
 
 // `poll: false` leaves the pi session status alone (the status poll itself refreshes the repo when a session finishes).
-const loadLocal = (id) => track(id, pooled(() => api(`/api/local?id=${id}`)).then((d) => { setFact('local', id, d); stamp(id, 'local'); noteLocal(id); }, (e) => { setFact('local', id, { error: e.message }); }));
-
-// A repo seen dirty for the first time starts the checking of its pi session (view.js liveSession) and asks for the live
-// state at once, so the commit button is never enabled while the answer is still due. A repo that turns clean forgets
-// both, so its next dirty spell is checked again. An errored read changes nothing.
-function noteLocal(id) {
-  const l = S.local[id];
-  if (!l || l.error || !Array.isArray(l.files)) return;
-  if (!l.files.length) { delete S.dirtyAt[id]; delete S.liveAnswered[id]; return; }
-  if (S.dirtyAt[id] !== undefined) return;
-  S.dirtyAt[id] = Date.now();
-  if (!S.sent[id]) loadLive(id);
-  setTimeout(draw, (V ? V.LIVE_CHECK_MS : 20000) + 50); // the hold ends by itself: redraw once it has
-}
+const loadLocal = (id) => track(id, pooled(() => api(`/api/local?id=${id}`)).then((d) => { setFact('local', id, d); stamp(id, 'local'); }, (e) => { setFact('local', id, { error: e.message }); }));
 
 // The session state the buttons of a repo see (S.sent has its own verdict). RPC2b-1: only the live session (S.rpc) says: idle, busy (a session that is
 // starting works), asking or closed (a closed one is not a hold: the click starts it). rpcSeed gives every repo a state, so it is not undefined for long.
@@ -218,53 +205,14 @@ function loadPiStatus(id) {
   if (!S.sent[id]) return Promise.resolve();
   const seq = S.pistatusSeq[id] = (S.pistatusSeq[id] || 0) + 1;
   return track(id, pooled(() => api(`/api/pi-status?id=${id}`)).then(
-    (d) => (seq === S.pistatusSeq[id] ? applyPiState(id, d.state, d.ask) : null),
+    (d) => (seq === S.pistatusSeq[id] ? applyPiState(id, d.state) : null),
     () => (seq === S.pistatusSeq[id] ? applyPiState(id, 'unknown') : null),
   ));
 }
 
-// The session state of a repo with uncommitted changes and no command of this page in flight (S.live), so the commit
-// button is disabled while the agent is still working. Silent: it redraws only when the answer changes, one request per
-// repo at a time. A failed request clears it: an unknown session never blocks.
-function loadLive(id) {
-  if (S.liveBusy[id]) return Promise.resolve();
-  S.liveBusy[id] = true;
-  const set = (state) => {
-    const first = !S.liveAnswered[id];
-    S.liveAnswered[id] = true; // the first answer, success or failure, ends the 'checking' hold
-    if (S.sent[id] || (!first && S.live[id] === state)) return;
-    if (state === undefined) delete S.live[id]; else S.live[id] = state;
-    draw();
-  };
-  return pooled(() => api(`/api/pi-status?id=${id}`)).then((d) => set(d.state), () => set(undefined)).finally(() => { delete S.liveBusy[id]; });
-}
-
 // ---------- event stream (RP77b) ----------
-// GET /api/events pushes the warmer's live state of every repo. It feeds the same state the pollers feed (S.live, S.chat.info.live) and never
-// touches a repo with a command in flight (S.sent): that one has its own poller. While it is open the pollers only run as a slow safety net.
-const ev = { ctl: null, timer: null, attempt: 0, connected: false, lastByteAt: 0, last: {}, ran: { live: 0, chat: 0 } };
-
-function applyLive(entries) {
-  let changed = false;
-  const targets = new Set(V.piPollTargets({ ids: allRepos().map((r) => r.id), local: S.local, sent: S.sent, hidden: document.hidden }));
-  for (const e of entries) {
-    ev.last[e.id] = e;
-    if (S.sent[e.id]) continue;
-    if (targets.has(e.id)) {
-      const first = !S.liveAnswered[e.id];
-      S.liveAnswered[e.id] = true;
-      if (first || S.live[e.id] !== e.state) { S.live[e.id] = e.state; changed = true; }
-    }
-    const info = S.chat.id === e.id && S.chat.info;
-    if (info && JSON.stringify(info.live) !== JSON.stringify(e.live)) {
-      S.chat.info = { ...info, live: e.live };
-      S.chat.key = JSON.stringify([S.chat.info, S.chat.hist]);
-      if (V) V.chatCachePut(S.chatCache, e.id, S.chat); // RP79
-      changed = true;
-    }
-  }
-  if (changed) draw();
-}
+// GET /api/events pushes what each pi session does (the `rpc` frames, applied by applyRpc). While it is open the chat poll only runs as a slow safety net.
+const ev = { ctl: null, timer: null, attempt: 0, connected: false, lastByteAt: 0, ran: { chat: 0 } };
 
 // RPC2-1: the live session of each repo (S.rpc[id], kept by V.rpcReduce). `rpc` frames feed it; the status read puts it right on open and on every (re)connect.
 function applyRpc(p) {
@@ -324,8 +272,6 @@ async function readEvents(ctl) {
     rest = parsed.rest;
     if (rest.length > 1e6) throw new Error('Event frame too large');
     for (const frame of parsed.events) {
-      const out = V.liveEvent(frame);
-      if (out) applyLive(Array.isArray(out) ? out : [out]);
       const rpc = V.rpcEvent(frame);
       if (rpc) applyRpc(rpc);
     }
@@ -336,7 +282,6 @@ function stopEvents() {
   clearTimeout(ev.timer);
   ev.timer = null;
   ev.connected = false;
-  ev.last = {};
   const ctl = ev.ctl;
   ev.ctl = null;
   if (ctl) ctl.abort();
@@ -358,21 +303,18 @@ function startEvents() {
 function pollSkipped(which) {
   const now = Date.now();
   const plan = V.eventsPlan({ connected: ev.connected, lastEventAt: ev.ran[which], now });
-  if (ev.connected && now - ev.ran[which] < (which === 'live' ? plan.pollLiveMs : plan.chatMs)) return true;
+  if (ev.connected && now - ev.ran[which] < plan.chatMs) return true;
   ev.ran[which] = now;
   return false;
 }
 
-// Every few seconds, while the tab is visible: polls the repos the view says need it and forgets the rest. It also
-// redraws when a repo is inside the quiet period, so the button enables itself once that ends.
-let quietNow = {}; // which polled repos were inside the quiet period at the last tick
-function pollLive() {
-  if (document.hidden) return; // a hidden tab keeps what it knew: forgetting it would reopen the window with the button enabled
-  const ids = V ? V.piPollTargets({ ids: allRepos().map((r) => r.id), local: S.local, sent: S.sent, hidden: document.hidden }) : [];
-  for (const id of Object.keys(S.live)) if (!ids.includes(id)) delete S.live[id];
+// Every few seconds, while the tab is visible: restarts a silent event stream and redraws while a repo with changes is inside the
+// quiet period, so the button enables itself once that ends.
+let quietNow = {}; // which watched repos were inside the quiet period at the last tick
+function quietTick() {
+  if (document.hidden) return;
+  const ids = V ? V.dirtyRepos({ ids: allRepos().map((r) => r.id), local: S.local, sent: S.sent, hidden: document.hidden }) : [];
   if (V && V.eventsStale({ connected: ev.connected, lastByteAt: ev.lastByteAt, now: Date.now() })) { stopEvents(); startEvents(); } // a silent stream is a dead one
-  if (V && !pollSkipped('live')) ids.forEach(loadLive);
-  else ids.filter((id) => !S.sent[id] && ev.last[id]).forEach((id) => applyLive([ev.last[id]])); // the stream's last word, no request
   // Redraw while a repo is inside the quiet period and once more on the tick that finds it over, or the disabled button stays.
   const quiet = {};
   for (const id of ids) quiet[id] = V.quietPeriod(S.local[id].lastChangeMs);
@@ -383,8 +325,8 @@ function pollLive() {
 
 // Applies a polled session state. A session that stops being busy has just finished its command: the repo's data is
 // refreshed first (so the card moves column at once and never judges the result on stale data), and only then is the
-// new state applied. The screen tail is asked for once per sent command, and only when the verdict needs attention.
-async function applyPiState(id, state, ask) {
+// new state applied.
+async function applyPiState(id, state) {
   const sent = S.sent[id];
   if (!sent) return;
   if (state === 'busy' || state === 'asking') sent.busySeen = true; // a dialog means the session is working on it
@@ -394,33 +336,19 @@ async function applyPiState(id, state, ask) {
   }
   if (S.sent[id] !== sent) return; // dismissed or sent again meanwhile
   S.pistatus[id] = state;
-  if (state === 'asking' && typeof ask === 'string') S.piask[id] = ask; else delete S.piask[id];
-  const v = verdictOf({ id });
   draw();
-  if (v && v.state === 'attention') await loadTail(id);
-}
-
-function loadTail(id) {
-  const sent = S.sent[id];
-  if (!sent || S.tailFor[id] === sent.at) return Promise.resolve();
-  S.tailFor[id] = sent.at;
-  return pooled(() => api(`/api/pi-status?id=${id}&tail=1`)).then(
-    (d) => { if (S.sent[id] === sent) { S.pitail[id] = typeof d.tail === 'string' ? d.tail : ''; draw(); } },
-    () => {},
-  );
 }
 
 // Starts (or restarts) the in-progress record of a command the session just received.
 function startSent(id, record) {
   clearSent(id);
-  delete S.live[id];
   S.sent[id] = record;
   draw();
   loadPiStatus(id);
 }
 
 function clearSent(id) {
-  delete S.sent[id]; delete S.pistatus[id]; delete S.pitail[id]; delete S.piask[id]; delete S.tailFor[id]; delete S.finishing[id];
+  delete S.sent[id]; delete S.pistatus[id]; delete S.finishing[id];
 }
 
 function loadPrerequisites() {
@@ -474,7 +402,7 @@ const AGED_MS = 120000;
 function applyBoardRepo(id, f, at = {}) {
   const err = f.errors || {};
   const aged = (k) => !!err[k] && Number.isFinite(at[k]) && Date.now() - at[k] >= AGED_MS;
-  if (f.local && !aged('local')) { setFact('local', id, f.local); noteLocal(id); } else if (err.local && (aged('local') || !S.local[id] || S.local[id].error)) setFact('local', id, { error: err.local });
+  if (f.local && !aged('local')) { setFact('local', id, f.local); } else if (err.local && (aged('local') || !S.local[id] || S.local[id].error)) setFact('local', id, { error: err.local });
   if (f.prs && !aged('prs')) { setFact('prs', id, f.prs); wakeReady(id, f.prs); releaseMerged(id, f.prs); } else if (err.prs && (aged('prs') || !S.prs[id] || S.prs[id].error)) setFact('prs', id, { error: err.prs });
   if (f.roadmap && !aged('roadmap')) setFact('roadmap', id, f.roadmap); else if (err.roadmap && (aged('roadmap') || !S.roadmap[id])) setFact('roadmap', id, null);
   if (f.state && !aged('state')) setFact('state', id, f.state); else if (err.state && (aged('state') || !S.state[id])) setFact('state', id, null);
@@ -523,7 +451,7 @@ async function refreshAll({ force = false } = {}) {
   const broken = (id) => [S.local[id], S.prs[id]].some((x) => x && x.error);
   const ask = missing ? [...new Set([...missing, ...allRepos().map((r) => r.id).filter(broken)])] : allRepos().map((r) => r.id);
   await Promise.all([...others, ...ask.map((id) => refreshRepo(id))]);
-  pollLive();
+  quietTick();
 }
 
 // Every few seconds, while the tab is visible and nothing is being merged: git-only data (local + declared state) of
@@ -1229,7 +1157,7 @@ function drawChat() {
   $('#msgBox').placeholder = cs.placeholder;
   $('#msgStop').hidden = !(S.rpc[id] && S.rpc[id].state === 'busy');
   const row = S.summary && Array.isArray(S.summary.rows) ? S.summary.rows.find((r) => r.id === id) : null;
-  const live = REASON_OF[S.rpc[id] && S.rpc[id].state] || 'unknown'; // RPC2b-1: the reason follows the session of the host, not Orca
+  const live = REASON_OF[S.rpc[id] && S.rpc[id].state] || 'unknown'; // RPC2b-1: the reason follows the session of the RPC host
   paint($('#chatActions'), R.actionButtonsHtml(R.actionMenu(row, { live, changes: summaryChanges(id), flow: summaryFlow(id) }), id, { sending: !!S.sending[id] }));
   paint($('#msgNote'), R.composerNote(S.notes[id] || (S.rpc[id] && S.rpc[id].error ? { text: S.rpc[id].error } : null)));
 }
@@ -1506,7 +1434,7 @@ const repoName = (r, url) => (url
 // RP94: removing a repo is the last item of its ⋯ menu (it asks before it removes; nothing is deleted from disk or GitHub), not a loose ✕ button.
 const removeItem = (r) => `<button role="menuitem" data-act="remove" data-id="${r.id}" title="Remove from panel (deletes nothing)">Remove from panel…</button>`;
 
-// Types the command into the repo's open pi session (through Orca); the server refuses when that is not safe.
+// Sends the command to the repo's pi session over RPC; the server refuses when that is not safe.
 const piBtn = (r, cmd, label = `/${cmd}`, { title = `Send /${cmd} to the open session of this repo`, pr, disabled = false } = {}) => `<button data-act="pi" data-id="${r.id}" data-cmd="${cmd}"${pr ? ` data-pr="${pr}"` : ''} title="${esc(title)}"${disabled ? ' disabled' : ''}>${esc(label)}</button>`;
 
 // "⋯" menu of a card. Its open state lives in S (the page redraws on every refresh); `slot` tells apart
@@ -1605,15 +1533,14 @@ const animStyle = () => `style="animation-delay:${V ? V.animDelay() : 0}ms"`;
 // last said (informational, escaped) and a way to dismiss it when it went wrong.
 function verdictRow(r, verdict) {
   if (!verdict) return '';
-  if (verdict.asking) return `<div class="ask-line" role="status" aria-live="polite" title="${esc(S.piask[r.id] || verdict.reason)}">${esc(verdict.label)}</div>`;
+  if (verdict.asking) return `<div class="ask-line" role="status" aria-live="polite" title="${esc(verdict.reason)}">${esc(verdict.label)}</div>`;
   if (verdict.state === 'running') {
     const label = verdict.label || 'committing…';
     const dots = label.endsWith('…') ? `${esc(label.slice(0, -1))}<span class="ell" ${animStyle()}>…</span>` : esc(label);
     return `<div class="verdict-line" role="status" aria-live="polite" title="${esc(verdict.reason)}" data-run="${V ? V.runColor(verdict.cmd) : 'gray'}"><span class="pulse-dot" aria-hidden="true" ${animStyle()}></span>${dots}</div>`;
   }
   if (verdict.state !== 'attention') return '';
-  const tail = S.pitail[r.id];
-  return `<div class="attn-bar"><span>⚠ Needs attention: ${esc(verdict.reason)}</span>${tail ? `<div class="attn-tail" title="${esc(tail)}">${esc(tail)}</div>` : ''}<button data-act="dismiss-sent" data-id="${r.id}" title="Dismiss">✕</button></div>`;
+  return `<div class="attn-bar"><span>⚠ Needs attention: ${esc(verdict.reason)}</span><button data-act="dismiss-sent" data-id="${r.id}" title="Dismiss">✕</button></div>`;
 }
 
 // Staged files block /flow-commit (it needs an empty index): say so next to the /flow-commit --unstage button.
@@ -2047,7 +1974,7 @@ setInterval(() => {
 setInterval(() => refreshTick(), 2000);
 setInterval(summaryTick, 20000);
 setInterval(chatTick, CHAT_MS);
-setInterval(pollLive, 10000);
+setInterval(quietTick, 10000);
 // RP62 (S61, S77): the Claude usage bar. A request that fails, or an answer without a boolean `available` (api() turns a broken body into
 // { error }), changes nothing: the last painted value stays, with no toast; before the first good answer the bar stays hidden.
 async function loadUsage() {
@@ -2070,7 +1997,7 @@ document.addEventListener('visibilitychange', () => {
   loadUsage();
   ev.attempt = 0;
   startEvents();
-  pollLive();
+  quietTick();
   if (boardLeads()) loadBoard(); // one request from memory instead of a burst of reads
   else if (Date.now() - S.lastRefresh > 30000) refreshAll();
 });

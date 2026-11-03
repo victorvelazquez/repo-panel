@@ -68,8 +68,6 @@ function setup(page, repos = [R], l = local()) {
   for (const r of repos) {
     S.local[r.id] = l;
     S.prs[r.id] = { prs: [], stale: null, repo: { url: 'https://github.com/o/demo' } };
-    S.live[r.id] = 'idle';
-    S.liveAnswered[r.id] = true;
   }
   return S;
 }

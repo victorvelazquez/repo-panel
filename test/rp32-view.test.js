@@ -1,6 +1,6 @@
 'use strict';
-// RP32 A and C, the pure part in public/view.js: the commit buttons wait for the first live answer of the pi session
-// (at most LIVE_CHECK_MS), and a command being sent already counts as a running one.
+// RP32 A and C, the pure part in public/view.js: a session value that nothing produces any more (`checking`) holds nothing,
+// and a command being sent already counts as a running one.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const V = require('../public/view.js');
@@ -9,59 +9,12 @@ const file = { path: 'a.txt', status: 'M', untracked: false };
 const local = (o = {}) => ({ branch: 'task', detached: false, upstream: 'origin/task', noUpstream: false, ahead: 0, behind: 0, files: [file], added: 1, deleted: 0, head: 'h1', inProgress: null, base: 'main', stagedCount: 0, stagedPaths: [], ...o });
 const PR = { prs: [], stale: null };
 
-// ---------- A: liveSession ----------
-test('liveSession: no answer yet, a dirty repo first seen less than LIVE_CHECK_MS ago is `checking`', () => {
-  assert.equal(V.LIVE_CHECK_MS, 20000);
-  const now = 1_000_000;
-  assert.equal(V.liveSession({ dirtyAt: now - 1, now }), 'checking');
-  assert.equal(V.liveSession({ dirtyAt: now - V.LIVE_CHECK_MS + 1, now }), 'checking');
-});
-
-test('liveSession: after LIVE_CHECK_MS it fails open', () => {
-  const now = 1_000_000;
-  assert.equal(V.liveSession({ dirtyAt: now - V.LIVE_CHECK_MS, now }), undefined);
-  assert.equal(V.liveSession({ dirtyAt: now - 60000, now }), undefined);
-});
-
-test('liveSession: the first answer, success or failure, ends the checking', () => {
-  const now = 1_000_000;
-  assert.equal(V.liveSession({ dirtyAt: now - 1, live: 'busy', answered: true, now }), 'busy');
-  assert.equal(V.liveSession({ dirtyAt: now - 1, live: 'idle', answered: true, now }), 'idle');
-  assert.equal(V.liveSession({ dirtyAt: now - 1, answered: true, now }), undefined, 'a failed request: unknown, never blocks');
-});
-
-test('liveSession: a command of the page in flight, or a repo never seen dirty, is not checked', () => {
-  const now = 1_000_000;
-  assert.equal(V.liveSession({ sent: { cmd: 'flow-commit' }, dirtyAt: now - 1, live: 'busy', now }), undefined);
-  assert.equal(V.liveSession({ now }), undefined);
-  assert.equal(V.liveSession({ dirtyAt: now + 60000, now }), undefined, 'a time from the future is a clock problem');
-});
-
-// ---------- A: the buttons ----------
-test('flowButtons: session `checking` disables /flow-commit with the reason', () => {
-  assert.deepEqual(V.flowButtons(local(), PR, null, { session: 'checking' }), [{ cmd: 'flow-commit', label: '/flow-commit', disabled: true, reason: 'checking the session…' }]);
-});
-
-test('flowButtons: session `checking` disables /flow-commit --unstage too and keeps its label', () => {
-  const [b] = V.flowButtons(local({ stagedCount: 2, stagedPaths: ['a', 'b'] }), PR, null, { session: 'checking' });
-  assert.deepEqual([b.cmd, b.label, b.disabled, b.reason], ['flow-commit-unstage', '/flow-commit --unstage', true, 'checking the session…']);
-});
-
-test('flowButtons: `override` lifts the checking hold like the other holds', () => {
-  assert.deepEqual(V.flowButtons(local(), PR, null, { session: 'checking', override: true }), [{ cmd: 'flow-commit', label: '/flow-commit' }]);
-});
-
 test('flowButtons: previous behaviour holds (busy, asking, idle, undefined)', () => {
   assert.equal(V.flowButtons(local(), PR, null, { session: 'busy' })[0].reason, 'the session is still working');
   assert.equal(V.flowButtons(local(), PR, null, { session: 'asking' })[0].reason, 'waiting for your answer in the session');
   assert.deepEqual(V.flowButtons(local(), PR, null, { session: 'idle' }), [{ cmd: 'flow-commit', label: '/flow-commit' }]);
   assert.deepEqual(V.flowButtons(local(), PR, null, {}), [{ cmd: 'flow-commit', label: '/flow-commit' }]);
-});
-
-test('commitOverrideItem: offers «Show /flow-commit anyway» while checking, and not once lifted', () => {
-  assert.deepEqual(V.commitOverrideItem(null, { session: 'checking' }), { act: 'show-commit', label: 'Show /flow-commit anyway' });
-  assert.equal(V.commitOverrideItem(null, { session: 'checking', override: true }), null);
-  assert.equal(V.commitOverrideItem(null, { session: 'idle' }), null);
+  assert.deepEqual(V.flowButtons(local(), PR, null, { session: 'checking' }), [{ cmd: 'flow-commit', label: '/flow-commit' }], 'holds nothing');
 });
 
 // ---------- C: sendingVerdict ----------

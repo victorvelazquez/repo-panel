@@ -1,6 +1,6 @@
 'use strict';
 // RP79 (S68, S74), point 2 of the design: the chat is shown at once from a per-repo cache kept by the PAGE (S.chatCache), in the real
-// public/app.js loaded in a vm (stubbed DOM, fake fetch with manual gates: no timers, no sleeps, no network, no Orca, no real config).
+// public/app.js loaded in a vm (stubbed DOM, fake fetch with manual gates: no timers, no sleeps, no network, no real config).
 // Every check of the "at once" rule happens BEFORE any fake response is released.
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -160,31 +160,6 @@ test('a: a FAILED read stores nothing, whichever of the two requests fails', asy
     assert.equal(S.chat.failed, true);
     assert.deepEqual(Object.keys(plain(S.chatCache)), [], JSON.stringify([sessions.status, chat.status]));
   }
-});
-
-test('a: an SSE applyLive update of the open chat stores the updated { info, hist, key }', async () => {
-  const { page, S } = boot();
-  const info = infoOf(FREE);
-  const hist = histOf('hello');
-  serve(page, 'abc', info, hist);
-  open(page, 'abc');
-  await page.tick();
-  delete S.chatCache.abc; // so the entry below can only come from the SSE update
-  page.run("applyLive([{ id: 'abc', state: 'busy', live: { state: 'working', count: 1 } }])");
-  const e = plain(S.chatCache.abc);
-  assert.deepEqual(e.info, { ...info, live: { state: 'working', count: 1 } });
-  assert.deepEqual(e.hist, hist);
-  assert.equal(e.key, plain(S.chat).key);
-  assert.equal(e.key, keyOf(e.info, hist));
-});
-
-test('a: an SSE update of a repo whose chat is NOT open stores nothing', async () => {
-  const { page, S } = boot();
-  serve(page, 'abc', infoOf(FREE), histOf('hello'));
-  open(page, 'abc');
-  await page.tick();
-  page.run("applyLive([{ id: 'xyz', state: 'busy', live: { state: 'working', count: 1 } }])");
-  assert.deepEqual(Object.keys(plain(S.chatCache)), ['abc']);
 });
 
 // ---------- (b) opening with a cache ----------

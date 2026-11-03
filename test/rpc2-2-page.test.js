@@ -132,19 +132,10 @@ test('g2: the commit button is enabled with an idle or a closed session and disa
   }
 });
 
-test('g3: with S.rpc unknown sessionOf is undefined: the Orca live answer and the checking window no longer count (RPC2b-1)', async () => {
+test('g3: with S.rpc unknown sessionOf is undefined: nothing else supplies a session (RPC2b-1)', async () => {
   const { page } = await pagePlus();
-  page.run(`delete S.rpc['${ID}']; S.dirtyAt['${ID}'] = Date.now(); delete S.liveAnswered['${ID}']`);
+  page.run(`delete S.rpc['${ID}']`);
   assert.equal(page.run(`sessionOf('${ID}')`), undefined);
-  page.run(`S.liveAnswered['${ID}'] = true; S.live['${ID}'] = 'busy'`);
-  assert.equal(page.run(`sessionOf('${ID}')`), undefined);
-});
-
-test('g4: S.rpc takes precedence over the live (Orca) state of the warmer', async () => {
-  const { page } = await pagePlus({}, 'idle');
-  page.run(`S.liveAnswered['${ID}'] = true; S.live['${ID}'] = 'busy'`);
-  assert.equal(page.run(`sessionOf('${ID}')`), 'idle');
-  assert.equal(!!buttons(page)[0].disabled, false);
 });
 
 test('g5: a click with the session closed starts it FIRST, then posts /api/pi with the same body as before', async () => {

@@ -32,8 +32,8 @@ test('unusable times are not stale: a stream with no byte time or a clock that w
 });
 
 test('eventsPlan and eventsRetryMs are unchanged', () => {
-  assert.deepEqual(V.eventsPlan({ connected: true }), { pollLiveMs: 60000, chatMs: 30000 });
-  assert.deepEqual(V.eventsPlan({ connected: false }), { pollLiveMs: 10000, chatMs: 5000 });
+  assert.deepEqual(V.eventsPlan({ connected: true }), { chatMs: 30000 });
+  assert.deepEqual(V.eventsPlan({ connected: false }), { chatMs: 5000 });
   assert.equal(V.eventsRetryMs(0), 1000);
   assert.equal(V.eventsRetryMs(10), 30000);
 });

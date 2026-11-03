@@ -1,6 +1,6 @@
 'use strict';
 // RP80 (S68, S75), design points 5-6: view.js boardApply / boardWait (pure) and the real public/app.js in a vm (stubbed DOM, fake clock, fake fetch
-// with queued answers and gates: no timers, no sleeps, no network, no real config, Orca, git or gh) reading the board from the server's memory.
+// with queued answers and gates: no timers, no sleeps, no network, no real config, git or gh) reading the board from the server's memory.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -204,7 +204,7 @@ test('a: a board answer that only changes `refreshing` still draws once (the Ref
   assert.equal(page.counter.draws, 1);
 });
 
-test('a: noteLocal after local; wakeReady and releaseMerged after prs', async () => {
+test('a: wakeReady and releaseMerged run after prs', async () => {
   const page = loadPage();
   const { S } = page;
   const dirty = { ...facts('d').local, files: [{ path: 'a.txt', status: 'M', untracked: false }] };
@@ -215,8 +215,6 @@ test('a: noteLocal after local; wakeReady and releaseMerged after prs', async ()
   const mark = page.fetches.length;
   await page.run('loadBoard()');
   await page.tick();
-  assert.equal(S.dirtyAt.abc, BASE, 'noteLocal saw the dirty repo');
-  assert.ok(reqs(page, mark).includes('GET /api/pi-status?id=abc'), 'and asked for the live state, as it does after the old loader');
   const snooze = page.fetches.slice(mark).find((f) => f.url === '/api/snooze');
   assert.deepEqual(snooze && JSON.parse(snooze.body), { id: 'abc', number: 1, on: false, wasReady: false }, 'wakeReady');
   assert.deepEqual(plain(S.merged), { 'xyz:5': BASE }, 'releaseMerged forgot the merge GitHub no longer lists, of that repo only');

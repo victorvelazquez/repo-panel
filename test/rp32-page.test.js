@@ -1,6 +1,6 @@
 'use strict';
-// RP32 A and C in the real public/app.js (vm with a stubbed DOM): the commit buttons wait for the first live answer
-// of the pi session, the live state is asked for at once, and a command being sent disables the repo's flow buttons
+// RP32 A and C in the real public/app.js (vm with a stubbed DOM): the commit buttons follow the RPC session of the repo
+// (S.rpc), and a command being sent disables the repo's flow buttons
 // from the click until the answer, however often the card is redrawn.
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -79,7 +79,7 @@ const btn = (html, id, cmd) => new RegExp(`<button data-act="pi" data-id="${id}"
 const el = (id, cmd, pr) => ({ dataset: { id, cmd, ...(pr ? { pr } : {}) }, disabled: false });
 
 // ---------- A ----------
-test('A: a repo first seen dirty asks for its live state at once, but the commit button follows S.rpc, not that answer (RPC2b-1)', async () => {
+test('A: a repo first seen dirty asks no pi-status, and the commit button follows S.rpc only (RPC2b-1)', async () => {
   const status = deferred();
   const page = await loadPage({
     '/api/local': () => ({ json: local() }),
@@ -89,28 +89,10 @@ test('A: a repo first seen dirty asks for its live state at once, but the commit
   delete S.local[R.id];
   page.get('loadLocal')(R.id);
   await flush();
-  assert.ok(page.urls().includes(STATUS(R.id)), 'the live state is asked for without waiting for the 10 s tick');
-  assert.doesNotMatch(btn(rendered(page), R.id, 'flow-commit'), /checking the session/);
+  assert.equal(page.urls().includes(STATUS(R.id)), false, 'no session state is asked for');
+  assert.doesNotMatch(btn(rendered(page), R.id, 'flow-commit'), /disabled/);
   S.rpc[R.id] = { state: 'busy' };
   assert.match(btn(rendered(page), R.id, 'flow-commit'), /title="the session is still working" disabled>/);
-  status.resolve({ state: 'idle' });
-  await flush();
-  assert.match(btn(rendered(page), R.id, 'flow-commit'), /disabled>/, 'the answer of pi-status does not lift it');
-});
-
-test('A: the first answer ends the checking: idle enables the button, and so does a failed request', async () => {
-  for (const answer of [{ json: { state: 'idle' } }, null]) {
-    const page = await loadPage({
-      '/api/local': () => ({ json: local() }),
-      '/api/pi-status': () => { if (!answer) throw new Error('boom'); return answer; },
-    });
-    const S = setup(page);
-    delete S.local[R.id];
-    page.get('loadLocal')(R.id);
-    await flush();
-    assert.doesNotMatch(btn(rendered(page), R.id, 'flow-commit'), /disabled/, answer ? 'idle' : 'failed');
-    assert.equal(S.liveAnswered[R.id], true);
-  }
 });
 
 test('A: there is no checking hold any more, and a clean repo is never checked', async () => {
@@ -126,20 +108,6 @@ test('A: there is no checking hold any more, and a clean repo is never checked',
   clean.get('loadLocal')(R.id);
   await flush();
   assert.deepEqual(clean.urls().filter((u) => u.startsWith('/api/pi-status')), []);
-});
-
-test('A: the first loadLocal of a dirty repo asks once; a later one does not ask again (pollLive owns the cadence)', async () => {
-  const page = await loadPage({ '/api/local': () => ({ json: local() }), '/api/pi-status': () => ({ json: { state: 'idle' } }) });
-  const S = setup(page);
-  delete S.local[R.id];
-  page.get('loadLocal')(R.id);
-  await flush();
-  page.get('loadLocal')(R.id);
-  await flush();
-  assert.equal(page.urls().filter((u) => u === STATUS(R.id)).length, 1);
-  S.local[R.id] = local({ files: [] });
-  page.get('noteLocal')(R.id);
-  assert.equal(S.dirtyAt[R.id], undefined, 'clean again: the next dirty spell is checked again');
 });
 
 test('A: `Show /flow-commit anyway` lifts the hold of a working session', async () => {
@@ -158,36 +126,6 @@ test('A: `Show /flow-commit anyway` lifts the hold of a working session', async 
   assert.doesNotMatch(btn(html, R.id, 'flow-commit'), /disabled/);
 });
 
-test('A: pollLive keeps the live state while the tab is hidden, and forgets clean repos and repos with a command in flight', async () => {
-  const page = await loadPage({ '/api/pi-status': () => ({ json: { state: 'busy' } }) });
-  const S = setup(page, [R, R2]);
-  S.live[R.id] = 'busy';
-  S.live[R2.id] = 'busy';
-  page.state.hidden = true;
-  page.get('pollLive')();
-  await flush();
-  assert.deepEqual([S.live[R.id], S.live[R2.id]], ['busy', 'busy'], 'hidden: nothing deleted');
-  assert.deepEqual(page.urls(), [], 'hidden: nothing asked');
-  page.state.hidden = false;
-  S.local[R2.id] = local({ files: [] });
-  S.sent[R.id] = { cmd: 'flow-commit', at: Date.now() };
-  page.get('pollLive')();
-  assert.deepEqual([S.live[R.id], S.live[R2.id]], [undefined, undefined]);
-});
-
-test('A: when the tab becomes visible again the live state is asked for at once', async () => {
-  const page = await loadPage({ '/api/pi-status': () => ({ json: { state: 'idle' } }) });
-  const S = setup(page);
-  S.live[R.id] = 'busy';
-  page.state.hidden = true;
-  page.get('pollLive')();
-  page.state.hidden = false;
-  for (const fn of page.listeners.visibilitychange || []) fn();
-  await flush();
-  assert.deepEqual(page.urls().filter((u) => !/^\/api\/(events|usage)/.test(String(u))), [STATUS(R.id)]); // RP77b and RP62: the event stream and the usage bar also load when the tab is visible
-  assert.equal(S.live[R.id], 'idle');
-});
-
 // ---------- C ----------
 function sendRoutes(extra = {}) {
   const order = deferred();
@@ -203,8 +141,6 @@ test('C: the click disables the repo at once, shows the progress line, and survi
   const { order, routes } = sendRoutes();
   const page = await loadPage(routes);
   const S = setup(page);
-  S.live[R.id] = 'idle';
-  S.liveAnswered[R.id] = true;
   const done = page.get('ACTIONS').pi(el(R.id, 'flow-commit'));
   assert.ok(S.sending[R.id], 'set before any await');
   for (let i = 0; i < 4; i++) {
@@ -251,8 +187,6 @@ test('C: on success the real verdict takes over and the sending flag is cleared'
 test('C: a rejected send clears the flag, enables the button again and allows a new click', async () => {
   const page = await loadPage({ '/api/local': () => ({ json: local() }), '/api/pi': () => ({ status: 409, json: { error: 'The session is busy' } }) });
   const S = setup(page);
-  S.live[R.id] = 'idle';
-  S.liveAnswered[R.id] = true;
   await page.get('ACTIONS').pi(el(R.id, 'flow-commit'));
   assert.equal(S.sending[R.id], undefined);
   assert.equal(S.sent[R.id], undefined);
@@ -272,7 +206,6 @@ test('C: the buttons of OTHER repos are untouched while one repo is sending', as
   const { order, routes } = sendRoutes();
   const page = await loadPage(routes);
   const S = setup(page, [R, R2]);
-  for (const r of [R, R2]) { S.live[r.id] = 'idle'; S.liveAnswered[r.id] = true; }
   const done = page.get('ACTIONS').pi(el(R.id, 'flow-commit'));
   const html = rendered(page);
   assert.match(btn(html, R.id, 'flow-commit'), /disabled>/);

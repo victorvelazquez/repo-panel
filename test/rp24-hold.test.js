@@ -8,7 +8,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const view = require('../public/view.js');
 
-const { commitAllowed, commitOverrideItem, stateLine, flowButtons, queueFlags, piPollTargets } = view;
+const { commitAllowed, commitOverrideItem, stateLine, flowButtons, queueFlags, dirtyRepos } = view;
 
 const NOW = Date.parse('2026-10-25T12:00:00Z');
 const file = { path: 'a.txt', status: 'M', untracked: false };
@@ -74,7 +74,7 @@ test('B: the --unstage variant is disabled the same way, keeping its label', () 
 });
 
 test('B: idle, closed, ambiguous, unknown, undefined and null never block (fail open)', () => {
-  for (const session of ['idle', 'closed', 'ambiguous', 'unknown', undefined, null, 'nonsense']) {
+  for (const session of ['idle', 'closed', 'ambiguous', 'unknown', 'checking', undefined, null, 'nonsense']) {
     const out = flowButtons(dirty(), prs(), null, ctx({ session }));
     assert.deepEqual(out, [{ cmd: 'flow-commit', label: '/flow-commit' }], String(session));
   }
@@ -118,14 +118,14 @@ test('B: a state that hides the button still hides it (no disabled button for a 
   assert.deepEqual(flowButtons(dirty(), prs(), declared('needs-input'), ctx({ session: 'busy' })), []);
 });
 
-test('B: piPollTargets polls dirty repos with no command in flight, never clean ones or hidden tabs', () => {
+test('B: dirtyRepos lists dirty repos with no command in flight, never clean ones or hidden tabs', () => {
   const local = { a: dirty(), b: { ...dirty(), files: [] }, c: dirty(), d: { error: 'x' }, e: undefined };
   const base = { ids: ['a', 'b', 'c', 'd', 'e', 'f'], local, sent: {}, hidden: false };
-  assert.deepEqual(piPollTargets(base), ['a', 'c']);
-  assert.deepEqual(piPollTargets({ ...base, sent: { c: { cmd: 'flow-commit' } } }), ['a']);
-  assert.deepEqual(piPollTargets({ ...base, hidden: true }), []);
-  assert.deepEqual(piPollTargets({ ids: [], local: {}, sent: {}, hidden: false }), []);
-  assert.deepEqual(piPollTargets({ ids: ['a'], local: {}, hidden: false }), []);
+  assert.deepEqual(dirtyRepos(base), ['a', 'c']);
+  assert.deepEqual(dirtyRepos({ ...base, sent: { c: { cmd: 'flow-commit' } } }), ['a']);
+  assert.deepEqual(dirtyRepos({ ...base, hidden: true }), []);
+  assert.deepEqual(dirtyRepos({ ids: [], local: {}, sent: {}, hidden: false }), []);
+  assert.deepEqual(dirtyRepos({ ids: ['a'], local: {}, hidden: false }), []);
 });
 
 // ---- B2: quiet period ----
