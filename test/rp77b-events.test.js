@@ -1,6 +1,6 @@
 'use strict';
-// RP77b (S68, S71, S72), the event hub. server/events.js exports createEventHub({ now, maxClients = 8, heartbeatMs = 15000, setTimer, clearTimer })
-// -> { add(res), size(), publish(id, payload), snapshotFor(), closeAll() }. A client is a ServerResponse-like object; the tests use a fake that
+// The event hub. server/events.js exports createEventHub({ maxClients = 8, heartbeatMs = 15000, maxBuffer, setTimer, clearTimer })
+// -> { add(res), size(), emit(event, id, payload), closeAll() }. It stores nothing: add writes only the preamble. A client is a ServerResponse-like object; the tests use a fake that
 // records every byte written. Injected timers: no real waiting, no wall clock, no network.
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -9,7 +9,6 @@ const hubModule = () => require('../server/events.js');
 const createEventHub = (...a) => hubModule().createEventHub(...a);
 
 const PREAMBLE = 'retry: 3000\n\n';
-const EMPTY_SNAPSHOT = 'event: snapshot\ndata: []\n\n';
 
 // A fake ServerResponse: `failWith` makes write throw; `closed()` simulates the peer going away.
 function fakeRes({ failWith = null } = {}) {
@@ -36,91 +35,22 @@ function fakeTimers() {
   return t;
 }
 const hubWith = (over = {}) => { const timers = fakeTimers(); return { timers, hub: createEventHub({ setTimer: timers.setTimer, clearTimer: timers.clearTimer, ...over }) }; };
-const frame = (id, payload) => `event: live\ndata: ${JSON.stringify({ id, ...payload })}\n\n`;
+const frame = (id, payload) => `event: rpc\ndata: ${JSON.stringify({ ...payload, id })}\n\n`;
 
-test('exports: createEventHub returns add, size, publish, emit, snapshotFor and closeAll', () => {
+test('exports: createEventHub returns exactly add, size, emit and closeAll', () => {
   const { hub } = hubWith();
-  assert.deepEqual(Object.keys(hub).sort(), ['add', 'closeAll', 'emit', 'publish', 'size', 'snapshotFor']);
+  assert.deepEqual(Object.keys(hub).sort(), ['add', 'closeAll', 'emit', 'size']);
   for (const k of Object.keys(hub)) assert.equal(typeof hub[k], 'function', k);
   assert.equal(hub.size(), 0);
 });
 
-test('add: the SSE preamble, then an empty snapshot when nothing was published; returns true and counts the client', () => {
+test('add: writes the SSE preamble and nothing else (no snapshot); returns true and counts the client', () => {
   const { hub } = hubWith();
   const res = fakeRes();
   assert.equal(hub.add(res), true);
-  assert.equal(res.text(), PREAMBLE + EMPTY_SNAPSHOT);
+  assert.equal(res.text(), PREAMBLE);
   assert.equal(res.ended, 0);
   assert.equal(hub.size(), 1);
-});
-
-test('publish: one `event: live` frame with the id first, to every client; nothing to a hub with no clients', () => {
-  const { hub } = hubWith();
-  assert.doesNotThrow(() => hub.publish('0123456789', { state: 'idle', live: { state: 'free', count: 1 } }));
-  const a = fakeRes();
-  const b = fakeRes();
-  hub.add(a);
-  hub.add(b);
-  a.clear(); b.clear();
-  hub.publish('abcdef0123', { state: 'busy', live: { state: 'working', count: 1 } });
-  const want = 'event: live\ndata: {"id":"abcdef0123","state":"busy","live":{"state":"working","count":1}}\n\n';
-  assert.equal(a.text(), want);
-  assert.equal(b.text(), want);
-});
-
-test('publish: an identical payload twice writes nothing the second time; a changed field, even nested, writes again', () => {
-  const { hub } = hubWith();
-  const res = fakeRes();
-  hub.add(res);
-  res.clear();
-  const p = { state: 'asking', ask: 'Allow?', live: { state: 'waiting', count: 1 } };
-  hub.publish('0123456789', p);
-  assert.equal(res.text(), frame('0123456789', p));
-  res.clear();
-  hub.publish('0123456789', { state: 'asking', ask: 'Allow?', live: { state: 'waiting', count: 1 } });
-  assert.equal(res.writes.length, 0, 'an equal copy is not news');
-  hub.publish('0123456789', { ...p, live: { state: 'waiting', count: 2 } });
-  assert.equal(res.text(), frame('0123456789', { ...p, live: { state: 'waiting', count: 2 } }));
-  res.clear();
-  hub.publish('0123456789', p);
-  assert.equal(res.text(), frame('0123456789', p), 'going back to the earlier value is a change');
-});
-
-test('publish: ids are independent; the first publish of an id always emits, even with the value of another id', () => {
-  const { hub } = hubWith();
-  const res = fakeRes();
-  hub.add(res);
-  res.clear();
-  const p = { state: 'idle', live: { state: 'free', count: 1 } };
-  hub.publish('aaaaaaaaaa', p);
-  hub.publish('bbbbbbbbbb', p);
-  hub.publish('aaaaaaaaaa', p);
-  assert.equal(res.text(), frame('aaaaaaaaaa', p) + frame('bbbbbbbbbb', p));
-});
-
-test('publish with no client still remembers the payload: a later identical publish writes nothing to a later client', () => {
-  const { hub } = hubWith();
-  const p = { state: 'idle', live: { state: 'free', count: 1 } };
-  hub.publish('0123456789', p);
-  const res = fakeRes();
-  hub.add(res);
-  res.clear();
-  hub.publish('0123456789', p);
-  assert.equal(res.writes.length, 0);
-});
-
-test('snapshot: a client that arrives later gets the LAST payload of every id as an array of {id,...}', () => {
-  const { hub } = hubWith();
-  hub.publish('aaaaaaaaaa', { state: 'busy', live: { state: 'working', count: 1 } });
-  hub.publish('bbbbbbbbbb', { state: 'closed', live: { state: 'none', count: 0 } });
-  hub.publish('aaaaaaaaaa', { state: 'idle', live: { state: 'free', count: 1 } });
-  const res = fakeRes();
-  hub.add(res);
-  const want = [
-    { id: 'aaaaaaaaaa', state: 'idle', live: { state: 'free', count: 1 } },
-    { id: 'bbbbbbbbbb', state: 'closed', live: { state: 'none', count: 0 } },
-  ];
-  assert.equal(res.text(), `${PREAMBLE}event: snapshot\ndata: ${JSON.stringify(want)}\n\n`);
 });
 
 test('maxClients: exactly the limit is accepted, one more is refused with nothing written and the count unchanged', () => {
@@ -134,7 +64,7 @@ test('maxClients: exactly the limit is accepted, one more is refused with nothin
   assert.equal(c.writes.length, 0);
   assert.equal(c.ended, 0, 'the caller answers the refused client, the hub does not end it');
   assert.equal(hub.size(), 2);
-  hub.publish('0123456789', { state: 'idle', live: { state: 'free', count: 1 } });
+  hub.emit('rpc', '0123456789', { state: 'idle', live: { state: 'free', count: 1 } });
   assert.equal(c.writes.length, 0, 'a refused client never receives events');
 });
 
@@ -154,14 +84,14 @@ test('a client that closes is removed, gets nothing more, and frees its slot', (
   a.clear();
   a.closed();
   assert.equal(hub.size(), 0);
-  hub.publish('0123456789', { state: 'idle', live: { state: 'free', count: 1 } });
+  hub.emit('rpc', '0123456789', { state: 'idle', live: { state: 'free', count: 1 } });
   assert.equal(a.writes.length, 0);
   const b = fakeRes();
   assert.equal(hub.add(b), true, 'the slot is free again');
   assert.equal(hub.size(), 1);
 });
 
-test('a client whose write throws in the middle of a publish is dropped and ended; the others still get the frame', () => {
+test('a client whose write throws in the middle of an emit is dropped and ended; the others still get the frame', () => {
   const { hub } = hubWith();
   const a = fakeRes();
   const bad = fakeRes();
@@ -170,13 +100,13 @@ test('a client whose write throws in the middle of a publish is dropped and ende
   [a, bad, c].forEach((r) => r.clear());
   bad.failWith = new Error('EPIPE');
   const p = { state: 'busy', live: { state: 'working', count: 1 } };
-  assert.doesNotThrow(() => hub.publish('0123456789', p));
+  assert.doesNotThrow(() => hub.emit('rpc', '0123456789', p));
   assert.equal(a.text(), frame('0123456789', p));
   assert.equal(c.text(), frame('0123456789', p));
   assert.equal(bad.ended, 1);
   assert.equal(hub.size(), 2);
   a.clear(); c.clear();
-  hub.publish('0123456789', { ...p, state: 'idle' });
+  hub.emit('rpc', '0123456789', { ...p, state: 'idle' });
   assert.equal(bad.ended, 1, 'a dropped client is not touched again');
   assert.equal(a.writes.length, 1);
   assert.equal(c.writes.length, 1);
@@ -188,17 +118,17 @@ test('a payload with LF, CRLF and U+2028 inside a string is ONE data line: JSON 
   hub.add(res);
   res.clear();
   const ask = 'one\ntwo\r\nthree\u2028four\rfive';
-  hub.publish('0123456789', { state: 'asking', ask, live: { state: 'waiting', count: 1 } });
+  hub.emit('rpc', '0123456789', { state: 'asking', ask, live: { state: 'waiting', count: 1 } });
   const out = res.text();
-  assert.ok(out.startsWith('event: live\ndata: ') && out.endsWith('}\n\n'));
-  assert.deepEqual(out.split('\n'), ['event: live', out.split('\n')[1], '', '']);
+  assert.ok(out.startsWith('event: rpc\ndata: ') && out.endsWith('}\n\n'));
+  assert.deepEqual(out.split('\n'), ['event: rpc', out.split('\n')[1], '', '']);
   assert.ok(!out.includes('\r') && !out.includes('\u2028'));
   assert.equal(JSON.parse(out.split('\n')[1].slice('data: '.length)).ask, ask);
 });
 
 test('heartbeat: no timer with 0 clients; ONE unref\'d timer of heartbeatMs with 1 and with 2 clients', () => {
   const { hub, timers } = hubWith();
-  hub.publish('0123456789', { state: 'idle', live: { state: 'free', count: 1 } });
+  hub.emit('rpc', '0123456789', { state: 'idle', live: { state: 'free', count: 1 } });
   assert.deepEqual(timers.set, [], '0 clients, no timer');
   hub.add(fakeRes());
   assert.deepEqual(timers.set, [15000]);
@@ -253,7 +183,7 @@ test('heartbeat: a client whose ping throws is dropped and ended; the other stil
   assert.equal(hub.size(), 1);
 });
 
-test('closeAll: ends every client once, empties the hub, clears the timer and later publishes write nothing', () => {
+test('closeAll: ends every client once, empties the hub, clears the timer and later emits write nothing', () => {
   const { hub, timers } = hubWith();
   const a = fakeRes();
   const b = fakeRes();
@@ -266,7 +196,7 @@ test('closeAll: ends every client once, empties the hub, clears the timer and la
   assert.equal(hub.size(), 0);
   assert.equal(timers.cleared, 1);
   assert.equal(timers.pending, null);
-  hub.publish('0123456789', { state: 'idle', live: { state: 'free', count: 1 } });
+  hub.emit('rpc', '0123456789', { state: 'idle', live: { state: 'free', count: 1 } });
   assert.equal(a.writes.length + b.writes.length, 0);
   assert.doesNotThrow(() => hub.closeAll(), 'closing an empty hub is fine');
 });
@@ -283,17 +213,17 @@ test('closeAll then a close event of an ended client does not break the count', 
 });
 
 // ---------- verification finding: a client that never reads must not grow the server's memory for ever ----------
-test('a client whose socket buffer is over the cap is dropped and ended, on a publish and when it is added; the others keep receiving', () => {
+test('a client whose socket buffer is over the cap is dropped and ended, on an emit and when it is added; the others keep receiving', () => {
   const hub = createEventHub({ maxBuffer: 1024 });
   const slow = fakeRes();
   slow.writableLength = 0;
   const fine = fakeRes();
   assert.equal(hub.add(slow), true);
   assert.equal(hub.add(fine), true);
-  hub.publish('aaaaaaaaaa', { state: 'busy', live: { state: 'working', count: 1 } });
+  hub.emit('rpc', 'aaaaaaaaaa', { state: 'busy', live: { state: 'working', count: 1 } });
   assert.equal(hub.size(), 2, 'a buffer under the cap is fine');
   slow.writableLength = 1025;
-  hub.publish('aaaaaaaaaa', { state: 'idle', live: { state: 'free', count: 1 } });
+  hub.emit('rpc', 'aaaaaaaaaa', { state: 'idle', live: { state: 'free', count: 1 } });
   assert.equal(hub.size(), 1);
   assert.equal(slow.ended, 1);
   assert.equal(fine.ended, 0);
@@ -310,9 +240,9 @@ test('the default cap is 1 MiB: exactly 1048576 bytes buffered stays, one more d
   const res = fakeRes();
   res.writableLength = 1048576;
   hub.add(res);
-  hub.publish('bbbbbbbbbb', { state: 'busy', live: { state: 'working', count: 1 } });
+  hub.emit('rpc', 'bbbbbbbbbb', { state: 'busy', live: { state: 'working', count: 1 } });
   assert.equal(hub.size(), 1);
   res.writableLength = 1048577;
-  hub.publish('bbbbbbbbbb', { state: 'idle', live: { state: 'free', count: 1 } });
+  hub.emit('rpc', 'bbbbbbbbbb', { state: 'idle', live: { state: 'free', count: 1 } });
   assert.equal(hub.size(), 0);
 });

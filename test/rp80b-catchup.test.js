@@ -2,7 +2,7 @@
 // RP80b (S68, S76), design point 2: store.catchUp(id) reads ALL facts of that repo now (joined with a cycle already in flight) and schedules
 // exactly ONE more forced read `catchUpDelayMs` later (default 5000) through the injected setTimer. One pending timer per repo: a new catchUp reads
 // now again but neither stacks nor rearms it. The delayed read swallows every error; stop() clears it; ids that are not repos are ignored.
-// Injected readers, a fake clock and fake timers (fired by hand): no sleeps, nothing of the real config, Orca, git or gh.
+// Injected readers, a fake clock and fake timers (fired by hand): no sleeps, nothing of the real config, git or gh.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -12,7 +12,6 @@ const { AsyncLocalStorage } = require('node:async_hooks');
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'rp80bc-'));
 process.env.REPO_PANEL_CONFIG = path.join(scratch, 'config.json');
-process.env.REPO_PANEL_CASES_FILE = 'off';
 const { mock } = test;
 test.after(() => { mock.restoreAll(); fs.rmSync(scratch, { recursive: true, force: true, maxRetries: 5 }); });
 

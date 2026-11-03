@@ -14,7 +14,6 @@ const sessionsBase = path.join(scratch, 'sessions');
 fs.mkdirSync(sessionsBase);
 process.env.REPO_PANEL_CONFIG = path.join(scratch, 'config.json');
 process.env.REPO_PANEL_SESSIONS_DIR = sessionsBase;
-process.env.REPO_PANEL_CASES_FILE = 'off';
 test.after(() => fs.rmSync(scratch, { recursive: true, force: true, maxRetries: 5 }));
 
 const SS = require('../server/sessions.js');

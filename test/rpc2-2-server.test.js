@@ -1,6 +1,6 @@
 'use strict';
 // RPC2-2 (S1, S6, S8), server side: the /flow-* buttons, put-in-conditions and fix-pr go to the session as an RPC `prompt` (POST /api/pi keeps its
-// contract), GET /api/pi-status is answered from the host, and no Orca function is ever called. The host is the real createRpcHost over a fake client.
+// contract), GET /api/pi-status is answered from the host. The host is the real createRpcHost over a fake client.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -25,7 +25,6 @@ const ID = lib.repoId(REPO);
 const ACTIVE = { id: 'gentle-shell', command: 'C:\\L\\gentle-shell.exe', agentDir: 'C:\\a' };
 const writeConfig = () => fs.writeFileSync(process.env.REPO_PANEL_CONFIG, JSON.stringify({ groups: [{ name: 'g', repos: [{ path: REPO }] }] }));
 const NEVER = async () => { throw new Error('must not be read'); };
-const THROWING_ORCA = async () => { throw new Error('Orca must not be called'); };
 const failing = { number: 7, title: 'Fix the thing', head: 'task', base: 'main', checks: { state: 'failed', items: [{ name: 'test', state: 'failed' }] } };
 const prs = async () => ({ repo: {}, prs: [failing] });
 const reqs = async () => ({ available: true, results: [{ id: 'agents-file', status: 'fail', level: 'required' }] });
@@ -40,7 +39,7 @@ const call = (port, method, p, { token, body } = {}) => new Promise((resolve, re
   req.end(data);
 });
 
-// `state` is what the fake client reports; `started: false` leaves the session closed. A fake `orca` that throws proves nothing reaches Orca.
+// `state` is what the fake client reports; `started: false` leaves the session closed.
 async function withServer(fn, { state = 'idle', started = true } = {}) {
   writeConfig();
   const made = [];
@@ -56,7 +55,7 @@ async function withServer(fn, { state = 'idle', started = true } = {}) {
   let t = 1_000_000;
   // The providers go through `cfg` so a test can swap them after the server is up.
   const cfg = { requirements: NEVER, prs };
-  const deps = { noSummaryStore: true, rpcHost: host, orca: THROWING_ORCA, wait: NEVER, requirements: (...a) => cfg.requirements(...a), prs: (...a) => cfg.prs(...a), guard: pi.sendGuard(() => t) };
+  const deps = { noSummaryStore: true, rpcHost: host, wait: NEVER, requirements: (...a) => cfg.requirements(...a), prs: (...a) => cfg.prs(...a), guard: pi.sendGuard(() => t) };
   const server = createServer(port, deps);
   await new Promise((r) => server.listen(port, '127.0.0.1', r));
   try {
@@ -164,7 +163,7 @@ test('s7: a failure of the prompt answers a fixed message and does not arm the d
   });
 });
 
-test('s8: GET /api/pi-status maps the five session states, ignores tail and fresh, and never calls Orca', async () => {
+test('s8: GET /api/pi-status maps the five session states, ignores tail and fresh', async () => {
   const want = { closed: 'closed', starting: 'busy', idle: 'idle', busy: 'busy', asking: 'asking' };
   for (const [state, answer] of Object.entries(want)) {
     await withServer(async ({ get }) => {

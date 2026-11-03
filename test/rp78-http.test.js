@@ -15,7 +15,6 @@ const repoDir = path.join(scratch, 'RepoOne');
 fs.mkdirSync(repoDir);
 const configFile = path.join(scratch, 'config.json');
 process.env.REPO_PANEL_CONFIG = configFile;
-process.env.REPO_PANEL_CASES_FILE = 'off';
 fs.writeFileSync(configFile, JSON.stringify({ port: 4310, groups: [{ name: 'G', repos: [{ path: repoDir }] }], rooms: [] }));
 test.after(() => fs.rmSync(scratch, { recursive: true, force: true, maxRetries: 5 }));
 
@@ -28,16 +27,15 @@ const gate = () => { let open; const p = new Promise((r) => { open = r; }); retu
 
 function fakeStore() {
   const log = [];
-  return { log, snapshot: () => { log.push('snapshot'); return SNAP; }, refreshAll: async () => { log.push('refreshAll'); }, refreshRepo: async () => {}, setSession() {}, touch() {}, start() { log.push('start'); }, stop() {}, tick: async () => {} };
+  return { log, snapshot: () => { log.push('snapshot'); return SNAP; }, refreshAll: async () => { log.push('refreshAll'); }, refreshRepo: async () => {}, touch() {}, start() { log.push('start'); }, stop() {}, tick: async () => {} };
 }
 
-// Fake readers that count their calls: nothing of the real Orca, git or gh is ever used.
+// Fake readers that count their calls: nothing of the real git or gh is ever used.
 function fakeDeps() {
   const calls = [];
   const note = (name, value) => async () => { calls.push(name); return value; };
   return {
     calls,
-    orca: async (args) => { calls.push(`orca ${args[0]}`); throw new Error('orca must not be called'); },
     local: note('local', { branch: 'main', files: [], ahead: 0, behind: 0, base: 'main' }),
     prs: note('prs', { prs: [], stale: null }),
     roadmap: note('roadmap', { available: false, reason: 'missing' }),
@@ -47,7 +45,7 @@ function fakeDeps() {
 }
 
 // ---------- summaryFor ----------
-test('summaryFor with a store answers its snapshot at once: no refresh, no Orca, no reader, no 10 s cache', async () => {
+test('summaryFor with a store answers its snapshot at once: no refresh, no reader, no 10 s cache', async () => {
   const store = fakeStore();
   const deps = { ...fakeDeps(), summaryStore: store };
   assert.deepEqual(await summaryFor(deps, {}), SNAP);
@@ -68,15 +66,13 @@ test('summaryFor with ?fresh=1 awaits refreshAll() first and then answers the sn
   assert.deepEqual(store.log, ['refreshAll', 'refreshed', 'snapshot']);
 });
 
-test('summaryFor without a store keeps today behaviour: Orca listed once, rows built from the readers, cached per deps', async () => {
+test('summaryFor without a store keeps today behaviour: rows built from the readers, cached per deps, session unknown without a getter', async () => {
   const deps = fakeDeps();
-  deps.orca = async (args) => { deps.calls.push(`orca ${args[0]}`); return { terminals: [] }; };
   const a = await summaryFor(deps, {});
   assert.deepEqual(Object.keys(a), ['rows', 'counts', 'attention', 'generatedAt']);
   assert.equal(a.rows.length, 1);
   assert.equal(a.rows[0].loading, undefined);
-  assert.deepEqual(a.rows[0].session, { state: 'none' });
-  assert.equal(deps.calls.filter((c) => c === 'orca list').length, 1);
+  assert.deepEqual(a.rows[0].session, { state: 'unknown' });
   assert.equal(await summaryFor(deps, {}), a, 'the cache of the old path is untouched');
 });
 
@@ -84,14 +80,14 @@ test('summaryFor without a store keeps today behaviour: Orca listed once, rows b
 test('createServer builds one store per server, keeps an injected one, and builds none with noSummaryStore', () => {
   const a = createServer(1, fakeDeps());
   const b = createServer(1, fakeDeps());
-  for (const s of [a, b]) for (const m of ['snapshot', 'refreshRepo', 'refreshAll', 'setSession', 'touch', 'start', 'stop', 'tick']) assert.equal(typeof s.summaryStore[m], 'function', m);
+  for (const s of [a, b]) for (const m of ['snapshot', 'refreshRepo', 'refreshAll', 'touch', 'start', 'stop', 'tick']) assert.equal(typeof s.summaryStore[m], 'function', m);
   assert.notEqual(a.summaryStore, b.summaryStore);
   const mine = fakeStore();
   assert.equal(createServer(1, { summaryStore: mine }).summaryStore, mine);
   assert.equal(createServer(1, { noSummaryStore: true }).summaryStore, undefined);
 });
 
-test('creating a server does not start its store: no timer, no reader call, no Orca call', async () => {
+test('creating a server does not start its store: no timer, no reader call', async () => {
   const deps = fakeDeps();
   createServer(1, deps);
   await flush();
@@ -142,7 +138,7 @@ test('the default store: the first answer is the loading rows with zero reader c
     assert.equal(first.rows[0].loading, true);
     assert.equal(first.rows[0].name, 'RepoOne');
     assert.deepEqual(first.counts, { working: 0, waiting: 0, blocked: 0, idle: 1 });
-    assert.deepEqual(deps.calls, [], 'the request reads nothing and never lists Orca');
+    assert.deepEqual(deps.calls, [], 'the request reads nothing');
     const fresh = JSON.parse((await api('/api/summary?fresh=1')).body);
     assert.equal(fresh.rows[0].loading, undefined);
     assert.equal(fresh.rows[0].error, null);
@@ -153,22 +149,19 @@ test('the default store: the first answer is the loading rows with zero reader c
   });
 });
 
-test('a server with noSummaryStore builds the rows per request with the session from the RPC host: Orca is never listed', async () => {
+test('a server with noSummaryStore builds the rows per request with the session from the RPC host', async () => {
   const deps = fakeDeps();
-  deps.orca = async (args) => { deps.calls.push(`orca ${args[0]}`); return { terminals: [] }; };
   await withServer({ ...deps, noSummaryStore: true }, async ({ api }) => {
     const out = JSON.parse((await api('/api/summary?fresh=1')).body);
     assert.equal(out.rows[0].loading, undefined);
     assert.deepEqual(out.rows[0].session, { state: 'none' });
-    assert.equal(deps.calls.filter((c) => c === 'orca list').length, 0);
   });
 });
 
-// ---------- server.js wiring (it only runs as a program, so it is pinned by its text, as rp77b-warm does) ----------
-test('server.js starts the store and feeds it the session state the warmer publishes, next to the hub', () => {
+// ---------- server.js wiring (it only runs as a program, so it is pinned by its text) ----------
+test('server.js starts the store and wires no warmer, no watcher, no recorder and no session feed', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
   assert.match(src, /server\.summaryStore\.start\(\)/);
-  assert.match(src, /server\.summaryStore\.setSession\(id, (?:payload\.)?state\)/);
-  assert.match(src, /server\.hub\.publish\(id, payload\)/, 'the hub still gets the payload');
+  assert.doesNotMatch(src, /setSession|hub\.publish|createWarmer|createWatcher|createRecorder|setCaseRecorder|REPO_PANEL_(WARM|WATCH|CASES)/);
   assert.doesNotMatch(src, /noSummaryStore/);
 });

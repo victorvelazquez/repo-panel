@@ -1,7 +1,7 @@
 'use strict';
 // RP80 (S68, S75), design points 1-3: server/summarystore.js keeps a sixth fact (`req`, requirementsFor, slow, not needed by the Summary),
 // a revision counter (`rev`, `revOf[id]`, bumped only when a read outcome differs) and store.board(since) -> { rev, repos, refreshing },
-// a SYNCHRONOUS answer built from memory that reads nothing. Injected fakes, a fake clock and gates only: no timers, no sleeps, no real git/gh/Orca.
+// a SYNCHRONOUS answer built from memory that reads nothing. Injected fakes, a fake clock and gates only: no timers, no sleeps, no real git/gh.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -11,7 +11,6 @@ const { AsyncLocalStorage } = require('node:async_hooks');
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'rp80b-'));
 process.env.REPO_PANEL_CONFIG = path.join(scratch, 'config.json');
-process.env.REPO_PANEL_CASES_FILE = 'off';
 const { mock } = test;
 test.after(() => { mock.restoreAll(); fs.rmSync(scratch, { recursive: true, force: true, maxRetries: 5 }); });
 

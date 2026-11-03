@@ -205,19 +205,19 @@ test('a9: no route takes a command, cwd, path, args or env from the browser', as
   });
 });
 
-test('e1: an event of a session reaches the page as `event: rpc`, and the live events are byte-identical', async () => {
+test('e1: an event of a session reaches the page as `event: rpc`, after the bare preamble and with no snapshot', async () => {
   await withServer(async ({ port, token, post, made, server }) => {
     const frames = [];
     const req = http.get({ host: '127.0.0.1', port, path: '/api/events', headers: { 'x-token': token } }, (res) => { res.setEncoding('utf8'); res.on('data', (c) => frames.push(c)); });
     await new Promise((r) => setTimeout(r, 100));
-    server.hub.publish('abc', { state: 'idle' });
     await post('start', { id: ID });
     made[0].opts.onEvent({ kind: 'event', record: { type: 'agent_start' } });
     made[0].opts.onEvent({ kind: 'dialog', id: 'd1', method: 'confirm', title: 'T' });
     await new Promise((r) => setTimeout(r, 100));
     req.destroy();
     const text = frames.join('');
-    assert.ok(text.includes('event: live\ndata: {"id":"abc","state":"idle"}\n\n'));
+    assert.ok(text.startsWith('retry: 3000\n\n'));
+    assert.ok(!text.includes('event: snapshot') && !text.includes('event: live'));
     assert.ok(text.includes(`event: rpc\ndata: {"kind":"event","record":{"type":"agent_start"},"id":"${ID}"}\n\n`));
     const dialog = text.split('\n\n').find((fr) => fr.includes('"kind":"dialog"'));
     assert.ok(dialog.startsWith('event: rpc\ndata: '));
@@ -261,9 +261,7 @@ test('e4: hub.emit writes one `event: rpc` frame; it is not remembered, cannot b
   res.writes.length = 0;
   hub.emit('rpc', 'abc', { kind: 'event', id: 'FORGED', record: { text: 'a\u2028b\nevent: live' } });
   assert.deepEqual(res.writes, ['event: rpc\ndata: {"kind":"event","id":"abc","record":{"text":"a\\u2028b\\nevent: live"}}\n\n']);
-  assert.equal(hub.snapshotFor(), 'event: snapshot\ndata: []\n\n', 'an rpc event never enters the snapshot');
-  hub.publish('abc', { state: 'idle' });
-  assert.equal(res.writes.at(-1), 'event: live\ndata: {"id":"abc","state":"idle"}\n\n');
+  assert.equal('snapshotFor' in hub || 'publish' in hub, false, 'the hub keeps nothing');
   assert.doesNotThrow(() => createEventHub().emit('rpc', 'x', { kind: 'state' }));
 });
 

@@ -1,7 +1,7 @@
 'use strict';
 // RP76 (S68): server/perf.js keeps the last timings of every route in a bounded ring (nearest-rank percentiles) and warns once per
 // route every 10 s about a slow request; the HTTP layer records every answer (also errors), sends Server-Timing, exposes
-// GET /api/perf and shares identical in-flight GET requests (single flight). Real Orca, real remotes and the real config are
+// GET /api/perf and shares identical in-flight GET requests (single flight). Real remotes and the real config are
 // never involved: a temp config with one tiny local git repo.
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -17,7 +17,6 @@ const repoDir = path.join(scratch, 'repo-one');
 fs.mkdirSync(repoDir);
 const configFile = path.join(scratch, 'config.json');
 process.env.REPO_PANEL_CONFIG = configFile;
-process.env.REPO_PANEL_CASES_FILE = 'off';
 process.env.REPO_PANEL_MAX_PARALLEL = '2';
 test.after(() => fs.rmSync(scratch, { recursive: true, force: true, maxRetries: 5 }));
 
@@ -147,7 +146,7 @@ test('GET /api/perf needs the token and answers routes and the queue', async () 
     assert.equal((await call('GET', '/api/perf')).status, 401);
     await call('GET', `/api/rooms?id=${REPO_ID}&secret=tok-123`, token);
     const body = await perf();
-    assert.deepEqual(Object.keys(body).sort(), ['liveCache', 'queue', 'routes']);
+    assert.deepEqual(Object.keys(body).sort(), ['queue', 'routes']);
     assert.deepEqual(body.queue, { active: 0, max: 2, waitingBackground: 0, waitingUser: 0 });
     assert.ok(body.routes['GET /api/rooms'].n >= 1, 'keyed by the route name, without the query');
     for (const key of Object.keys(body.routes)) assert.ok(!key.includes('?'), key);

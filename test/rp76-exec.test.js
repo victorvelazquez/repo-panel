@@ -2,7 +2,7 @@
 // RP76 (S68): the process queue of server/exec.js has two lanes. A job started inside withPriority('user', ...) goes before every
 // waiting background job and may use up to URGENT_EXTRA processes over MAX_PARALLEL; background jobs keep their FIFO order.
 // withContext(ctx, fn) collects ctx.procs and ctx.waitMs of every run() inside it; singleFlight shares one in-flight call per key.
-// Only quick local child processes (process.execPath -e) run here: no git, no gh, no Orca.
+// Only quick local child processes (process.execPath -e) run here: no git, no gh.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');

@@ -15,7 +15,6 @@ const { sh } = require('./git-helper.js');
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'rp93-'));
 process.env.REPO_PANEL_CONFIG = path.join(scratch, 'config.json');
-process.env.REPO_PANEL_CASES_FILE = 'off';
 const mk = (name) => {
   const dir = path.join(scratch, name);
   fs.mkdirSync(dir);

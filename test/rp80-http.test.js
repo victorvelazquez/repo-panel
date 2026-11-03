@@ -1,7 +1,7 @@
 'use strict';
 // RP80 (S68, S75), design point 4: GET /api/board?since=N answers deps.summaryStore.board(since) (token and host checks, 400 for a bad since,
-// 404 without a store, no Orca/git/gh call) and POST /api/board/refresh answers { started: true } at once and starts refreshRepo(id) or refreshAll()
-// in the background (errors swallowed). Fake stores and fake readers on a temp config only; the real config, Orca, git and gh are never used.
+// 404 without a store, no git/gh call) and POST /api/board/refresh answers { started: true } at once and starts refreshRepo(id) or refreshAll()
+// in the background (errors swallowed). Fake stores and fake readers on a temp config only; the real config, git and gh are never used.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -15,7 +15,6 @@ const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'rp80h-'));
 const repoDir = path.join(scratch, 'RepoOne');
 fs.mkdirSync(repoDir);
 process.env.REPO_PANEL_CONFIG = path.join(scratch, 'config.json');
-process.env.REPO_PANEL_CASES_FILE = 'off';
 fs.writeFileSync(process.env.REPO_PANEL_CONFIG, JSON.stringify({ port: 4310, groups: [{ name: 'G', repos: [{ path: repoDir }] }], rooms: [] }));
 const { mock } = test;
 test.after(() => { mock.restoreAll(); fs.rmSync(scratch, { recursive: true, force: true, maxRetries: 5 }); });
@@ -39,7 +38,7 @@ function fakeStore() {
     log: [], lanes: [], held: null, failWith: null,
     board(since) { s.log.push(['board', since]); return BOARD; },
     snapshot: () => ({ rows: [], counts: {}, attention: [], generatedAt: 'x' }),
-    setSession() {}, touch() {}, start() {}, stop() {}, tick: async () => {},
+    touch() {}, start() {}, stop() {}, tick: async () => {},
   };
   for (const m of ['refreshAll', 'refreshRepo', 'catchUp']) {
     s[m] = async (...args) => {
@@ -52,14 +51,13 @@ function fakeStore() {
   return s;
 }
 
-// Fake readers that count their calls and the lane they ran in: nothing of the real Orca, git or gh is ever used.
+// Fake readers that count their calls and the lane they ran in: nothing of the real git or gh is ever used.
 function fakeDeps() {
   const calls = [];
   const lanes = [];
   const note = (name, value) => async () => { calls.push(name); lanes.push(lane.getStore()); return value; };
   return {
     calls, lanes,
-    orca: async (args) => { calls.push(`orca ${args[0]}`); throw new Error('orca must not be called'); },
     local: note('local', { branch: 'main', files: [], ahead: 0, behind: 0, base: 'main' }),
     prs: note('prs', { prs: [], stale: null }),
     roadmap: note('roadmap', { available: false, reason: 'missing' }),
@@ -120,7 +118,7 @@ test('GET /api/board?since=N answers exactly what store.board(N) answers, with N
       assert.deepEqual(store.log.at(-1), ['board', since], q);
     }
     assert.equal(store.log.length, 3);
-    assert.deepEqual(deps.calls, [], 'no Orca, git, gh or reader call');
+    assert.deepEqual(deps.calls, [], 'no git, gh or reader call');
   });
 });
 
@@ -163,7 +161,6 @@ test('with the real store the first board is every repo with no fact and reads n
     assert.deepEqual(Object.keys(b.repos[ID]).sort(), ['at', 'errors', 'local', 'prs', 'req', 'rev', 'roadmap', 'stale', 'state']);
     assert.deepEqual(b.repos[ID].req, { available: true, results: [], summary: { ok: 1, total: 1 } });
     assert.deepEqual((await get('/api/board?since=6')).json(), { rev: 6, repos: {}, refreshing: [] });
-    assert.equal(deps.calls.filter((c) => c.startsWith('orca')).length, 0);
   });
 });
 

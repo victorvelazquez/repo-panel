@@ -1,6 +1,6 @@
 'use strict';
 // RP78 (S68, S73), points 1-6: server/summarystore.js, the Summary kept in memory. createSummaryStore({ deps, now, loadCfg, setTimer,
-// clearTimer, intervals, idleAfterMs, pool }) -> { snapshot, refreshRepo, refreshAll, setSession, touch, start, stop, tick }.
+// clearTimer, intervals, idleAfterMs, pool }) -> { snapshot, refreshRepo, refreshAll, touch, start, stop, tick }.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -10,7 +10,6 @@ const { AsyncLocalStorage } = require('node:async_hooks');
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'rp78s-'));
 process.env.REPO_PANEL_CONFIG = path.join(scratch, 'config.json');
-process.env.REPO_PANEL_CASES_FILE = 'off';
 const { mock } = test;
 test.after(() => { mock.restoreAll(); fs.rmSync(scratch, { recursive: true, force: true, maxRetries: 5 }); });
 
@@ -73,7 +72,7 @@ const LOADING = (name, room = null) => ({
 // ---------- points 1-2: facts and snapshot ----------
 test('creating a store reads nothing and arms nothing; it exposes exactly the pinned API', () => {
   const e = setup();
-  assert.deepEqual(Object.keys(e.store).sort(), ['awake', 'board', 'catchUp', 'refreshAll', 'refreshRepo', 'setSession', 'snapshot', 'start', 'stop', 'tick', 'touch']); // RP80 added `board`, RP80b `catchUp` and `awake`
+  assert.deepEqual(Object.keys(e.store).sort(), ['awake', 'board', 'catchUp', 'refreshAll', 'refreshRepo', 'snapshot', 'start', 'stop', 'tick', 'touch']); // RP80 added `board`, RP80b `catchUp` and `awake`
   assert.deepEqual(e.totals(), total(0));
   assert.equal(e.timers.length, 0);
 });
@@ -154,24 +153,29 @@ test('rooms of the config reach the row; the loading row carries the room too', 
   assert.deepEqual(rows[1], { ...LOADING('beta', 'Room 1'), rank: rows[1].rank });
 });
 
-test('session comes only from setSession: unknown before, the summary mapping after, no reader call, an unknown repo is ignored', async () => {
-  const e = setup({ repos: ['alpha', 'beta'] });
+test('session comes only from sessionOf: unknown without one, the summary mapping with one, no reader call, a throwing getter is unknown', async () => {
+  const none = setup({ repos: ['alpha', 'beta'] });
+  await none.store.refreshAll();
+  assert.deepEqual(none.store.snapshot().rows.map((r) => r.session), [{ state: 'unknown' }, { state: 'unknown' }]);
+  assert.equal('setSession' in none.store, false);
+  const cur = {};
+  const e = setup({ repos: ['alpha', 'beta'], sessionOf: (id) => { if (cur.boom) throw new Error('host down'); return cur[id]; } });
   await e.store.refreshAll();
   const before = e.totals();
-  assert.deepEqual(e.store.snapshot().rows.map((r) => r.session), [{ state: 'unknown' }, { state: 'unknown' }]);
-  const MAP = { closed: 'none', idle: 'free', busy: 'working', asking: 'waiting', ambiguous: 'unknown', unknown: 'unknown' };
+  const MAP = { closed: 'none', idle: 'free', busy: 'working', starting: 'working', asking: 'waiting', ambiguous: 'unknown', unknown: 'unknown' };
   for (const [piState, shown] of Object.entries(MAP)) {
-    e.store.setSession(idOf('alpha'), piState);
+    cur[idOf('alpha')] = piState;
     assert.deepEqual(e.store.snapshot().rows[0], e.expected('alpha', { session: piState }), piState);
     assert.deepEqual(e.store.snapshot().rows[0].session, { state: shown });
   }
-  e.store.setSession(idOf('alpha'), 'asking');
-  e.store.setSession('nope000000', 'busy');
+  cur[idOf('alpha')] = 'asking';
   const snap = e.store.snapshot();
   assert.deepEqual(snap.counts, { working: 0, waiting: 1, blocked: 0, idle: 1 });
   assert.deepEqual(snap.attention, [{ id: idOf('alpha'), name: 'alpha', why: 'The session is waiting for an answer' }]);
   assert.equal(snap.rows[0].action.kind, 'answer');
-  assert.deepEqual(snap.rows[1], e.expected('beta'), 'another repo is untouched');
+  assert.deepEqual(snap.rows[1].session, { state: 'unknown' }, 'a repo the getter does not know is unknown');
+  cur.boom = true;
+  assert.deepEqual(e.store.snapshot().rows.map((r) => r.session), [{ state: 'unknown' }, { state: 'unknown' }]);
   assert.deepEqual(e.totals(), before);
 });
 

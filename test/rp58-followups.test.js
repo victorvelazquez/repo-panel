@@ -16,7 +16,7 @@ const { piSend, sendGuard } = require('../server/pi.js');
 
 test.after(() => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5 }));
 
-// RPC2-2: the key goes to the session through the rpc host (status + prompt), not through Orca.
+// RPC2-2: the key goes to the session through the rpc host (status + prompt).
 const fakeHost = (state = 'idle') => { const sent = []; return { sent, status: async () => ({ state }), prompt: async (id, text) => { sent.push(text); return {}; } }; };
 const REPO = { id: 'r1', path: 'C:\dev\repo' };
 const refuses = (p, status, re) => assert.rejects(p, (e) => e.status === status && re.test(e.message));

@@ -1,7 +1,7 @@
 'use strict';
-// RPC2b-1 (S1, S6, S8), server side: the session state of a repo comes from the RPC host (`stateOf`), never from Orca. It feeds GET /api/rpc/states,
+// RPC2b-1 (S1, S6, S8), server side: the session state of a repo comes from the RPC host (`stateOf`), from nothing else. It feeds GET /api/rpc/states,
 // the Summary rows (with and without the store), GET /api/sessions `live` and the rooms (which lose `presence`). The host is the real createRpcHost
-// over a fake client; every Orca dependency in these tests throws, so a call to Orca fails the test.
+// over a fake client.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -32,7 +32,6 @@ const ID = lib.repoId(REPO);
 const OTHER_ID = lib.repoId(OTHER);
 const ACTIVE = { id: 'gentle-shell', command: 'C:\\L\\gentle-shell.exe', agentDir: 'C:\\a' };
 const writeConfig = () => fs.writeFileSync(process.env.REPO_PANEL_CONFIG, JSON.stringify({ groups: [{ name: 'g', repos: [{ path: REPO }, { path: OTHER }] }], rooms: [{ name: 'Room', path: ROOM, repos: [ID] }] }));
-const THROWING_ORCA = async () => { throw new Error('Orca must not be called'); };
 const GOOD = {
   local: async () => ({ branch: 'main', files: [], ahead: 0, behind: 0, base: 'main' }),
   prs: async () => ({ prs: [], stale: null }),
@@ -56,7 +55,7 @@ const call = (port, p, token) => new Promise((resolve, reject) => {
 async function withServer(fn, { deps = {}, host = hostWith() } = {}) {
   writeConfig();
   const port = await freePort();
-  const server = createServer(port, { rpcHost: host, orca: THROWING_ORCA, ...GOOD, noSummaryStore: true, ...deps });
+  const server = createServer(port, { rpcHost: host, ...GOOD, noSummaryStore: true, ...deps });
   await new Promise((r) => server.listen(port, '127.0.0.1', r));
   try {
     const token = /name="?token"? content="([0-9a-f]+)"/.exec((await call(port, '/')).body)[1];
@@ -119,7 +118,7 @@ test('r1: GET /api/rpc/states needs the token', async () => {
   });
 });
 
-test('r2: every configured repo is there as closed by default, with no process started and no Orca call', async () => {
+test('r2: every configured repo is there as closed by default, with no process started', async () => {
   await withServer(async ({ get }) => {
     const r = await get('/api/rpc/states');
     assert.equal(r.status, 200);
@@ -145,7 +144,7 @@ const cfgOf = () => ({ groups: [{ name: 'G', repos: [{ path: REPO }, { path: OTH
 
 test('m1: the store row session follows sessionOf for every state, starting is working', async () => {
   const cur = {};
-  const store = createSummaryStore({ deps: { ...GOOD, orca: THROWING_ORCA }, waitForClient: false, loadCfg: cfgOf, sessionOf: (id) => cur[id] });
+  const store = createSummaryStore({ deps: { ...GOOD }, waitForClient: false, loadCfg: cfgOf, sessionOf: (id) => cur[id] });
   await store.refreshAll();
   for (const [state, word] of Object.entries(ROW_SESSION)) {
     cur[ID] = state;
@@ -155,29 +154,17 @@ test('m1: the store row session follows sessionOf for every state, starting is w
   assert.equal(store.snapshot().rows.find((r) => r.id === ID).session.state, 'unknown', 'a state the vocabulary does not know');
 });
 
-test('m2: with a sessionOf the store ignores what setSession stored, so no word ever expires', async () => {
-  let t = 1_000_000;
-  const store = createSummaryStore({ deps: GOOD, waitForClient: false, loadCfg: cfgOf, now: () => t, sessionOf: () => 'idle' });
+test('m2: without a sessionOf the store row session is unknown, whatever else is read', async () => {
+  const store = createSummaryStore({ deps: GOOD, waitForClient: false, loadCfg: cfgOf });
   await store.refreshAll();
-  store.setSession(ID, 'asking');
-  t += 3_600_000;
-  assert.equal(store.snapshot().rows.find((r) => r.id === ID).session.state, 'free');
-});
-
-test('m3: without a sessionOf the store keeps the old behavior (setSession and its 30 s expiry)', async () => {
-  let t = 1_000_000;
-  const store = createSummaryStore({ deps: GOOD, waitForClient: false, loadCfg: cfgOf, now: () => t });
-  await store.refreshAll();
-  store.setSession(ID, 'asking');
-  assert.equal(store.snapshot().rows.find((r) => r.id === ID).session.state, 'waiting');
-  t += 30000;
   assert.equal(store.snapshot().rows.find((r) => r.id === ID).session.state, 'unknown');
+  assert.equal('setSession' in store, false);
 });
 
-test('m4: summaryFor without a store reads the session from deps.sessionOf for every state and never lists Orca', async () => {
+test('m4: summaryFor without a store reads the session from deps.sessionOf for every state', async () => {
   writeConfig();
   const cur = {};
-  const deps = { ...GOOD, orca: THROWING_ORCA, sessionOf: (id) => cur[id] };
+  const deps = { ...GOOD, sessionOf: (id) => cur[id] };
   for (const [state, word] of Object.entries(ROW_SESSION)) {
     cur[ID] = state;
     const out = await summaryFor({ ...deps }, { fresh: '1' });
@@ -186,16 +173,13 @@ test('m4: summaryFor without a store reads the session from deps.sessionOf for e
   }
 });
 
-test('m5: summaryFor without a sessionOf still lists Orca once (the old path until RPC2b-2)', async () => {
+test('m5: summaryFor without a sessionOf gives an unknown session to every row', async () => {
   writeConfig();
-  let lists = 0;
-  const orca = async (args) => { if (args[0] === 'list') { lists++; return { terminals: [] }; } throw new Error('unexpected'); };
-  const out = await summaryFor({ ...GOOD, orca }, { fresh: '1' });
-  assert.equal(lists, 1);
-  assert.equal(out.rows.find((r) => r.id === ID).session.state, 'none');
+  const out = await summaryFor({ ...GOOD }, { fresh: '1' });
+  assert.deepEqual(out.rows.map((r) => r.session.state), ['unknown', 'unknown']);
 });
 
-test('m6: the real server builds its store over the host: GET /api/summary shows the live state with no Orca call', async () => {
+test('m6: the real server builds its store over the host: GET /api/summary shows the live state', async () => {
   writeConfig();
   const cur = { state: 'asking' };
   const host = hostWith(cur);
@@ -211,10 +195,10 @@ test('m6: the real server builds its store over the host: GET /api/summary shows
 const NONE = { state: 'none', count: 0 };
 const LIVE = { closed: NONE, idle: { state: 'free', count: 1 }, busy: { state: 'working', count: 1 }, starting: { state: 'working', count: 1 }, asking: { state: 'waiting', count: 1 } };
 
-test('l1: sessionsState live comes from the host getter for every state, with no Orca call', async () => {
+test('l1: sessionsState live comes from the host getter for every state', async () => {
   writeConfig();
   for (const [state, live] of Object.entries(LIVE)) {
-    const out = await sessionsState(ID, THROWING_ORCA, path.join(scratch, 'sessions'), () => state);
+    const out = await sessionsState(ID, path.join(scratch, 'sessions'), () => state);
     assert.deepEqual(out.live, live, state);
     assert.deepEqual(Object.keys(out).sort(), ['adopted', 'adoptedFound', 'key', 'live', 'sessions']);
   }
@@ -222,12 +206,12 @@ test('l1: sessionsState live comes from the host getter for every state, with no
 
 test('l2: a room key has no session: live is none even when the getter says busy', async () => {
   writeConfig();
-  const out = await sessionsState('room:Room', THROWING_ORCA, path.join(scratch, 'sessions'), () => 'busy');
+  const out = await sessionsState('room:Room', path.join(scratch, 'sessions'), () => 'busy');
   assert.deepEqual(out.live, NONE);
   assert.equal(out.key, 'room:Room');
 });
 
-test('l3: GET /api/sessions answers from the host and adopt/release keep working without Orca', async () => {
+test('l3: GET /api/sessions answers from the host and adopt/release keep working', async () => {
   writeConfig();
   const cur = { state: 'busy' };
   const host = hostWith(cur);
@@ -238,26 +222,24 @@ test('l3: GET /api/sessions answers from the host and adopt/release keep working
   }, { host });
 });
 
-test('l4: without a getter sessionsState still asks Orca (the old path until RPC2b-2), and adopt/release still answer', async () => {
+test('l4: without a getter sessionsState says none, and adopt/release still answer', async () => {
   writeConfig();
-  let lists = 0;
-  const orca = async (args) => { if (args[0] === 'list') { lists++; return { terminals: [] }; } throw new Error('unexpected'); };
-  assert.deepEqual((await sessionsState(ID, orca, path.join(scratch, 'sessions'))).live, NONE);
-  assert.ok(lists > 0);
-  assert.deepEqual((await releaseSession(ID, orca, path.join(scratch, 'sessions'))).adopted, null);
-  await assert.rejects(() => adoptSession(ID, 'missing', orca, path.join(scratch, 'sessions')), (e) => e.status === 400);
+  const base = path.join(scratch, 'sessions');
+  assert.deepEqual((await sessionsState(ID, base)).live, NONE);
+  assert.deepEqual((await releaseSession(ID, base)).adopted, null);
+  await assert.rejects(() => adoptSession(ID, 'missing', base), (e) => e.status === 400);
 });
 
 // ---------- rooms ----------
-test('o1: roomsState has no presence and never lists Orca', async () => {
+test('o1: roomsState has no presence', async () => {
   const requirements = async () => ({ available: true, base: 'main', results: [], summary: { ready: true } });
   const git = async () => ({ code: 0, stdout: '2026-10-24T10:00:00-05:00\n', stderr: '' });
-  const out = await roomsState({ rooms: [{ name: 'R', path: ROOM, repos: ['a'] }], orca: THROWING_ORCA, git, requirements });
+  const out = await roomsState({ rooms: [{ name: 'R', path: ROOM, repos: ['a'] }], git, requirements });
   assert.deepEqual(Object.keys(out.rooms[0]).sort(), ['available', 'base', 'lastCommit', 'name', 'path', 'repos', 'results', 'summary']);
   assert.equal(out.rooms[0].lastCommit, '2026-10-24T10:00:00-05:00');
 });
 
-test('o2: GET /api/rooms answers without presence and without calling Orca', async () => {
+test('o2: GET /api/rooms answers without presence', async () => {
   await withServer(async ({ get }) => {
     const r = await get('/api/rooms');
     assert.equal(r.status, 200);
@@ -265,18 +247,4 @@ test('o2: GET /api/rooms answers without presence and without calling Orca', asy
     assert.equal('presence' in r.json.rooms[0], false);
     assert.deepEqual([r.json.rooms[0].name, r.json.rooms[0].repos], ['Room', [ID]]);
   });
-});
-
-test('o3: neither roomsState nor GET /api/rooms ever runs the Orca program (the real function is watched)', async () => {
-  const pi = require('../server/pi.js');
-  const calls = [];
-  const real = pi.orcaTerminal;
-  pi.orcaTerminal = async (...a) => { calls.push(a); throw new Error('Orca must not be called'); };
-  try {
-    const requirements = async () => ({ available: true, base: 'main', results: [], summary: { ready: true } });
-    const git = async () => ({ code: 0, stdout: '2026-10-24T10:00:00-05:00\n', stderr: '' });
-    await roomsState({ rooms: [{ name: 'R', path: ROOM, repos: [] }], git, requirements });
-    await withServer(async ({ get }) => { assert.equal((await get('/api/rooms')).status, 200); });
-  } finally { pi.orcaTerminal = real; }
-  assert.deepEqual(calls, []);
 });

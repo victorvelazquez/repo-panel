@@ -9,7 +9,6 @@ const path = require('node:path');
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'rp78x-'));
 process.env.REPO_PANEL_CONFIG = path.join(scratch, 'config.json');
-process.env.REPO_PANEL_CASES_FILE = 'off';
 test.after(() => fs.rmSync(scratch, { recursive: true, force: true, maxRetries: 5 }));
 
 const lib = require('../lib.js');
@@ -159,19 +158,6 @@ test('the default intervals: local and state are due after 15 s, prs, roadmap an
   e.store.touch();
   await e.store.tick();
   assert.deepEqual([e.counts.prs, e.counts.roadmap, e.counts.git], [2, 2, 2], '60000 ms: the slow facts');
-});
-
-test('a session state nobody has refreshed for 30000 ms or more is unknown (the warmer stopped, Orca is down); 29999 ms is still believed', async () => {
-  const e = setup({}, { repos: ['alpha'] });
-  await e.store.refreshAll();
-  const id = lib.repoId(pathOf('alpha'));
-  e.store.setSession(id, 'asking');
-  e.t += 29999;
-  assert.equal(e.store.snapshot().rows[0].session.state, 'waiting');
-  e.t += 1;
-  assert.equal(e.store.snapshot().rows[0].session.state, 'unknown');
-  e.store.setSession(id, 'busy');
-  assert.equal(e.store.snapshot().rows[0].session.state, 'working', 'a new word makes it fresh again');
 });
 
 test('a read that the injected timeout gives up on is a failed fact, keeps the last good value and frees the repo', async () => {

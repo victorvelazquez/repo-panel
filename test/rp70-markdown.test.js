@@ -15,7 +15,6 @@ for (const d of [sessionsBase, repoDir]) fs.mkdirSync(d);
 const configFile = path.join(scratch, 'config.json');
 process.env.REPO_PANEL_CONFIG = configFile;
 process.env.REPO_PANEL_SESSIONS_DIR = sessionsBase;
-process.env.REPO_PANEL_CASES_FILE = 'off';
 test.after(() => fs.rmSync(scratch, { recursive: true, force: true, maxRetries: 5 }));
 
 const lib = require('../lib.js');

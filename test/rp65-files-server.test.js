@@ -18,7 +18,6 @@ const outside = path.join(scratch, 'outside.txt');
 const outsideDir = path.join(scratch, 'outdir');
 fs.mkdirSync(repoDir);
 process.env.REPO_PANEL_CONFIG = path.join(scratch, 'config.json');
-process.env.REPO_PANEL_CASES_FILE = 'off';
 fs.writeFileSync(process.env.REPO_PANEL_CONFIG, JSON.stringify({ port: 4312, groups: [{ name: 'G', repos: [{ path: repoDir }] }], rooms: [] }));
 test.after(() => fs.rmSync(scratch, { recursive: true, force: true, maxRetries: 5 }));
 

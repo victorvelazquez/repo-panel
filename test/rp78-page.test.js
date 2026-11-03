@@ -8,7 +8,6 @@ const path = require('node:path');
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'repo-panel-rp78p-'));
 process.env.REPO_PANEL_CONFIG = path.join(dir, 'config.json');
-process.env.REPO_PANEL_CASES_FILE = 'off';
 
 const test = require('node:test');
 const assert = require('node:assert/strict');

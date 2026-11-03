@@ -1,6 +1,6 @@
 'use strict';
 // RP62 (S61, S77), design points 1 to 3: server/usage.js (readUsage never rejects; usageFile picks the path) and GET /api/usage.
-// Every file is built in a temp dir; the real claude-usage.json, the real config and Orca, git and gh are never touched. The clock is injected
+// Every file is built in a temp dir; the real claude-usage.json, the real config, git and gh are never touched. The clock is injected
 // (readUsage({ now })); the route cases use values that do not depend on the real clock (a far-future or a very old date).
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -15,7 +15,6 @@ const repoDir = path.join(scratch, 'RepoOne');
 fs.mkdirSync(repoDir);
 const ENV_FILE = path.join(scratch, 'env-usage.json'); // a safety net: a route that ignores deps.usageFile reads this, never the real file
 process.env.REPO_PANEL_CONFIG = path.join(scratch, 'config.json');
-process.env.REPO_PANEL_CASES_FILE = 'off';
 process.env.REPO_PANEL_USAGE_FILE = ENV_FILE;
 fs.writeFileSync(process.env.REPO_PANEL_CONFIG, JSON.stringify({ port: 4311, groups: [{ name: 'G', repos: [{ path: repoDir }] }], rooms: [] }));
 test.after(() => fs.rmSync(scratch, { recursive: true, force: true, maxRetries: 5 }));
@@ -218,7 +217,7 @@ const call = (port, method, p, { headers = {} } = {}) => new Promise((resolve, r
 function fakeDeps(extra = {}) {
   const calls = [];
   const fail = (name) => async () => { calls.push(name); throw new Error(`${name} must not be called`); };
-  return { calls, noSummaryStore: true, orca: async (args) => { calls.push(`orca ${args[0]}`); throw new Error('orca must not be called'); }, local: fail('local'), prs: fail('prs'), roadmap: fail('roadmap'), state: fail('state'), requirements: fail('requirements'), git: fail('git'), ...extra };
+  return { calls, noSummaryStore: true, local: fail('local'), prs: fail('prs'), roadmap: fail('roadmap'), state: fail('state'), requirements: fail('requirements'), git: fail('git'), ...extra };
 }
 async function withServer(deps, fn) {
   const port = await freePort();
@@ -297,7 +296,7 @@ test('GET /api/usage without deps.usageFile uses usageFile() (REPO_PANEL_USAGE_F
   });
 });
 
-test('GET /api/usage makes no Orca, git or gh call, and never returns the path or content outside its keys', async () => {
+test('GET /api/usage makes no git or gh call, and never returns the path or content outside its keys', async () => {
   const file = put({ ...FRESH_DOC, note: 'top-secret-note', windows: { ...FRESH_DOC.windows, '5h': { ...FRESH_DOC.windows['5h'], token: 'top-secret-token' } } });
   const deps = fakeDeps({ usageFile: file });
   await withServer(deps, async ({ get }) => {

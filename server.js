@@ -4,28 +4,13 @@
 const { spawn } = require('node:child_process');
 const { loadConfig } = require('./server/config.js');
 const { createServer, isPanelRunning } = require('./server/http.js');
-const { piSend, setCaseRecorder, orcaTerminal } = require('./server/pi.js');
-const { createRecorder, casesFile } = require('./server/casos.js');
-const { createWatcher, watchInterval } = require('./server/vigia.js');
-const { createWarmer, warmInterval } = require('./server/livewarm.js');
+const { piSend } = require('./server/pi.js');
 
 if (require.main === module) {
   const { port } = loadConfig();
-  // The passive recorder of question-like pi screens is installed ONLY here, never by a module import (see README).
-  const cases = casesFile(process.env, __dirname);
-  if (cases) {
-    setCaseRecorder(createRecorder({ file: cases }).record);
-    // The watcher scans the sessions by itself (read-only) so the recorder works with the page closed; it exists only with a recorder.
-    const every = watchInterval(process.env);
-    if (every) createWatcher({ orca: orcaTerminal, intervalMs: every }).start();
-  }
   const server = createServer(port);
   // RPC1b: the pi sessions are children of this process; no child may outlive the panel, so they end with it (Ctrl+C, a stop, a restart).
   for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { server.rpcHost.closeAll(); setTimeout(() => process.exit(0), 300); });
-  // The live warmer keeps the read-only screens cached (RP77) and feeds the event stream (RP77b): it warms every second while someone listens.
-  const warm = warmInterval(process.env);
-  // RP78: the Summary store learns each session state from the very payload the hub publishes.
-  if (warm) createWarmer({ orca: orcaTerminal, intervalMs: () => (server.hub.size() > 0 ? 1000 : warm), publish: (id, payload) => { server.summaryStore.setSession(id, payload.state); server.hub.publish(id, payload); } }).start();
   server.on('error', async (e) => {
     if (e.code !== 'EADDRINUSE') { console.error(e.message); process.exit(1); }
     // The URL must stay stable, so never fall back to another port.

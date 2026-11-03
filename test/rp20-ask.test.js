@@ -1,125 +1,14 @@
 'use strict';
-// RP20 part B: a pi session that waits for the user's answer to a selection dialog. The panel only shows a notice;
-// it never answers the dialog and never sends anything to a session that is asking.
+// RP20 part B: a pi session that waits for the user's answer to a dialog. The panel only shows a notice;
+// it never sends anything to a session that is asking (the state comes from the RPC host).
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const lib = require('../lib.js');
-const { piStatus, piSend, scanSessions } = require('../server/pi.js');
+const { piSend } = require('../server/pi.js');
 
-const DIALOG = [
-  'rdd running · start',
-  '',
-  'Review consent',
-  'Gentle AI can review this change before you call it done.',
-  'Review can help detect execution issues in these changes.',
-  '→ 1. Review this change',
-  '  2. Skip this time',
-  '  3. Review and allow this session',
-  '',
-  'Effect: Reviews only this change; later medium- or high-risk changes ask again, and delivery needs separate approval.',
-  '',
-  '↑↓ choose · Enter confirm · Esc cancel · D details',
-  '',
-].join('\n');
-const IDLE_BAR = '▎ ✿ waiting for input\n▎   type, or / for commands\n▎\n';
-const WORKING_BAR = '▎ ❁ working…\n▎   type, or / for commands\n▎\n';
-const IDLE_PI = IDLE_BAR;
-const BUSY_PI = `$ sleep 20\nElapsed 7.2s\n${WORKING_BAR}`;
-
-// ---------- piScreenAsk ----------
-test('piScreenAsk: the exact selection dialog is asking, with its last lines as sanitized text', () => {
-  const a = lib.piScreenAsk(DIALOG);
-  assert.ok(a && typeof a.text === 'string');
-  assert.match(a.text, /Review consent/);
-  assert.match(a.text, /→ 1\. Review this change/);
-  assert.match(a.text, /Enter confirm · Esc cancel/);
-  assert.equal(a.text.split('\n').length <= 12, true);
-  assert.equal(a.text.length <= 900, true);
-});
-
-test('piScreenAsk: the dialog with an idle bar or a working bar below it still asks', () => {
-  assert.ok(lib.piScreenAsk(DIALOG + IDLE_BAR));
-  assert.ok(lib.piScreenAsk(DIALOG + WORKING_BAR));
-});
-
-test('piScreenAsk: ordinary idle and busy screens are not asking', () => {
-  assert.equal(lib.piScreenAsk(IDLE_PI), null);
-  assert.equal(lib.piScreenAsk(BUSY_PI), null);
-});
-
-test('piScreenAsk: an old dialog far above the last 14 non-empty lines is not asking', () => {
-  const later = Array.from({ length: 15 }, (_, i) => `output line ${i}`).join('\n');
-  assert.equal(lib.piScreenAsk(`${DIALOG}\n${later}\n${IDLE_BAR}`), null);
-});
-
-test('piScreenAsk: needs BOTH hints, and garbage, empty and non-strings fail closed', () => {
-  assert.equal(lib.piScreenAsk('Enter confirm'), null);
-  assert.equal(lib.piScreenAsk('Esc cancel'), null);
-  assert.equal(lib.piScreenAsk('Enter confirm\nEsc cancel'), null);
-  for (const v of ['', '   \n\n', null, undefined, 7, {}, ['Enter confirm · Esc cancel']]) assert.equal(lib.piScreenAsk(v), null, String(v));
-});
-
-test('piScreenAsk: control characters become spaces, each line is capped at 200 and the total at 900', () => {
-  const nasty = `a${String.fromCharCode(27)}[31mred${String.fromCharCode(7)}\n${'x'.repeat(500)}\n↑↓ choose · Enter confirm · Esc cancel`;
-  const a = lib.piScreenAsk(nasty);
-  assert.equal(/[\x00-\x09\x0b-\x1f\x7f-\x9f]/.test(a.text), false);
-  assert.ok(a.text.split('\n').every((l) => l.length <= 200));
-  const many = Array.from({ length: 13 }, () => 'y'.repeat(200)).slice(0, 12).join('\n');
-  assert.equal(lib.piScreenAsk(`${many}\nEnter confirm · Esc cancel`).text.length <= 900, true);
-});
-
-test('piScreenState: still null for the dialog alone and busy with a working bar (the panel only adds the asking layer)', () => {
-  assert.equal(lib.piScreenState(DIALOG), null);
-  assert.equal(lib.piScreenState(DIALOG + WORKING_BAR), 'busy');
-  assert.equal(lib.piScreenState(IDLE_PI), 'idle');
-});
-
-// ---------- scanSessions / piStatus / piSend ----------
-const piTerm = (o = {}) => ({ handle: 'h1', title: 'Terminal 1', worktreePath: 'C:/dev/repo', connected: true, writable: true, ...o });
-function fakeOrca({ terminals = [piTerm()], preview = IDLE_PI } = {}) {
-  const calls = [];
-  const orca = async (args) => {
-    calls.push(args);
-    if (args[0] === 'list') return { terminals };
-    if (args[0] === 'show') return { terminal: { preview } };
-    return { send: { accepted: true } };
-  };
-  return { orca, calls, sends: () => calls.filter((c) => c[0] === 'send') };
-}
 const REPO = { path: 'C:\\dev\\repo' };
-const noWait = async () => {};
 
-test('piStatus: a dialog alone is asking (never closed) and carries the ask text', async () => {
-  const s = await piStatus(REPO, fakeOrca({ preview: DIALOG }).orca);
-  assert.equal(s.state, 'asking');
-  assert.match(s.ask, /Review consent/);
-});
-
-test('piStatus: a dialog above a working bar is asking too, and the ask wins over idle', async () => {
-  assert.equal((await piStatus(REPO, fakeOrca({ preview: DIALOG + WORKING_BAR }).orca)).state, 'asking');
-  assert.equal((await piStatus(REPO, fakeOrca({ preview: DIALOG + IDLE_BAR }).orca)).state, 'asking');
-});
-
-test('piStatus: plain busy and plain idle keep their answer, with no ask field', async () => {
-  assert.deepEqual(await piStatus(REPO, fakeOrca({ preview: BUSY_PI }).orca), { state: 'busy' });
-  assert.deepEqual(await piStatus(REPO, fakeOrca({ preview: IDLE_PI }).orca), { state: 'idle' });
-  assert.deepEqual(await piStatus(REPO, fakeOrca({ terminals: [] }).orca), { state: 'closed' });
-});
-
-test('piStatus with tail: asking keeps the tail field next to ask', async () => {
-  const s = await piStatus(REPO, fakeOrca({ preview: DIALOG + WORKING_BAR }).orca, { tail: true });
-  assert.equal(s.state, 'asking');
-  assert.equal(typeof s.tail, 'string');
-  assert.match(s.ask, /Enter confirm/);
-});
-
-test('scanSessions: reports asking only to a caller that asks for it, busy otherwise', async () => {
-  const f = fakeOrca({ preview: DIALOG });
-  assert.deepEqual((await scanSessions(REPO.path, f.orca, undefined, false, true)).sessions.map((s) => s.state), ['asking']);
-  assert.deepEqual((await scanSessions(REPO.path, f.orca)).sessions.map((s) => s.state), ['busy']);
-});
-
-// RPC2-2: piSend asks the rpc host, so an asking session is refused from its state, with no Orca call at all.
+// RPC2-2: piSend asks the rpc host, so an asking session is refused from its state.
 const fakeHost = (state) => { const sent = []; return { sent, status: async () => ({ state }), prompt: async (id, text) => { sent.push(text); return {}; } }; };
 
 test('piSend: refuses a session that is asking with 409 and never sends text', async () => {
