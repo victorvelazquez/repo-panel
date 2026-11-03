@@ -16,7 +16,9 @@ const stub = () => new Proxy(function stubElement() {}, {
   apply: () => stub(),
 });
 
-async function loadPage(routes = {}) {
+async function loadPage(extraRoutes = {}) {
+  // RPC2-2: a click starts the session first (a session of unknown state counts as not started).
+  const routes = { '/api/rpc/start': () => ({ json: { state: 'idle', pendingDialogs: [], sessionId: 's1' } }), ...extraRoutes };
   const app = { innerHTML: '' };
   const drawer = { innerHTML: '', hidden: true };
   const calls = [];

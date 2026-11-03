@@ -467,89 +467,16 @@ function fakeOrca({ terminals = [piTerm()], previews = [IDLE_PI, IDLE_PI, 'worki
   };
   return { orca, calls, sends: () => calls.filter((c) => c[0] === 'send') };
 }
-const REPO = { path: 'C:\\dev\\repo' };
-const noWait = async () => {};
+const REPO = { id: 'r1', path: 'C:\\dev\\repo' };
+// RPC2-2: the commands go to the session through the rpc host (status + prompt); the Orca fake above stays for piSessions.
+const fakeHost = (state = 'idle') => { const sent = []; return { sent, status: async () => ({ state }), prompt: async (id, text) => { sent.push(text); return {}; } }; };
 const refuses = (p, status, re) => assert.rejects(p, (e) => e.status === status && re.test(e.message));
-
-test('piSend types the fixed command and Enter into the one idle session and confirms it started', async () => {
-  const f = fakeOrca();
-  assert.deepEqual(await piSend(REPO, 'flow-commit', f.orca, noWait), { sent: true, confirmed: true });
-  assert.deepEqual(f.sends(), [['send', '--terminal', 'h1', '--text', '/flow-commit', '--enter']]);
-});
-
-test('piSend finds the session by its screen: a title of Terminal 1 works, a π title over a plain PowerShell does not', async () => {
-  for (const title of ['Terminal 1', 'pi', 'Windows PowerShell', 'π - panel-e2e', undefined]) {
-    const f = fakeOrca({ terminals: [piTerm({ title })] });
-    assert.deepEqual(await piSend(REPO, 'flow-commit', f.orca, noWait), { sent: true, confirmed: true });
-    assert.equal(f.sends().length, 1);
-  }
-  const f = fakeOrca({ terminals: [piTerm({ title: 'π - x' })], screens: { h1: PLAIN_PS } });
-  await refuses(piSend(REPO, 'flow-commit', f.orca, noWait), 409, /No open session found for this repo in Orca/);
-  assert.equal(f.sends().length, 0);
-});
-
-test('piSend uses the one pi screen among several terminals and ignores a terminal whose show fails', async () => {
-  const terminals = [piTerm({ handle: 'ps' }), piTerm({ handle: 'broken' }), piTerm({ handle: 'pi' })];
-  const f = fakeOrca({ terminals, screens: { ps: PLAIN_PS, pi: [IDLE_PI, 'working'] }, failShow: ['broken'] });
-  assert.deepEqual(await piSend(REPO, 'flow-commit', f.orca, noWait), { sent: true, confirmed: true });
-  assert.deepEqual(f.sends(), [['send', '--terminal', 'pi', '--text', '/flow-commit', '--enter']]);
-  const none = fakeOrca({ terminals: [piTerm({ handle: 'broken' })], failShow: ['broken'] });
-  await refuses(piSend(REPO, 'flow-commit', none.orca, noWait), 409, /No open session/);
-  assert.equal(none.sends().length, 0);
-});
 
 test('piSessions lists only the terminals of the worktree whose screen is a pi screen, with their state', async () => {
   const terminals = [piTerm({ handle: 'a' }), piTerm({ handle: 'b' }), piTerm({ handle: 'c' }), piTerm({ handle: 'd' }), piTerm({ handle: 'e', worktreePath: 'C:/dev/else' })];
   const f = fakeOrca({ terminals, screens: { a: IDLE_PI, b: BUSY_PI, c: PLAIN_PS, d: IDLE_PI.replace('type, or / for commands', 'half typed'), e: IDLE_PI } });
   assert.deepEqual(await piSessions(REPO, f.orca), [{ handle: 'a', state: 'idle' }, { handle: 'b', state: 'busy' }, { handle: 'd', state: 'typed' }]);
   assert.deepEqual(f.calls.map((c) => c.join(' ')).sort(), ['list', 'show --terminal a', 'show --terminal b', 'show --terminal c', 'show --terminal d']);
-});
-
-test('piSend says not confirmed when the session never leaves the idle prompt', async () => {
-  const f = fakeOrca({ previews: [IDLE_PI] });
-  assert.deepEqual(await piSend(REPO, 'flow-pr', f.orca, noWait), { sent: true, confirmed: false });
-  assert.equal(f.sends().length, 1);
-});
-
-test('piSend refuses an unknown command before touching Orca', async () => {
-  const f = fakeOrca();
-  for (const c of ['rm -rf', '/flow-commit', 'constructor', '__proto__', undefined]) await refuses(piSend(REPO, c, f.orca, noWait), 400, /Unknown command/);
-  assert.equal(f.calls.length, 0);
-});
-
-test('piSend refuses, and sends nothing, with no session, several sessions, a busy prompt or typed text', async () => {
-  const cases = [
-    [{ terminals: [] }, /No open session/],
-    [{ terminals: [piTerm({ worktreePath: 'C:/dev/elsewhere' })] }, /No open session/],
-    [{ terminals: [piTerm(), piTerm({ handle: 'h2' })] }, /Several sessions/],
-    [{ terminals: [piTerm(), piTerm({ handle: 'h2' })], screens: { h1: BUSY_PI, h2: IDLE_PI } }, /Several sessions/],
-    [{ previews: [BUSY_PI] }, /busy or has text/],
-    [{ previews: [IDLE_PI.replace('type, or / for commands', 'half typed')] }, /busy or has text/],
-  ];
-  for (const [opts, re] of cases) {
-    const f = fakeOrca(opts);
-    await refuses(piSend(REPO, 'flow-commit', f.orca, noWait), 409, re);
-    assert.equal(f.sends().length, 0);
-  }
-});
-
-test('piSend refuses a second send to the same repo while one is in flight, then frees the repo', async () => {
-  let release;
-  const gate = new Promise((r) => { release = r; });
-  const f = fakeOrca();
-  const slow = async (args) => { if (args[0] === 'send') await gate; return f.orca(args); };
-  const first = piSend(REPO, 'flow-commit', slow, noWait);
-  await new Promise((r) => setImmediate(r));
-  await refuses(piSend(REPO, 'flow-commit', f.orca, noWait), 409, /already being sent/);
-  release();
-  await first;
-  assert.equal((await piSend(REPO, 'flow-commit', fakeOrca().orca, noWait)).sent, true);
-});
-
-test('piSend frees the repo when Orca fails', async () => {
-  const boom = async () => { throw Object.assign(new Error('Orca CLI is unavailable'), { status: 503 }); };
-  await refuses(piSend(REPO, 'flow-commit', boom, noWait), 503, /Orca/);
-  assert.equal((await piSend(REPO, 'flow-commit', fakeOrca().orca, noWait)).sent, true);
 });
 
 test('POST /api/pi needs the token and rejects an unknown command or repo', async () => {
@@ -837,33 +764,32 @@ test('put-in-conditions: refuses a path with a double quote or a control charact
   }
 });
 
-test('put-in-conditions: piSend types the built order into the one idle session', async () => {
-  const f = fakeOrca();
-  assert.deepEqual(await piSend(REPO, 'put-in-conditions', f.orca, noWait, reqsOf(...MIXED)), { sent: true, confirmed: true });
-  assert.deepEqual(f.sends(), [['send', '--terminal', 'h1', '--text', conditionsOrder(MIXED), '--enter']]);
+test('put-in-conditions: piSend sends the built order to the idle session', async () => {
+  const h = fakeHost();
+  assert.deepEqual(await piSend(REPO, 'put-in-conditions', h, reqsOf(...MIXED)), { sent: true, confirmed: true });
+  assert.deepEqual(h.sent, [conditionsOrder(MIXED)]);
 });
 
 test('put-in-conditions: refuses with 409, touching nothing, when everything passes or the requirements are unavailable', async () => {
-  const f = fakeOrca();
-  await refuses(piSend(REPO, 'put-in-conditions', f.orca, noWait, reqsOf(res('a', 'pass'), res('b', 'pass', 'recommended'))), 409, /nothing to do/i);
-  await refuses(piSend(REPO, 'put-in-conditions', f.orca, noWait, async () => ({ available: false, results: [res('a', 'unavailable')] })), 409, /could not be (read|evaluated)/i);
-  assert.equal(f.calls.length, 0);
-  assert.equal((await piSend(REPO, 'put-in-conditions', fakeOrca().orca, noWait, reqsOf(res('a', 'fail')))).sent, true); // lock freed
+  const h = fakeHost();
+  await refuses(piSend(REPO, 'put-in-conditions', h, reqsOf(res('a', 'pass'), res('b', 'pass', 'recommended'))), 409, /nothing to do/i);
+  await refuses(piSend(REPO, 'put-in-conditions', h, async () => ({ available: false, results: [res('a', 'unavailable')] })), 409, /could not be (read|evaluated)/i);
+  assert.deepEqual(h.sent, []);
 });
 
-test('put-in-conditions: keeps the session safeguards (busy prompt, several sessions) and sends nothing', async () => {
-  for (const [opts, re] of [[{ previews: [BUSY_PI] }, /busy or has text/], [{ terminals: [piTerm(), piTerm({ handle: 'h2' })] }, /Several sessions/]]) {
-    const f = fakeOrca(opts);
-    await refuses(piSend(REPO, 'put-in-conditions', f.orca, noWait, reqsOf(res('a', 'fail'))), 409, re);
-    assert.equal(f.sends().length, 0);
+test('put-in-conditions: keeps the session safeguards (busy, not started, asking) and sends nothing', async () => {
+  for (const [state, re] of [['busy', /busy/], ['closed', /not started/], ['asking', /waiting for an answer/]]) {
+    const h = fakeHost(state);
+    await refuses(piSend(REPO, 'put-in-conditions', h, reqsOf(res('a', 'fail'))), 409, re);
+    assert.deepEqual(h.sent, []);
   }
 });
 
-test('piSend still types each fixed command as before', async () => {
+test('piSend still sends each fixed command as before, without reading the requirements', async () => {
   for (const [key, text] of [['flow-commit', '/flow-commit'], ['flow-pr', '/flow-pr'], ['flow-base', '/flow-base'], ['flow-base-stash', '/flow-base --stash']]) {
-    const f = fakeOrca();
-    await piSend(REPO, key, f.orca, noWait, async () => { throw new Error('requirements must not be read'); });
-    assert.deepEqual(f.sends(), [['send', '--terminal', 'h1', '--text', text, '--enter']]);
+    const h = fakeHost();
+    await piSend(REPO, key, h, async () => { throw new Error('requirements must not be read'); });
+    assert.deepEqual(h.sent, [text]);
   }
 });
 

@@ -29,7 +29,7 @@ const S = require('../server/sessions.js');
 const P = require('../server/pi.js');
 const { summaryFor } = require('../server/summary.js');
 const { answerDialog } = require('../server/dialoganswer.js');
-const { scanSessions, piStatus, piSend, piSessions, clearLiveCache } = P;
+const { scanSessions, piStatus, piSessions, clearLiveCache } = P;
 
 const REPO_ID = lib.repoId(repoDir);
 const REPO = { path: repoDir };
@@ -47,7 +47,7 @@ const ASK_PREVIEW = ASK_ROWS.filter((l) => l.trim()).slice(-6).join('\n');
 
 // A fake Orca recording every call. `world[handle]` = { preview, rows, lastOutputAt?, dir?, showFails?, readFails? }. The `lastOutputAt` key is
 // listed only when the terminal object has it (so absent / NaN / string / null can be told apart). `listed()` is what `list` answers, as a plain
-// array a test can hand to scanSessions. A `send` makes every `show` answer WORKING from then on (only the piSend test sends).
+// array a test can hand to scanSessions. A `send` makes every `show` answer WORKING from then on (RPC2-2: no test sends any more).
 function fakeOrca(world) {
   const calls = [];
   let sent = false;
@@ -487,27 +487,6 @@ async function warm(f) { // fills the cache for the idle terminal, as the read-o
   await scan(f, true, false, CACHED);
   await scan(f, false, false, CACHED);
 }
-
-test('piSend reads fresh even when the cache is warm: one show for the scan and one for the delivery check, exactly as when cold', async () => {
-  const cold = fakeOrca({ t1: term(IDLE, 5) });
-  assert.deepEqual(await piSend(REPO, 'flow-commit', cold.orca, async () => {}), { sent: true, confirmed: true });
-  assert.equal(cold.shows(), 2);
-  clearLiveCache();
-  const f = fakeOrca({ t1: term(IDLE, 5) });
-  await warm(f);
-  const before = f.calls.length;
-  assert.deepEqual(await piSend(REPO, 'flow-commit', f.orca, async () => {}), { sent: true, confirmed: true });
-  assert.equal(showsOf(f, before), 2);
-  assert.equal(f.sends(), 1);
-});
-
-test('piSend with a warm cache that says idle refuses a terminal that is working now (same lastOutputAt): nothing is sent', async () => {
-  const f = fakeOrca({ t1: term(IDLE, 5) });
-  await warm(f);
-  f.world.t1.preview = WORKING;
-  await assert.rejects(piSend(REPO, 'flow-commit', f.orca, async () => {}), (e) => e.status === 409 && e.message === 'The session is busy or has text typed in its prompt');
-  assert.equal(f.sends(), 0);
-});
 
 test('piSessions (the writers\' scan) makes a show per terminal on every call, warm or not', async () => {
   const f = fakeOrca({ t1: term(IDLE, 5), t2: term(WORKING, 6) });

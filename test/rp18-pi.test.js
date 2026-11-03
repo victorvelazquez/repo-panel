@@ -1,6 +1,6 @@
 'use strict';
-// RP18 server side of POST /api/pi and GET /api/pi-status: the unstage key, the duplicate-send guard, the screen
-// tail, and the "keep the index empty" sentence of the orders.
+// RP18 server side of POST /api/pi: the unstage key, the duplicate-send guard, the screen tail of piStatus (kept until RPC2b), and the
+// "keep the index empty" sentence of the orders. RPC2-2: the commands go to the session through the rpc host, not through Orca.
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -34,7 +34,12 @@ function fakeOrca({ terminals = [piTerm()], previews = [IDLE_PI, IDLE_PI, 'worki
   };
   return { orca, calls, sends: () => calls.filter((c) => c[0] === 'send') };
 }
-const REPO = { path: REPO_PATH };
+const REPO = { id: 'r1', path: REPO_PATH };
+// The rpc host's side of a send: the session state it reports and the prompts it received.
+function fakeHost(state = 'idle') {
+  const sent = [];
+  return { sent, status: async () => ({ state }), prompt: async (id, text) => { sent.push(text); return { disposition: 'started' }; } };
+}
 const noWait = async () => {};
 const NEVER = async () => { throw new Error('must not be read'); };
 const refuses = (p, status, re) => assert.rejects(p, (e) => e.status === status && re.test(e.message));
@@ -42,73 +47,69 @@ const failing = { number: 7, title: 'Fix the thing', head: 'task', base: 'main',
 const prs = async () => ({ repo: {}, prs: [failing] });
 
 // ---------- the new fixed command ----------
-test('flow-commit-unstage: piSend types exactly /flow-commit --unstage into the one idle session', async () => {
-  const f = fakeOrca();
-  assert.deepEqual(await piSend(REPO, 'flow-commit-unstage', f.orca, noWait), { sent: true, confirmed: true });
-  assert.deepEqual(f.sends(), [['send', '--terminal', 'h1', '--text', '/flow-commit --unstage', '--enter']]);
+test('flow-commit-unstage: piSend prompts exactly /flow-commit --unstage', async () => {
+  const h = fakeHost();
+  assert.deepEqual(await piSend(REPO, 'flow-commit-unstage', h), { sent: true, confirmed: true });
+  assert.deepEqual(h.sent, ['/flow-commit --unstage']);
 });
 
 test('flow-commit-unstage: keeps the session safeguards and sends nothing when they refuse', async () => {
-  for (const [opts, re] of [
-    [{ terminals: [] }, /No open session/],
-    [{ terminals: [piTerm(), piTerm({ handle: 'h2' })] }, /Several sessions/],
-    [{ previews: [BUSY_PI] }, /busy or has text typed/],
-  ]) {
-    const f = fakeOrca(opts);
-    await refuses(piSend(REPO, 'flow-commit-unstage', f.orca, noWait), 409, re);
-    assert.equal(f.sends().length, 0);
+  for (const [state, re] of [['closed', /^The session is not started$/], ['busy', /^The session is busy$/], ['asking', /^The session is waiting for an answer$/]]) {
+    const h = fakeHost(state);
+    await refuses(piSend(REPO, 'flow-commit-unstage', h), 409, re);
+    assert.deepEqual(h.sent, []);
   }
 });
 
-test('flow-commit: still types /flow-commit and the near-miss keys stay unknown', async () => {
-  const f = fakeOrca();
-  await piSend(REPO, 'flow-commit', f.orca, noWait);
-  assert.deepEqual(f.sends().map((c) => c[4]), ['/flow-commit']);
+test('flow-commit: still sends /flow-commit and the near-miss keys stay unknown', async () => {
+  const h = fakeHost();
+  await piSend(REPO, 'flow-commit', h);
+  assert.deepEqual(h.sent, ['/flow-commit']);
   for (const c of ['flow-commit --unstage', 'flow-commit-unstage ', 'FLOW-COMMIT-UNSTAGE', '/flow-commit --unstage', 'flow-commit-unstage2']) {
-    await refuses(piSend(REPO, c, fakeOrca().orca, noWait), 400, /Unknown command/);
+    await refuses(piSend(REPO, c, fakeHost()), 400, /Unknown command/);
   }
 });
 
 // ---------- the duplicate-send guard ----------
-test('guard: the same key for the same repo is refused for 45 s after a confirmed send, other keys are not', async () => {
+test('guard: the same key for the same repo is refused for 45 s after a send, other keys are not', async () => {
   let t = 1_000_000;
   const guard = sendGuard(() => t);
-  const send = (key, o = fakeOrca(), extra = {}) => piSend(REPO, key, o.orca, noWait, NEVER, { guard, ...extra });
+  const send = (key, h = fakeHost(), repo = REPO, extra = {}) => piSend(repo, key, h, NEVER, { guard, ...extra });
   assert.equal((await send('flow-pr')).sent, true);
   t += 7000;
-  const again = fakeOrca();
+  const again = fakeHost();
   await refuses(send('flow-pr', again), 409, /^That command was already sent 7 s ago; wait for it to finish$/);
-  assert.equal(again.sends().length, 0);
+  assert.deepEqual(again.sent, []);
   assert.equal((await send('flow-commit')).sent, true); // a different key
-  assert.equal((await piSend({ path: 'C:\\dev\\other' }, 'flow-pr', fakeOrca({ terminals: [piTerm({ worktreePath: 'C:/dev/other' })] }).orca, noWait, NEVER, { guard })).sent, true); // another repo
+  assert.equal((await send('flow-pr', fakeHost(), { id: 'r2', path: 'C:\dev\other' })).sent, true); // another repo
   t += 38_000; // 45 s after the first send
   assert.equal((await send('flow-pr')).sent, true);
 });
 
-test('guard: fix-pr and put-in-conditions are covered, and an unconfirmed send does not arm it', async () => {
+test('guard: fix-pr and put-in-conditions are covered, and a refused send does not arm it', async () => {
   let t = 5_000_000;
   const guard = sendGuard(() => t);
   const reqs = async () => ({ available: true, results: [{ id: 'a', status: 'fail', level: 'required' }] });
-  await piSend(REPO, 'fix-pr', fakeOrca().orca, noWait, NEVER, { guard, pr: 7, prs });
-  await refuses(piSend(REPO, 'fix-pr', fakeOrca().orca, noWait, NEVER, { guard, pr: 7, prs }), 409, /already sent/);
-  await piSend(REPO, 'put-in-conditions', fakeOrca().orca, noWait, reqs, { guard });
-  await refuses(piSend(REPO, 'put-in-conditions', fakeOrca().orca, noWait, reqs, { guard }), 409, /already sent/);
-  const unconfirmed = fakeOrca({ previews: [IDLE_PI] });
-  assert.equal((await piSend(REPO, 'flow-base', unconfirmed.orca, noWait, NEVER, { guard })).confirmed, false);
-  assert.equal((await piSend(REPO, 'flow-base', fakeOrca().orca, noWait, NEVER, { guard })).confirmed, true);
+  await piSend(REPO, 'fix-pr', fakeHost(), NEVER, { guard, pr: 7, prs });
+  await refuses(piSend(REPO, 'fix-pr', fakeHost(), NEVER, { guard, pr: 7, prs }), 409, /already sent/);
+  await piSend(REPO, 'put-in-conditions', fakeHost(), reqs, { guard });
+  await refuses(piSend(REPO, 'put-in-conditions', fakeHost(), reqs, { guard }), 409, /already sent/);
+  await refuses(piSend(REPO, 'flow-base', fakeHost('busy'), NEVER, { guard }), 409, /busy/);
+  assert.equal((await piSend(REPO, 'flow-base', fakeHost(), NEVER, { guard })).sent, true);
 });
 
-test('guard: the busy, typed, missing-session and unknown-key refusals keep their messages and win over it', async () => {
+test('guard: the not-started, busy, asking and unknown-key refusals keep their messages and win over it', async () => {
   const guard = sendGuard(() => 9_000_000);
-  await piSend(REPO, 'flow-pr', fakeOrca().orca, noWait, NEVER, { guard });
-  await refuses(piSend(REPO, 'flow-pr', fakeOrca({ previews: [BUSY_PI] }).orca, noWait, NEVER, { guard }), 409, /^The session is busy or has text typed in its prompt$/);
-  await refuses(piSend(REPO, 'flow-pr', fakeOrca({ terminals: [] }).orca, noWait, NEVER, { guard }), 409, /^No open session found for this repo in Orca$/);
-  await refuses(piSend(REPO, 'nope', fakeOrca().orca, noWait, NEVER, { guard }), 400, /^Unknown command$/);
+  await piSend(REPO, 'flow-pr', fakeHost(), NEVER, { guard });
+  await refuses(piSend(REPO, 'flow-pr', fakeHost('busy'), NEVER, { guard }), 409, /^The session is busy$/);
+  await refuses(piSend(REPO, 'flow-pr', fakeHost('closed'), NEVER, { guard }), 409, /^The session is not started$/);
+  await refuses(piSend(REPO, 'flow-pr', fakeHost('asking'), NEVER, { guard }), 409, /^The session is waiting for an answer$/);
+  await refuses(piSend(REPO, 'nope', fakeHost(), NEVER, { guard }), 400, /^Unknown command$/);
 });
 
 test('guard: piSend without a guard behaves as before (repeat sends are not refused)', async () => {
-  await piSend(REPO, 'flow-pr', fakeOrca().orca, noWait);
-  assert.equal((await piSend(REPO, 'flow-pr', fakeOrca().orca, noWait)).sent, true);
+  await piSend(REPO, 'flow-pr', fakeHost());
+  assert.equal((await piSend(REPO, 'flow-pr', fakeHost())).sent, true);
 });
 
 // ---------- the real server ----------
@@ -137,16 +138,15 @@ const ID = lib.repoId(REPO_PATH);
 
 test('POST /api/pi: flow-commit-unstage goes through the route, and the second send of a key is refused with 409', async () => {
   let t = 2_000_000;
-  let f = fakeOrca();
-  await withServer({ orca: (args) => f.orca(args), wait: noWait, requirements: NEVER, prs, guard: sendGuard(() => t) }, async ({ post }) => {
+  const h = fakeHost();
+  await withServer({ rpcHost: { ...h, closeAll() {} }, requirements: NEVER, prs, guard: sendGuard(() => t) }, async ({ post }) => {
     const ok = await post('/api/pi', { id: ID, command: 'flow-commit-unstage' });
     assert.deepEqual([ok.status, ok.json], [200, { sent: true, confirmed: true }]);
-    assert.deepEqual(f.sends(), [['send', '--terminal', 'h1', '--text', '/flow-commit --unstage', '--enter']]);
-    f = fakeOrca();
+    assert.deepEqual(h.sent, ['/flow-commit --unstage']);
     t += 3000;
     const dup = await post('/api/pi', { id: ID, command: 'flow-commit-unstage' });
     assert.deepEqual([dup.status, dup.json.error], [409, 'That command was already sent 3 s ago; wait for it to finish']);
-    assert.equal(f.sends().length, 0);
+    assert.equal(h.sent.length, 1);
     assert.equal((await post('/api/pi', { id: ID, command: 'flow-commit-unstage' }, false)).status, 401);
     assert.equal((await post('/api/pi', { id: 'nope', command: 'flow-commit-unstage' })).status, 404);
     assert.equal((await post('/api/pi', { id: ID, command: 'flow-commit --unstage' })).status, 400);
@@ -155,8 +155,7 @@ test('POST /api/pi: flow-commit-unstage goes through the route, and the second s
 
 test('POST /api/pi: each server keeps its own guard, so a second server starts with a clean slate', async () => {
   for (let i = 0; i < 2; i++) {
-    const f = fakeOrca();
-    await withServer({ orca: (args) => f.orca(args), wait: noWait, requirements: NEVER, prs }, async ({ post }) => {
+    await withServer({ rpcHost: { ...fakeHost(), closeAll() {} }, requirements: NEVER, prs }, async ({ post }) => {
       assert.equal((await post('/api/pi', { id: ID, command: 'flow-pr' })).status, 200);
     });
   }
@@ -199,15 +198,13 @@ test('piStatus tail: an unreadable screen, no session or an Orca failure give an
   assert.deepEqual(await piStatus(REPO, boom, { tail: true }), { state: 'unknown', tail: '' });
 });
 
-test('GET /api/pi-status: tail=1 adds the tail, no flag leaves the answer as before, and the token and 404 still apply', async () => {
-  const f = fakeOrca({ previews: [screen('Index is not empty\n')] });
-  await withServer({ orca: (args) => f.orca(args) }, async ({ get }) => {
+test('GET /api/pi-status: the token and the 404 still apply, tail is ignored and the answer is { state } from the host (RPC2-2)', async () => {
+  const host = { status: async () => ({ state: 'idle' }), closeAll() {} };
+  await withServer({ rpcHost: host, orca: async () => { throw new Error('Orca must not be called'); } }, async ({ get }) => {
     assert.equal((await get(`/api/pi-status?id=${ID}&tail=1`, false)).status, 401);
     assert.equal((await get('/api/pi-status?id=nope&tail=1')).status, 404);
     assert.equal((await get('/api/pi-status?tail=1')).status, 404);
-    assert.equal((await get(`/api/pi-status?id=${ID}`)).raw, '{"state":"idle"}');
-    assert.equal((await get(`/api/pi-status?id=${ID}&tail=0`)).raw, '{"state":"idle"}');
-    assert.equal((await get(`/api/pi-status?id=${ID}&tail=1`)).raw, '{"state":"idle","tail":"Index is not empty"}');
+    for (const q of ['', '&tail=0', '&tail=1']) assert.equal((await get(`/api/pi-status?id=${ID}${q}`)).raw, '{"state":"idle"}');
   });
 });
 

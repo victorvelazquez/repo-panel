@@ -17,7 +17,7 @@ const { readNotes, saveNotes } = require('./notes.js');
 const { prState, mergePr, rerunFailed } = require('./github.js');
 const { roadmapState } = require('./roadmap.js');
 const { addRepo, removeRepo, setSnoozed, setDismissed, scanFolder } = require('./repos.js');
-const { piSend, piStatus, sendGuard, liveCacheStats } = require('./pi.js');
+const { piSend, rpcPiStatus, sendGuard, liveCacheStats } = require('./pi.js');
 const { readState } = require('./state.js');
 const { requirementsFor, prerequisites } = require('./requirements.js');
 const { roomsState, createRoom, removeRoom, assignRoom } = require('./rooms.js');
@@ -79,7 +79,7 @@ const routes = {
   'GET /api/roadmap': (q) => roadmapState(findRepo(q.id)),
   'GET /api/requirements': (q) => requirementsFor(findRepo(q.id)),
   'GET /api/state': (q) => readState(findRepo(q.id)),
-  'GET /api/pi-status': (q, b, d) => piStatus(findRepo(q.id), d.orca, { tail: q.tail === '1' }),
+  'GET /api/pi-status': (q, b, d) => rpcPiStatus(findRepo(q.id), d.rpcHost), // RPC2-2: `tail` and `fresh` are accepted and ignored
   'GET /api/rooms': () => roomsState(),
   'GET /api/summary': (q, b, d) => summaryFor(d, q),
   // RP80: the board is answered from the store's memory (reads nothing); the refresh answers at once and reads in the background.
@@ -135,7 +135,7 @@ const routes = {
   'POST /api/rerun': (q, b) => rerunFailed(findRepo(b.id), Number(b.number)),
   'POST /api/snooze': (q, b) => setSnoozed(b.id, Number(b.number), !!b.on, !!b.wasReady),
   'POST /api/dismiss': (q, b) => setDismissed(b.id, !!b.on),
-  'POST /api/pi': (q, b, d) => piSend(findRepo(b.id), b.command, d.orca, d.wait, d.requirements, { pr: b.pr, prs: d.prs, guard: d.guard }),
+  'POST /api/pi': (q, b, d) => piSend(findRepo(b.id), b.command, d.rpcHost, d.requirements, { pr: b.pr, prs: d.prs, guard: d.guard }),
   'POST /api/sessions/adopt': (q, b, d) => adoptSession(b.id, b.session, d.orca, d.sessionsDir),
   'POST /api/sessions/release': (q, b, d) => releaseSession(b.id, d.orca, d.sessionsDir),
   'POST /api/dialog/answer': (q, b, d) => answerDialog(b && b.id, b, { orca: d.orca, wait: d.wait, now: d.now }),

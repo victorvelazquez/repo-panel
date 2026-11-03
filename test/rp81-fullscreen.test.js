@@ -22,7 +22,7 @@ test.after(() => fs.rmSync(scratch, { recursive: true, force: true, maxRetries: 
 const lib = require('../lib.js');
 const S = require('../server/sessions.js');
 const P = require('../server/pi.js');
-const { scanSessions, piSessions, piSend } = P;
+const { scanSessions, piSessions } = P;
 
 const REPO_ID = lib.repoId(repoDir);
 const REPO = { path: repoDir };
@@ -285,19 +285,3 @@ test('piSessions (askAware) makes no read when the session is idle, one read whe
   assert.deepEqual(ask.sends(), []);
 });
 
-test('piSend: an idle session sends as before with no read call', async () => {
-  const f = fakeOrca({ t1: idle() });
-  assert.deepEqual(await piSend(REPO, 'flow-commit', f.orca, async () => {}), { sent: true, confirmed: true });
-  assert.deepEqual(f.reads(), []);
-  assert.equal(f.sends().length, 1);
-});
-
-test('piSend: an asking session makes the one read and is still refused with the same 409 and nothing sent', async () => {
-  const f = fakeOrca({ t1: asking() });
-  await assert.rejects(piSend(REPO, 'flow-commit', f.orca, async () => {}), (e) => e.status === 409 && e.message === 'The session is waiting for your answer to a question');
-  assert.deepEqual(f.reads(), [readArgs('t1')]);
-  assert.deepEqual(f.sends(), []);
-  const broken = fakeOrca({ t1: asking({ read: 'reject' }) });
-  await assert.rejects(piSend(REPO, 'flow-commit', broken.orca, async () => {}), (e) => e.status === 409 && e.message === 'The session is waiting for your answer to a question');
-  assert.deepEqual(broken.sends(), []);
-});

@@ -120,23 +120,24 @@ test('scanSessions: reports asking only to a caller that asks for it, busy other
   assert.deepEqual((await scanSessions(REPO.path, f.orca)).sessions.map((s) => s.state), ['busy']);
 });
 
-test('piSend: refuses a session that is asking with 409 and never sends a key or text', async () => {
-  for (const preview of [DIALOG, DIALOG + IDLE_BAR, DIALOG + WORKING_BAR]) {
-    for (const key of ['flow-commit', 'flow-pr', 'flow-base']) {
-      const f = fakeOrca({ preview });
-      await assert.rejects(piSend(REPO, key, f.orca, noWait), (e) => e.status === 409 && e.message === 'The session is waiting for your answer to a question');
-      assert.equal(f.sends().length, 0);
-      assert.equal(f.calls.every((c) => ['list', 'show', 'read'].includes(c[0])), true); // read-only calls only (RP81 adds the full-screen read)
-    }
+// RPC2-2: piSend asks the rpc host, so an asking session is refused from its state, with no Orca call at all.
+const fakeHost = (state) => { const sent = []; return { sent, status: async () => ({ state }), prompt: async (id, text) => { sent.push(text); return {}; } }; };
+
+test('piSend: refuses a session that is asking with 409 and never sends text', async () => {
+  for (const key of ['flow-commit', 'flow-pr', 'flow-base']) {
+    const h = fakeHost('asking');
+    await assert.rejects(piSend({ id: 'r1', ...REPO }, key, h), (e) => e.status === 409 && e.message === 'The session is waiting for an answer');
+    assert.deepEqual(h.sent, []);
   }
 });
 
-test('piSend: an idle session still gets its command, a busy one still refuses as before', async () => {
-  const f = fakeOrca({ preview: IDLE_PI });
-  assert.equal((await piSend(REPO, 'flow-commit', f.orca, noWait)).sent, true);
-  assert.equal(f.sends().length, 1);
-  const b = fakeOrca({ preview: BUSY_PI });
-  await assert.rejects(piSend(REPO, 'flow-commit', b.orca, noWait), (e) => e.status === 409 && /busy or has text typed/.test(e.message));
+test('piSend: an idle session still gets its command, a busy one still refuses', async () => {
+  const h = fakeHost('idle');
+  assert.equal((await piSend({ id: 'r1', ...REPO }, 'flow-commit', h)).sent, true);
+  assert.deepEqual(h.sent, ['/flow-commit']);
+  const b = fakeHost('busy');
+  await assert.rejects(piSend({ id: 'r1', ...REPO }, 'flow-commit', b), (e) => e.status === 409 && e.message === 'The session is busy');
+  assert.deepEqual(b.sent, []);
 });
 
 // ---------- rooms presence ----------
