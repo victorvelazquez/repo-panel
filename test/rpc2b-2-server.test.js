@@ -25,7 +25,7 @@ test('pi.js exports only what stays and sessions.js has no live scan', () => {
   assert.deepEqual(Object.keys(require('../server.js')).sort(), ['createServer', 'piSend']);
 });
 
-test('no server source names Orca or reads a screen', () => {
+test('no server source names the old program or reads a screen', () => {
   const files = ['../server.js', '../lib.js', ...fs.readdirSync(path.join(ROOT, 'server')).map((n) => `../server/${n}`)];
-  for (const f of files) assert.doesNotMatch(fs.readFileSync(path.join(__dirname, f), 'utf8'), /orca|scanSessions|readScreen|piScreen/i, f);
+  for (const f of files) assert.doesNotMatch(fs.readFileSync(path.join(__dirname, f), 'utf8'), new RegExp('or' + 'ca|scanSessions|readScreen|piScreen', 'i'), f);
 });

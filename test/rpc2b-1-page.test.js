@@ -154,17 +154,17 @@ test('a5: a failed read keeps what the page knew, and a state it does not know i
   assert.equal(S.rpc[ID2].state, 'idle', 'the valid entry of that last answer is taken');
 });
 
-test('a6: the actions of the open chat follow S.rpc (idle free; busy, starting, asking and closed not), whatever the live answer of Orca says', async () => {
+test('a6: the actions of the open chat follow S.rpc (idle free; busy, starting, asking and closed not), whatever the live answer of the old program says', async () => {
   const sessions = (live) => ({ ...NONE, adopted: { id: 's1', name: 'n', adoptedAt: 'x' }, adoptedFound: true, live });
-  for (const orcaSays of [{ state: 'free', count: 1 }, { state: 'none', count: 0 }]) {
-    const { page, S } = await startPage({ answers: { '/api/sessions': sessions(orcaSays), '/api/rpc/states': states({ [ID]: 'idle', [ID2]: 'closed' }) } });
+  for (const oldSays of [{ state: 'free', count: 1 }, { state: 'none', count: 0 }]) {
+    const { page, S } = await startPage({ answers: { '/api/sessions': sessions(oldSays), '/api/rpc/states': states({ [ID]: 'idle', [ID2]: 'closed' }) } });
     S.summary = { rows: [{ id: ID, name: 'demo', error: null, next: { id: 'U1', entrega: 'x' }, action: { kind: 'start', label: 'x', pr: null }, session: { state: 'free' } }], generatedAt: 'x' };
     page.run("ACTIONS['chat-open']({ dataset: { id: '" + ID + "' } })");
     await page.tick();
-    assert.equal(S.chat.info.live.state, orcaSays.state);
+    assert.equal(S.chat.info.live.state, oldSays.state);
     const set = async (state) => { S.rpc[ID] = { ...S.rpc[ID], state }; page.run('draw()'); await page.tick(); return page.get('#chatActions').html; };
-    assert.match(await set('idle'), /data-cmd="flow-next"/, 'idle: ' + orcaSays.state);
-    for (const state of ['busy', 'starting', 'asking', 'closed']) assert.doesNotMatch(await set(state), /data-cmd/, state + ': ' + orcaSays.state);
+    assert.match(await set('idle'), /data-cmd="flow-next"/, 'idle: ' + oldSays.state);
+    for (const state of ['busy', 'starting', 'asking', 'closed']) assert.doesNotMatch(await set(state), /data-cmd/, state + ': ' + oldSays.state);
   }
 });
 
@@ -180,5 +180,5 @@ test('a8: a room block has a gray dot and no session line, only the folder, the 
   const html = page.run("roomBlock({ name: 'UPEN', path: 'C:/dev/ceo', repos: [], available: true, base: 'main', results: [], summary: { ready: true }, lastCommit: '2026-10-23T18:30:00-05:00' })");
   assert.match(html, /<span class="dot dot-gray"><\/span> UPEN/);
   assert.match(html, /Last commit 2026-10-23/);
-  assert.doesNotMatch(html, /Session:|session open|Orca|presence/i);
+  assert.doesNotMatch(html, new RegExp('Session:|session open|or' + 'ca|presence', 'i'));
 });

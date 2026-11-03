@@ -313,6 +313,20 @@ Known limits and what is not verified:
 - The requirements and prerequisites blocks of the Conformity drawer have no browser test: their rendering (collapsed passing list, remedy lines, loading and failed messages) and the badge count were not seen on screen. Unit tests cover the checks, the routes and `conformityView`.
 - The conformity view was only checked with a headless screenshot of the open drawer. Not verified in a browser: clicking the button and a repo name, closing the drawer, the `All repositories conform.` message, the `no-base` and `no-repo` statuses, and a repo whose only problems are info-level. Unit tests cover the report logic.
 
+## Page code
+
+The page is plain scripts with no build step. `index.html` loads them one after the other and they share the global scope (the state `S`, the helpers and every function), so the order matters: every file except the last only defines things, and touches the page when one of its functions is called, never while it loads. Two files are pure (data in, HTML out) and the page tests share them: `public/view.js` and `public/resumen.js`. The rest is split by layer, in load order:
+
+- `public/data.js`: the requests to the server (with their pool) and the reads of each repo.
+- `public/feed.js`: the event stream, the board data and the refresh ticks.
+- `public/tabs.js`: the derived state, the "go work on" queue and the Summary and Conformity tabs.
+- `public/chat.js`: the chat, its composer, the notes pad and the three-block layout.
+- `public/board.js`: the Work board and its cards.
+- `public/actions.js`: the click handlers (`data-act`): merge, re-run, rooms and the usage bar.
+- `public/app.js`: only the boot (the state, the document listeners, the timers and the first load). It loads last because it is the one that runs at load.
+
+A new page script goes into `index.html`, into the closed list of static files in `server/http.js` and into `test/pagesrc.js`, in that order of loading.
+
 ## Security
 
 The server binds to `127.0.0.1` only, rejects unknown `Host` headers (DNS rebinding), requires a random per-run token on every API call, and only operates on repositories listed in `config.json`. The one place where the panel writes inside a repo is the notes file (`POST /api/notes`, RP93): a fixed path, never one sent by the page, refused through links, and out of Git.
