@@ -29,12 +29,15 @@ function cleanText(value) {
   return clean;
 }
 
-// The adopted session of the repo (config.json `sessions`), else `panel-<slug>` like the sessions the panel names itself.
+// The adopted session of the repo (config.json `sessions`), else `panel-<slug>-<id>` like the sessions the panel names itself. RP97: the id is the first 8 letters and digits of the repo id
+// (the hash of its path), so two repos whose last folder has the same name (`C:\a\app`, `C:\b\app`) never share an id; an adopted id always wins, so no repo that already runs a session changes id.
 function sessionIdFor(repo, adopted) {
   if (adopted && typeof adopted.id === 'string' && SESSION_ID.test(adopted.id)) return adopted.id;
   // The last folder name with BOTH separators: `path.basename` only knows the ones of the platform, so a Windows path read on Linux would give the whole string.
   const slug = (String(repo.path).split(/[\\/]/).filter((s) => s && !/^[A-Za-z]:$/.test(s)).pop() || '').toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^[-.]+|[-.]+$/g, '').slice(0, 60);
-  return `panel-${slug || String(repo.id).replace(/[^A-Za-z0-9]/g, '').slice(0, 20) || 'repo'}`;
+  const own = (repo.id == null ? '' : String(repo.id)).replace(/[^A-Za-z0-9]/g, '');
+  if (!slug) return `panel-${own.slice(0, 20) || 'repo'}`;
+  return `panel-${slug}${own ? `-${own.slice(0, 8)}` : ''}`;
 }
 
 const CONTENT_MAX = 8 * 1024;
