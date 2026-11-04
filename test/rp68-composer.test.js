@@ -137,7 +137,7 @@ test('composerState: canSend for a loaded chat whose session is idle or not star
   const rpc = (state) => ({ state });
   assert.equal(cs({ info: adoptedInfo(), rpc: rpc('idle') }).canSend, true);
   assert.match(cs({ info: adoptedInfo(), rpc: rpc('idle') }).placeholder, /alpha/);
-  assert.equal(cs({ info: info(), rpc: rpc('closed') }).canSend, true, 'not adopted and not started: the send starts it');
+  assert.equal(cs({ info: info(), rpc: rpc('closed') }).canSend, false, 'RP99: not adopted (the list is in view): open a session or start a new one first');
   assert.equal(cs({ info: adoptedInfo() }).canSend, false, 'no rpc entry yet: the status read has not answered');
   assert.equal(cs({ info: adoptedInfo() }).reason, 'The session state is unknown');
   assert.equal(cs({ info: adoptedInfo(), rpc: rpc('idle'), sending: true }).canSend, false);

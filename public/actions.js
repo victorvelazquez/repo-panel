@@ -136,6 +136,7 @@ const ACTIONS = {
   },
   'chat-adopt': async (el) => {
     const { id, session } = el.dataset;
+    if (S.chat.starting) return; // RP99: a new session is starting: the server would refuse (409) and the list is disabled
     try { await api('/api/sessions/adopt', { id, session }); } catch (e) { toast(e.message, 'bad'); }
     if (S.chat.id === id) loadChat(id);
   },
@@ -144,8 +145,9 @@ const ACTIONS = {
     if (S.chat.starting) return;
     S.chat.starting = true;
     el.disabled = true;
+    setRpc(id, { state: 'starting', error: '' }); // RP99: the composer waits and the list is disabled until it answers
     draw();
-    try { S.rpc[id] = V.rpcFromStatus(S.rpc[id], await api('/api/rpc/start', { id }, { timeoutMs: 125000 })); } catch (e) { toast(e.message, 'bad'); }
+    try { S.rpc[id] = V.rpcFromStatus(S.rpc[id], await api('/api/rpc/start', { id, new: true }, { timeoutMs: 125000 })); } catch (e) { setRpc(id, { state: 'closed' }); toast(e.message, 'bad'); } // RP99: a NEW session with its own id
     S.chat.starting = false;
     el.disabled = false;
     if (S.chat.id === id) loadChat(id);

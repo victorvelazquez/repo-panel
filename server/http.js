@@ -135,7 +135,11 @@ const routes = {
   'POST /api/snooze': (q, b) => setSnoozed(b.id, Number(b.number), !!b.on, !!b.wasReady),
   'POST /api/dismiss': (q, b) => setDismissed(b.id, !!b.on),
   'POST /api/pi': (q, b, d) => piSend(findRepo(b.id), b.command, d.rpcHost, d.requirements, { pr: b.pr, prs: d.prs, guard: d.guard }),
-  'POST /api/sessions/adopt': (q, b, d) => adoptSession(b.id, b.session, d.sessionsDir, d.sessionOf),
+  // RP99: a session cannot be adopted while the repo has one live or starting (a start takes up to two minutes): it would end with the adopted session in the chat and another one running.
+  'POST /api/sessions/adopt': (q, b, d) => {
+    if (d.rpcHost && d.rpcHost.stateOf(b && b.id) !== 'closed') throw new HttpError(409, 'This repo has a session running: close it first');
+    return adoptSession(b.id, b.session, d.sessionsDir, d.sessionOf);
+  },
   'POST /api/sessions/release': (q, b, d) => releaseSession(b.id, d.sessionsDir, d.sessionOf),
   // RPC1b: pi sessions in RPC mode, one per repo; the repo comes from the config by id and no program, folder or argument comes from the page.
   'POST /api/rpc/start': (q, b, d) => rpcApi(d.rpcHost).start(b),
