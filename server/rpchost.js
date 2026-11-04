@@ -17,6 +17,7 @@ const SESSION_ID = /^[A-Za-z0-9._-]{1,80}$/;
 const CONTROLS = /[\x00-\x08\x0b-\x1f\x7f-\x9f\u2028\u2029\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g;
 const BEHAVIORS = ['steer', 'followUp'];
 const STATES = ['closed', 'starting', 'idle', 'busy', 'asking'];
+const SESSION_CLOSED = 'The session was closed';
 
 // Text typed in the browser: CR and CRLF become LF, controls go, ends are trimmed. Too long is refused, never cut; a leading `!` is a
 // shell command for pi, so it is refused too.
@@ -110,6 +111,7 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
     let found;
     try { found = await resolve(); } catch { found = null; }
     if (at !== epoch) throw new HttpError(503, 'The panel is closing');
+    if (entry.closed) throw new HttpError(409, SESSION_CLOSED); // RP98: closed while the host waited for the runtime: no client is created for it
     if (!found || !found.active) throw new HttpError(409, 'No pi runtime is available');
     entry.sessionId = sessionIdFor(repo, adoptedOf(id));
     entry.client = createClient({
@@ -118,18 +120,21 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
       cwd: repo.path,
       env: runtimeEnv(found.active, env),
       onEvent: (e) => { const w = wire(e); if (w) publish(id, w); },
-      onExit: () => { if (live.get(id) === entry) live.delete(id); publish(id, { kind: 'exit' }); },
+      // RP98: the exit of an OLD client (closed, replaced by a new start) is not the new session's: it is published only while this entry is the live one or none is.
+      onExit: () => { const cur = live.get(id); if (cur === entry) live.delete(id); if (cur === entry || !cur) publish(id, { kind: 'exit' }); },
     });
     try { await entry.client.start(); entry.up = true; } catch (e) {
+      if (entry.closed) throw new HttpError(409, SESSION_CLOSED); // closed while starting: not a failure to launch
       // Fixed messages only: a start that ran out of time is not a failure to launch, and the raw error never reaches the page.
       throw e && e.message === 'The session did not start in time' ? new HttpError(504, 'The session did not start in time') : new HttpError(502, 'The session could not be started');
     }
+    if (entry.closed) throw new HttpError(409, SESSION_CLOSED); // the client answered but the session was closed meanwhile
   }
 
   async function start(id) {
     const repo = repoOf(id); // unknown repo: 404 before anything starts
     const current = live.get(id);
-    if (current) { await current.ready; return statusOf(live.get(id)); }
+    if (current) { await current.ready; if (current.closed) throw new HttpError(409, SESSION_CLOSED); return statusOf(live.get(id)); } // RP98: a joiner of a session that was closed meanwhile fails like the others
     if (live.size >= max) throw new HttpError(409, `Too many live sessions (at most ${max})`);
     const entry = { client: null, sessionId: null, ready: null };
     live.set(id, entry);
@@ -139,9 +144,22 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
       throw e;
     });
     await entry.ready;
+    if (entry.closed) throw new HttpError(409, SESSION_CLOSED); // RP98: a session that was closed is never adopted, so the chat does not come back to it
     // The session id it used becomes the adopted one when the repo has none (the history is read from the adopted id); never fails the start.
     try { adopt(id, entry.sessionId); } catch { /* the chat shows no history until a session is adopted */ }
     return statusOf(live.get(id));
+  }
+
+  // RP98: closes the session of ONE repo: the slot is free at once, the process is stopped (also one that is still starting: its start then fails with 409 and adopts nothing) and the
+  // answer is the closed status. A repo with no live session answers closed too; an unknown repo is 404.
+  async function close(id) {
+    repoOf(id);
+    const entry = live.get(id);
+    if (!entry) return { ...closedStatus };
+    live.delete(id);
+    entry.closed = true;
+    if (entry.client) entry.client.close();
+    return { ...closedStatus };
   }
 
   // RPC2b-1: the state of a repo's session, synchronous and total: it reads memory only, never starts anything and never calls `repoOf`.
@@ -158,6 +176,7 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
 
   return {
     start,
+    close,
     stateOf,
     async prompt(id, value, { behavior } = {}) {
       repoOf(id);
@@ -216,6 +235,7 @@ function answerOf(b) {
 function rpcApi(host) {
   return {
     start: (b) => host.start(idOf(bodyOf(b))),
+    close: (b) => host.close(idOf(bodyOf(b))),
     prompt: (b) => host.prompt(idOf(bodyOf(b)), b.text, b.behavior === undefined ? {} : { behavior: b.behavior }),
     steer: (b) => host.steer(idOf(bodyOf(b)), b.text),
     abort: (b) => host.abort(idOf(bodyOf(b))),

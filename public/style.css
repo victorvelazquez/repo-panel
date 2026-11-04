@@ -494,6 +494,10 @@ body.tab-conformity #viewbar { display: none; }
 .hl-v { color: #ffa657; }
 .hl-h { color: #79c0ff; font-weight: 600; }
 .ch-name { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* RP98: the Close session button sits at the right of the session state, inside the composer frame. */
+.sess-state { display: flex; align-items: center; gap: 8px; }
+.ss-close { margin-left: auto; flex: none; font-size: 12px; padding: 1px 8px; }
+.ss-close:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 .ch-body { flex: 1; min-height: 0; overflow: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
 .ch-body .empty { padding: 30px 0; }
 .ch-older { text-align: center; }
