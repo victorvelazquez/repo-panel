@@ -77,6 +77,7 @@ const ACTIONS = {
   'diff': (el) => { const id = el.dataset.id; if (S.tab !== 'summary') setTab('summary'); if (S.chat.id !== id) openChat(id); setChatTab('changes'); },
   // RP90: touching a file of the Changes list opens it in the ONE diff tab of the centre (reused for every file); RP92 will open it from the files card.
   'changes-file': (el) => { const p = el.dataset.path || ''; if (p) { S.chat.dfile = p; setChatTab('diff'); } else draw(); },
+  'diff-split': () => setPref('split', !S.prefs.split), // RP66c: the side-by-side diff on or off, kept with the other preferences
   'diff-close': () => { S.chat.dfile = ''; if (S.chat.tab === 'diff') S.chat.tab = 'chat'; draw(); },
   'files-open': (el) => loadFile(el.dataset.path || ''),
   // The button says what the person SEES (data-open): the default is open only when a changed file is inside, so toggling flips that.
