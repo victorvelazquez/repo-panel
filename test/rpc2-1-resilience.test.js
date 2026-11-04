@@ -21,8 +21,8 @@ function hostWith(client = {}) {
   return { host, made, published };
 }
 
-test('t1: the default start cap is two minutes (the real pi took 4 s to over 60 s to start)', () => {
-  assert.equal(START_MS, 120000);
+test('t1: the default start cap is five minutes (the real pi took 4 s to over 60 s to start; RP101 raised it from two minutes)', () => {
+  assert.equal(START_MS, 300000);
 });
 
 test('t2: a start that ran out of time answers 504 with a fixed message; any other failure stays 502 and never echoes the raw error', async () => {

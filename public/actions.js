@@ -149,7 +149,7 @@ const ACTIONS = {
     el.disabled = true;
     setRpc(id, { state: 'starting', error: '' }); // RP99: the composer waits and the list is disabled until it answers
     draw();
-    try { S.rpc[id] = V.rpcFromStatus(S.rpc[id], await api('/api/rpc/start', { id, new: true }, { timeoutMs: 125000 })); } catch (e) { setRpc(id, { state: 'closed' }); toast(e.message, 'bad'); } // RP99: a NEW session with its own id
+    try { S.rpc[id] = V.rpcFromStatus(S.rpc[id], await api('/api/rpc/start', { id, new: true }, { timeoutMs: START_WAIT_MS })); } catch (e) { setRpc(id, { state: 'closed' }); toast(startError(e).message, 'bad'); } // RP99: a NEW session with its own id
     S.chat.starting = false;
     el.disabled = false;
     if (S.chat.id === id) loadChat(id);

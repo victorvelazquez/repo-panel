@@ -4,6 +4,11 @@
 // never while this file loads (test/rpc3a-data.test.js loads it alone).
 
 // ---------- api + request pool ----------
+// RP101: how long the page waits for a session to start: a little longer than the server's cap (START_MS, five minutes), so the server's own answer is the one that arrives.
+const START_WAIT_MS = 305000;
+// A start that ran out of time, on the page ("Request timed out") or on the server (504), says one plain thing; any other failure is kept as it is.
+const startError = (e) => (e && (e.message === 'Request timed out' || e.message === 'The session did not start in time') ? new Error('The session did not start in five minutes') : e);
+
 // RP76: every request has a time limit (S.timeouts) and sends x-priority: user when a click caused it (every POST, or opts.priority).
 // opts.signal links an outer AbortSignal: when it aborts, so does the request (the rejection is an AbortError callers can ignore).
 async function api(url, body, opts = {}) {

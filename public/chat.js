@@ -365,7 +365,7 @@ const composerOf = (id) => R.composerState({ ...S.chat, rpc: S.rpc[id], sending:
 const sayNote = (id, text) => { S.notes[id] = { text, id }; };
 const setRpc = (id, patch) => { S.rpc[id] = { ...(S.rpc[id] || V.rpcFromStatus(undefined, null)), ...patch }; };
 
-// A session that is not started is started first (it can take up to two minutes: the label says Starting…); the start also adopts the session id the
+// A session that is not started is started first (it can take up to five minutes: the label says Starting…); the start also adopts the session id the
 // history is read from. A failure leaves the session closed and throws the server's message. The chat Send and the flow buttons share it.
 // The callers check rpcNeedsStart first, so a session that is up adds no await (the send goes out in the same tick).
 const rpcNeedsStart = (id) => !S.rpc[id] || S.rpc[id].state === 'closed';
@@ -373,9 +373,9 @@ async function ensureRpcStarted(id) {
   if (!rpcNeedsStart(id)) return;
   setRpc(id, { state: 'starting', error: '' });
   draw();
-  try { S.rpc[id] = V.rpcFromStatus(S.rpc[id], await api('/api/rpc/start', { id }, { timeoutMs: 125000 })); } catch (e) {
+  try { S.rpc[id] = V.rpcFromStatus(S.rpc[id], await api('/api/rpc/start', { id }, { timeoutMs: START_WAIT_MS })); } catch (e) {
     setRpc(id, { state: 'closed' });
-    throw e.message === 'Request timed out' ? new Error('The session did not start in two minutes') : e;
+    throw startError(e);
   }
   if (S.chat.id === id) loadChat(id);
 }
