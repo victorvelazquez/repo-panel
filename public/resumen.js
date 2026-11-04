@@ -500,7 +500,8 @@
   };
   const rpcWait = (c) => (c.rpc && COMPOSER_WAIT[c.rpc.state]) || (!c.rpc ? REASON.unknown : '');
   function composerState(c, ctx = {}) {
-    const reason = !c.info ? 'Loading the chat…' : c.sending ? 'Sending…' : rpcWait(c);
+    // RP99: with no session adopted (the list is in view) nothing can be sent: it would start and adopt a new session without telling. Open one or start a new one first.
+    const reason = !c.info ? 'Loading the chat…' : !c.info.adopted ? 'Open a session or start a new one to write' : c.sending ? 'Sending…' : rpcWait(c);
     return { canSend: !reason, reason, placeholder: reason || `Message the session of ${ctx.name ?? 'this repo'}` };
   }
 
@@ -722,8 +723,8 @@
     const note = c.failed ? '<div class="rs-note" role="status">⚠ Chat unavailable: showing the last data we have.</div>' : '';
     const id = esc(c.id);
     if (!info.adopted) {
-      const rows = (info.sessions || []).slice(0, 5).map((s) => `<div class="ch-pick"><div class="ch-pick-l1"><span class="mono ch-sname" title="${esc(s.id)}">${esc(s.name || s.id)}</span><span class="rs-sub">${esc(relativeTime(s.updatedAt, ctx.now))}</span><button type="button" data-act="chat-adopt" data-id="${id}" data-session="${esc(s.id)}">Adopt</button></div>${s.lastMessage ? `<div class="rs-sub ch-last">${esc(clip(s.lastMessage.text, 90))}</div>` : ''}</div>`).join('');
-      return `${note}<div class="ch-state"><p>No session is adopted for this folder.${rows ? ' Adopt one, or start a new one.' : ''}</p>${rows}<button type="button" data-act="chat-start" data-id="${id}"${c.starting ? ' disabled' : ''}>Start panel session</button></div>`;
+      const rows = (Array.isArray(info.sessions) ? info.sessions : []).slice(0, 20).map((s) => `<div class="ch-pick"><div class="ch-pick-l1"><span class="mono ch-sname" title="${esc(s.id)}">${esc(s.name || s.id)}</span><span class="rs-sub">${esc(relativeTime(s.updatedAt, ctx.now))}</span><button type="button" data-act="chat-adopt" data-id="${id}" data-session="${esc(s.id)}"${c.starting ? ' disabled' : ''}>Open</button></div>${s.lastMessage ? `<div class="rs-sub ch-last">${esc(clip(s.lastMessage.text, 90))}</div>` : ''}</div>`).join('');
+      return `${note}<div class="ch-state"><p>No session is adopted for this folder.${rows ? ' Open one, or start a new one.' : ''}</p>${rows ? `<div class="ch-picks">${rows}</div>` : ''}<button type="button" data-act="chat-start" data-id="${id}"${c.starting ? ' disabled' : ''}>New session</button></div>`;
     }
     const who = info.adopted.name || info.adopted.id;
     if (!info.adoptedFound) return `${note}<div class="ch-state" role="status"><p>The session is loading. The history appears with its first message.</p></div>${pendingHtml(c.pending, [])}${rpcTail(c, who)}`;

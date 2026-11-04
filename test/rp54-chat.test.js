@@ -254,10 +254,10 @@ test('chat header: only the repo name (the session id is its tooltip) and the cl
   assert.match(label(null), /Loading…/);
 });
 
-test('no adopted session: up to 5 sessions with Adopt buttons, a Start button, all text escaped; Start is disabled while starting', () => {
-  const list = Array.from({ length: 7 }, (_, i) => sess({ id: `s${i}`, name: i === 0 ? '<img src=x onerror=1>' : null, lastMessage: { role: 'user', text: 'z'.repeat(300) } }));
+test('no adopted session: up to 20 sessions with Open buttons (RP99), a New session button, all text escaped; New session is disabled while starting', () => {
+  const list = Array.from({ length: 25 }, (_, i) => sess({ id: `s${i}`, name: i === 0 ? '<img src=x onerror=1>' : null, lastMessage: { role: 'user', text: 'z'.repeat(300) } }));
   const html = body({ info: info({ sessions: list }) });
-  assert.equal((html.match(/data-act="chat-adopt"/g) || []).length, 5);
+  assert.equal((html.match(/data-act="chat-adopt"/g) || []).length, 20);
   assert.match(html, /data-act="chat-adopt" data-id="r1" data-session="s0"/);
   assert.match(html, /data-act="chat-start" data-id="r1"/);
   assert.doesNotMatch(html, /<img/);
@@ -544,7 +544,7 @@ test('Adopt posts to /api/sessions/adopt and reloads; Start posts to /api/rpc/st
   await running;
   await page.tick();
   assert.equal(page.fetches.find((f) => f.url === '/api/rpc/start').method, 'POST');
-  assert.deepEqual(JSON.parse(page.fetches.find((f) => f.url === '/api/rpc/start').body), { id: 'abc' });
+  assert.deepEqual(JSON.parse(page.fetches.find((f) => f.url === '/api/rpc/start').body), { id: 'abc', new: true }); // RP99: New session is a NEW session
   assert.ok(toasts.some((t) => /already has a session open/.test(t.textContent)), '409 message shown');
   assert.equal(page.run('S.chat.starting'), false);
   assert.ok(page.fetches.some((f) => f.url === '/api/sessions?id=abc'), 'reloads');

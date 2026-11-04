@@ -4,6 +4,7 @@
 // with that id. There is no separate daemon. The browser can only start, prompt, steer, abort and answer a pending dialog; it never names
 // a program, a folder or an argument. Everything it sends is cleaned or refused with a fixed message that echoes nothing.
 const path = require('node:path');
+const crypto = require('node:crypto');
 const { HttpError } = require('./errors.js');
 const { loadConfig } = require('./config.js');
 const { runtimeEnv } = require('./piruntime.js');
@@ -34,11 +35,23 @@ function cleanText(value) {
 // (the hash of its path), so two repos whose last folder has the same name (`C:\a\app`, `C:\b\app`) never share an id; an adopted id always wins, so no repo that already runs a session changes id.
 function sessionIdFor(repo, adopted) {
   if (adopted && typeof adopted.id === 'string' && SESSION_ID.test(adopted.id)) return adopted.id;
-  // The last folder name with BOTH separators: `path.basename` only knows the ones of the platform, so a Windows path read on Linux would give the whole string.
-  const slug = (String(repo.path).split(/[\\/]/).filter((s) => s && !/^[A-Za-z]:$/.test(s)).pop() || '').toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^[-.]+|[-.]+$/g, '').slice(0, 60);
-  const own = (repo.id == null ? '' : String(repo.id)).replace(/[^A-Za-z0-9]/g, '');
+  const { slug, own } = idParts(repo, 60);
   if (!slug) return `panel-${own.slice(0, 20) || 'repo'}`;
   return `panel-${slug}${own ? `-${own.slice(0, 8)}` : ''}`;
+}
+// The two parts of a panel session id: the last folder name with BOTH separators (`path.basename` only knows the ones of the platform, so a Windows path read on Linux would give the whole
+// string), cut to `cap`, and the letters and digits of the repo id.
+function idParts(repo, cap) {
+  const slug = (String(repo.path).split(/[\\/]/).filter((s) => s && !/^[A-Za-z]:$/.test(s)).pop() || '').toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^[-.]+|[-.]+$/g, '').slice(0, cap);
+  return { slug, own: (repo.id == null ? '' : String(repo.id)).replace(/[^A-Za-z0-9]/g, '') };
+}
+// RP99: the id of a NEW session: the id of RP97 plus a unique part, so a new session never resumes an old one (the id of RP97 is the same for every session of the repo). The folder name is cut
+// to 50 so the whole id stays within the 80 characters of SESSION_ID: panel- + 50 + - + 8 + - + 12 at most.
+function freshSessionId(repo, suffix) {
+  const { slug, own } = idParts(repo, 50);
+  const tail = String(suffix).replace(/[^A-Za-z0-9]/g, '').slice(0, 12) || 'new';
+  if (!slug) return `panel-${own.slice(0, 20) || 'repo'}-${tail}`;
+  return `panel-${slug}${own ? `-${own.slice(0, 8)}` : ''}-${tail}`;
 }
 
 const CONTENT_MAX = 8 * 1024;
@@ -83,7 +96,7 @@ function wire(e) {
   return e;
 }
 
-function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClient, max = 6, adoptedOf = (id) => (loadConfig().sessions || {})[id], adopt = () => {}, env = process.env }) {
+function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClient, max = 6, adoptedOf = (id) => (loadConfig().sessions || {})[id], adopt = () => {}, env = process.env, suffix = () => crypto.randomBytes(3).toString('hex') }) {
   const live = new Map(); // repo id -> { client, sessionId, ready }
 
   const closedStatus = { state: 'closed', pendingDialogs: [], sessionId: null };
@@ -113,7 +126,7 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
     if (at !== epoch) throw new HttpError(503, 'The panel is closing');
     if (entry.closed) throw new HttpError(409, SESSION_CLOSED); // RP98: closed while the host waited for the runtime: no client is created for it
     if (!found || !found.active) throw new HttpError(409, 'No pi runtime is available');
-    entry.sessionId = sessionIdFor(repo, adoptedOf(id));
+    entry.sessionId = entry.fresh ? freshSessionId(repo, suffix()) : sessionIdFor(repo, adoptedOf(id));
     entry.client = createClient({
       command: found.active.command,
       args: ['--mode', 'rpc', '--session-id', entry.sessionId],
@@ -131,12 +144,14 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
     if (entry.closed) throw new HttpError(409, SESSION_CLOSED); // the client answered but the session was closed meanwhile
   }
 
-  async function start(id) {
+  // RP99: `fresh` starts a NEW session with its own id. It is only for a repo with no session: a live one or an adopted one (live or not) is 409, and nothing is created.
+  async function start(id, { fresh = false } = {}) {
     const repo = repoOf(id); // unknown repo: 404 before anything starts
     const current = live.get(id);
+    if (fresh && (current || adoptedOf(id))) throw new HttpError(409, 'This repo already has a session: close it first');
     if (current) { await current.ready; if (current.closed) throw new HttpError(409, SESSION_CLOSED); return statusOf(live.get(id)); } // RP98: a joiner of a session that was closed meanwhile fails like the others
     if (live.size >= max) throw new HttpError(409, `Too many live sessions (at most ${max})`);
-    const entry = { client: null, sessionId: null, ready: null };
+    const entry = { client: null, sessionId: null, ready: null, fresh };
     live.set(id, entry);
     entry.ready = launch(id, repo, entry).catch((e) => {
       if (live.get(id) === entry) live.delete(id);
@@ -234,7 +249,12 @@ function answerOf(b) {
 
 function rpcApi(host) {
   return {
-    start: (b) => host.start(idOf(bodyOf(b))),
+    start: (b) => {
+      const body = bodyOf(b);
+      const id = idOf(body);
+      if (body.new !== undefined && body.new !== true) throw new HttpError(400, 'Invalid request'); // RP99: `new` is true or absent
+      return host.start(id, { fresh: body.new === true });
+    },
     close: (b) => host.close(idOf(bodyOf(b))),
     prompt: (b) => host.prompt(idOf(bodyOf(b)), b.text, b.behavior === undefined ? {} : { behavior: b.behavior }),
     steer: (b) => host.steer(idOf(bodyOf(b)), b.text),
