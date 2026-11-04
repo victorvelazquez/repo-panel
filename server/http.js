@@ -174,6 +174,8 @@ const STATIC = {
   '/actions.js': ['actions.js', 'text/javascript; charset=utf-8'],
   '/app.js': ['app.js', 'text/javascript; charset=utf-8'],
   '/style.css': ['style.css', 'text/css; charset=utf-8'],
+  '/kletus-dev.svg': ['kletus-dev.svg', 'image/svg+xml'], // RP102: the logo of the header
+  '/icon.svg': ['icon.svg', 'image/svg+xml'], // RP102: the K of the logo, the icon of the tab
 };
 
 function readBody(req) {

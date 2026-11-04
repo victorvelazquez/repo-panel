@@ -242,9 +242,9 @@ const NOW = { now: Date.parse('2026-10-24T12:00:00Z') };
 const clean = { files: [], branch: 'task', base: 'main', ahead: 0, behind: 0, head: 'h1' };
 const fresh = (state, extra = {}) => ({ available: true, state, next: 'Answer the question.', detail: null, at: '2026-10-24T11:59:00Z', stale: false, reason: null, ...extra });
 
-test('index.html has an empty data: icon so the browser does not ask for /favicon.ico', () => {
+test('index.html declares an icon of its own (the K, RP102) so the browser does not ask for /favicon.ico', () => {
   const html = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'public', 'index.html'), 'utf8');
-  assert.ok(html.includes('<link rel="icon" href="data:,">'));
+  assert.ok(html.includes('<link rel="icon" type="image/svg+xml" href="/icon.svg">'));
 });
 
 test('queueFlags: manual comes from manualAction', () => {

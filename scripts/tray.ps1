@@ -162,24 +162,41 @@ $created = $false
 $mutex = New-Object System.Threading.Mutex($true, 'Local\repo-panel-tray', [ref]$created)
 if (-not $created) { $mutex.Dispose(); exit 0 }
 
-# Draws a round badge with an "R" and returns the icon plus the raw handle that must be destroyed later.
+# Draws a round badge with the K of the logo (RP102) and returns the icon plus the raw handle that must be destroyed later.
 function New-StateIcon([System.Drawing.Color]$Color) {
   $size = [System.Windows.Forms.SystemInformation]::SmallIconSize
   $bmp = New-Object System.Drawing.Bitmap($size.Width, $size.Height)
   $g = [System.Drawing.Graphics]::FromImage($bmp)
   $brush = New-Object System.Drawing.SolidBrush($Color)
   $white = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::White)
-  $font = New-Object System.Drawing.Font('Segoe UI', ($size.Height * 0.52), [System.Drawing.FontStyle]::Bold, [System.Drawing.GraphicsUnit]::Pixel)
-  $fmt = New-Object System.Drawing.StringFormat
-  $fmt.Alignment = [System.Drawing.StringAlignment]::Center
-  $fmt.LineAlignment = [System.Drawing.StringAlignment]::Center
+  # The K of the logo (public/icon.svg): 14 straight-line points in the units of the logo (85.2 wide, 111.75 tall from y = 1.8), scaled to the icon and centered.
+  $kPoints = @(
+    @(0, 113.55),
+    @(0, 1.8),
+    @(14.7, 1.8),
+    @(14.7, 64.65),
+    @(11.1, 63.15),
+    @(64.5, 1.8),
+    @(82.95, 1.8),
+    @(38.1, 53.55),
+    @(38.85, 43.05),
+    @(85.2, 113.55),
+    @(67.65, 113.55),
+    @(32.25, 60.45),
+    @(14.7, 80.55),
+    @(14.7, 113.55)
+  )
+  $scale = $size.Height * 0.6 / 111.75
+  $offsetX = ($size.Width - 85.2 * $scale) / 2
+  $offsetY = ($size.Height - 111.75 * $scale) / 2 - 1.8 * $scale
+  $points = [System.Drawing.PointF[]]($kPoints | ForEach-Object { New-Object System.Drawing.PointF([single]($offsetX + $_[0] * $scale), [single]($offsetY + $_[1] * $scale)) })
   try {
     $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
     $g.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::AntiAlias
     $g.FillEllipse($brush, 0, 0, $size.Width - 1, $size.Height - 1)
-    $g.DrawString('R', $font, $white, (New-Object System.Drawing.RectangleF(0, 0, $size.Width, $size.Height)), $fmt)
+    $g.FillPolygon($white, $points)
     $handle = $bmp.GetHicon()
-  } finally { $fmt.Dispose(); $font.Dispose(); $white.Dispose(); $brush.Dispose(); $g.Dispose(); $bmp.Dispose() }
+  } finally { $white.Dispose(); $brush.Dispose(); $g.Dispose(); $bmp.Dispose() }
   return @{ Icon = [System.Drawing.Icon]::FromHandle($handle); Handle = $handle }
 }
 
@@ -199,14 +216,14 @@ $itemQuit = $menu.Items.Add($script:menuLabels[3])
 $notify.ContextMenuStrip = $menu
 
 function Show-Balloon([string]$Text) {
-  try { $notify.ShowBalloonTip(5000, 'repo-panel', $Text, [System.Windows.Forms.ToolTipIcon]::Info) } catch { }
+  try { $notify.ShowBalloonTip(5000, 'Kletus.dev', $Text, [System.Windows.Forms.ToolTipIcon]::Info) } catch { }
 }
 
 function Update-State {
   $script:port = Get-PanelPort
   $script:healthy = Test-PanelHealthy $script:port
   $notify.Icon = if ($script:healthy) { $green.Icon } else { $gray.Icon }
-  $notify.Text = if ($script:healthy) { "repo-panel: running (port $($script:port))" } else { 'repo-panel: stopped' }
+  $notify.Text = if ($script:healthy) { "Kletus.dev: running (port $($script:port))" } else { 'Kletus.dev: stopped' }
   $itemStart.Enabled = -not $script:healthy
 }
 
