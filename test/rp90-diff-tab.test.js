@@ -15,23 +15,23 @@ const V = require('../public/view.js');
 const PUBLIC = path.join(__dirname, '..', 'public');
 const css = fs.readFileSync(path.join(PUBLIC, 'style.css'), 'utf8').replace(/\r\n/g, '\n');
 const DIFF = (name) => ['diff --git a/' + name + ' b/' + name, '--- a/' + name, '+++ b/' + name, '@@ -1,2 +1,2 @@', ' keep ' + name, '-old ' + name, '+new ' + name].join('\n');
-const TWO = `${DIFF('src/one.js')}\n${DIFF('src/two.js')}`;
+const TWO = `${DIFF('src/one.txt')}\n${DIFF('src/two.txt')}`;
 const tabsOf = (h) => [...h.matchAll(/data-tab="(\w+)"/g)].map((m) => m[1]);
 
 // ---------- pure: the tab bar ----------
 test('t1: with a file open the bar gets ONE more tab, the last one, named after the file; it is selected only for the diff tab', () => {
-  const h = R.chatHead({ id: 'abc', dfile: 'src/one.js', tab: 'diff' }, { name: 'demo' });
+  const h = R.chatHead({ id: 'abc', dfile: 'src/one.txt', tab: 'diff' }, { name: 'demo' });
   assert.deepEqual(tabsOf(h), ['chat', 'tasks', 'changes', 'files', 'notes', 'diff']);
-  assert.match(h, /<button type="button" role="tab" class="ch-tab" data-act="chat-tab" data-tab="diff" title="src\/one\.js" aria-selected="true">one\.js<\/button>/);
+  assert.match(h, /<button type="button" role="tab" class="ch-tab" data-act="chat-tab" data-tab="diff" title="src\/one\.txt" aria-selected="true">one.txt<\/button>/);
   assert.match(h, /data-tab="chat"[^>]*aria-selected="false"/);
-  const back = R.chatHead({ id: 'abc', dfile: 'src/one.js', tab: 'chat' }, { name: 'demo' });
+  const back = R.chatHead({ id: 'abc', dfile: 'src/one.txt', tab: 'chat' }, { name: 'demo' });
   assert.match(back, /data-tab="diff"[^>]*aria-selected="false"/);
   assert.match(back, /data-tab="chat"[^>]*aria-selected="true"/);
 });
 
 test('t2: the diff tab has its own close button, labelled with the path, next to it (not inside the tab button)', () => {
-  const h = R.chatHead({ id: 'abc', dfile: 'src/one.js', tab: 'diff' }, { name: 'demo' });
-  assert.match(h, /<span class="ch-dtab">[^]*data-tab="diff"[^]*<button type="button" class="ch-dclose" data-act="diff-close" aria-label="Close the diff of src\/one\.js" title="Close the diff">✕<\/button><\/span>/);
+  const h = R.chatHead({ id: 'abc', dfile: 'src/one.txt', tab: 'diff' }, { name: 'demo' });
+  assert.match(h, /<span class="ch-dtab">[^]*data-tab="diff"[^]*<button type="button" class="ch-dclose" data-act="diff-close" aria-label="Close the diff of src\/one\.txt" title="Close the diff">✕<\/button><\/span>/);
   assert.equal((h.match(/<button/g) || []).length, 5 + 1 + 1 + 1, 'five standard tabs, the diff tab, its close button and the close of the chat');
 });
 
@@ -58,29 +58,29 @@ test('t5: with the column in the diff tab is still there, after Chat and Files (
 
 // ---------- pure: the viewer for ONE file ----------
 test('v1: in single-file mode only that file is drawn: no list of files and no "All files" button', () => {
-  const h = R.changesView({ diff: TWO, truncated: false }, { selected: 'src/two.js', only: true });
-  assert.match(h, /new src\/two\.js/);
-  assert.doesNotMatch(h, /new src\/one\.js/);
+  const h = R.changesView({ diff: TWO, truncated: false }, { selected: 'src/two.txt', only: true });
+  assert.match(h, /new src\/two\.txt/);
+  assert.doesNotMatch(h, /new src\/one\.txt/);
   assert.doesNotMatch(h, /cv-list|cv-item|cv-all|data-act="changes-file"/);
-  assert.match(h, /<section class="cv-file"><h3 class="cv-title" title="src\/two\.js">src\/two\.js<\/h3>/);
+  assert.match(h, /<section class="cv-file"><h3 class="cv-title" title="src\/two\.txt">src\/two\.txt<\/h3>/);
 });
 
 test('v2: in single-file mode a file that is not in the diff (any more) says so instead of showing the others; the other states say what they said', () => {
-  const gone = R.changesView({ diff: TWO, truncated: false }, { selected: 'src/gone.js', only: true });
-  assert.match(gone, /<div class="empty" role="status">src\/gone\.js has no uncommitted changes<\/div>/);
+  const gone = R.changesView({ diff: TWO, truncated: false }, { selected: 'src/gone.txt', only: true });
+  assert.match(gone, /<div class="empty" role="status">src\/gone\.txt has no uncommitted changes<\/div>/);
   assert.doesNotMatch(gone, /new src/);
   assert.match(R.changesView(null, { selected: 'x', only: true }), /Loading changes…/);
   assert.match(R.changesView(null, { selected: 'x', only: true, failed: true }), /Changes unavailable/);
   assert.match(R.changesView({ diff: '', truncated: false }, { selected: 'x', only: true }), /No uncommitted changes/);
-  assert.match(R.changesView({ diff: TWO, truncated: true }, { selected: 'src/one.js', only: true }), /Diff truncated/);
+  assert.match(R.changesView({ diff: TWO, truncated: true }, { selected: 'src/one.txt', only: true }), /Diff truncated/);
   assert.match(R.changesView({ diff: TWO, truncated: false }, { selected: 'a<b>', only: true }), /a&lt;b&gt; has no uncommitted changes/);
 });
 
 test('v3: without the flag the viewer is exactly as RP64 left it (the list, the selection, "All files")', () => {
-  const sel = R.changesView({ diff: TWO, truncated: false }, { selected: 'src/two.js' });
+  const sel = R.changesView({ diff: TWO, truncated: false }, { selected: 'src/two.txt' });
   assert.match(sel, /cv-list/);
   assert.match(sel, /data-act="changes-file" data-path=""[^>]*>All files/);
-  assert.doesNotMatch(sel, /new src\/one\.js/);
+  assert.doesNotMatch(sel, /new src\/one\.txt/);
 });
 
 // ---------- the page ----------
@@ -150,43 +150,43 @@ test('p1: touching a file in the Changes list opens it in the diff tab: only tha
   const page = boot();
   await withChanges(page);
   assert.match(body(page), /cv-list/, 'the Changes tab lists the files');
-  pick(page, 'src/two.js');
+  pick(page, 'src/two.txt');
   await page.tick();
   assert.equal(cur(page), 'diff');
-  assert.equal(page.run('S.chat.dfile'), 'src/two.js');
-  assert.match(body(page), /new src\/two\.js/);
-  assert.doesNotMatch(body(page), /new src\/one\.js|cv-list/);
-  assert.match(head(page), /data-tab="diff"[^>]*aria-selected="true"[^>]*>two\.js</);
+  assert.equal(page.run('S.chat.dfile'), 'src/two.txt');
+  assert.match(body(page), /new src\/two\.txt/);
+  assert.doesNotMatch(body(page), /new src\/one\.txt|cv-list/);
+  assert.match(head(page), /data-tab="diff"[^>]*aria-selected="true"[^>]*>two.txt</);
 });
 
 test('p2: the tab is REUSED: another file replaces the first one in the same tab (one diff tab in the bar)', async () => {
   const page = boot();
   await withChanges(page);
-  pick(page, 'src/one.js');
+  pick(page, 'src/one.txt');
   await page.tick();
-  pick(page, 'src/two.js');
+  pick(page, 'src/two.txt');
   await page.tick();
   assert.equal((head(page).match(/data-tab="diff"/g) || []).length, 1);
-  assert.match(head(page), />two\.js</);
-  assert.doesNotMatch(head(page), />one\.js</);
-  assert.match(body(page), /new src\/two\.js/);
+  assert.match(head(page), />two.txt</);
+  assert.doesNotMatch(head(page), />one.txt</);
+  assert.match(body(page), /new src\/two\.txt/);
 });
 
 test('p3: back to the chat the diff tab stays in the bar; touching it shows the diff again and reads /api/diff again (the files change)', async () => {
   const page = boot();
   await withChanges(page);
-  pick(page, 'src/one.js');
+  pick(page, 'src/one.txt');
   await page.tick();
   const before = reads(page, 'abc');
   tab(page, 'chat');
   page.flush();
   assert.equal(cur(page), 'chat');
-  assert.match(head(page), /data-tab="diff"[^>]*aria-selected="false"[^>]*>one\.js</);
+  assert.match(head(page), /data-tab="diff"[^>]*aria-selected="false"[^>]*>one.txt</);
   assert.equal(page.get('#composer').hidden, false, 'the composer is back with the chat');
   tab(page, 'diff');
   await page.tick();
   assert.equal(cur(page), 'diff');
-  assert.match(body(page), /new src\/one\.js/);
+  assert.match(body(page), /new src\/one\.txt/);
   assert.equal(reads(page, 'abc'), before + 1, 'one read per switch to the tab');
   page.run('draw()');
   page.flush();
@@ -196,14 +196,14 @@ test('p3: back to the chat the diff tab stays in the bar; touching it shows the 
 test('p4: the close button removes the tab; if it was the current one the chat comes back, and closing from the chat keeps the chat', async () => {
   const page = boot();
   await withChanges(page);
-  pick(page, 'src/one.js');
+  pick(page, 'src/one.txt');
   await page.tick();
   page.run("ACTIONS['diff-close']({})");
   page.flush();
   assert.equal(cur(page), 'chat');
   assert.equal(page.run('S.chat.dfile || ""'), '');
   assert.doesNotMatch(head(page), /data-tab="diff"|ch-dtab/);
-  pick(page, 'src/two.js');
+  pick(page, 'src/two.txt');
   await page.tick();
   tab(page, 'files');
   page.flush();
@@ -216,7 +216,7 @@ test('p4: the close button removes the tab; if it was the current one the chat c
 test('p5: on the diff tab the composer is hidden and the chat is not polled; a "diff" tab without a file is the chat', async () => {
   const page = boot();
   await withChanges(page);
-  pick(page, 'src/one.js');
+  pick(page, 'src/one.txt');
   await page.tick();
   assert.equal(page.get('#composer').hidden, true);
   const poll = page.intervals.find((i) => i.ms === 5000).fn;
@@ -233,7 +233,7 @@ test('p5: on the diff tab the composer is hidden and the chat is not polled; a "
 test('p6: changing repo drops the diff tab and the chat of the new repo starts clean', async () => {
   const page = boot();
   await withChanges(page);
-  pick(page, 'src/one.js');
+  pick(page, 'src/one.txt');
   await page.tick();
   open(page, 'xyz');
   page.flush();
@@ -264,28 +264,28 @@ test('p7: the answer of the diff is applied even if the chat polled meanwhile (i
   late.flush();
   lateAnswer(ok({ diff: TWO, truncated: false }));
   await late.tick();
-  assert.doesNotMatch(body(late), /src\/one\.js/, 'the repo shown is not painted with the diff of the one left');
+  assert.doesNotMatch(body(late), /src\/one\.txt/, 'the repo shown is not painted with the diff of the one left');
 });
 
 test('p8: a file that is not changed any more says so in the tab (it does not show the other files)', async () => {
   const page = boot();
   await withChanges(page);
-  pick(page, 'src/gone.js');
+  pick(page, 'src/gone.txt');
   await page.tick();
-  assert.match(body(page), /src\/gone\.js has no uncommitted changes/);
+  assert.match(body(page), /src\/gone\.txt has no uncommitted changes/);
   assert.doesNotMatch(body(page), /new src/);
 });
 
 test('p9: the Changes tab keeps listing ALL the files after a file was opened in the diff tab (it no longer filters in place)', async () => {
   const page = boot();
   await withChanges(page);
-  pick(page, 'src/two.js');
+  pick(page, 'src/two.txt');
   await page.tick();
   tab(page, 'changes');
   await page.tick();
   assert.match(body(page), /cv-list/);
-  assert.match(body(page), /new src\/one\.js/);
-  assert.match(body(page), /new src\/two\.js/);
+  assert.match(body(page), /new src\/one\.txt/);
+  assert.match(body(page), /new src\/two\.txt/);
 });
 
 test('p10: nothing is written by opening or closing the diff tab (no POST)', async () => {
@@ -293,7 +293,7 @@ test('p10: nothing is written by opening or closing the diff tab (no POST)', asy
   await withChanges(page);
   const posts = () => page.fetches.filter((f) => f.method !== 'GET').map((f) => f.url);
   const before = posts(); // the page makes some POSTs of its own at start (the queue); only what opening and closing the tab adds counts
-  pick(page, 'src/one.js');
+  pick(page, 'src/one.txt');
   await page.tick();
   page.run("ACTIONS['diff-close']({})");
   page.flush();

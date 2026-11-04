@@ -7,7 +7,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const { PUBLIC, APP_FILES } = require('./pagesrc.js');
+const { PUBLIC, LIB_FILES, APP_FILES } = require('./pagesrc.js');
 
 const read = (f) => fs.readFileSync(path.join(PUBLIC, f), 'utf8').replace(/\r\n/g, '\n');
 const MOVED = ['raf', 'draw', 'PRESS_MAX_MS', 'pressedAt', 'renderWaiting', 'pressHeld', 'releasePress', 'COLUMNS', 'COLUMN_BY_KEY', 'BOARD_KEYS', 'cleanAsColumn', 'boardKeys',
@@ -42,7 +42,7 @@ test('board.js sits between chat.js and app.js, and index.html loads the scripts
   assert.ok(at('chat.js') >= 0 && at('board.js') > at('chat.js') && at('app.js') > at('board.js'), JSON.stringify(APP_FILES));
   assert.equal(APP_FILES[APP_FILES.length - 1], 'app.js');
   const scripts = [...read('index.html').matchAll(/<script src="([^"]+)"><\/script>/g)].map((m) => m[1]);
-  assert.deepEqual(scripts, ['/view.js', '/resumen.js', ...APP_FILES.map((f) => `/${f}`)]);
+  assert.deepEqual(scripts, [...LIB_FILES, ...APP_FILES].map((f) => `/${f}`));
 });
 
 test('board.js loads after the other four as a separate script and touches no S, V, R or document', () => {

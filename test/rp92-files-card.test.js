@@ -179,7 +179,7 @@ test('g2: touching a file of the card opens it in the diff tab (the diff is read
   assert.equal(page.run('S.chat.tab'), 'diff');
   assert.equal(page.run('S.chat.dfile'), 'src/app.js');
   assert.equal(diffReads(page), 1);
-  assert.match(page.get('#chatBody').html, /new app/);
+  assert.match(page.get('#chatBody').html.replace(/<[^>]+>/g, ''), /new app/); // RP66b: the .js rows are colored, the text is the same
   assert.match(col(page), /cf-on" data-act="changes-file" data-path="src\/app\.js" aria-pressed="true"/);
   assert.deepEqual(tabsOf(page), ['chat', 'files', 'notes', 'diff']);
   page.run("ACTIONS['changes-file']({ dataset: { path: 'new.txt' } })");

@@ -7,7 +7,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const { PUBLIC, APP_FILES } = require('./pagesrc.js');
+const { PUBLIC, LIB_FILES, APP_FILES } = require('./pagesrc.js');
 
 const read = (f) => fs.readFileSync(path.join(PUBLIC, f), 'utf8').replace(/\r\n/g, '\n');
 const MOVED = ['ev', 'applyRpc', 'settled', 'rpcSync', 'rpcSyncAll', 'RPC_STATE_NAMES', 'rpcSeed', 'readEvents', 'stopEvents', 'startEvents', 'pollSkipped', 'quietNow',
@@ -29,7 +29,7 @@ test('data.js and feed.js come first and app.js last in the page scripts, and in
   assert.deepEqual(APP_FILES.slice(0, 2), ['data.js', 'feed.js']);
   assert.equal(APP_FILES[APP_FILES.length - 1], 'app.js');
   const scripts = [...read('index.html').matchAll(/<script src="([^"]+)"><\/script>/g)].map((m) => m[1]);
-  assert.deepEqual(scripts, ['/view.js', '/resumen.js', ...APP_FILES.map((f) => `/${f}`)]);
+  assert.deepEqual(scripts, [...LIB_FILES, ...APP_FILES].map((f) => `/${f}`));
 });
 
 test('feed.js loads after data.js, as a separate script, without touching S, V, R or the DOM', () => {

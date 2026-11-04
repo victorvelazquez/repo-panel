@@ -113,7 +113,7 @@ const countOf = (page, url) => urls(page).filter((u) => u === url).length;
 
 // ---------- RP64 fixtures ----------
 const DIFF = (name) => ['diff --git a/' + name + ' b/' + name, '--- a/' + name, '+++ b/' + name, '@@ -1,2 +1,2 @@', ' keep ' + name, '-old ' + name, '+new ' + name].join('\n');
-const DATA = (name = 'src/a.js') => ({ diff: DIFF(name), truncated: false });
+const DATA = (name = 'src/a.txt') => ({ diff: DIFF(name), truncated: false });
 const DF = (id) => `/api/diff?id=${id}`;
 const diffReads = (page, id) => page.fetches.filter((f) => f.url === DF(id)).length;
 const tab = (page, t) => page.run(`ACTIONS['chat-tab']({ dataset: { tab: '${t}' } })`);
@@ -129,8 +129,8 @@ test('d1: the diff chip on the Summary opens that repo\'s chat on the Changes ta
   assert.equal(page.run('S.chat.id'), 'abc');
   assert.equal(chatTab(page), 'changes');
   assert.equal(diffReads(page, 'abc'), 1);
-  assert.match(body(page), /data-path="src\/a\.js"/);
-  assert.match(body(page), /new src\/a\.js/);
+  assert.match(body(page), /data-path="src\/a\.txt"/);
+  assert.match(body(page), /new src\/a\.txt/);
 });
 
 test('d2: the diff chip on the Work tab switches to the Summary and opens Changes there (one viewer, in one place)', async () => {
@@ -260,36 +260,36 @@ test('d9: a failed read says "Changes unavailable"; a later failure keeps the la
   tab(page, 'chat');
   tab(page, 'changes');
   await page.tick();
-  assert.match(body(page), /new src\/a\.js/);
+  assert.match(body(page), /new src\/a\.txt/);
   page.routes[DF('abc')] = () => Promise.resolve(bad(500));
   tab(page, 'chat');
   tab(page, 'changes');
   await page.tick();
-  assert.match(body(page), /new src\/a\.js/, 'the last good answer is kept');
+  assert.match(body(page), /new src\/a\.txt/, 'the last good answer is kept');
 });
 
 test('d10 (RP90): changes-file with a path opens that file in the diff tab (one file, the Changes list keeps every file) and an empty path only redraws; the file is forgotten when the chat is reopened', async () => {
   const { page } = boot();
   serve(page, 'abc', infoOf(FREE), histOf('hi'));
-  page.routes[DF('abc')] = () => Promise.resolve(ok({ diff: `${DIFF('one.js')}\n${DIFF('two.js')}`, truncated: false }));
+  page.routes[DF('abc')] = () => Promise.resolve(ok({ diff: `${DIFF('one.txt')}\n${DIFF('two.txt')}`, truncated: false }));
   diffAct(page, 'abc');
   await page.tick();
-  assert.ok(/new one\.js/.test(body(page)) && /new two\.js/.test(body(page)));
-  page.run("ACTIONS['changes-file']({ dataset: { path: 'two.js' } })");
+  assert.ok(/new one.txt/.test(body(page)) && /new two.txt/.test(body(page)));
+  page.run("ACTIONS['changes-file']({ dataset: { path: 'two.txt' } })");
   await page.tick();
   assert.equal(page.run('S.chat.tab'), 'diff');
-  assert.ok(!/new one\.js/.test(body(page)) && /new two\.js/.test(body(page)), 'the diff tab shows only that file');
+  assert.ok(!/new one.txt/.test(body(page)) && /new two.txt/.test(body(page)), 'the diff tab shows only that file');
   page.run("ACTIONS['changes-file']({ dataset: { path: '' } })");
   page.flush();
   assert.equal(page.run('S.chat.tab'), 'diff', 'an empty path changes nothing');
   page.run("ACTIONS['chat-tab']({ dataset: { tab: 'changes' } })");
   await page.tick();
-  assert.ok(/new one\.js/.test(body(page)) && /new two\.js/.test(body(page)), 'the Changes tab still lists every file');
-  page.run("ACTIONS['changes-file']({ dataset: { path: 'two.js' } })");
+  assert.ok(/new one.txt/.test(body(page)) && /new two.txt/.test(body(page)), 'the Changes tab still lists every file');
+  page.run("ACTIONS['changes-file']({ dataset: { path: 'two.txt' } })");
   close(page);
   diffAct(page, 'abc');
   await page.tick();
-  assert.ok(/new one\.js/.test(body(page)), 'a new opening starts with every file and no diff tab');
+  assert.ok(/new one.txt/.test(body(page)), 'a new opening starts with every file and no diff tab');
   assert.equal(page.run('S.chat.dfile || ""'), '');
 });
 
