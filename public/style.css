@@ -455,6 +455,24 @@ body.tab-conformity #viewbar { display: none; }
 .cv-l.h { background: #101d2e; color: var(--blue); }
 .cv-l.m { color: var(--muted); }
 .cv-more { text-align: center; padding: 8px 0; }
+/* RP66c: the side-by-side diff. A row is two halves (old on the left, new on the right); below the width of the code box the halves stack: deleted first, the context once, the empty half gone. */
+.cv-bar { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+.cv-split-btn { font-size: 12px; padding: 2px 10px; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--muted); cursor: pointer; }
+.cv-split-btn[aria-pressed="true"] { border-color: var(--blue); color: var(--blue); background: #12253d; }
+.cv-split-btn:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.cv-code.cv-split { container-type: inline-size; container-name: cvs; }
+.cv-s { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.cv-half { display: flex; min-width: 0; min-height: 1.45em; }
+.cv-half .cv-t { min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.cv-half.d { background: #2a1517; color: #ffa198; }
+.cv-half.a { background: #12261a; color: #7ee787; }
+.cv-half.e { background: var(--panel); }
+.cv-hr { border-left: 1px solid var(--line); }
+@container cvs (max-width: 700px) {
+  .cv-s { grid-template-columns: minmax(0, 1fr); }
+  .cv-hr.c, .cv-half.e { display: none; }
+  .cv-hr { border-left: 0; }
+}
 /* RP65: the Files tab. The tree scrolls on its own so the file below it keeps its room; the changed lines of a file are a soft amber, apart from the green and red of a diff. */
 .ft-tree { flex: none; max-height: 40vh; overflow: auto; display: flex; flex-direction: column; margin-bottom: 12px; font-size: 13px; }
 .ft-row { display: flex; align-items: center; gap: 6px; width: 100%; text-align: left; border: 1px solid transparent; background: transparent; padding: 2px 6px 2px calc(6px + var(--d, 0) * 14px); border-radius: 6px; }

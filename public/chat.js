@@ -282,7 +282,7 @@ function drawChat() {
     return;
   }
   if (diffTab) {
-    paint($('#chatBody'), R.changesView(S.changes[S.chat.id] || null, { selected: S.chat.dfile, only: true, loading: !!S.chat.changesLoading, failed: !!S.chat.changesFailed }));
+    paint($('#chatBody'), R.changesView(S.changes[S.chat.id] || null, { selected: S.chat.dfile, only: true, split: !!S.prefs.split, loading: !!S.chat.changesLoading, failed: !!S.chat.changesFailed }));
     chatShown = null;
     return;
   }
@@ -295,7 +295,7 @@ function drawChat() {
     return;
   }
   if (changesTab) {
-    paint($('#chatBody'), R.changesView(S.changes[S.chat.id] || null, { selected: '', loading: !!S.chat.changesLoading, failed: !!S.chat.changesFailed }));
+    paint($('#chatBody'), R.changesView(S.changes[S.chat.id] || null, { selected: '', split: !!S.prefs.split, loading: !!S.chat.changesLoading, failed: !!S.chat.changesFailed }));
     chatShown = null;
     return;
   }

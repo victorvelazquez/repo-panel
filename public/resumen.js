@@ -375,17 +375,42 @@
     let left = CODE_MAX;
     let cut = 0;
     const SIGN = { c: ' ', a: '+', d: '-', h: '', m: '' };
+    const uni = (r, html) => `<div class="cv-l ${r.kind}"><span class="cv-n">${r.old ?? ''}</span><span class="cv-n">${r.new ?? ''}</span><span class="cv-t">${SIGN[r.kind]}${html}</span></div>`;
+    // RP66c: one half of a side-by-side row (kind c context, d deleted, a added, e empty); the old number on the left, the new one on the right.
+    const half = (side, kind, n, html) => `<div class="cv-half cv-h${side} ${kind}"><span class="cv-n">${n ?? ''}</span><span class="cv-t">${html}</span></div>`;
+    const pair = (d, a, html) => `<div class="cv-s">${d ? half('l', 'd', d[1].old, SIGN.d + html(...d)) : half('l', 'e', '', '')}${a ? half('r', 'a', a[1].new, SIGN.a + html(...a)) : half('r', 'e', '', '')}</div>`;
+    // Pairs the lines of each hunk: context on both sides; a group of deleted lines next to a group of added ones one by one, the rest alone; headers and markers stay full width.
+    const sideBySide = (vis, html) => {
+      const out = [];
+      let dels = [];
+      let adds = [];
+      const flush = () => { for (let k = 0; k < Math.max(dels.length, adds.length); k++) out.push(pair(dels[k], adds[k], html)); dels = []; adds = []; };
+      for (const e of vis) {
+        const [i, r] = e;
+        if (r.kind === 'd') dels.push(e);
+        else if (r.kind === 'a') adds.push(e);
+        else {
+          flush();
+          out.push(r.kind === 'c' ? `<div class="cv-s">${half('l', 'c', r.old, SIGN.c + html(i, r))}${half('r', 'c', r.new, SIGN.c + html(i, r))}</div>` : uni(r, esc(r.text)));
+        }
+      }
+      flush();
+      return out;
+    };
     const sections = shown.map((x) => {
-      const rows = [];
       const colored = highlightDiff(x);
+      const html = (i, r) => colored[i] ?? esc(r.text);
+      const vis = [];
       for (const [i, r] of x.lines.entries()) {
         if (left <= 0) { if (r.kind !== 'h') cut++; continue; }
         if (r.kind !== 'h') left--;
-        rows.push(`<div class="cv-l ${r.kind}"><span class="cv-n">${r.old ?? ''}</span><span class="cv-n">${r.new ?? ''}</span><span class="cv-t">${SIGN[r.kind]}${colored[i] ?? esc(r.text)}</span></div>`);
+        vis.push([i, r]);
       }
-      return `<section class="cv-file"><h3 class="cv-title" title="${esc(x.path)}">${esc(x.path)}</h3>${x.note ? `<div class="cv-note rs-sub">${esc(x.note)}</div>` : ''}${rows.length ? `<div class="cv-code">${rows.join('')}</div>` : ''}</section>`;
+      const rows = ctx.split ? sideBySide(vis, html) : vis.map(([i, r]) => uni(r, html(i, r)));
+      return `<section class="cv-file"><h3 class="cv-title" title="${esc(x.path)}">${esc(x.path)}</h3>${x.note ? `<div class="cv-note rs-sub">${esc(x.note)}</div>` : ''}${rows.length ? `<div class="cv-code${ctx.split ? ' cv-split' : ''}">${rows.join('')}</div>` : ''}</section>`;
     }).join('');
-    return `${list}${data.truncated ? '<div class="err">Diff truncated (too large).</div>' : ''}${sections}${cut ? `<div class="cv-more rs-sub">+${cut} more lines</div>` : ''}`;
+    const bar = `<div class="cv-bar"><button type="button" class="cv-split-btn" data-act="diff-split" aria-pressed="${!!ctx.split}">Side by side</button></div>`;
+    return `${bar}${list}${data.truncated ? '<div class="err">Diff truncated (too large).</div>' : ''}${sections}${cut ? `<div class="cv-more rs-sub">+${cut} more lines</div>` : ''}`;
   }
 
   // The Files tab (RP65, S62): the tree of files of the repo (GET /api/files) and the file read (GET /api/file) in the numbered-lines look of
