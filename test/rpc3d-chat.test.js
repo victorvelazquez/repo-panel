@@ -7,7 +7,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const { PUBLIC, APP_FILES } = require('./pagesrc.js');
+const { PUBLIC, LIB_FILES, APP_FILES } = require('./pagesrc.js');
 
 const read = (f) => fs.readFileSync(path.join(PUBLIC, f), 'utf8').replace(/\r\n/g, '\n');
 const MOVED = ['CHAT_MS', 'chatUrl', 'chatShown', 'LAYOUT_KEY', 'COLUMN_FROM', 'layoutRatios', 'chatCtl', 'loadChat', 'openChat', 'closeChat', 'chatTick', 'loadTasks', 'loadChanges',
@@ -41,7 +41,7 @@ test('chat.js sits between tabs.js and app.js, and index.html loads the scripts 
   assert.ok(at('tabs.js') >= 0 && at('chat.js') > at('tabs.js') && at('app.js') > at('chat.js'), JSON.stringify(APP_FILES));
   assert.equal(APP_FILES[APP_FILES.length - 1], 'app.js');
   const scripts = [...read('index.html').matchAll(/<script src="([^"]+)"><\/script>/g)].map((m) => m[1]);
-  assert.deepEqual(scripts, ['/view.js', '/resumen.js', ...APP_FILES.map((f) => `/${f}`)]);
+  assert.deepEqual(scripts, [...LIB_FILES, ...APP_FILES].map((f) => `/${f}`));
 });
 
 test('chat.js loads after data.js, feed.js and tabs.js as a separate script, reads the saved layout and touches no S, V, R or document', () => {

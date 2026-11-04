@@ -335,6 +335,32 @@
 
   // The Changes tab: the file list (a button per file) and the code with two number gutters. ctx = { selected, loading, failed }.
   const CODE_MAX = 2000;
+  // RP66b: the syntax highlighter (highlight.js: a global in the page, a module in Node), looked up like view.js. Without it every row is painted as plain escaped text.
+  const highlighter = () => { const h = typeof module === 'object' && module.exports ? require('./highlight.js') : root.RepoPanelHighlight; return h && h.languageOf && h.highlightLines ? h : null; };
+  // The highlighted HTML of every row of one changed file, by index of `x.lines` (null: paint that row as plain text). The new side (context and added lines) and the old side (context and
+  // deleted lines) are two separate streams per hunk, so a deleted `/*` never turns the added lines into a comment, and nothing carries over from one hunk to the next.
+  function highlightDiff(x) {
+    const h = highlighter();
+    const lang = h ? h.languageOf(x.path) : null;
+    if (!lang) return [];
+    const out = [];
+    let side = { n: [], o: [] };
+    const flush = () => {
+      for (const k of ['n', 'o']) {
+        const html = h.highlightLines(side[k].map(([, t]) => t), lang);
+        if (html) side[k].forEach(([i], j) => { if (k === 'n' || x.lines[i].kind === 'd') out[i] = html[j]; });
+      }
+      side = { n: [], o: [] };
+    };
+    x.lines.forEach((r, i) => {
+      if (r.kind === 'h') flush();
+      else if (r.kind === 'c') { side.n.push([i, r.text]); side.o.push([i, r.text]); }
+      else if (r.kind === 'a') side.n.push([i, r.text]);
+      else if (r.kind === 'd') side.o.push([i, r.text]);
+    });
+    flush();
+    return out;
+  }
   function changesView(data, ctx = {}) {
     const note = (t) => `<div class="empty" role="status">${t}</div>`;
     if (!data) return note(ctx.failed ? 'Changes unavailable' : 'Loading changes…');
@@ -351,10 +377,11 @@
     const SIGN = { c: ' ', a: '+', d: '-', h: '', m: '' };
     const sections = shown.map((x) => {
       const rows = [];
-      for (const r of x.lines) {
+      const colored = highlightDiff(x);
+      for (const [i, r] of x.lines.entries()) {
         if (left <= 0) { if (r.kind !== 'h') cut++; continue; }
         if (r.kind !== 'h') left--;
-        rows.push(`<div class="cv-l ${r.kind}"><span class="cv-n">${r.old ?? ''}</span><span class="cv-n">${r.new ?? ''}</span><span class="cv-t">${SIGN[r.kind]}${esc(r.text)}</span></div>`);
+        rows.push(`<div class="cv-l ${r.kind}"><span class="cv-n">${r.old ?? ''}</span><span class="cv-n">${r.new ?? ''}</span><span class="cv-t">${SIGN[r.kind]}${colored[i] ?? esc(r.text)}</span></div>`);
       }
       return `<section class="cv-file"><h3 class="cv-title" title="${esc(x.path)}">${esc(x.path)}</h3>${x.note ? `<div class="cv-note rs-sub">${esc(x.note)}</div>` : ''}${rows.length ? `<div class="cv-code">${rows.join('')}</div>` : ''}</section>`;
     }).join('');
@@ -383,7 +410,10 @@
     if (!lines.length) return wrap('<div class="cv-note rs-sub">Empty file</div>');
     const marks = (Array.isArray(file.changed) ? file.changed : []).filter(Array.isArray).map(([s, n]) => [Math.floor(Number(s)), Math.floor(Number(n))]).filter(([s, n]) => s >= 1 && n >= 1);
     const hit = (i) => marks.some(([s, n]) => i >= s && i < s + n);
-    const rows = lines.slice(0, CODE_MAX).map((ln, i) => `<div class="cv-l${hit(i + 1) ? ' e' : ''}"><span class="cv-n">${i + 1}</span><span class="cv-t">${esc(ln.replace(/\r$/, ''))}</span></div>`);
+    const text = lines.map((ln) => ln.replace(/\r$/, ''));
+    const h = highlighter();
+    const colored = h && h.languageOf(sel) ? h.highlightLines(text, h.languageOf(sel)) : null;
+    const rows = text.slice(0, CODE_MAX).map((ln, i) => `<div class="cv-l${hit(i + 1) ? ' e' : ''}"><span class="cv-n">${i + 1}</span><span class="cv-t">${colored ? colored[i] : esc(ln)}</span></div>`);
     return wrap(`<div class="cv-code">${rows.join('')}</div>${lines.length > CODE_MAX ? `<div class="cv-more rs-sub">+${lines.length - CODE_MAX} more lines</div>` : ''}`);
   }
   function filesView(tree, ctx = {}, file = null) {

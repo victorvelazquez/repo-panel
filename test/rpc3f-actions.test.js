@@ -7,7 +7,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const { PUBLIC, APP_FILES } = require('./pagesrc.js');
+const { PUBLIC, LIB_FILES, APP_FILES } = require('./pagesrc.js');
 
 const read = (f) => fs.readFileSync(path.join(PUBLIC, f), 'utf8').replace(/\r\n/g, '\n');
 const MOVED = ['doMerge', 'doRerun', 'addRepos', 'reloadRooms', 'createRoom', 'JUDGED_CMDS', 'ACTIONS', 'loadUsage'];
@@ -41,7 +41,7 @@ test('actions.js sits between board.js and app.js, and index.html loads the scri
   assert.ok(at('board.js') >= 0 && at('actions.js') > at('board.js') && at('app.js') > at('actions.js'), JSON.stringify(APP_FILES));
   assert.equal(APP_FILES[APP_FILES.length - 1], 'app.js');
   const scripts = [...read('index.html').matchAll(/<script src="([^"]+)"><\/script>/g)].map((m) => m[1]);
-  assert.deepEqual(scripts, ['/view.js', '/resumen.js', ...APP_FILES.map((f) => `/${f}`)]);
+  assert.deepEqual(scripts, [...LIB_FILES, ...APP_FILES].map((f) => `/${f}`));
 });
 
 test('actions.js loads after the other five as a separate script and touches no S, V, R or document', () => {

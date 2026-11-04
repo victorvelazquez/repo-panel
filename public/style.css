@@ -465,6 +465,16 @@ body.tab-conformity #viewbar { display: none; }
 .ft-mark { font-family: ui-monospace, Consolas, monospace; font-size: 11px; color: var(--yellow); }
 .ft-row:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 .cv-l.e { background: #2a2410; color: #f0d98a; }
+/* RP66b: syntax colors of the viewer (public/highlight.js). Colors only, never a background: the added, deleted and changed rows keep theirs. */
+.hl-k { color: #ff7b72; }
+.hl-s { color: #a5d6ff; }
+.hl-c { color: #8b949e; font-style: italic; }
+.hl-n { color: #79c0ff; }
+.hl-p { color: #d2a8ff; }
+.hl-t { color: #7ee787; }
+.hl-a { color: #79c0ff; }
+.hl-v { color: #ffa657; }
+.hl-h { color: #79c0ff; font-weight: 600; }
 .ch-name { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ch-body { flex: 1; min-height: 0; overflow: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
 .ch-body .empty { padding: 30px 0; }

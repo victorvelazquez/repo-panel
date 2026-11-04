@@ -169,6 +169,40 @@ test('a line of backticks that never closes is linear in markdown: 60000 of them
   assert.ok(Date.now() - t0 < 1000, `took ${Date.now() - t0} ms`);
 });
 
+test('every scanner is linear: a line of 100,000 characters that repeat a name separator, a tag or a quote finishes fast in every language (RP66b, found by the independent check)', () => {
+  const nasty = [
+    '<a ' + 'a.'.repeat(50000), '<a ' + 'a:a:'.repeat(25000), '<a ' + 'a-'.repeat(50000), '<a ' + 'a@'.repeat(50000), '<a ' + 'a b '.repeat(25000), '<a ' + 'x = '.repeat(25000),
+    '<a ' + '"'.repeat(100000), '<' + 'a<'.repeat(50000), '<!--'.repeat(25000), '&'.repeat(100000),
+    'a.'.repeat(50000), 'a:'.repeat(50000), '$'.repeat(100000), '$('.repeat(50000), '"'.repeat(100000), "'".repeat(100000), '/*'.repeat(50000), '//'.repeat(50000),
+    '@a '.repeat(30000), '{'.repeat(100000), 'a{b:c;'.repeat(20000), '#'.repeat(100000), '1.'.repeat(50000), '0x'.repeat(50000), '`'.repeat(100000), '**'.repeat(50000), '['.repeat(100000),
+  ];
+  for (const lang of LANGS) {
+    for (const s of nasty) {
+      const t = Date.now();
+      const out = one(s, lang);
+      const ms = Date.now() - t;
+      assert.ok(ms < 1500, `${lang}: ${ms} ms for ${JSON.stringify(s.slice(0, 12))}... (${s.length} chars): not linear`);
+      assert.equal(strip(out), esc(s));
+    }
+  }
+});
+
+test('S5: the spans are balanced and never nested, in every language, on deterministic random hostile lines (a stray </span> would break out of the cell)', () => {
+  const alpha = ['<', '>', '"', "'", '`', '/', '*', '\\', '#', '$', '{', '}', '-', '!', '=', ':', ' ', '\r', '\0', '\ud800', '\udc00', 'a', '1', '.', '<!--', '-->', '/*', '*/', '</', '<a', '${', '```', '</span>', '<span class="hl-k">'];
+  let seed = 7;
+  const rnd = (n) => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed % n; };
+  const balanced = (h) => { let d = 0; for (const m of h.matchAll(/<span class="hl-[a-z]">|<\/span>/g)) { d += m[0] === '</span>' ? -1 : 1; if (d < 0 || d > 1) return false; } return d === 0; };
+  for (const lang of LANGS) {
+    for (let t = 0; t < 400; t++) {
+      const lines = Array.from({ length: 1 + rnd(5) }, () => Array.from({ length: rnd(25) }, () => alpha[rnd(alpha.length)]).join(''));
+      H.highlightLines(lines, lang).forEach((h, i) => {
+        assert.ok(balanced(h), `${lang} ${JSON.stringify(lines[i])} gave unbalanced spans: ${h}`);
+        assert.equal(strip(h), esc(lines[i]), `${lang} ${JSON.stringify(lines[i])}`);
+      });
+    }
+  }
+});
+
 test('it is pure: it loads in an empty context with no document, no window and no network', () => {
   const ctx = vm.createContext({});
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'public', 'highlight.js'), 'utf8'), ctx);

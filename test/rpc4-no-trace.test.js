@@ -7,7 +7,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
-const { APP_FILES } = require('./pagesrc.js');
+const { LIB_FILES, APP_FILES } = require('./pagesrc.js');
 
 const ROOT = path.join(__dirname, '..');
 const NAME = new RegExp('or' + 'ca', 'i');
@@ -59,7 +59,7 @@ test('the README says where the page code lives: every page script, in load orde
   const readme = fs.readFileSync(path.join(ROOT, 'README.md'), 'utf8').replace(/\r\n/g, '\n'); // a Windows checkout has \r\n
   const section = (readme.match(/^## Page code\n([\s\S]*?)(?=^## )/m) || [])[1];
   assert.ok(section, 'the README has a "Page code" section');
-  for (const f of ['view.js', 'resumen.js', ...APP_FILES]) assert.ok(section.includes(`public/${f}`), `the section names public/${f}`);
+  for (const f of [...LIB_FILES, ...APP_FILES]) assert.ok(section.includes(`public/${f}`), `the section names public/${f}`);
   const order = APP_FILES.map((f) => section.indexOf(`public/${f}`));
   assert.deepEqual(order, [...order].sort((a, b) => a - b), 'the section lists the page scripts in the order index.html loads them');
 });

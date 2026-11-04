@@ -10,7 +10,7 @@ const net = require('node:net');
 const os = require('node:os');
 const path = require('node:path');
 const vm = require('node:vm');
-const { PUBLIC, APP_FILES, appSource } = require('./pagesrc.js');
+const { PUBLIC, LIB_FILES, APP_FILES, appSource } = require('./pagesrc.js');
 
 const read = (f) => fs.readFileSync(path.join(PUBLIC, f), 'utf8');
 const MOVED = ['api', 'pooled', 'pump', 'toast', 'allRepos', 'loadConfig', 'track', 'touchSummary', 'setFact', 'loadLocal', 'rpcSession', 'sessionOf', 'loadPrs',
@@ -25,10 +25,10 @@ test('data.js defines the whole data layer and app.js defines none of it', () =>
   for (const n of ['S', 'TOKEN', 'paint']) assert.equal(defines(app, n), true, `app.js keeps ${n}`);
 });
 
-test('the page list is the one index.html loads, in order, after view.js and resumen.js', () => {
+test('the page list is the one index.html loads, in order, after the pure libraries', () => {
   const html = read('index.html');
   const scripts = [...html.matchAll(/<script src="([^"]+)"><\/script>/g)].map((m) => m[1]);
-  assert.deepEqual(scripts, ['/view.js', '/resumen.js', ...APP_FILES.map((f) => `/${f}`)]);
+  assert.deepEqual(scripts, [...LIB_FILES, ...APP_FILES].map((f) => `/${f}`));
 });
 
 test('data.js loads on its own, before app.js, without touching S, V, R or the DOM', () => {

@@ -315,7 +315,7 @@ Known limits and what is not verified:
 
 ## Page code
 
-The page is plain scripts with no build step. `index.html` loads them one after the other and they share the global scope (the state `S`, the helpers and every function), so the order matters: every file except the last only defines things, and touches the page when one of its functions is called, never while it loads. Two files are pure (data in, HTML out) and the page tests share them: `public/view.js` and `public/resumen.js`. The rest is split by layer, in load order:
+The page is plain scripts with no build step. `index.html` loads them one after the other and they share the global scope (the state `S`, the helpers and every function), so the order matters: every file except the last only defines things, and touches the page when one of its functions is called, never while it loads. Three files are pure (data in, HTML out) and the page tests share them: `public/view.js`, `public/highlight.js` (the syntax colors of the file and diff viewer: JavaScript and TypeScript, JSON, CSS, HTML, Markdown and shell, files up to 2,000 lines; the text of a file is always escaped, the only markup it adds is a token span) and `public/resumen.js`. The rest is split by layer, in load order:
 
 - `public/data.js`: the requests to the server (with their pool) and the reads of each repo.
 - `public/feed.js`: the event stream, the board data and the refresh ticks.

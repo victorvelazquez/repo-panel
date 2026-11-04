@@ -134,7 +134,17 @@
 
   // ---- html ----
   const htmlTag = sticky(/<\/?[A-Za-z][\w:-]*/);
-  const htmlAttr = sticky(/[A-Za-z_:@][\w:.@-]*(?=\s*=)/);
+  // An attribute is a name followed by `=`. The name is read once (no lookahead inside the pattern, so nothing backtracks) and `=` is looked for after it; the rule only starts at the
+  // boundary of a name (never inside one), so a line of `a.a.a.` or `a:a:` is read once instead of once per character.
+  const htmlName = sticky(/[A-Za-z_:@][\w:.@-]*/);
+  const isNameChar = (c) => c !== undefined && /[\w:.@-]/.test(c);
+  const htmlAttr = (line, i) => {
+    const n = htmlName(line, i);
+    if (!n) return 0;
+    let j = i + n;
+    while (j < line.length && /\s/.test(line[j])) j++;
+    return line[j] === '=' ? n : 0;
+  };
   const HTML_RULES = [
     (line, i, st) => {
       if (line.startsWith('<!--', i)) { const k = line.indexOf('-->', i + 4); if (k < 0) { st.mode = 'htmlc'; return [line.length - i, 'c']; } return [k + 3 - i, 'c']; }
@@ -142,7 +152,7 @@
     },
     (line, i, st) => { if (line[i] !== '<') return null; const n = htmlTag(line, i); if (!n) return null; st.inTag = true; return [n, 't']; },
     (line, i, st) => { if (!st.inTag || line[i] !== '>') return null; st.inTag = false; return [1, null]; },
-    (line, i, st) => { if (!st.inTag || isWordChar(line[i - 1])) return null; const n = htmlAttr(line, i); return n ? [n, 'a'] : null; },
+    (line, i, st) => { if (!st.inTag || isNameChar(line[i - 1])) return null; const n = htmlAttr(line, i); return n ? [n, 'a'] : null; },
     (line, i, st) => (st.inTag ? quoted(['"', "'"], 'html')(line, i, st) : null),
   ];
 

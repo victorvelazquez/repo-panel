@@ -8,7 +8,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const { PUBLIC, APP_FILES } = require('./pagesrc.js');
+const { PUBLIC, LIB_FILES, APP_FILES } = require('./pagesrc.js');
 
 const read = (f) => fs.readFileSync(path.join(PUBLIC, f), 'utf8').replace(/\r\n/g, '\n');
 const MOVED = ['modelOf', 'info', 'visibleRepos', 'queueItems', 'refreshQueue', 'QUEUE_MAX', 'QUEUE_CLIP', 'clip', 'QUEUE_TEXT', 'QUEUE_TITLE', 'QUEUE_COLOR', 'drawQueue',
@@ -33,7 +33,7 @@ test('the page scripts keep data.js, feed.js and tabs.js before app.js, and inde
   assert.deepEqual(APP_FILES.slice(0, 3), ['data.js', 'feed.js', 'tabs.js']);
   assert.equal(APP_FILES[APP_FILES.length - 1], 'app.js');
   const scripts = [...read('index.html').matchAll(/<script src="([^"]+)"><\/script>/g)].map((m) => m[1]);
-  assert.deepEqual(scripts, ['/view.js', '/resumen.js', ...APP_FILES.map((f) => `/${f}`)]);
+  assert.deepEqual(scripts, [...LIB_FILES, ...APP_FILES].map((f) => `/${f}`));
 });
 
 test('tabs.js loads after data.js and feed.js, as a separate script, without touching S, V, R or the DOM', () => {
