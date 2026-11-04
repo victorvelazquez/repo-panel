@@ -111,7 +111,7 @@ test('h5: --session-id is the adopted one, else panel-<slug>, and always passes 
   }
   const plain = hostWith();
   await plain.host.start(addRepo('p1', 'C:\\repos\\My App'));
-  assert.equal(plain.made[0].opts.args[3], 'panel-my-app');
+  assert.equal(plain.made[0].opts.args[3], 'panel-my-app-p1'); // RP97: the first 8 letters and digits of the repo id are part of it
   const bad = hostWith({ adoptedOf: () => ({ id: '../evil;x' }) });
   await bad.host.start(a);
   assert.match(bad.made[0].opts.args[3], SESSION_ID);
@@ -233,7 +233,7 @@ test('h14: status carries state, pending dialogs and the session id; events are 
   await host.start(a);
   made[0].st = 'asking';
   made[0].dialogs.push('d9');
-  assert.deepEqual(await host.status(a), { state: 'asking', pendingDialogs: [{ requestId: 'd9', method: 'select' }], sessionId: 'panel-alpha' });
+  assert.deepEqual(await host.status(a), { state: 'asking', pendingDialogs: [{ requestId: 'd9', method: 'select' }], sessionId: 'panel-alpha-aaa' });
   made[0].opts.onEvent({ kind: 'dialog', id: 'd9', method: 'select', title: 'T' });
   made[0].opts.onEvent({ kind: 'event', record: { type: 'agent_start' } });
   made[0].opts.onEvent({ kind: 'event', record: { type: 'huge', text: 'z'.repeat(400000) } });
@@ -245,9 +245,9 @@ test('h14: status carries state, pending dialogs and the session id; events are 
 
 test('h5b: the slug of panel-<slug> is the last folder with either separator, on any platform, and a root path falls back to the repo id', () => {
   const slug = (p, id = 'ab1') => sessionIdFor({ path: p, id }, null);
-  assert.equal(slug('C:\\repos\\My App'), 'panel-my-app');
-  assert.equal(slug('/home/u/repos/my-app/'), 'panel-my-app');
-  assert.equal(slug('C:/repos/my-app'), 'panel-my-app');
+  assert.equal(slug('C:\\repos\\My App'), 'panel-my-app-ab1');
+  assert.equal(slug('/home/u/repos/my-app/'), 'panel-my-app-ab1');
+  assert.equal(slug('C:/repos/my-app'), 'panel-my-app-ab1');
   assert.equal(slug('/', 'ab1'), 'panel-ab1', 'no folder name: the repo id, never a throw');
   assert.equal(slug('C:\\'), 'panel-ab1');
   for (const p of ['C:\\repos\\x y', '/a/b', '/', 'C:\\']) assert.match(slug(p), SESSION_ID);

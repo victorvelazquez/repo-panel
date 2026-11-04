@@ -121,7 +121,7 @@ test('a4: start answers the status; prompt, steer and abort reach the session of
   await withServer(async ({ post, get, made }) => {
     const s = await post('start', { id: ID });
     assert.equal(s.status, 200);
-    assert.deepEqual(s.json, { state: 'idle', pendingDialogs: [], sessionId: 'panel-my-repo' });
+    assert.deepEqual(s.json, { state: 'idle', pendingDialogs: [], sessionId: `panel-my-repo-${ID.slice(0, 8)}` });
     assert.equal(made.length, 1);
     assert.equal((await post('start', { id: ID })).status, 200);
     assert.equal(made.length, 1);
@@ -132,7 +132,7 @@ test('a4: start answers the status; prompt, steer and abort reach the session of
     assert.equal((await post('abort', { id: ID })).status, 200);
     assert.deepEqual(made[0].reqs, [['prompt', { message: 'hi\nthere', streamingBehavior: 'followUp' }], ['steer', { message: 'left' }], ['abort', {}]]);
     const g = await get(`/api/rpc/status?id=${ID}`);
-    assert.deepEqual(g.json, { state: 'idle', pendingDialogs: [], sessionId: 'panel-my-repo' });
+    assert.deepEqual(g.json, { state: 'idle', pendingDialogs: [], sessionId: `panel-my-repo-${ID.slice(0, 8)}` });
     for (const k of ['command', 'cwd', 'agentDir', 'gentle-shell.exe']) assert.equal(g.body.includes(k), false, k);
   });
 });
@@ -195,7 +195,7 @@ test('a9: no route takes a command, cwd, path, args or env from the browser', as
     assert.equal(made.length, 1);
     assert.equal(made[0].opts.cwd, REPO);
     assert.equal(made[0].opts.command, ACTIVE.command);
-    assert.deepEqual(made[0].opts.args, ['--mode', 'rpc', '--session-id', 'panel-my-repo']);
+    assert.deepEqual(made[0].opts.args, ['--mode', 'rpc', '--session-id', `panel-my-repo-${ID.slice(0, 8)}`]);
     assert.equal(JSON.stringify(made[0].opts.env).includes('"PI_X"'), false);
     await post('prompt', { id: ID, text: 'x', ...evil });
     await post('steer', { id: ID, text: 'x', ...evil });

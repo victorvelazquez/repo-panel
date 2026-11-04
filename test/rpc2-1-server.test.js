@@ -105,7 +105,7 @@ test('w5: state, dialog and exit still pass as they were (the dialog id travels 
 // ---------- status ----------
 test('s1: the status names a pending dialog by requestId, like the SSE dialog event', async () => {
   const { host } = await hostWith({}, { pendingDialogs: () => [{ id: 'd9', method: 'select', title: 'T', options: ['a'] }], state: () => 'asking' });
-  assert.deepEqual(await host.status('aaa'), { state: 'asking', pendingDialogs: [{ requestId: 'd9', method: 'select', title: 'T', options: ['a'] }], sessionId: 'panel-alpha' });
+  assert.deepEqual(await host.status('aaa'), { state: 'asking', pendingDialogs: [{ requestId: 'd9', method: 'select', title: 'T', options: ['a'] }], sessionId: 'panel-alpha-aaa' });
 });
 
 // ---------- adoption ----------
@@ -127,7 +127,7 @@ test('a1: adoptIfNone writes the id once, never overwrites and never writes an i
 test('a2: a start that creates the session adopts the id it used; a failed start adopts nothing', async () => {
   const calls = [];
   const { host } = await hostWith({ adopt: (id, sid) => calls.push([id, sid]) });
-  assert.deepEqual(calls, [['aaa', 'panel-alpha']]);
+  assert.deepEqual(calls, [['aaa', 'panel-alpha-aaa']]);
   await host.start('aaa');
   assert.equal(calls.length, 1, 'the second start returns the live one and adopts nothing more');
   const failing = [];
@@ -166,7 +166,7 @@ test('a4: POST /api/rpc/start adopts the session id of a repo with none; with on
   writeConfig();
   await withServer(async ({ post }) => {
     assert.equal((await post('/api/rpc/start', { id: ID })).status, 200);
-    assert.equal(loadConfig().sessions[ID].id, 'panel-my-repo');
+    assert.equal(loadConfig().sessions[ID].id, `panel-my-repo-${ID.slice(0, 8)}`); // RP97: the first 8 letters and digits of the repo id are part of it
   });
   writeConfig({ sessions: { [ID]: { id: 'mine-1', name: 'Mine', adoptedAt: '2026-01-01T00:00:00.000Z' } } });
   await withServer(async ({ post }) => {
