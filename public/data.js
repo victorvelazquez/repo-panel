@@ -130,15 +130,21 @@ function markAsked(id, now, { prs = true } = {}) {
 function stamp(id, kind) { (S.factAt[id] ||= {})[kind] = Date.now(); }
 
 // `catchUp`: the person's own action just ended, so the server's memory is asked to re-read that repo too (the board follows).
+// RP86b: and while the board answers (boardLeads) the roadmap (240 KB) and the requirements are not read directly when the page already holds them for that repo (the server answers
+// `{ available: false }` for a repo with no roadmap, so a `null` is a failed read, not an answer, and is read again): they arrive by the board. local and prs are what an action changes, and state is the freshest signal after one (the board would be up to 3 s late), so those are still read.
+// A fact the page does not hold yet, a board that is down or never answered, and a refresh that is not an action (refreshAll) keep the direct read.
 function refreshRepo(id, { poll = true, catchUp = false } = {}) {
   markAsked(id, Date.now());
   if (catchUp && boardWorks()) api('/api/board/refresh', { id }).catch(() => {});
+  const byBoard = catchUp && boardLeads();
+  const skipRoadmap = byBoard && !!S.roadmap[id];
+  const skipReq = byBoard && !!S.req[id] && S.req[id].state === 'loaded';
   return Promise.all([
     loadLocal(id),
     loadPrs(id),
     // The roadmap is optional: a repo without one, or a failed request, simply shows nothing extra.
-    track(id, pooled(() => api(`/api/roadmap?id=${id}`)).then((d) => { setFact('roadmap', id, d); stamp(id, 'roadmap'); }, () => { setFact('roadmap', id, null); })),
-    loadRequirements(id),
+    skipRoadmap ? Promise.resolve() : track(id, pooled(() => api(`/api/roadmap?id=${id}`)).then((d) => { setFact('roadmap', id, d); stamp(id, 'roadmap'); }, () => { setFact('roadmap', id, null); })),
+    skipReq ? Promise.resolve() : loadRequirements(id),
     loadState(id),
     poll ? loadPiStatus(id) : Promise.resolve(),
   ]);

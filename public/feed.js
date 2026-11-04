@@ -117,8 +117,8 @@ function quietTick() {
 }
 
 // Applies a polled session state. A session that stops being busy has just finished its command: the repo's data is
-// refreshed first (so the card moves column at once and never judges the result on stale data), and only then is the
-// new state applied.
+// refreshed first (local, prs and state are read directly, so the card moves column at once and never judges the result on
+// stale data; RP86b: the roadmap and the requirements come by the board, up to about 3 s later), and only then is the new state applied.
 async function applyPiState(id, state) {
   const sent = S.sent[id];
   if (!sent) return;
