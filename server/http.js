@@ -139,6 +139,8 @@ const routes = {
   'POST /api/sessions/release': (q, b, d) => releaseSession(b.id, d.sessionsDir, d.sessionOf),
   // RPC1b: pi sessions in RPC mode, one per repo; the repo comes from the config by id and no program, folder or argument comes from the page.
   'POST /api/rpc/start': (q, b, d) => rpcApi(d.rpcHost).start(b),
+  // RP98: closes the session of ONE repo (the process is stopped, also while it starts) and releases its adoption, so the chat comes back to the list of sessions; the repo comes from the config by id.
+  'POST /api/rpc/close': async (q, b, d) => { const status = await rpcApi(d.rpcHost).close(b); await releaseSession(b.id, d.sessionsDir, d.sessionOf); return status; },
   'POST /api/rpc/prompt': (q, b, d) => rpcApi(d.rpcHost).prompt(b),
   'POST /api/rpc/steer': (q, b, d) => rpcApi(d.rpcHost).steer(b),
   'POST /api/rpc/abort': (q, b, d) => rpcApi(d.rpcHost).abort(b),

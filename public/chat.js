@@ -309,7 +309,8 @@ function drawChat() {
   }
   prunePending(S.chat.id);
   const shown = chatView();
-  paint($('#sessState'), R.sessionLabelHtml(shown));
+  const hasSession = !!(S.chat.info && S.chat.info.adopted) || !!(S.rpc[S.chat.id] && S.rpc[S.chat.id].state !== 'closed'); // RP98: a session to close
+  paint($('#sessState'), R.sessionLabelHtml(shown) + R.sessionCloseHtml(hasSession, S.chat.closing));
   const body = $('#chatBody');
   const atBottom = chatShown !== S.chat.id || !(body.scrollHeight > 0) || body.scrollHeight - body.scrollTop - body.clientHeight < 24;
   if (paint(body, R.chatBody(shown, { now: Date.now() })) && atBottom) body.scrollTop = body.scrollHeight;

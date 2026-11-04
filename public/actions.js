@@ -151,6 +151,22 @@ const ACTIONS = {
     if (S.chat.id === id) loadChat(id);
     draw();
   },
+  // RP98: stops the session of the open chat and releases its adoption, so the chat comes back to the list of sessions. A session that is working or asking is confirmed first (closing stops what it is doing).
+  'session-close': async () => {
+    const id = S.chat.id;
+    if (!id || S.chat.closing) return;
+    const st = S.rpc[id] && S.rpc[id].state;
+    if ((st === 'busy' || st === 'asking') && !confirm('This session is working. Close it anyway? What it is doing is stopped.')) return;
+    S.chat.closing = true;
+    draw();
+    try {
+      await api('/api/rpc/close', { id });
+      S.rpc[id] = V.rpcFromStatus(S.rpc[id], { state: 'closed', pendingDialogs: [], sessionId: null });
+    } catch (e) { toast(e.message, 'bad'); }
+    S.chat.closing = false;
+    if (S.chat.id === id) loadChat(id);
+    draw();
+  },
   'pi': async (el) => {
     const { id, cmd, pr } = el.dataset;
     if (S.sending[id]) return; // a second click while the first order is on its way never sends another
