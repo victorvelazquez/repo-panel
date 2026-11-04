@@ -137,6 +137,8 @@ const ACTIONS = {
   'chat-adopt': async (el) => {
     const { id, session } = el.dataset;
     if (S.chat.starting) return; // RP99: a new session is starting: the server would refuse (409) and the list is disabled
+    // RP100: pi does not lock its session files; a session written to a moment ago may be open in a terminal, and two programs on the same session mix up its history.
+    if (el.dataset.recent === '1' && !confirm('This session was written to a moment ago, so it may be open in a terminal. Two programs on the same session mix up its history. Open it here anyway?')) return;
     try { await api('/api/sessions/adopt', { id, session }); } catch (e) { toast(e.message, 'bad'); }
     if (S.chat.id === id) loadChat(id);
   },

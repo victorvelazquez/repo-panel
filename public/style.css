@@ -495,7 +495,8 @@ body.tab-conformity #viewbar { display: none; }
 .hl-h { color: #79c0ff; font-weight: 600; }
 .ch-name { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* RP99: the list of sessions of a repo scrolls inside the chat (up to 20 rows) and does not grow it. */
-.ch-picks { max-height: min(340px, 50vh); overflow-y: auto; display: flex; flex-direction: column; gap: 6px; margin: 8px 0; }
+/* RP99/RP100: the list of sessions of a repo uses the width of the chat and the height it leaves (the box shrinks and scrolls inside it); a row never squashes. */
+.ch-picks { align-self: stretch; flex: 0 1 auto; min-height: 0; max-height: 100%; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; margin: 0; }
 /* RP98: the Close session button sits at the right of the session state, inside the composer frame. */
 .sess-state { display: flex; align-items: center; gap: 8px; }
 .ss-close { margin-left: auto; flex: none; font-size: 12px; padding: 1px 8px; }
@@ -522,10 +523,12 @@ body.tab-conformity #viewbar { display: none; }
 .m strong { font-weight: 600; }
 .m .who { display: block; margin-bottom: 2px; font-size: 11px; color: var(--muted); }
 .tools { align-self: flex-start; font-size: 12px; color: var(--muted); border: 1px dashed var(--line); border-radius: 8px; padding: 3px 10px; overflow-wrap: anywhere; }
-.ch-state { display: grid; gap: 10px; justify-items: start; }
+.ch-state { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; flex: 1 1 auto; min-height: 0; }
 .ch-state p { margin: 0; color: var(--muted); }
-.ch-pick { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel2); }
+.ch-pick { flex: none; width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel2); }
 .ch-pick-l1 { display: flex; align-items: center; gap: 8px; min-width: 0; }
+/* RP100: the tag of a session written to less than 2 minutes ago (it may be open in a terminal). */
+.ch-busy { flex: 1 1 auto; min-width: 0; color: var(--yellow); font-size: 12px; }
 .ch-sname { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ch-last { margin-top: 4px; overflow-wrap: anywhere; }
 @media (max-width: 720px) {

@@ -717,13 +717,22 @@
     return streaming + asks;
   }
 
+  // RP100 (S5, S7): pi does not lock its session files, so the panel cannot see that a session is open in a terminal. The hint it has is the last write of the session file (`updatedAt`): written to less
+  // than 2 minutes ago, either side of now (a clock a little ahead still counts; a date far ahead must not warn forever). A terminal that is open but quiet is not detected: a hint, not a guarantee.
+  const RECENT_MS = 2 * 60 * 1000;
+  function recentlyActive(s, now) {
+    if (!s || typeof s.updatedAt !== 'string' || !Number.isFinite(now)) return false;
+    const t = Date.parse(s.updatedAt);
+    return Number.isFinite(t) && Math.abs(now - t) < RECENT_MS;
+  }
+
   function chatBody(c, ctx = {}) {
     const info = c.info;
     if (!info) return `<div class="empty" role="status">${c.failed ? 'Chat unavailable. Try again in a moment.' : 'Loading chat…'}</div>`;
     const note = c.failed ? '<div class="rs-note" role="status">⚠ Chat unavailable: showing the last data we have.</div>' : '';
     const id = esc(c.id);
     if (!info.adopted) {
-      const rows = (Array.isArray(info.sessions) ? info.sessions : []).slice(0, 20).map((s) => `<div class="ch-pick"><div class="ch-pick-l1"><span class="mono ch-sname" title="${esc(s.id)}">${esc(s.name || s.id)}</span><span class="rs-sub">${esc(relativeTime(s.updatedAt, ctx.now))}</span><button type="button" data-act="chat-adopt" data-id="${id}" data-session="${esc(s.id)}"${c.starting ? ' disabled' : ''}>Open</button></div>${s.lastMessage ? `<div class="rs-sub ch-last">${esc(clip(s.lastMessage.text, 90))}</div>` : ''}</div>`).join('');
+      const rows = (Array.isArray(info.sessions) ? info.sessions : []).slice(0, 20).map((s) => `<div class="ch-pick"><div class="ch-pick-l1"><span class="mono ch-sname" title="${esc(s.id)}">${esc(s.name || s.id)}</span><span class="rs-sub">${esc(relativeTime(s.updatedAt, ctx.now))}</span>${recentlyActive(s, ctx.now) ? '<span class="ch-busy" title="This session was written to less than 2 minutes ago">Active a moment ago, it may be open in a terminal</span>' : ''}<button type="button" data-act="chat-adopt" data-id="${id}" data-session="${esc(s.id)}"${recentlyActive(s, ctx.now) ? ' data-recent="1"' : ''}${c.starting ? ' disabled' : ''}>Open</button></div>${s.lastMessage ? `<div class="rs-sub ch-last">${esc(clip(s.lastMessage.text, 90))}</div>` : ''}</div>`).join('');
       return `${note}<div class="ch-state"><p>No session is adopted for this folder.${rows ? ' Open one, or start a new one.' : ''}</p>${rows ? `<div class="ch-picks">${rows}</div>` : ''}<button type="button" data-act="chat-start" data-id="${id}"${c.starting ? ' disabled' : ''}>New session</button></div>`;
     }
     const who = info.adopted.name || info.adopted.id;
@@ -789,5 +798,5 @@
     return `${ctx.failed ? '<div class="rs-note" role="status">⚠ Summary unavailable: showing the last data we have.</div>' : ''}<div class="rs-list">${body}</div>${rows.length ? LEGEND : ''}`;
   }
 
-  return { esc, mdHtml, sessionChip, blockWidths, columnView, composerState, askAllowed, actionMenu, actionButtonsHtml, composerNote, chatHead, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, sessionCloseHtml, chatBody, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
+  return { esc, mdHtml, sessionChip, blockWidths, columnView, composerState, askAllowed, actionMenu, actionButtonsHtml, composerNote, chatHead, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, sessionCloseHtml, recentlyActive, chatBody, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
 }));
