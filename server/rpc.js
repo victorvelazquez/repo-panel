@@ -9,8 +9,9 @@ const fs = require('node:fs');
 const { StringDecoder } = require('node:string_decoder');
 const { commandProblem, launchSpec, killTree, makeWhich, isAbs } = require('./piruntime.js');
 
-// Two minutes: the real pi took 4 s to over 60 s to start, with no pattern (measured through the panel, RPC2-1).
-const START_MS = 120000;
+// Five minutes (RP101): the real pi took 4 s to over 60 s to start, with no pattern (measured through the panel, RPC2-1), and on one machine a New session ran past the old
+// two-minute cap twice in a row (24 to 29 s measured here when pi has to look for the session id among a repo's sessions).
+const START_MS = 300000;
 const MAX_LINE = 8 * 1024 * 1024;
 const MAX_WAITING = 200;
 const MAX_DIALOGS = 20;
