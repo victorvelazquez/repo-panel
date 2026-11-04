@@ -1,4 +1,4 @@
-# Repo Panel
+# Kletus.dev
 
 A local, single-window dashboard for the repos you work on. It answers one question: **what is left for me to do?**
 
