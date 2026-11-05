@@ -570,7 +570,21 @@
   const composerNote = (n) => (n && n.text ? `<span>${esc(n.text)}</span>` : '');
 
   const hhmm = (iso) => { const d = new Date(iso); return iso && !Number.isNaN(d.getTime()) ? `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}` : ''; };
-  const toolsLine = (t) => (t.length ? `<div class="tools">▸ ${plural(t.length, 'tool')} · ${esc(t.slice(0, 3).join(', '))}${t.length > 3 ? ` (+${t.length - 3})` : ''}</div>` : '');
+  // RP105: a chip per tool when the server sent `toolInfo` (✓/✗ or … while it runs, the name, the redacted argument, the time); without it, the line of names of before.
+  const TOOL_CHIPS = 12;
+  const fmtMs = (ms) => (!Number.isFinite(ms) ? '' : ms < 1000 ? `${Math.round(ms)}ms` : ms < 59950 ? `${(ms / 1000).toFixed(1)}s` : `${Math.floor(Math.round(ms / 1000) / 60)}m${String(Math.round(ms / 1000) % 60).padStart(2, '0')}s`);
+  const chipHtml = (c) => {
+    const [cls, mark] = c.ok === true ? ['ok', '✓'] : c.ok === false ? ['bad', '✗'] : ['run', '…'];
+    const arg = typeof c.arg === 'string' && c.arg ? ` <i>${esc(c.arg)}</i>` : '';
+    const time = fmtMs(c.ms) ? ` <small>${fmtMs(c.ms)}</small>` : '';
+    return `<span class="tc ${cls}">${mark} <b>${esc(c.name)}</b>${arg}${time}</span>`;
+  };
+  const toolsLine = (t, info) => {
+    const chips = (Array.isArray(info) ? info : []).filter((c) => c && typeof c === 'object' && typeof c.name === 'string');
+    if (chips.length) return `<div class="tools tcs">${chips.slice(0, TOOL_CHIPS).map(chipHtml).join('')}${chips.length > TOOL_CHIPS ? `<span class="tcmore">+${chips.length - TOOL_CHIPS}</span>` : ''}</div>`;
+    return toolsLineOld(t);
+  };
+  const toolsLineOld = (t) => (t.length ? `<div class="tools">▸ ${plural(t.length, 'tool')} · ${esc(t.slice(0, 3).join(', '))}${t.length > 3 ? ` (+${t.length - 3})` : ''}</div>` : '');
   // One chat message as safe HTML: escape first, then a small Markdown subset. Only the tags built here reach the output,
   // every scan is a single pass with indexOf (no backtracking regular expression), and unclosed markers stay plain text.
   const MD_URL = /^https?:\/\/[^\s"'<>`]+$/i;
@@ -657,8 +671,8 @@
   const thoughtLine = (it) => (it.thinking === true ? '<div class="tools thought">▸ thinking…</div>' : '');
   const bubble = (it, who) => {
     const time = hhmm(it.at);
-    if (it.role === 'assistant' && !it.text) return `${thoughtLine(it)}${toolsLine(it.tools)}<div class="m working">working…</div>`;
-    return `${thoughtLine(it)}${toolsLine(it.tools || [])}<div class="m${it.role === 'user' ? ' me' : ''}"><span class="who">${esc(it.role === 'user' ? 'You' : who)}${time ? ` · ${time}` : ''}</span>${mdHtml(it.text)}</div>`;
+    if (it.role === 'assistant' && !it.text) return `${thoughtLine(it)}${toolsLine(it.tools, it.toolInfo)}<div class="m working">working…</div>`;
+    return `${thoughtLine(it)}${toolsLine(it.tools || [], it.toolInfo)}<div class="m${it.role === 'user' ? ' me' : ''}"><span class="who">${esc(it.role === 'user' ? 'You' : who)}${time ? ` · ${time}` : ''}</span>${mdHtml(it.text)}</div>`;
   };
 
   // Pending messages of the composer (RP75): shown after the real ones until the history has them. `base` is how many user items

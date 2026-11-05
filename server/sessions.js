@@ -8,6 +8,7 @@ const path = require('node:path');
 const { HttpError } = require('./errors.js');
 const { loadConfig, saveConfig, findRepo } = require('./config.js');
 const { chooseRuntime, findCached } = require('./piruntime.js');
+const { argSummary } = require('./redact.js');
 
 const CHUNK = 64 * 1024;
 // RP104: the chat reads this much of the END of the session file (the listing keeps the 64 KB of CHUNK); the first line of the window may be partial and is dropped.
@@ -119,7 +120,7 @@ const capped = (s) => { const t = cleanText(s).trim(); return t.length > CHAT_TE
 const blocksOf = (m, type) => (Array.isArray(m.content) ? m.content.filter((c) => c && c.type === type) : []);
 
 // The history of one session for the chat panel: only the LAST 64 KB of its file is read (the first line of that window may be
-// partial and is dropped). Only text reaches the output: no thinking text (only a `thinking` mark), no tool arguments, no tool results; a tool is its NAME.
+// partial and is dropped). Only text reaches the output: no thinking text (only a `thinking` mark), no tool results (only their verdict and time); a tool is its NAME plus `toolInfo`: ok, ms and a redacted one-line argument (server/redact.js).
 function readChat(folder, sessionId, { base = baseDir(), limit = CHAT_DEFAULT, key = null } = {}) {
   const none = { key, sessionId, found: false, items: [], truncated: false, updatedAt: null };
   let file;
@@ -133,19 +134,31 @@ function readChat(folder, sessionId, { base = baseDir(), limit = CHAT_DEFAULT, k
     const start = Math.max(0, size - CHAT_WINDOW);
     const items = [];
     let pending = [];
+    let pendingInfo = [];
+    const infoById = new Map(); // toolCallId -> the chip of that call, so its result (which comes later) fills ok and ms
     let thought = false;
     for (const entry of linesOf(readChunk(fd, start, size - start), start > 0, false).map(parse)) {
       const m = entry && entry.type === 'message' && entry.message;
       if (!m || typeof m !== 'object') continue;
       const at = isoOf(m.timestamp ?? entry.timestamp);
       const body = capped(blocksOf(m, 'text').filter((c) => typeof c.text === 'string').map((c) => c.text).join(BLOCK_GAP));
-      if (m.role === 'user') { pending = []; thought = false; if (body) items.push({ role: 'user', text: body, at, tools: [] }); continue; }
+      if (m.role === 'toolResult') {
+        const chip = typeof m.toolCallId === 'string' ? infoById.get(m.toolCallId) : undefined;
+        if (chip) Object.assign(chip, { ok: m.isError !== true, ms: Number.isFinite(m.durationMs) && m.durationMs >= 0 && m.durationMs <= 7 * 86400000 ? Math.round(m.durationMs) : null }); // only the verdict and the time: the result text is never read
+        continue;
+      }
+      if (m.role === 'user') { pending = []; pendingInfo = []; thought = false; if (body) items.push({ role: 'user', text: body, at, tools: [] }); continue; }
       if (m.role !== 'assistant') continue;
       if (blocksOf(m, 'thinking').length) thought = true; // only THAT it reasoned: the reasoning text never leaves the server
-      pending.push(...blocksOf(m, 'toolCall').filter((c) => typeof c.name === 'string').map((c) => clean(c.name).slice(0, 60)));
-      if (body) { items.push({ role: 'assistant', text: body, at, tools: pending, ...(thought ? { thinking: true } : {}) }); pending = []; thought = false; }
+      for (const c of blocksOf(m, 'toolCall').filter((b) => typeof b.name === 'string')) {
+        const chip = { name: clean(c.name).slice(0, 60), ok: null, ms: null, arg: argSummary(c.name, c.arguments) };
+        pending.push(chip.name);
+        pendingInfo.push(chip);
+        if (typeof c.id === 'string') infoById.set(c.id, chip);
+      }
+      if (body) { items.push({ role: 'assistant', text: body, at, tools: pending, ...(pendingInfo.length ? { toolInfo: pendingInfo } : {}), ...(thought ? { thinking: true } : {}) }); pending = []; pendingInfo = []; thought = false; }
     }
-    if (pending.length || thought) items.push({ role: 'assistant', text: '', at: null, tools: pending, ...(thought ? { thinking: true } : {}) });
+    if (pending.length || thought) items.push({ role: 'assistant', text: '', at: null, tools: pending, ...(pendingInfo.length ? { toolInfo: pendingInfo } : {}), ...(thought ? { thinking: true } : {}) });
     return { key, sessionId, found: true, items: items.slice(-max), truncated: start > 0 || items.length > max, updatedAt: new Date(mtimeMs).toISOString() };
   } catch { return none; } finally { if (fd !== undefined) fs.closeSync(fd); }
 }

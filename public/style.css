@@ -524,6 +524,15 @@ body.tab-conformity #viewbar { display: none; }
 .m strong { font-weight: 600; }
 .m .who { display: block; margin-bottom: 2px; font-size: 11px; color: var(--muted); }
 .tools.thought { font-style: italic; }
+.tools.tcs { display: flex; flex-wrap: wrap; gap: 4px; max-width: 90%; padding: 0; border: 0; }
+.tc { border: 1px solid var(--line); border-radius: 8px; padding: 2px 8px; }
+.tc b { font-weight: 600; }
+.tc i { font-style: normal; color: var(--text); opacity: .8; }
+.tc small { opacity: .7; }
+.tc.ok { border-color: #2c4f3a; }
+.tc.bad { border-color: #6b2c2c; color: #e07a7a; }
+.tc.run { border-style: dashed; }
+.tcmore { padding: 2px 4px; }
 .tools { align-self: flex-start; font-size: 12px; color: var(--muted); border: 1px dashed var(--line); border-radius: 8px; padding: 3px 10px; overflow-wrap: anywhere; }
 .ch-state { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; flex: 1 1 auto; min-height: 0; }
 .ch-state p { margin: 0; color: var(--muted); }
