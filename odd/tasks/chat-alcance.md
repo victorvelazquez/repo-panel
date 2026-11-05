@@ -25,3 +25,5 @@ Series that widens what the panel chat shows and studies how to use subagents, u
 - L3. RP105 closed (split: turn marks and compaction lines moved to RP105b). Independent verification took three rounds because a pattern-based redaction of shell commands leaked (23, then 12 forms): the design became a closed vocabulary in `server/redact.js`; accepted limits are in the README. S3 covered; tests `test/rp105-tool-chips.test.js`, `test/rp105-allowlist.test.js`.
 
 - L4. RP105b closed: `stop` on assistant items and a `system`/`compaction` item in `readChat`, notes in the page; retry has no record in the session file and moved to RP105c. Tests `test/rp105b-turn-marks.test.js`.
+
+- L5. RP105c closed, live only: pi emits `auto_retry_start`/`auto_retry_end` and the RPC mode forwards them; the history file keeps no retry. Whitelist keeps numbers and the verdict, never the error texts; the page shows «Retrying…» in the live tail. Tests `test/rp105c-retry.test.js`.

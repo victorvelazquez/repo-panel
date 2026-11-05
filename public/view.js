@@ -532,7 +532,8 @@
   // the blocks in order (the index is the `contentIndex` of pi; thinking and tool blocks leave theirs empty), capped.
   const RPC_BLOCKS = 64;
   const RPC_TEXT_MAX = 200000;
-  const rpcBlank = () => ({ state: 'closed', text: '', blocks: [], error: '', startedAt: 0, streaming: false, thinking: false, asks: [] });
+  const rpcBlank = () => ({ state: 'closed', text: '', blocks: [], error: '', startedAt: 0, streaming: false, thinking: false, retry: null, asks: [] });
+  const rpcInt = (v, min, max) => (Number.isInteger(v) && v >= min && v <= max ? v : null);
   const rpcText = (blocks) => blocks.filter(Boolean).join('\n\n').slice(0, RPC_TEXT_MAX);
   // One pending dialog as the card needs it (RPC2-3), or null when it is not well formed. The server already caps what it sends; what is still
   // too long here is cut and counts as truncated, so the card never offers to approve text it did not get whole.
@@ -557,14 +558,17 @@
     let reload = false;
     if (!isObject(p)) return { entry: e, reload };
     if (p.kind === 'state' && RPC_STATES.includes(p.state)) { e.state = p.state; if (p.state === 'busy') e.streaming = true; }
-    else if (p.kind === 'exit') Object.assign(e, { state: 'closed', blocks: [], text: '', streaming: false, thinking: false, asks: [] });
+    else if (p.kind === 'exit') Object.assign(e, { state: 'closed', blocks: [], text: '', streaming: false, thinking: false, retry: null, asks: [] });
     else if (p.kind === 'dialog') e.asks = rpcAsks(e.asks, rpcAskOf(p));
     else if (p.kind === 'dialog-closed' && typeof p.requestId === 'string') e.asks = rpcAsks(e.asks, null, p.requestId);
     else if (p.kind === 'event' && isObject(p.record)) {
       const r = p.record;
       const a = isObject(r.assistantMessageEvent) ? r.assistantMessageEvent : {};
-      if (r.type === 'agent_start') Object.assign(e, { blocks: [], streaming: true, thinking: false, error: '', startedAt: now });
-      else if (r.type === 'agent_settled') { e.streaming = false; e.thinking = false; reload = true; }
+      if (r.type === 'agent_start') Object.assign(e, { blocks: [], streaming: true, thinking: false, retry: null, error: '', startedAt: now });
+      else if (r.type === 'agent_settled') { e.streaming = false; e.thinking = false; e.retry = null; reload = true; }
+      // RP105c: pi is retrying a failed request on its own (live only: the history keeps no record). Only valid numbers are kept.
+      else if (r.type === 'auto_retry_start') e.retry = { attempt: rpcInt(r.attempt, 1, 1000), max: rpcInt(r.maxAttempts, 1, 1000), delayMs: rpcInt(r.delayMs, 0, 3600000) };
+      else if (r.type === 'auto_retry_end') e.retry = null;
       else if (r.type === 'message_update' && Number.isInteger(a.contentIndex) && a.contentIndex >= 0 && a.contentIndex < RPC_BLOCKS) {
         for (let i = e.blocks.length; i < a.contentIndex; i++) e.blocks[i] = '';
         // RP104: the reasoning only turns a flag on and off (the server never sends its text); the first text of the run ends it.
@@ -584,7 +588,7 @@
     e.state = st.state;
     e.asks = (Array.isArray(st.pendingDialogs) ? st.pendingDialogs : []).map(rpcAskOf).filter(Boolean).slice(0, 20);
     e.streaming = st.state === 'busy' || st.state === 'asking';
-    if (!e.streaming) Object.assign(e, { blocks: [], text: '', thinking: false });
+    if (!e.streaming) Object.assign(e, { blocks: [], text: '', thinking: false, retry: null });
     return e;
   }
   // RP79 (S68, S74): the page keeps the last chats it read, per repo, and paints them at once when the card is opened again. The use order
