@@ -138,6 +138,8 @@ function readChat(folder, sessionId, { base = baseDir(), limit = CHAT_DEFAULT, k
     const infoById = new Map(); // toolCallId -> the chip of that call, so its result (which comes later) fills ok and ms
     let thought = false;
     for (const entry of linesOf(readChunk(fd, start, size - start), start > 0, false).map(parse)) {
+      // RP105b: a compaction of the context is only a mark in its place (its summary is long and private and never read).
+      if (entry && entry.type === 'compaction') { items.push({ role: 'system', kind: 'compaction', text: '', at: isoOf(entry.timestamp), tools: [] }); continue; }
       const m = entry && entry.type === 'message' && entry.message;
       if (!m || typeof m !== 'object') continue;
       const at = isoOf(m.timestamp ?? entry.timestamp);
@@ -156,7 +158,10 @@ function readChat(folder, sessionId, { base = baseDir(), limit = CHAT_DEFAULT, k
         pendingInfo.push(chip);
         if (typeof c.id === 'string') infoById.set(c.id, chip);
       }
-      if (body) { items.push({ role: 'assistant', text: body, at, tools: pending, ...(pendingInfo.length ? { toolInfo: pendingInfo } : {}), ...(thought ? { thinking: true } : {}) }); pending = []; pendingInfo = []; thought = false; }
+      // RP105b: only the CATEGORY of a stopped or failed turn travels; the `errorMessage` (it can hold the raw body of an API answer) is never read. A turn that stopped with
+      // no text is an item too (it was invisible before).
+      const stop = m.stopReason === 'aborted' || m.stopReason === 'error' ? m.stopReason : null;
+      if (body || stop) { items.push({ role: 'assistant', text: body, at, tools: pending, ...(pendingInfo.length ? { toolInfo: pendingInfo } : {}), ...(thought ? { thinking: true } : {}), ...(stop ? { stop } : {}) }); pending = []; pendingInfo = []; thought = false; }
     }
     if (pending.length || thought) items.push({ role: 'assistant', text: '', at: null, tools: pending, ...(pendingInfo.length ? { toolInfo: pendingInfo } : {}), ...(thought ? { thinking: true } : {}) });
     return { key, sessionId, found: true, items: items.slice(-max), truncated: start > 0 || items.length > max, updatedAt: new Date(mtimeMs).toISOString() };

@@ -23,3 +23,5 @@ Series that widens what the panel chat shows and studies how to use subagents, u
 - L2. RP104 closed: `CHAT_WINDOW` = 512 KB in `readChat`; `thinking: true` on assistant items; live flag `thinking` in `rpcReduce`; tests `test/rp104-chat-reach.test.js`. S1 and S2 covered. Closed in the same diff as the row.
 
 - L3. RP105 closed (split: turn marks and compaction lines moved to RP105b). Independent verification took three rounds because a pattern-based redaction of shell commands leaked (23, then 12 forms): the design became a closed vocabulary in `server/redact.js`; accepted limits are in the README. S3 covered; tests `test/rp105-tool-chips.test.js`, `test/rp105-allowlist.test.js`.
+
+- L4. RP105b closed: `stop` on assistant items and a `system`/`compaction` item in `readChat`, notes in the page; retry has no record in the session file and moved to RP105c. Tests `test/rp105b-turn-marks.test.js`.
