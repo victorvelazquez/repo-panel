@@ -97,3 +97,11 @@ Ejemplo, al esperar una decisión:
 `{"state": "needs-input", "next": "Elegí si el informe va en PDF o en HTML y avisame.", "at": "2026-01-31T12:00:00Z"}`
 y la última línea de la respuesta: `Siguiente: Elegí si el informe va en PDF o en HTML y avisame.`
 <!-- /panel:estado -->
+
+## Verificación liviana para cambios chicos
+
+Decisión de la persona (4 de noviembre de 2026). No es parte de los bloques administrados de arriba y no los reemplaza: el CI en verde sigue siendo obligatorio.
+
+- **Cambio chico:** texto, estilos, archivos estáticos, una constante o un mensaje, sin lógica del servidor ni de datos. Se corren las pruebas propias de la unidad y las vecinas (las que cubren los mismos archivos). La suite completa la corre el CI en Windows y Ubuntu.
+- **Cambio con riesgo** (seguridad, datos, concurrencia, lógica del servidor, contratos que otros consumen): además, la suite completa en local, la simulación de CRLF y una mutación corta de las garantías clave.
+- **No cambia:** las pruebas se escriben primero y se las ve fallar, el tamaño de la unidad, que la persona apruebe las pantallas mirándolas y que el CI quede en verde.
