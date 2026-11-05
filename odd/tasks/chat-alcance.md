@@ -27,3 +27,5 @@ Series that widens what the panel chat shows and studies how to use subagents, u
 - L4. RP105b closed: `stop` on assistant items and a `system`/`compaction` item in `readChat`, notes in the page; retry has no record in the session file and moved to RP105c. Tests `test/rp105b-turn-marks.test.js`.
 
 - L5. RP105c closed, live only: pi emits `auto_retry_start`/`auto_retry_end` and the RPC mode forwards them; the history file keeps no retry. Whitelist keeps numbers and the verdict, never the error texts; the page shows «Retrying…» in the live tail. Tests `test/rp105c-retry.test.js`.
+
+- L6. RP106 closed, split by the person: numbers only (`size`, and `add`/`del` for edits from `details.patch`). The text of a result moved to RP106b (privacy, free text, on demand, independent verification). Tests `test/rp106-edit-summary.test.js`.

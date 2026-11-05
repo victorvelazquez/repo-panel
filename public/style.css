@@ -532,6 +532,8 @@ body.tab-conformity #viewbar { display: none; }
 .tc b { font-weight: 600; }
 .tc i { font-style: normal; color: var(--text); opacity: .8; }
 .tc small { opacity: .7; }
+.tc small.chg { opacity: 1; color: var(--green); }
+.tc small.sz { font-variant-numeric: tabular-nums; }
 .tc.ok { border-color: #2c4f3a; }
 .tc.bad { border-color: #6b2c2c; color: #e07a7a; }
 .tc.run { border-style: dashed; }

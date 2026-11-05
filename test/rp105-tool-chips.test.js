@@ -125,16 +125,16 @@ test('S3: toolInfo carries, per tool and in order, name, ok, ms and the redacted
   const a = chatOf('i1').items[1];
   assert.deepEqual(a.tools, ['read', 'bash', 'grep']);
   assert.deepEqual(a.toolInfo, [
-    { name: 'read', ok: true, ms: 72, arg: 'server/a.js' },
-    { name: 'bash', ok: false, ms: 2500, arg: 'false' },
-    { name: 'grep', ok: true, ms: 1234, arg: 'x' },
+    { name: 'read', ok: true, ms: 72, arg: 'server/a.js', size: 11 },
+    { name: 'bash', ok: false, ms: 2500, arg: 'false', size: 11 },
+    { name: 'grep', ok: true, ms: 1234, arg: 'x', size: 11 },
   ]);
 });
 
 test('S3: a tool with no result yet is ok: null (still running); a result without a duration has ms: null', () => {
   putSession('i2', [header('i2', repoDir), msg('user', [text('go')]), msg('assistant', [call('read', { path: 'a' }, 'r1'), call('bash', { command: 'ls' }, 'b1')]), result('b1', false, undefined)]);
   const t = chatOf('i2').items[1];
-  assert.deepEqual(t.toolInfo, [{ name: 'read', ok: null, ms: null, arg: 'a' }, { name: 'bash', ok: true, ms: null, arg: 'ls' }]);
+  assert.deepEqual(t.toolInfo, [{ name: 'read', ok: null, ms: null, arg: 'a' }, { name: 'bash', ok: true, ms: null, arg: 'ls', size: 11 }]);
 });
 
 test('S3 abuse: a secret in an argument, in a result or in the reasoning is nowhere in the answer', () => {

@@ -117,6 +117,21 @@ const isoOf = (t) => {
   return typeof t === 'number' || typeof t === 'string' ? (Number.isNaN(d.getTime()) ? null : d.toISOString()) : null;
 };
 const capped = (s) => { const t = cleanText(s).trim(); return t.length > CHAT_TEXT ? `${t.slice(0, CHAT_TEXT)}…` : t; };
+// RP106: NUMBERS about a tool result, never its text: the characters of its text blocks, and for an edit the lines its unified diff adds and removes (counted only after the
+// first hunk header, so a changed line that starts with "--" or "++" is not taken for a file header).
+const textSize = (c) => (typeof c === 'string' ? c.length : Array.isArray(c) ? c.reduce((n, b) => n + (b && b.type === 'text' && typeof b.text === 'string' ? b.text.length : 0), 0) : 0);
+function patchLines(patch) {
+  let add = 0;
+  let del = 0;
+  let inHunk = false;
+  for (const l of patch.split('\n')) {
+    if (l.startsWith('@@')) { inHunk = true; continue; }
+    if (!inHunk) continue;
+    if (l.startsWith('+')) add++;
+    else if (l.startsWith('-')) del++;
+  }
+  return { add, del };
+}
 const blocksOf = (m, type) => (Array.isArray(m.content) ? m.content.filter((c) => c && c.type === type) : []);
 
 // The history of one session for the chat panel: only the LAST 64 KB of its file is read (the first line of that window may be
@@ -146,7 +161,10 @@ function readChat(folder, sessionId, { base = baseDir(), limit = CHAT_DEFAULT, k
       const body = capped(blocksOf(m, 'text').filter((c) => typeof c.text === 'string').map((c) => c.text).join(BLOCK_GAP));
       if (m.role === 'toolResult') {
         const chip = typeof m.toolCallId === 'string' ? infoById.get(m.toolCallId) : undefined;
-        if (chip) Object.assign(chip, { ok: m.isError !== true, ms: Number.isFinite(m.durationMs) && m.durationMs >= 0 && m.durationMs <= 7 * 86400000 ? Math.round(m.durationMs) : null }); // only the verdict and the time: the result text is never read
+        if (chip) {
+          Object.assign(chip, { ok: m.isError !== true, ms: Number.isFinite(m.durationMs) && m.durationMs >= 0 && m.durationMs <= 7 * 86400000 ? Math.round(m.durationMs) : null, size: textSize(m.content) }); // the verdict, the time and the size: the result text is never sent
+          if (chip.name.toLowerCase() === 'edit' && m.details && typeof m.details.patch === 'string') Object.assign(chip, patchLines(m.details.patch));
+        }
         continue;
       }
       if (m.role === 'user') { pending = []; pendingInfo = []; thought = false; if (body) items.push({ role: 'user', text: body, at, tools: [] }); continue; }
