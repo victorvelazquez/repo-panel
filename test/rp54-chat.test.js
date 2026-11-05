@@ -1,5 +1,5 @@
 'use strict';
-// RP54 (S48, S53, S56): the chat panel of the Summary. Server: readChat + GET /api/chat (last 64 KB of the adopted session,
+// RP54 (S48, S53, S56): the chat panel of the Summary. Server: readChat + GET /api/chat (last 512 KB since RP104 of the adopted session,
 // read-only). Client: the divider math, the card as chat selector, the panel states, polling, and the guarantee that
 // nothing here ever sends text to a session. Temp dirs and fake deps only: the real sessions are never touched.
 const test = require('node:test');
@@ -139,7 +139,7 @@ test('a missing session is found:false; corrupt lines are skipped; a small file 
   assert.equal(r.truncated, false);
 });
 
-test('only the last 64 KB of a ~5 MB file is read: a garbage middle and a long last line neither throw nor load the file', () => {
+test('only the last 512 KB (RP104; it was 64 KB) of a ~5 MB file is read: a garbage middle and a long last line neither throw nor load the file', () => {
   resetDisk();
   const dir = S.sessionsDirFor(repoDir, sessionsBase);
   fs.mkdirSync(dir, { recursive: true });
@@ -151,11 +151,11 @@ test('only the last 64 KB of a ~5 MB file is read: a garbage middle and a long l
   fs.readSync = (...a) => { const n = realRead(...a); bytes += n; return n; };
   let r;
   try { r = chatOf('big'); } finally { fs.readSync = realRead; }
-  assert.ok(bytes <= 70 * 1024, `read ${bytes} bytes`);
+  assert.ok(bytes <= 530 * 1024, `read ${bytes} bytes`);
   assert.deepEqual(r.items.map((i) => i.text.length), [6, 4001]);
   assert.equal(r.truncated, true);
   assert.doesNotMatch(JSON.stringify(r), /FIRST/);
-  fs.appendFileSync(file, `\n${msg('assistant', [text('H'.repeat(90000))])}\n`);
+  fs.appendFileSync(file, `\n${msg('assistant', [text('H'.repeat(600000))])}\n`);
   assert.deepEqual(chatOf('big').items, []);
   assert.equal(chatOf('big').truncated, true);
 });

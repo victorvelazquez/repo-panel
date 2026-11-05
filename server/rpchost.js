@@ -65,7 +65,7 @@ const WHITELIST = {
     const a = r.assistantMessageEvent && typeof r.assistantMessageEvent === 'object' ? r.assistantMessageEvent : null;
     if (!a) return {};
     const out = own(a, 'type', 'contentIndex');
-    // Only the text blocks carry their words: the thinking and the tool-call deltas are not used by the page and can hold private or huge data.
+    // Only the text blocks carry their words: the thinking and the tool-call deltas keep just their `type` and `contentIndex` (RP104: the page shows «thinking…» from the type), never their words, which can be private or huge.
     if (typeof a.type === 'string' && a.type.startsWith('text_')) {
       if (typeof a.delta === 'string') out.delta = a.delta;
       if (typeof a.content === 'string' && a.content.length <= CONTENT_MAX) out.content = a.content;
