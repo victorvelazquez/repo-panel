@@ -559,6 +559,10 @@ body.tab-settings #viewbar { display: none; }
 .m strong { font-weight: 600; }
 .m .who { display: block; margin-bottom: 2px; font-size: 11px; color: var(--muted); }
 .tools.thought { font-style: italic; }
+/* RP110b: the memory chip, next to the state of the session. */
+.mem { font-size: 12px; padding: 0 8px; border-radius: 10px; border: 1px solid var(--line); margin-left: 6px; white-space: nowrap; color: var(--muted); }
+.mem-warn { color: var(--yellow); border-color: #53410f; background: #251d08; }
+.mem-bad { color: var(--red); border-color: #5a1f1c; background: #2a1213; }
 .tools.tcs { display: flex; flex-wrap: wrap; gap: 4px; max-width: 90%; padding: 0; border: 0; }
 .tc { border: 1px solid var(--line); border-radius: 8px; padding: 2px 8px; }
 .tc b { font-weight: 600; }

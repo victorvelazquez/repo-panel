@@ -520,7 +520,9 @@
   const EVENT_MAX = 64 * 1024;
   const isObject = (x) => !!x && typeof x === 'object' && !Array.isArray(x);
   // RPC2-1 (S1): the `rpc` event carries what one pi session does ({ id, kind, ... }; the id is a repo id). Frames over EVENT_MAX are dropped.
-  const RPC_KINDS = ['event', 'state', 'dialog', 'dialog-closed', 'exit'];
+  const RPC_KINDS = ['event', 'state', 'dialog', 'dialog-closed', 'exit', 'memory'];
+  // RP110b: the category of the memory plugin of a session, from a closed list; anything else is ignored.
+  const MEMORY_CATS = ['ready', 'offline', 'disabled', 'error'];
   const RPC_STATES = ['starting', 'idle', 'busy', 'asking', 'closed'];
   function rpcEvent(frame) {
     if (!frame || frame.event !== 'rpc' || typeof frame.data !== 'string' || frame.data.length > EVENT_MAX) return null;
@@ -532,7 +534,7 @@
   // the blocks in order (the index is the `contentIndex` of pi; thinking and tool blocks leave theirs empty), capped.
   const RPC_BLOCKS = 64;
   const RPC_TEXT_MAX = 200000;
-  const rpcBlank = () => ({ state: 'closed', text: '', blocks: [], error: '', startedAt: 0, streaming: false, thinking: false, retry: null, asks: [] });
+  const rpcBlank = () => ({ state: 'closed', text: '', blocks: [], error: '', startedAt: 0, streaming: false, thinking: false, retry: null, memory: null, asks: [] });
   const rpcInt = (v, min, max) => (Number.isInteger(v) && v >= min && v <= max ? v : null);
   const rpcText = (blocks) => blocks.filter(Boolean).join('\n\n').slice(0, RPC_TEXT_MAX);
   // One pending dialog as the card needs it (RPC2-3), or null when it is not well formed. The server already caps what it sends; what is still
@@ -558,7 +560,8 @@
     let reload = false;
     if (!isObject(p)) return { entry: e, reload };
     if (p.kind === 'state' && RPC_STATES.includes(p.state)) { e.state = p.state; if (p.state === 'busy') e.streaming = true; }
-    else if (p.kind === 'exit') Object.assign(e, { state: 'closed', blocks: [], text: '', streaming: false, thinking: false, retry: null, asks: [] });
+    else if (p.kind === 'exit') Object.assign(e, { state: 'closed', blocks: [], text: '', streaming: false, thinking: false, retry: null, memory: null, asks: [] });
+    else if (p.kind === 'memory') { if (MEMORY_CATS.includes(p.memory)) e.memory = p.memory; }
     else if (p.kind === 'dialog') e.asks = rpcAsks(e.asks, rpcAskOf(p));
     else if (p.kind === 'dialog-closed' && typeof p.requestId === 'string') e.asks = rpcAsks(e.asks, null, p.requestId);
     else if (p.kind === 'event' && isObject(p.record)) {
@@ -586,6 +589,7 @@
     const e = { ...rpcBlank(), ...(isObject(prev) ? prev : {}) };
     if (!isObject(st) || !RPC_STATES.includes(st.state)) return e;
     e.state = st.state;
+    e.memory = MEMORY_CATS.includes(st.memory) ? st.memory : st.state === 'closed' ? null : e.memory; // RP110b: a closed session has no memory to report
     e.asks = (Array.isArray(st.pendingDialogs) ? st.pendingDialogs : []).map(rpcAskOf).filter(Boolean).slice(0, 20);
     e.streaming = st.state === 'busy' || st.state === 'asking';
     if (!e.streaming) Object.assign(e, { blocks: [], text: '', thinking: false, retry: null });
