@@ -6,5 +6,6 @@
   ],
   "rooms": [
     { "name": "My room", "path": "C:\\Users\\you\\Developer\\my-room", "repos": [] }
-  ]
+  ],
+  "chat": { "showResults": false }
 }

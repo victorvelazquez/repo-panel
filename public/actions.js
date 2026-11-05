@@ -99,6 +99,27 @@ const ACTIONS = {
   'tasks-filter': (el) => { S.tasksFilter = String((el && el.value) || ''); draw(); },
   'chat-close': () => closeChat(),
   'chat-send': () => sendChatMessage(),
+  // RP106b: the start of the text of one tool result, on request. The chip names the call; a second click folds it. An answer that arrives after the chat changed is dropped (the bag is replaced when a chat opens or closes).
+  'chat-result': async (el) => {
+    const { call } = el.dataset;
+    const id = S.chat.id;
+    if (!id || !call || !/^[A-Za-z0-9_.:-]{1,80}$/.test(call)) return;
+    const bag = S.chatResults;
+    const cur = Object.hasOwn(bag, call) ? bag[call] : null;
+    if (cur && cur.state === 'loading') return;
+    if (cur && cur.state === 'ok') { delete bag[call]; draw(); return; }
+    bag[call] = { state: 'loading' };
+    draw();
+    try {
+      const r = await api(`/api/chat/result?id=${encodeURIComponent(id)}&call=${encodeURIComponent(call)}`);
+      if (S.chatResults !== bag) return;
+      bag[call] = { state: 'ok', text: typeof r.text === 'string' ? r.text.slice(0, 2000) : '' };
+    } catch (e) {
+      if (S.chatResults !== bag) return;
+      bag[call] = { state: 'error', error: String((e && e.message) || 'Result unavailable').slice(0, 200) };
+    }
+    draw();
+  },
   'chat-stop': async () => {
     const id = S.chat.id;
     if (!id) return;

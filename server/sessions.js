@@ -8,7 +8,7 @@ const path = require('node:path');
 const { HttpError } = require('./errors.js');
 const { loadConfig, saveConfig, findRepo } = require('./config.js');
 const { chooseRuntime, findCached } = require('./piruntime.js');
-const { argSummary } = require('./redact.js');
+const { argSummary, resultText } = require('./redact.js');
 
 const CHUNK = 64 * 1024;
 // RP104: the chat reads this much of the END of the session file (the listing keeps the 64 KB of CHUNK); the first line of the window may be partial and is dropped.
@@ -136,7 +136,11 @@ const blocksOf = (m, type) => (Array.isArray(m.content) ? m.content.filter((c) =
 
 // The history of one session for the chat panel: only the LAST 64 KB of its file is read (the first line of that window may be
 // partial and is dropped). Only text reaches the output: no thinking text (only a `thinking` mark), no tool results (only their verdict and time); a tool is its NAME plus `toolInfo`: ok, ms and a redacted one-line argument (server/redact.js).
-function readChat(folder, sessionId, { base = baseDir(), limit = CHAT_DEFAULT, key = null } = {}) {
+// RP106b: the id of a tool call (it links a chip to its result) and the switch of config.json that lets the page ask for the text of a result. Off by default.
+const CALL_ID = /^[A-Za-z0-9_.:-]{1,80}$/;
+const resultsOn = () => (loadConfig().chat || {}).showResults === true;
+
+function readChat(folder, sessionId, { base = baseDir(), limit = CHAT_DEFAULT, key = null, results = false } = {}) {
   const none = { key, sessionId, found: false, items: [], truncated: false, updatedAt: null };
   let file;
   try { file = fs.readdirSync(sessionsDirFor(folder, base)).sort().find((n) => isSessionFile(n, String(sessionId))); } catch { return none; }
@@ -171,7 +175,7 @@ function readChat(folder, sessionId, { base = baseDir(), limit = CHAT_DEFAULT, k
       if (m.role !== 'assistant') continue;
       if (blocksOf(m, 'thinking').length) thought = true; // only THAT it reasoned: the reasoning text never leaves the server
       for (const c of blocksOf(m, 'toolCall').filter((b) => typeof b.name === 'string')) {
-        const chip = { name: clean(c.name).slice(0, 60), ok: null, ms: null, arg: argSummary(c.name, c.arguments) };
+        const chip = { name: clean(c.name).slice(0, 60), ok: null, ms: null, arg: argSummary(c.name, c.arguments), ...(results && typeof c.id === 'string' && CALL_ID.test(c.id) ? { id: c.id } : {}) };
         pending.push(chip.name);
         pendingInfo.push(chip);
         if (typeof c.id === 'string') infoById.set(c.id, chip);
@@ -186,19 +190,70 @@ function readChat(folder, sessionId, { base = baseDir(), limit = CHAT_DEFAULT, k
   } catch { return none; } finally { if (fd !== undefined) fs.closeSync(fd); }
 }
 
-// GET /api/chat: the adopted session of the key, or an explicit one that must be among the folder's listed sessions.
-function chatState(id, session, limit, base = baseDir()) {
-  const { key, folder } = sessionKeyFor(id);
-  let sid = null;
+// The id of the session a chat shows: an explicit one that must be among the folder's listed sessions, else the adopted one (null when none).
+function chatSessionId(key, folder, session, base) {
   if (session) {
     if (!SESSION_ID.test(session)) throw new HttpError(400, 'Invalid session id');
     if (!listSessions(folder, { base }).some((s) => s.id === session)) throw new HttpError(400, 'That session is not one of the sessions listed for this folder');
-    sid = session;
-  } else {
-    const stored = (loadConfig().sessions || {})[key];
-    sid = stored ? stored.id : null;
+    return session;
   }
-  return sid ? readChat(folder, sid, { base, limit, key }) : { key, sessionId: null, found: false, items: [], truncated: false, updatedAt: null };
+  const stored = (loadConfig().sessions || {})[key];
+  return stored ? stored.id : null;
+}
+
+// GET /api/chat: the adopted session of the key, or an explicit one that must be among the folder's listed sessions. With the switch on, `results: true` and the call id of each chip.
+function chatState(id, session, limit, base = baseDir()) {
+  const { key, folder } = sessionKeyFor(id);
+  const sid = chatSessionId(key, folder, session, base);
+  const results = resultsOn();
+  const out = sid ? readChat(folder, sid, { base, limit, key, results }) : { key, sessionId: null, found: false, items: [], truncated: false, updatedAt: null };
+  return results ? { ...out, results: true } : out;
+}
+
+// The last toolResult of `call` in the recent window of a session file (the same 512 KB as the history), or null.
+function findToolResult(folder, sessionId, call, base) {
+  let file;
+  try { file = fs.readdirSync(sessionsDirFor(folder, base)).sort().find((n) => isSessionFile(n, String(sessionId))); } catch { return null; }
+  if (!file) return null;
+  let fd;
+  try {
+    fd = fs.openSync(path.join(sessionsDirFor(folder, base), file), 'r');
+    const { size } = fs.fstatSync(fd);
+    const start = Math.max(0, size - CHAT_WINDOW);
+    let found = null;
+    for (const entry of linesOf(readChunk(fd, start, size - start), start > 0, false).map(parse)) {
+      const m = entry && entry.type === 'message' && entry.message;
+      if (m && typeof m === 'object' && m.role === 'toolResult' && m.toolCallId === call) found = m;
+    }
+    return found;
+  } catch { return null; } finally { if (fd !== undefined) fs.closeSync(fd); }
+}
+
+// The refusal of a tool that reads a file looks at its NAME as a person would read it, not as the file spells it: compatibility forms (full width), accents and combining marks, controls,
+// invisible characters, spaces and punctuation inside the name all go first (`r e a d`, `re<NUL>ad`), and the name is refused when it IS `read`, has a file-reading compound in it or ends like one
+// (`readFile`, `readTextFile`, `fileRead`) or has the word `read` among its words (`read_file`, `mcp__fs__read_file`, `ReadManyFiles`) -- but not `thread`, `Reader` or `readme`. No name at all is refused too.
+const READ_COMPOUND = /read(file|files|text|binary|many|multiple|resource|document|doc|lines|source|path|content|contents)|getfilecontent|filegetcontent|viewfile|openfile|fetchfile|loadfile|showfile|displayfile|printfile|dumpfile|catfile|headfile|tailfile|opendocument/;
+const FILE_VERBS = new Set(['read', 'cat', 'view', 'slurp']);
+function isFileReader(raw) {
+  const plain = String(raw).normalize('NFKD').replace(/\u001b\[[0-9;?]*[ -/]*[@-~]/g, '').replace(/\p{M}/gu, '').replace(/[\p{Cc}\p{Cf}\u2028\u2029]/gu, '');
+  const compact = plain.replace(/[^\p{L}\p{N}]/gu, '').toLowerCase();
+  if (!compact || FILE_VERBS.has(compact) || READ_COMPOUND.test(compact) || /files?read$/.test(compact)) return true;
+  return plain.replace(/([a-z])([A-Z])/g, '$1 $2').split(/[^\p{L}]+/u).some((w) => w.toLowerCase() === 'read');
+}
+
+// GET /api/chat/result: the cleaned START of the text of one tool result, only when the switch is on, never for `read` (the contents of a file), and never as part of the history.
+function chatResult(id, call, base = baseDir()) {
+  if (!resultsOn()) throw new HttpError(403, 'Result viewing is off (chat.showResults in config.json)');
+  if (typeof call !== 'string' || !CALL_ID.test(call)) throw new HttpError(400, 'Invalid call id');
+  const { key, folder } = sessionKeyFor(id);
+  const sid = chatSessionId(key, folder, null, base);
+  const m = sid ? findToolResult(folder, sid, call, base) : null;
+  if (!m) throw new HttpError(404, 'That result is not in the recent part of the session');
+  const rawName = typeof m.toolName === 'string' ? m.toolName : '';
+  if (isFileReader(rawName)) throw new HttpError(403, 'The result of this tool is not shown');
+  const name = clean(rawName).trim().slice(0, 60);
+  const body = (Array.isArray(m.content) ? m.content : []).filter((b) => b && b.type === 'text' && typeof b.text === 'string').map((b) => b.text).join('\n');
+  return { call, name, ok: m.isError !== true, ...resultText(body), size: textSize(m.content) };
 }
 
 // What an adopted-session key stands for: a repo id, or "room:<name>". Unknown keys are 404, as in the other routes.
@@ -262,4 +317,4 @@ function adoptIfNone(key, sid) {
   return true;
 }
 
-module.exports = { baseDir, sessionsDirFor, listSessions, readChat, chatState, sessionKeyFor, sessionsState, adoptSession, releaseSession, adoptIfNone, SESSION_ID };
+module.exports = { baseDir, sessionsDirFor, listSessions, readChat, chatState, chatResult, sessionKeyFor, sessionsState, adoptSession, releaseSession, adoptIfNone, SESSION_ID };

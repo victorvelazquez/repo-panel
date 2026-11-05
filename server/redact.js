@@ -20,9 +20,9 @@ const RULES = [
   // user:password@ in a URL.
   [/(\b[a-z][a-z0-9+.-]*:\/\/)[^\s/@:]+:[^\s/@]+@/gi, `$1${MARK}@`],
   // The value of a flag whose name says it is a secret, in both forms (`--password x` and `--password=x`).
-  [new RegExp(`(--?(?:[a-z0-9]+[-_])*${NAME_WORDS}s?)(=|\\s+)(?:"[^"]*"|'[^']*'|\\S+)`, 'gi'), `$1$2${MARK}`],
+  [new RegExp(`(--?(?:[a-z0-9]{1,20}[-_]){0,4}${NAME_WORDS}s?)(=|\\s+)(?:"[^"]*"|'[^']*'|\\S+)`, 'gi'), `$1$2${MARK}`],
   // NAME=value where the name says it is a secret (quoted values may hold spaces).
-  [new RegExp(`\\b([A-Za-z0-9_.-]*${NAME_WORDS}[A-Za-z0-9_.-]*)(\\s*=\\s*)("[^"]*"|'[^']*'|[^\\s"']+)`, 'gi'), `$1$2${MARK}`],
+  [new RegExp(`\\b([A-Za-z0-9_.-]{0,40}${NAME_WORDS}[A-Za-z0-9_.-]{0,40})(\\s*=\\s*)("[^"]*"|'[^']*'|[^\\s"']+)`, 'gi'), `$1$2${MARK}`],
   // Token formats that identify themselves.
   [/\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|[sp]k[-_](?:live_|test_|proj-)?[A-Za-z0-9_-]{16,}|glpat-[A-Za-z0-9_-]{16,}|npm_[A-Za-z0-9]{30,}|xox[abprs]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{30,}|eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}(?:\.[A-Za-z0-9_-]*)?)/g, MARK],
 ];
@@ -125,4 +125,34 @@ function argSummary(name, args) {
   return cut(redact(tool.url ? urlHost(looked) : tool.shell ? shellSummary(looked) : looked));
 }
 
-module.exports = { redact, argSummary, MAX_ARG, MARK };
+// ---- RP106b: the start of the text of a tool RESULT, shown only on request. Free text cannot be allow-listed, so this is the second layer, never the only one (the
+// switch in config.json and the click are the first). Every line of the form UPPERCASE_NAME=value loses its value (the shape of `env`, `printenv` and a .env file), then the
+// patterns run, then the text is cut: the cut comes LAST on purpose here, because a cut of 300 characters cannot split a secret that the patterns already replaced.
+const RESULT_MAX = 300;
+// Only this much of a result is looked at (it bounds the work of the patterns: a nested quantifier was cubic on a run of `--pass-token-`, found by an independent check).
+const RESULT_LOOK = RESULT_MAX * 5;
+// What a terminal puts in front of a line and would hide it from the `^NAME=` rule: a title (OSC), colour and cursor sequences (CSI, 7-bit or 8-bit), any other escape pair, and the
+// control characters. They all go BEFORE the lines are split; every line break (LF, CR, CRLF, NEL, U+2028, U+2029) ends a line; a tab stays.
+const OSC = /\u001b\][^\u0007\u001b]*(?:\u0007|\u001b\\)?/g;
+const ANSI = /(?:\u001b\[|\u009b)[0-9;?]*[ -/]*[@-~]/g;
+const ESC_PAIR = /\u001b[ -~]?/g;
+const LINE_BREAKS = /\r\n?|[\u000b\u000c\u001c-\u001e\u2028\u2029\u0085]/g;
+const CONTROLS = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f]/g;
+// A line that sets a variable: `NAME=value`, `export`, `set`, `setx`, `declare -x` and `typeset` forms, PowerShell's `$env:NAME=`, spaces around the `=`, an optional quote. The NAME is uppercase.
+const ASSIGNMENT = /^(\s*(?:(?:export|EXPORT|set|SET|setx|SETX|declare|typeset)(?:\s+-[A-Za-z]+)*\s+|\$env:)?"?[A-Z_][A-Z0-9_]*\s*=\s*).*$/;
+// The forms that set a variable with a space and no `=`: Windows' `setx NAME value` and fish's `set -x NAME value`.
+const ASSIGN_SPACE = /^(\s*(?:setx|SETX|set\s+-[A-Za-z]+|SET\s+-[A-Za-z]+)\s+[A-Z_][A-Z0-9_]*\s+).*$/;
+function redactText(text) {
+  const lines = String(text).replace(INVISIBLE, '').replace(OSC, '').replace(ANSI, '').replace(ESC_PAIR, '').replace(LINE_BREAKS, '\n').replace(CONTROLS, '').split('\n').map((l) => l.replace(ASSIGNMENT, `$1${MARK}`).replace(ASSIGN_SPACE, `$1${MARK}`));
+  return redact(lines.join('\n'));
+}
+// The cleaned start of a result: control characters (but not line feeds) become spaces, at most RESULT_MAX characters, a cut ends with `…`.
+function resultText(text) {
+  const raw = String(text);
+  // The word the look ends in is dropped (a blob with no space keeps its first RESULT_LOOK characters), so a secret is never left half there.
+  const looked = raw.length > RESULT_LOOK ? raw.slice(0, RESULT_LOOK).replace(/\S*$/, '') || raw.slice(0, RESULT_LOOK) : raw;
+  const clean = redactText(looked).trim();
+  return clean.length > RESULT_MAX ? { text: `${clean.slice(0, RESULT_MAX - 1)}…`, truncated: true } : { text: clean, truncated: false };
+}
+
+module.exports = { redact, argSummary, redactText, resultText, MAX_ARG, MARK, RESULT_MAX };
