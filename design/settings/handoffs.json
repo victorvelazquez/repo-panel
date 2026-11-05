@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "chosen": "01-lista-agrupada.html",
+  "handoffs": {
+    "01-lista-agrupada.html": {
+      "status": "sent",
+      "queued": false,
+      "sentAt": "2026-11-05T16:50:56.799Z",
+      "startedAt": null,
+      "implementedAt": null,
+      "feature": "odd/tasks/chat-alcance.md"
+    }
+  }
+}
