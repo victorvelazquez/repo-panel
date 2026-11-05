@@ -28,6 +28,7 @@ const { createEventHub } = require('./events.js');
 const { createRpcHost, rpcApi } = require('./rpchost.js');
 const { readUsage, usageFile } = require('./usage.js');
 const { sessionsState, chatState, chatResult, adoptSession, releaseSession, adoptIfNone } = require('./sessions.js');
+const { readSettings, writeSetting } = require('./settings.js');
 
 const ROOT = path.join(__dirname, '..');
 const TOKEN = crypto.randomBytes(24).toString('hex');
@@ -99,6 +100,12 @@ const routes = {
   'GET /api/chat': (q, b, d) => chatState(q.id, q.session, q.limit, d.sessionsDir),
   // RP106b: the cleaned start of the text of one tool result; 403 unless `chat.showResults` is true in config.json, and never for `read`.
   'GET /api/chat/result': (q, b, d) => chatResult(q.id, q.call, d.sessionsDir),
+  // RP111b: the options the page may read and write, a CLOSED list (server/settings.js); never the whole configuration.
+  'GET /api/settings': () => readSettings(),
+  'POST /api/settings': (q, b) => {
+    if (!b || typeof b !== 'object' || Array.isArray(b)) throw new HttpError(400, 'The body must be an object { key, value }');
+    return writeSetting(b.key, b.value);
+  },
   // RP62: the Claude usage file, read on every request (no cache); a missing or broken file is a normal 200 with available false.
   'GET /api/usage': (q, b, d) => readUsage({ file: d.usageFile || usageFile() }),
   'GET /api/prerequisites': (q, b, d) => prerequisites(undefined, d.piRuntime ? () => resolveRuntime(d.piRuntime) : undefined),

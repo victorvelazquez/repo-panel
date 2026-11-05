@@ -3,12 +3,13 @@
   "chosen": "01-lista-agrupada.html",
   "handoffs": {
     "01-lista-agrupada.html": {
-      "status": "sent",
+      "status": "implemented",
       "queued": false,
       "sentAt": "2026-11-05T16:50:56.799Z",
-      "startedAt": null,
-      "implementedAt": null,
-      "feature": "odd/tasks/chat-alcance.md"
+      "startedAt": "2026-11-05T17:22:35.180Z",
+      "implementedAt": "2026-11-05T17:46:45.924Z",
+      "feature": "odd/tasks/chat-alcance.md",
+      "note": "RP111b implemented (uncommitted until /flow-commit): Settings tab, closed list of options on the server. No preview URL: the panel is not running. Defaults shown are the real ones (delete branch and clean column are on)."
     }
   }
 }
