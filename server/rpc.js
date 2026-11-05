@@ -15,6 +15,7 @@ const START_MS = 300000;
 const MAX_LINE = 8 * 1024 * 1024;
 const MAX_WAITING = 200;
 const MAX_DIALOGS = 20;
+const STATUS_MAX = 200;
 const DIALOGS = new Set(['select', 'confirm', 'input', 'editor']);
 const SAFE_ARG = /^[A-Za-z0-9._-]+$/;
 const FAILURES = { timeout: 'The session did not start in time', error: 'The session could not be started', exit: 'The session ended', closed: 'The session is closed' };
@@ -132,7 +133,13 @@ function createRpcClient({ command, args = [], cwd, env, spawn = cp.spawn, platf
   const publicDialog = (d) => ({ id: d.id, method: d.method, title: d.title, options: d.options, message: d.message, expiresAt: d.expiresAt, truncated: d.truncated });
 
   function onUi(rec) {
-    // Notices (setStatus, setWidget, notify...) need no answer and are dropped; only the four dialog methods block the agent.
+    // RP110b: of all the notices, only the status of the MEMORY plugin (the key `engram`) is kept, and only its tail: the plugin ends it with the part that tells the state (`· ready`, `· offline`), so a
+    // long project name must not push that part out. It is not a dialog: it needs no answer and does not change the state. The host reduces it to a category; the text never goes further.
+    if (rec.method === 'setStatus') {
+      if (rec.statusKey === 'engram') emit({ kind: 'status', key: 'engram', text: typeof rec.statusText === 'string' ? rec.statusText.slice(-STATUS_MAX) : '' });
+      return;
+    }
+    // The other notices (setWidget, notify...) need no answer and are dropped; only the four dialog methods block the agent.
     if (!DIALOGS.has(rec.method) || typeof rec.id !== 'string' || !rec.id || rec.id.length > 200) return;
     if (dialogs.has(rec.id) || dialogs.size >= MAX_DIALOGS) return;
     const wait = Number(rec.timeout) > 0 ? Math.min(Number(rec.timeout), 2147483647) : 0;

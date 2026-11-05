@@ -90,8 +90,23 @@ const slim = (r) => {
 
 // What the host tells the page: the dialog id travels as `requestId` (the hub reserves `id` for the repo); a record is cut to its whitelist,
 // and what is still huge after that is cut to its type.
+// RP110b: what the page may know of the memory plugin of a session: ONE category of this closed list, never the text of its notice (it can hold the name of the project or an error message).
+const MEMORY = ['ready', 'offline', 'disabled', 'error'];
+// The text of the notice of the key `engram` -> a category, or null when it says nothing lasting: a step in progress (`· saving…`), the result of one call or a text nobody knows. null never changes the
+// category already known. The plugin writes `🧠 <project> · ready|offline|error|ambiguous project` and `🧠 memory disabled`; only those two shapes count, and only at the END of the text.
+function memoryOf(text) {
+  if (typeof text !== 'string') return null;
+  const t = text.replace(/\s+/g, ' ').trim();
+  if (t.replace(/^[^A-Za-z0-9]+/, '').toLowerCase() === 'memory disabled') return 'disabled';
+  const m = /\u00b7 ?(ready|offline|error|ambiguous project)$/i.exec(t);
+  if (!m) return null;
+  return m[1].toLowerCase() === 'ready' ? 'ready' : m[1].toLowerCase() === 'offline' ? 'offline' : 'error';
+}
+
 function wire(e) {
   if (!e || typeof e !== 'object') return null;
+  if (e.kind === 'status') return null; // a raw notice never goes to the page (the host turns it into `memory` first)
+  if (e.kind === 'memory') return MEMORY.includes(e.memory) ? { kind: 'memory', memory: e.memory } : null;
   if (e.kind === 'dialog' || e.kind === 'dialog-closed') { const { id, ...rest } = e; return { ...rest, requestId: id }; }
   if (e.kind === 'event') {
     const record = slim(e.record);
@@ -106,7 +121,7 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
   const closedStatus = { state: 'closed', pendingDialogs: [], sessionId: null };
   // A pending dialog is named `requestId` here as in the SSE `dialog` event.
   const statusOf = (entry) => (entry && entry.client
-    ? { state: entry.client.state(), pendingDialogs: entry.client.pendingDialogs().map(({ id, ...rest }) => ({ requestId: id, ...rest })), sessionId: entry.sessionId }
+    ? { state: entry.client.state(), pendingDialogs: entry.client.pendingDialogs().map(({ id, ...rest }) => ({ requestId: id, ...rest })), sessionId: entry.sessionId, ...(entry.memory ? { memory: entry.memory } : {}) }
     : closedStatus);
   const running = (id) => {
     const entry = live.get(id);
@@ -136,7 +151,15 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
       args: ['--mode', 'rpc', '--session-id', entry.sessionId],
       cwd: repo.path,
       env: runtimeEnv(found.active, env),
-      onEvent: (e) => { const w = wire(e); if (w) publish(id, w); },
+      onEvent: (e) => {
+        if (e && e.kind === 'status') { // RP110b: only the notice of THIS session counts (an old client's is not the new one's), and only a change of category is published
+          const cat = e.key === 'engram' && live.get(id) === entry ? memoryOf(e.text) : null;
+          if (cat && cat !== entry.memory) { entry.memory = cat; publish(id, { kind: 'memory', memory: cat }); }
+          return;
+        }
+        const w = wire(e);
+        if (w) publish(id, w);
+      },
       // RP98: the exit of an OLD client (closed, replaced by a new start) is not the new session's: it is published only while this entry is the live one or none is.
       onExit: () => { const cur = live.get(id); if (cur === entry) live.delete(id); if (cur === entry || !cur) publish(id, { kind: 'exit' }); },
     });
@@ -272,4 +295,4 @@ function rpcApi(host) {
   };
 }
 
-module.exports = { createRpcHost, rpcApi, cleanText, sessionIdFor };
+module.exports = { createRpcHost, rpcApi, cleanText, sessionIdFor, memoryOf, MEMORY };

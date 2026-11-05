@@ -207,6 +207,21 @@
     return `<span class="ss ss-${s.tone} ss-${s.key}${s.animate ? ' ss-anim' : ''}" role="status" title="${esc(s.title)}"><i class="ss-dot" aria-hidden="true">${s.icon}</i> ${s.word}</span>`;
   };
 
+  // RP110b: the memory (Engram) of the session, as one chip next to its state. The server sends ONE category of a closed list, never the text of the plugin; the chip says it in words
+  // and the tone follows it (ready is quiet, disabled warns, offline and error are in red). Nothing is drawn without a known category or when the session is closed.
+  const MEMORY_CHIP = {
+    ready: ['mem-ready', 'memory ready', 'The memory of this session is ready'],
+    offline: ['mem-bad', 'memory offline', 'The memory of this session cannot be reached'],
+    error: ['mem-bad', 'memory error', 'The memory of this session reported an error'],
+    disabled: ['mem-warn', 'memory disabled', 'The memory is disabled for this session: it will not remember anything'],
+  };
+  const memoryChipHtml = (c) => {
+    const r = c && c.rpc && typeof c.rpc === 'object' ? c.rpc : null;
+    if (!r || r.state === 'closed' || typeof r.memory !== 'string' || !Object.hasOwn(MEMORY_CHIP, r.memory)) return '';
+    const [cls, word, title] = MEMORY_CHIP[r.memory];
+    return `<span class="mem ${cls}" title="${esc(title)}">${word}</span>`;
+  };
+
   // RP98: "Close session" stops the pi process of the repo and releases its adoption (the chat goes back to the list of sessions). It lives next to the session state in the composer frame (RP72 keeps the
   // chat header to the repo name and the ✕, which only hides the chat) and is there while the repo has a session: adopted or live.
   const sessionCloseHtml = (show, closing) => (show ? `<button type="button" class="ss-close" data-act="session-close"${closing ? ' disabled' : ''} title="Stop this session and go back to the list of sessions">Close session</button>` : '');
@@ -887,5 +902,5 @@ ${status}</div>`;
     return `${ctx.failed ? '<div class="rs-note" role="status">⚠ Summary unavailable: showing the last data we have.</div>' : ''}<div class="rs-list">${body}</div>${rows.length ? LEGEND : ''}`;
   }
 
-  return { esc, mdHtml, settingsView, sessionChip, blockWidths, columnView, composerState, askAllowed, actionMenu, actionButtonsHtml, composerNote, chatHead, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, sessionCloseHtml, recentlyActive, chatBody, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
+  return { esc, mdHtml, settingsView, memoryChipHtml, sessionChip, blockWidths, columnView, composerState, askAllowed, actionMenu, actionButtonsHtml, composerNote, chatHead, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, sessionCloseHtml, recentlyActive, chatBody, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
 }));
