@@ -154,6 +154,17 @@ function loadPrerequisites() {
   );
 }
 
+// RP111b: the options of the panel the page may change (the closed list of the server), read each time the Settings tab opens.
+function loadSettings() {
+  const seq = ++S.settings.seq;
+  if (S.settings.state !== 'ready') S.settings.state = 'loading';
+  return api('/api/settings').then(
+    (d) => { if (seq === S.settings.seq) { S.settings.state = 'ready'; S.settings.options = settingsMap(d); draw(); } },
+    () => { if (seq === S.settings.seq) { S.settings.state = 'failed'; draw(); } },
+  );
+}
+const settingsMap = (d) => Object.fromEntries(((d && Array.isArray(d.options)) ? d.options : []).filter((o) => o && typeof o.key === 'string' && typeof o.value === 'boolean').map((o) => [o.key, o.value]));
+
 // With no rooms there is nothing to ask. The room list itself (S.rooms) comes from /api/config.
 function loadRooms() {
   const seq = ++S.roomSeq;

@@ -369,8 +369,40 @@ button:is([data-cmd], [data-kind], header .primary, .empty .primary, .merge):dis
 /* An author `display` beats the browser's `[hidden] { display: none }`: every block the page hides with the attribute and that gets a display rule needs this line (RP71). */
 .chatlayout[hidden], .queue[hidden], .composer[hidden] { display: none; }
 #conformityView[hidden] { display: none; }
+#settingsView[hidden] { display: none; }
 /* RP60: the audit covers every repo, so the shared filters of the view bar do not apply to it. */
 body.tab-conformity #viewbar { display: none; }
+/* RP111b: nor do they apply to the Settings tab. */
+body.tab-settings #viewbar { display: none; }
+/* RP111b: the Settings tab (artboard A, a grouped list). */
+.st { max-width: 900px; margin: 0 auto; padding: 8px 0 48px; }
+.st h2 { font-size: 18px; margin: 0; }
+.st-h { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; margin: 26px 0 8px; display: flex; align-items: center; gap: 8px; }
+.st-rows { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
+.st-row { display: grid; grid-template-columns: 1fr auto; gap: 16px; padding: 12px 14px; border-top: 1px solid var(--line); align-items: start; }
+.st-row:first-child { border-top: 0; }
+.st-row.is-planned { opacity: .7; }
+.st-what label { font-weight: 600; }
+.st-what p { margin: 2px 0 0; }
+.st-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.st-ctl { display: flex; align-items: center; gap: 10px; min-width: 170px; justify-content: flex-end; }
+.st-sw { width: 40px; height: 22px; padding: 0; border-radius: 11px; position: relative; background: var(--gray); border-color: var(--gray); }
+.st-sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: left .12s; }
+.st-sw[aria-checked="true"] { background: var(--green); border-color: var(--green); }
+.st-sw[aria-checked="true"]::after { left: 20px; }
+.st-state { color: var(--muted); font-size: 12px; min-width: 24px; }
+.st-seg { display: inline-flex; }
+.st-seg button { border-radius: 0; margin-left: -1px; }
+.st-seg button:first-child { border-radius: 6px 0 0 6px; margin-left: 0; }
+.st-seg button:last-child { border-radius: 0 6px 6px 0; }
+.st-seg button[aria-pressed="true"] { background: #12253d; border-color: var(--blue); position: relative; z-index: 1; }
+.st-warn { margin-top: 8px; padding: 8px 10px; border: 1px solid #53410f; background: #251d08; border-radius: 6px; font-size: 12px; }
+.st-warn b { color: var(--yellow); }
+.st-note { padding: 10px 14px; color: var(--muted); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
+.st-status { margin-top: 20px; min-height: 20px; color: var(--green); font-size: 12px; }
+.st-status.bad { color: var(--red); }
+.st button:focus-visible, .st select:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .st-sw::after { transition: none; } }
 .chatlayout #summary { flex: 1 1 0; min-width: 0; }
 .chatlayout.chat-open { height: calc(100vh - 140px); min-height: 480px; }
 .chatlayout.chat-open #summary { flex: none; width: var(--list-w, 25%); max-width: none; margin: 0; min-width: 260px; overflow: auto; }

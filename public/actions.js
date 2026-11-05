@@ -82,7 +82,27 @@ const ACTIONS = {
   'files-open': (el) => loadFile(el.dataset.path || ''),
   // The button says what the person SEES (data-open): the default is open only when a changed file is inside, so toggling flips that.
   'files-dir': (el) => { (S.filesOpen[S.chat.id] ||= {})[el.dataset.path || ''] = el.dataset.open !== 'true'; draw(); },
-  'tab': (el) => { if (['summary', 'work', 'conformity'].includes(el.dataset.tab)) setTab(el.dataset.tab); },
+  'tab': (el) => { if (['summary', 'work', 'conformity', 'settings'].includes(el.dataset.tab)) setTab(el.dataset.tab); },
+  // RP111b: an option of the PANEL. The key must be one the page knows (it is checked again by the server against its closed list); the new value is the opposite of the one read.
+  'setting-toggle': async (el) => {
+    const key = el.dataset && el.dataset.key;
+    if (typeof key !== 'string' || !Object.hasOwn(S.settings.options, key) || typeof S.settings.options[key] !== 'boolean') return;
+    try {
+      const d = await api('/api/settings', { key, value: !S.settings.options[key] });
+      Object.assign(S.settings, { options: settingsMap(d), saved: 'Saved to config.json', error: '' });
+    } catch (e) { Object.assign(S.settings, { saved: '', error: String((e && e.message) || 'Could not save').slice(0, 200) }); }
+    draw();
+  },
+  // An option of THIS BROWSER: the preference that already exists, from a closed list with the type each one has. Nothing goes to the server.
+  'pref-set': (el) => {
+    const { pref, value } = (el && el.dataset) || {};
+    const v = value === 'true' ? true : value === 'false' ? false : value;
+    const ok = (pref === 'method' && ['squash', 'merge', 'rebase'].includes(v)) || (['del', 'cleanAsColumn', 'split'].includes(pref) && typeof v === 'boolean');
+    if (!ok) return;
+    Object.assign(S.settings, { saved: 'Saved in this browser', error: '' });
+    setPref(pref, v);
+    syncPrefControls();
+  },
   'sfilter': (el) => { S.sfilter = el.dataset.filter === 'attention' ? 'attention' : 'all'; draw(); },
   'toggle-group': (el) => { S.collapsed[el.dataset.group] = !S.collapsed[el.dataset.group]; draw(); },
   'scope': (el) => { S.scope = el.dataset.kind === 'room' ? { kind: 'room', name: el.dataset.name } : { kind: el.dataset.kind === 'none' ? 'none' : 'all' }; draw(); },

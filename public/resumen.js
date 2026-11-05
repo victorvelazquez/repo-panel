@@ -768,6 +768,52 @@
     return Number.isFinite(t) && Math.abs(now - t) < RECENT_MS;
   }
 
+  // RP111b (artboard A, a grouped list): the Settings tab as a pure function of `m` = { state, options, prefs, pi, saved, error }. A row is label and description on the left, the
+  // control on the right, and chips that say where it is saved and its default. The options of the PANEL go to the server through `setting-toggle` (and «pi to use» through the
+  // route that already exists); the options of THIS BROWSER go through `pref-set`. What is not built yet is shown disabled and marked «Planned». Everything dynamic is escaped.
+  const stSwitch = (id, on, attrs, disabled) => `<button type="button" class="st-sw" role="switch" aria-checked="${on === true}" aria-labelledby="${id}" ${attrs}${disabled ? ' disabled' : ''}></button><span class="st-state">${on === true ? 'On' : 'Off'}</span>`;
+  const stSeg = (id, pref, current, choices) => `<span class="st-seg" role="group" aria-labelledby="${id}">${choices.map(([value, label]) => `<button type="button" aria-pressed="${String(current) === value}" data-act="pref-set" data-pref="${pref}" data-value="${value}">${label}</button>`).join('')}</span>`;
+  const stRow = (what, ctl, planned) => `<div class="st-row${planned ? ' is-planned' : ''}"><div class="st-what">${what}</div><div class="st-ctl">${ctl}</div></div>`;
+  const stMeta = (...chips) => `<div class="st-meta">${chips.join('')}</div>`;
+  const stBrowser = (def) => stMeta('<span class="chip">Saved in this browser</span>', `<span class="chip">Default: ${def}</span>`);
+  function settingsView(m) {
+    const o = m && typeof m === 'object' ? m : {};
+    const opts = o.options && typeof o.options === 'object' ? o.options : {};
+    const p = o.prefs && typeof o.prefs === 'object' ? o.prefs : {};
+    const pi = o.pi && typeof o.pi === 'object' && Array.isArray(o.pi.candidates) ? o.pi : null;
+    const ready = o.state === 'ready';
+    const runtimes = pi ? pi.candidates.filter((c) => c && typeof c === 'object' && c.available === true && typeof c.id === 'string') : [];
+    const piOptions = [['auto', 'Auto'], ...runtimes.map((c) => [c.id, typeof c.label === 'string' ? c.label : c.id])];
+    const piSelectHtml = pi
+      ? `<select id="st-pi" data-pi-runtime aria-label="pi to use">${piOptions.map(([id, label]) => `<option value="${esc(id)}"${id === pi.mode ? ' selected' : ''}>${esc(label)}</option>`).join('')}</select>`
+      : '<select id="st-pi" data-pi-runtime aria-label="pi to use" disabled><option>Loading…</option></select>';
+    const detected = runtimes.map((c) => `${typeof c.label === 'string' ? c.label : c.id}${typeof c.version === 'string' && c.version ? ` ${c.version}` : ''}`).join(' · ');
+    const panelChip = '<span class="chip blue">Panel</span>';
+    const resultsRow = o.state === 'failed'
+      ? '<div class="st-note">Settings of the panel are unavailable. Open the tab again to retry.</div>'
+      : `<div class="st-rows">${stRow(
+        `<label id="st-l-results">Show the result of a tool on click</label><p class="rs-sub">A click on a tool chip shows the first ~300 characters of what that tool returned.</p>
+<div class="st-warn" role="note"><b>Privacy.</b> A result is free text and can hold secrets (for example the output of <code>cat .env</code>). It is cleaned, but no filter catches every form. The result of <code>read</code> is never shown.</div>${stMeta('<span class="chip blue">Saved in config.json · chat.showResults</span>', '<span class="chip">Default: off</span>')}`,
+        stSwitch('st-l-results', opts['chat.showResults'] === true, 'data-act="setting-toggle" data-key="chat.showResults"', !ready),
+      )}</div>`;
+    const status = o.error ? `<div class="st-status bad" role="status" aria-live="polite">${esc(String(o.error))}</div>` : `<div class="st-status" role="status" aria-live="polite">${esc(String(o.saved || ''))}</div>`;
+    return `<div class="st"><h2>Settings</h2><p class="rs-sub">Each option says where it is saved. «Panel» options live in <code>config.json</code> and apply to every browser; «This browser» options stay in this browser only. A change is saved as soon as you make it.</p>
+`
+      + `<h3 class="st-h">Chat ${panelChip}</h3>${resultsRow}
+`
+      + `<h3 class="st-h">Pi ${panelChip}</h3><div class="st-rows">${stRow(`<label for="st-pi">pi to use</label><p class="rs-sub">Which program runs the sessions of each repo. Auto picks the first one that is installed.</p>${stMeta('<span class="chip blue">Saved in config.json · pi.runtime</span>', '<span class="chip">Default: Auto</span>', detected ? `<span class="chip">Detected: ${esc(detected)}</span>` : '')}`, piSelectHtml)}`
+      + `${stRow(`<label for="st-env">Variables passed to the sessions</label><p class="rs-sub">The panel removes <code>PI_*</code>, <code>GENTLE_*</code> and <code>ENGRAM_*</code> from the environment of a session. List the ones Engram and your MCP servers need.</p>${stMeta('<span class="chip yellow">Planned · RP110</span>', '<span class="chip">Default: none</span>')}`, '<input id="st-env" value="ENGRAM_PROJECT" disabled aria-label="Variables passed to the sessions">', true)}</div>
+`
+      + `<h3 class="st-h">Delivery <span class="chip">This browser</span></h3><div class="st-rows">${stRow(`<label id="st-l-method">Merge method</label><p class="rs-sub">How the Merge button joins a pull request.</p>${stBrowser('squash')}`, stSeg('st-l-method', 'method', p.method, [['squash', 'squash'], ['merge', 'merge'], ['rebase', 'rebase']]))}`
+      + `${stRow(`<label id="st-l-del">Delete the branch after merging</label>${stBrowser('on')}`, stSwitch('st-l-del', p.del === true, 'data-act="pref-set" data-pref="del" data-value="' + (p.del === true ? 'false' : 'true') + '"', false))}</div>
+`
+      + `<h3 class="st-h">Visual <span class="chip">This browser</span></h3><div class="st-rows">${stRow(`<label id="st-l-diff">Diff view</label><p class="rs-sub">How the Changes tab draws a file.</p>${stBrowser('unified')}`, stSeg('st-l-diff', 'split', p.split === true, [['false', 'unified'], ['true', 'side by side']]))}`
+      + `${stRow(`<label id="st-l-clean">Show clean repos as a column</label>${stBrowser('on')}`, stSwitch('st-l-clean', p.clean === true, 'data-act="pref-set" data-pref="cleanAsColumn" data-value="' + (p.clean === true ? 'false' : 'true') + '"', false))}</div>
+`
+      + `<h3 class="st-h">Director <span class="chip yellow">Planned · RP109</span></h3><div class="st-rows">${stRow(`<label for="st-par">Agents working in parallel</label><p class="rs-sub">How many repo agents the Director may run at once.</p>${stMeta('<span class="chip yellow">Planned · RP109</span>', '<span class="chip">Default: 3</span>')}`, '<select id="st-par" disabled aria-label="Agents working in parallel"><option>3</option></select>', true)}</div>
+${status}</div>`;
+  }
+
   function chatBody(c, ctx = {}) {
     const info = c.info;
     if (!info) return `<div class="empty" role="status">${c.failed ? 'Chat unavailable. Try again in a moment.' : 'Loading chat…'}</div>`;
@@ -841,5 +887,5 @@
     return `${ctx.failed ? '<div class="rs-note" role="status">⚠ Summary unavailable: showing the last data we have.</div>' : ''}<div class="rs-list">${body}</div>${rows.length ? LEGEND : ''}`;
   }
 
-  return { esc, mdHtml, sessionChip, blockWidths, columnView, composerState, askAllowed, actionMenu, actionButtonsHtml, composerNote, chatHead, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, sessionCloseHtml, recentlyActive, chatBody, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
+  return { esc, mdHtml, settingsView, sessionChip, blockWidths, columnView, composerState, askAllowed, actionMenu, actionButtonsHtml, composerNote, chatHead, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, sessionCloseHtml, recentlyActive, chatBody, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
 }));

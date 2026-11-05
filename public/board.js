@@ -122,6 +122,7 @@ function render() {
   syncRefreshIcon();
   drawQueue();
   drawConformity();
+  drawSettings();
   drawSummary();
   drawChat();
   if (!allRepos().length) {
@@ -159,6 +160,12 @@ function setPref(key, value) {
   S.prefs[key] = value;
   localStorage.setItem('prefs', JSON.stringify(S.prefs));
   draw();
+}
+// RP111b: the controls of the bar are set once when the page starts; a preference changed from Settings puts them in step.
+function syncPrefControls() {
+  $('#method').value = S.prefs.method;
+  $('#delBranch').checked = S.prefs.del;
+  $('#cleanAsColumn').checked = cleanAsColumn();
 }
 
 // Well-separated hues, assigned to groups by their position in config.json (wraps after 6 groups).

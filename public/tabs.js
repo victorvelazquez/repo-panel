@@ -223,6 +223,13 @@ function drawConformity() {
 
 function openConformity() { setTab('conformity'); }
 
+// RP111b: the Settings tab (artboard A). The view is a pure function of this model (R.settingsView); the preferences of the browser are the ones that already exist.
+function drawSettings() {
+  if (S.tab !== 'settings') return;
+  const prefs = { method: S.prefs.method, del: S.prefs.del, clean: cleanAsColumn(), split: !!S.prefs.split };
+  paint($('#settingsView'), R.settingsView({ ...S.settings, prefs, pi: S.prereq.pi }));
+}
+
 // ---------- summary ----------
 // GET /api/summary on the 60 s cycle and every 20 s while the tab is shown. generatedAt changes on every answer, so it is left
 // out of the comparison: the page redraws only when the payload really changed. A failed read keeps the last data.
@@ -258,15 +265,19 @@ function applyTab() {
   $('#sumLayout').hidden = S.tab !== 'summary'; // the chat lives inside this wrapper: it exists only in Summary (S56)
   $('#work').hidden = S.tab !== 'work';
   $('#conformityView').hidden = S.tab !== 'conformity';
-  if (document.body && document.body.classList) for (const t of ['summary', 'work', 'conformity']) document.body.classList.toggle(`tab-${t}`, S.tab === t);
+  $('#settingsView').hidden = S.tab !== 'settings';
+  if (document.body && document.body.classList) for (const t of ['summary', 'work', 'conformity', 'settings']) document.body.classList.toggle(`tab-${t}`, S.tab === t);
   for (const b of Array.from((document.querySelectorAll && document.querySelectorAll('.rs-tabs [role=tab][data-tab]')) || [])) b.setAttribute('aria-selected', String(b.dataset.tab === S.tab));
 }
 // Conformity is a tab like the others but never the saved one: a reload comes back to Summary or Work, and a repo picked in it returns there.
 function setTab(tab) {
-  if (tab === 'conformity' && S.tab !== 'conformity') S.backTab = S.tab;
+  // The way back is Summary or Work, whichever the person was last on (Settings and Conformity are never one: RP111b).
+  if (tab === 'conformity' && S.tab !== 'conformity') S.backTab = S.tab === 'summary' || S.tab === 'work' ? S.tab : S.prefs.tab === 'work' ? 'work' : 'summary';
   S.tab = tab;
   applyTab();
-  if (tab === 'conformity') draw(); else setPref('tab', tab);
+  if (tab === 'conformity') draw();
+  else if (tab === 'settings') { draw(); loadSettings(); if (!S.prereq.pi) loadPrerequisites(); } // like Conformity, never the saved tab
+  else setPref('tab', tab);
   if (tab === 'summary') { loadSummary(); if (S.chat.id) loadChat(S.chat.id); }
 }
 
