@@ -21,3 +21,5 @@ Series that widens what the panel chat shows and studies how to use subagents, u
 - L1. User: «que tanto mostramos en el chat lo que se muestra en la terminal con pi?» … list of what is and is not shown; then asked for a longer history, «thinking...», and more functional chat; agreed the 3-step plan, argument visible with redaction; added subagent studies, the room Director, the Director/orchestrator naming (Director chosen) and the Engram/MCP parity check.
 
 - L2. RP104 closed: `CHAT_WINDOW` = 512 KB in `readChat`; `thinking: true` on assistant items; live flag `thinking` in `rpcReduce`; tests `test/rp104-chat-reach.test.js`. S1 and S2 covered. Closed in the same diff as the row.
+
+- L3. RP105 closed (split: turn marks and compaction lines moved to RP105b). Independent verification took three rounds because a pattern-based redaction of shell commands leaked (23, then 12 forms): the design became a closed vocabulary in `server/redact.js`; accepted limits are in the README. S3 covered; tests `test/rp105-tool-chips.test.js`, `test/rp105-allowlist.test.js`.

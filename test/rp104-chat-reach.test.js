@@ -65,7 +65,7 @@ test('S2: an assistant item that reasoned is marked thinking, also when the reas
 });
 
 test('S2: an assistant item with no reasoning has no thinking field at all (the items of before are unchanged)', () => {
-  putSession('t2', [header('t2', repoDir), msg('user', [text('hi')]), msg('assistant', [text('ok'), call('read')])]);
+  putSession('t2', [header('t2', repoDir), msg('user', [text('hi')]), msg('assistant', [text('ok')])]);
   assert.deepEqual(chatOf('t2').items.map((i) => Object.keys(i).sort()), [['at', 'role', 'text', 'tools'], ['at', 'role', 'text', 'tools']]);
 });
 

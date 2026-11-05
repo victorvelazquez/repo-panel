@@ -49,12 +49,12 @@ function putSession(folder, id, lines, mtimeSec = 2000) {
 const chatOf = (id, opts) => S.readChat(repoDir, id, { base: sessionsBase, ...opts });
 
 // ---------- Part A: readChat ----------
-test('readChat returns user and assistant text oldest first, with the tool NAMES only, never thinking, arguments or results', () => {
+test('readChat returns user and assistant text oldest first, with the tool NAMES only (plus the redacted main argument, RP105), never thinking, other arguments or results', () => {
   resetDisk();
   putSession(repoDir, 'c1', [
     header('c1', repoDir),
     msg('user', [text('/flow-next'), text('please')]),
-    msg('assistant', [{ type: 'thinking', thinking: 'SECRET-THOUGHT' }, call('read', { path: 'SECRET-ARG' })]),
+    msg('assistant', [{ type: 'thinking', thinking: 'SECRET-THOUGHT' }, call('read', { path: 'a.js', other: 'SECRET-ARG' })]),
     msg('toolResult', [text('SECRET-RESULT')]),
     msg('assistant', [{ type: 'thinking', thinking: 'SECRET-THOUGHT-2' }, text('Taking B2b.'), text('It is one file.')]),
     msg('system', [text('SECRET-SYSTEM')]),
