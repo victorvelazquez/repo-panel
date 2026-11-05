@@ -669,10 +669,14 @@
 
   // RP104: where the model reasoned the history shows «thinking…» (never the reasoning); an item that did not has no such line.
   const thoughtLine = (it) => (it.thinking === true ? '<div class="tools thought">▸ thinking…</div>' : '');
+  // RP105b: a note after a turn that stopped or failed (only the two known categories draw), and a quiet line where the context was compacted.
+  const STOP_NOTES = { aborted: '⏹ Turn stopped', error: '⚠ Turn failed' };
+  const stopNote = (it) => (Object.hasOwn(STOP_NOTES, it.stop) ? `<div class="m stopnote ${it.stop}">${STOP_NOTES[it.stop]}</div>` : '');
   const bubble = (it, who) => {
     const time = hhmm(it.at);
-    if (it.role === 'assistant' && !it.text) return `${thoughtLine(it)}${toolsLine(it.tools, it.toolInfo)}<div class="m working">working…</div>`;
-    return `${thoughtLine(it)}${toolsLine(it.tools || [], it.toolInfo)}<div class="m${it.role === 'user' ? ' me' : ''}"><span class="who">${esc(it.role === 'user' ? 'You' : who)}${time ? ` · ${time}` : ''}</span>${mdHtml(it.text)}</div>`;
+    if (it.role === 'system') return it.kind === 'compaction' ? `<div class="sysnote">↻ Context compacted${time ? ` · ${time}` : ''}</div>` : '';
+    if (it.role === 'assistant' && !it.text) return `${thoughtLine(it)}${toolsLine(it.tools, it.toolInfo)}${stopNote(it) || '<div class="m working">working…</div>'}`;
+    return `${thoughtLine(it)}${toolsLine(it.tools || [], it.toolInfo)}<div class="m${it.role === 'user' ? ' me' : ''}"><span class="who">${esc(it.role === 'user' ? 'You' : who)}${time ? ` · ${time}` : ''}</span>${mdHtml(it.text)}</div>${stopNote(it)}`;
   };
 
   // Pending messages of the composer (RP75): shown after the real ones until the history has them. `base` is how many user items

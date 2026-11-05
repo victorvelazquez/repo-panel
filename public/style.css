@@ -509,6 +509,9 @@ body.tab-conformity #viewbar { display: none; }
 .m.me { align-self: flex-end; background: #12253d; border-color: #1d3a5f; border-radius: 12px 12px 3px 12px; }
 .m.working { color: var(--muted); font-style: italic; }
 .m.streaming { border-left: 2px solid var(--green); }
+.m.stopnote { color: var(--muted); font-size: 12px; padding: 3px 10px; }
+.m.stopnote.error { color: #e07a7a; border-color: #6b2c2c; }
+.sysnote { align-self: center; color: var(--muted); font-size: 12px; padding: 2px 10px; }
 #msgStop[hidden] { display: none; }
 .m p, .m ul, .m ol, .m pre, .m blockquote, .m h3, .m h4, .m h5 { margin: 6px 0; }
 .m > .who + *, .m > :first-child:not(.who) { margin-top: 0; }
