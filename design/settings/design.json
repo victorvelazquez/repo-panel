@@ -1,0 +1,28 @@
+{
+  "title": "Repo Panel — Settings",
+  "brief": "A «Settings» tab at full width (like Conformity) that gathers the options of the panel, today spread over config.json, the «pi to use» selector of Conformity and loose controls of the browser. Each option says where it is saved (Panel = config.json for every browser, This browser = local to it), its default and, for the privacy switch, the risk. Options that do not exist yet (RP109, RP110) are shown as planned. The server will accept only a closed list of options, never the whole configuration (port, token, paths).",
+  "feature": "odd/tasks/chat-alcance.md",
+  "artboards": [
+    {
+      "file": "01-lista-agrupada.html",
+      "title": "A · Grouped list",
+      "tradeoff": "One column of sections and rows with the control on the right and the risk note inside the row; the simplest to read and to build, but it gets long when the options grow (planned ones included)",
+      "width": 1440,
+      "height": 1100
+    },
+    {
+      "file": "02-indice-y-panel.html",
+      "title": "B · Index and panel",
+      "tradeoff": "A section index with search on the left and one section at a time on the right, with room to explain each option, its default and a «Restore default»; scales to many options, but hides the rest behind a click and needs a search to feel fast",
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "file": "03-tarjetas-por-alcance.html",
+      "title": "C · Cards by scope",
+      "tradeoff": "Two groups, «Panel» and «This browser», of compact cards: the scope is the main organizing idea and everything is on one screen; less room for explanations (they fold in «What it does»), and the grouping by scope does not match the topics a person looks for",
+      "width": 1440,
+      "height": 900
+    }
+  ]
+}
