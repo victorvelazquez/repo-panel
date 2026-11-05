@@ -573,11 +573,18 @@
   // RP105: a chip per tool when the server sent `toolInfo` (✓/✗ or … while it runs, the name, the redacted argument, the time); without it, the line of names of before.
   const TOOL_CHIPS = 12;
   const fmtMs = (ms) => (!Number.isFinite(ms) ? '' : ms < 1000 ? `${Math.round(ms)}ms` : ms < 59950 ? `${(ms / 1000).toFixed(1)}s` : `${Math.floor(Math.round(ms / 1000) / 60)}m${String(Math.round(ms / 1000) % 60).padStart(2, '0')}s`);
+  // RP106: numbers about the result: «+N −M» for an edit, else the size of a big result. Only whole numbers in range draw anything.
+  const nat = (v) => (Number.isInteger(v) && v >= 0 && v <= 1e9 ? v : null);
+  const fmtSize = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M chars` : `${(n / 1000).toFixed(1)}k chars`);
   const chipHtml = (c) => {
     const [cls, mark] = c.ok === true ? ['ok', '✓'] : c.ok === false ? ['bad', '✗'] : ['run', '…'];
     const arg = typeof c.arg === 'string' && c.arg ? ` <i>${esc(c.arg)}</i>` : '';
     const time = fmtMs(c.ms) ? ` <small>${fmtMs(c.ms)}</small>` : '';
-    return `<span class="tc ${cls}">${mark} <b>${esc(c.name)}</b>${arg}${time}</span>`;
+    const add = nat(c.add);
+    const del = nat(c.del);
+    const size = nat(c.size);
+    const more = add !== null && del !== null ? ` <small class="chg">+${add} −${del}</small>` : size !== null && size >= 1000 ? ` <small class="sz">${fmtSize(size)}</small>` : '';
+    return `<span class="tc ${cls}">${mark} <b>${esc(c.name)}</b>${arg}${time}${more}</span>`;
   };
   const toolsLine = (t, info) => {
     const chips = (Array.isArray(info) ? info : []).filter((c) => c && typeof c === 'object' && typeof c.name === 'string');
