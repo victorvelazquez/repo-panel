@@ -1,0 +1,21 @@
+# Chat: más alcance y subagentes (RP104 a RP110)
+
+Series that widens what the panel chat shows and studies how to use subagents, up to a room Director. Status of each task lives only in `docs/ROADMAP.md`.
+
+## Specs
+
+- S1. Chat history reads more than the last 64 KB of the session file: a 512 KB window, hard cap 1 MB (RP104).
+- S2. «No es necesario mostrar todo el bloque de thinking. pero que muestre por lo menos el texto 'thinking...'.» Only the block type travels, never the text (RP104).
+- S3. The tool chip shows ✓/✗, duration and a one-line argument of at most 80 characters, always visible, with secrets redacted; tests prove a secret does not leave the server (RP105).
+- S4. Tool results are folded and truncated, opt-in, in their own PR; edits show only «edited X +12 −3», never a diff (RP106).
+- S5. Studies RP107 and RP108 write no code; each ends in a short document with `path:line` evidence.
+- S6. Room Director (RP109): «el Director lanza y ordena». Repo agents report to the Director; the Director resolves by itself only technical, reversible matters inside the already authorized scope, and ALWAYS asks the person for any decision («las deciciones debe preguntarme siempre que yo las decida»). When in doubt it asks. What it resolved alone is logged and visible. Agents leave work at `ready-to-commit`; delivery stays with the person.
+- S7. «analiza si el repo panel al usar gentle shell o pi en el chat si igual les funciona engram? y las otras conexiones mcps?» (RP110, prerequisite of RP109).
+
+## Tasks
+
+- RP104 (S1, S2) · RP105 (S3) · RP106 (S4) · RP107 (S5) · RP108 (S5) · RP109 (S5, S6) · RP110 (S7)
+
+## Log
+
+- L1. User: «que tanto mostramos en el chat lo que se muestra en la terminal con pi?» … list of what is and is not shown; then asked for a longer history, «thinking...», and more functional chat; agreed the 3-step plan, argument visible with redaction; added subagent studies, the room Director, the Director/orchestrator naming (Director chosen) and the Engram/MCP parity check.
