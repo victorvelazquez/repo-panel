@@ -576,7 +576,18 @@
   // RP106: numbers about the result: «+N −M» for an edit, else the size of a big result. Only whole numbers in range draw anything.
   const nat = (v) => (Number.isInteger(v) && v >= 0 && v <= 1e9 ? v : null);
   const fmtSize = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M chars` : `${(n / 1000).toFixed(1)}k chars`);
-  const chipHtml = (c) => {
+  // RP106b: with the flag of the history (config.json, off by default), a chip of a tool that is not `read`, with a call id and something in its result, is a button that asks
+  // for the start of that result; what comes back opens under the chips (escaped text, a note while it loads or when it fails). Without any of those it is the span of before.
+  const CALL_OK = /^[A-Za-z0-9_.:-]{1,80}$/;
+  const canAsk = (c, rx) => !!rx && rx.allow === true && typeof c.id === 'string' && CALL_OK.test(c.id) && String(c.name).toLowerCase() !== 'read' && nat(c.size) > 0;
+  const resultPanel = (c, rx) => {
+    const r = canAsk(c, rx) && rx.map && Object.hasOwn(rx.map, c.id) ? rx.map[c.id] : null;
+    if (!r || typeof r !== 'object') return '';
+    if (r.state === 'loading') return '<div class="tresnote">Loading result…</div>';
+    if (r.state === 'ok') return `<pre class="tres">${esc(typeof r.text === 'string' ? r.text : '')}</pre>`;
+    return r.state === 'error' ? `<div class="tresnote bad">${esc(typeof r.error === 'string' ? r.error : 'Result unavailable')}</div>` : '';
+  };
+  const chipHtml = (c, rx) => {
     const [cls, mark] = c.ok === true ? ['ok', '✓'] : c.ok === false ? ['bad', '✗'] : ['run', '…'];
     const arg = typeof c.arg === 'string' && c.arg ? ` <i>${esc(c.arg)}</i>` : '';
     const time = fmtMs(c.ms) ? ` <small>${fmtMs(c.ms)}</small>` : '';
@@ -584,11 +595,12 @@
     const del = nat(c.del);
     const size = nat(c.size);
     const more = add !== null && del !== null ? ` <small class="chg">+${add} −${del}</small>` : size !== null && size >= 1000 ? ` <small class="sz">${fmtSize(size)}</small>` : '';
-    return `<span class="tc ${cls}">${mark} <b>${esc(c.name)}</b>${arg}${time}${more}</span>`;
+    const inner = `${mark} <b>${esc(c.name)}</b>${arg}${time}${more}`;
+    return canAsk(c, rx) ? `<button type="button" class="tc ${cls} res" data-act="chat-result" data-id="${esc(rx.id)}" data-call="${esc(c.id)}" title="Show the start of the result">${inner}</button>` : `<span class="tc ${cls}">${inner}</span>`;
   };
-  const toolsLine = (t, info) => {
+  const toolsLine = (t, info, rx) => {
     const chips = (Array.isArray(info) ? info : []).filter((c) => c && typeof c === 'object' && typeof c.name === 'string');
-    if (chips.length) return `<div class="tools tcs">${chips.slice(0, TOOL_CHIPS).map(chipHtml).join('')}${chips.length > TOOL_CHIPS ? `<span class="tcmore">+${chips.length - TOOL_CHIPS}</span>` : ''}</div>`;
+    if (chips.length) return `<div class="tools tcs">${chips.slice(0, TOOL_CHIPS).map((c) => chipHtml(c, rx)).join('')}${chips.length > TOOL_CHIPS ? `<span class="tcmore">+${chips.length - TOOL_CHIPS}</span>` : ''}</div>${chips.slice(0, TOOL_CHIPS).map((c) => resultPanel(c, rx)).join('')}`;
     return toolsLineOld(t);
   };
   const toolsLineOld = (t) => (t.length ? `<div class="tools">▸ ${plural(t.length, 'tool')} · ${esc(t.slice(0, 3).join(', '))}${t.length > 3 ? ` (+${t.length - 3})` : ''}</div>` : '');
@@ -679,11 +691,11 @@
   // RP105b: a note after a turn that stopped or failed (only the two known categories draw), and a quiet line where the context was compacted.
   const STOP_NOTES = { aborted: '⏹ Turn stopped', error: '⚠ Turn failed' };
   const stopNote = (it) => (Object.hasOwn(STOP_NOTES, it.stop) ? `<div class="m stopnote ${it.stop}">${STOP_NOTES[it.stop]}</div>` : '');
-  const bubble = (it, who) => {
+  const bubble = (it, who, rx) => {
     const time = hhmm(it.at);
     if (it.role === 'system') return it.kind === 'compaction' ? `<div class="sysnote">↻ Context compacted${time ? ` · ${time}` : ''}</div>` : '';
-    if (it.role === 'assistant' && !it.text) return `${thoughtLine(it)}${toolsLine(it.tools, it.toolInfo)}${stopNote(it) || '<div class="m working">working…</div>'}`;
-    return `${thoughtLine(it)}${toolsLine(it.tools || [], it.toolInfo)}<div class="m${it.role === 'user' ? ' me' : ''}"><span class="who">${esc(it.role === 'user' ? 'You' : who)}${time ? ` · ${time}` : ''}</span>${mdHtml(it.text)}</div>${stopNote(it)}`;
+    if (it.role === 'assistant' && !it.text) return `${thoughtLine(it)}${toolsLine(it.tools, it.toolInfo, rx)}${stopNote(it) || '<div class="m working">working…</div>'}`;
+    return `${thoughtLine(it)}${toolsLine(it.tools || [], it.toolInfo, rx)}<div class="m${it.role === 'user' ? ' me' : ''}"><span class="who">${esc(it.role === 'user' ? 'You' : who)}${time ? ` · ${time}` : ''}</span>${mdHtml(it.text)}</div>${stopNote(it)}`;
   };
 
   // Pending messages of the composer (RP75): shown after the real ones until the history has them. `base` is how many user items
@@ -768,8 +780,9 @@
     const who = info.adopted.name || info.adopted.id;
     if (!info.adoptedFound) return `${note}<div class="ch-state" role="status"><p>The session is loading. The history appears with its first message.</p></div>${pendingHtml(c.pending, [])}${rpcTail(c, who)}`;
     const items = (c.hist && c.hist.items) || [];
+    const rx = { allow: !!c.hist && c.hist.results === true, map: c.results && typeof c.results === 'object' ? c.results : {}, id: c.id };
     const pending = pendingHtml(c.pending, items);
-    return `${note}${c.hist && c.hist.truncated ? '<div class="rs-sub ch-older">Older messages are not shown</div>' : ''}${items.map((it) => bubble(it, who)).join('') || (pending ? '' : '<div class="empty">No messages yet.</div>')}${pending}${rpcTail(c, who)}`;
+    return `${note}${c.hist && c.hist.truncated ? '<div class="rs-sub ch-older">Older messages are not shown</div>' : ''}${items.map((it) => bubble(it, who, rx)).join('') || (pending ? '' : '<div class="empty">No messages yet.</div>')}${pending}${rpcTail(c, who)}`;
   }
 
   // Pinned room card (not clickable yet): the aggregate of its member rows (a room has no session state any more).

@@ -29,3 +29,5 @@ Series that widens what the panel chat shows and studies how to use subagents, u
 - L5. RP105c closed, live only: pi emits `auto_retry_start`/`auto_retry_end` and the RPC mode forwards them; the history file keeps no retry. Whitelist keeps numbers and the verdict, never the error texts; the page shows «Retrying…» in the live tail. Tests `test/rp105c-retry.test.js`.
 
 - L6. RP106 closed, split by the person: numbers only (`size`, and `add`/`del` for edits from `details.patch`). The text of a result moved to RP106b (privacy, free text, on demand, independent verification). Tests `test/rp106-edit-summary.test.js`.
+
+- L7. RP106b closed with the switch OFF by default (decision of the person: «podemos empezar con apagado»). Route `GET /api/chat/result`, `chat.showResults` in config.json (kept by loadConfig), cleaning in `server/redact.js` (`redactText`, `resultText`), refusal of file readers by name (`isFileReader`). Three rounds of independent verification; the accepted limits are in the README. RP111 (Settings tab) added to show the switch. Tests `test/rp106b-results.test.js`, `test/rp106b-hardening.test.js`.

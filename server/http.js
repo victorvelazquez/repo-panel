@@ -27,7 +27,7 @@ const { createSummaryStore } = require('./summarystore.js');
 const { createEventHub } = require('./events.js');
 const { createRpcHost, rpcApi } = require('./rpchost.js');
 const { readUsage, usageFile } = require('./usage.js');
-const { sessionsState, chatState, adoptSession, releaseSession, adoptIfNone } = require('./sessions.js');
+const { sessionsState, chatState, chatResult, adoptSession, releaseSession, adoptIfNone } = require('./sessions.js');
 
 const ROOT = path.join(__dirname, '..');
 const TOKEN = crypto.randomBytes(24).toString('hex');
@@ -97,6 +97,8 @@ const routes = {
   },
   'GET /api/sessions': (q, b, d) => sessionsState(q.id, d.sessionsDir, d.sessionOf),
   'GET /api/chat': (q, b, d) => chatState(q.id, q.session, q.limit, d.sessionsDir),
+  // RP106b: the cleaned start of the text of one tool result; 403 unless `chat.showResults` is true in config.json, and never for `read`.
+  'GET /api/chat/result': (q, b, d) => chatResult(q.id, q.call, d.sessionsDir),
   // RP62: the Claude usage file, read on every request (no cache); a missing or broken file is a normal 200 with available false.
   'GET /api/usage': (q, b, d) => readUsage({ file: d.usageFile || usageFile() }),
   'GET /api/prerequisites': (q, b, d) => prerequisites(undefined, d.piRuntime ? () => resolveRuntime(d.piRuntime) : undefined),

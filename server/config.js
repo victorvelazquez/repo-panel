@@ -91,6 +91,10 @@ const PI_RUNTIMES = ['auto', 'gentle-shell', 'pi'];
 
 // The `pi` setting: which pi the panel runs. `runtime` is one of PI_RUNTIMES; `command` and `agentDir` are only ever written by hand in
 // the file (the browser cannot set them) and are validated again before use. Anything else is dropped.
+// RP106b: the options of the chat. Only booleans are read, and `showResults` is true ONLY for the value true (anything else is off): it lets the page ask for the
+// start of the text of a tool result, which can hold secrets.
+const cleanChat = (v) => ({ showResults: !!v && typeof v === 'object' && v.showResults === true });
+
 function cleanPi(v) {
   const out = {};
   if (!v || typeof v !== 'object' || Array.isArray(v)) return out;
@@ -120,6 +124,8 @@ function loadConfig() {
     ...(cfg.sessions !== undefined ? { sessions: cleanSessions(cfg.sessions) } : {}),
     // Which pi the panel runs; written back only when present.
     ...(cfg.pi !== undefined ? { pi: cleanPi(cfg.pi) } : {}),
+    // Chat options; written back only when present.
+    ...(cfg.chat !== undefined ? { chat: cleanChat(cfg.chat) } : {}),
     // Optional manual order of the "Go work on" strip; written back only when present.
     ...(Array.isArray(cfg.priority) ? { priority: cleanPriority(cfg.priority) } : {}),
   };

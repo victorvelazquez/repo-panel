@@ -34,7 +34,7 @@ const S = {
   tab: 'summary', scope: { kind: 'all' }, summary: null, summaryKey: '', summaryFailed: false, sfilter: 'all', collapsed: {},
   timeouts: { get: 25000, post: 70000 },
   tasks: {}, tasksFilter: '', tasksOpenDone: false, changes: {}, files: {}, filesOpen: {}, fileData: {}, pad: {},
-  chat: { id: null, seq: 0 }, chatCache: {}, drafts: {}, recall: {}, notes: {}, askBusy: {}, rpc: {},
+  chat: { id: null, seq: 0 }, chatCache: {}, drafts: {}, recall: {}, notes: {}, askBusy: {}, chatResults: Object.create(null), rpc: {},
 };
 S.tab = S.prefs.tab === 'work' ? 'work' : 'summary';
 S.backTab = S.tab; // the tab Conformity returns to (it is never saved as the preference)

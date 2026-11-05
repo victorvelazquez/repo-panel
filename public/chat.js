@@ -48,6 +48,7 @@ function openChat(id, tab) {
   saveDraft();
   flushNotes();
   S.recall = {};
+  S.chatResults = Object.create(null);
   S.chat = { id, seq: S.chat.seq + 1, ...(V && V.chatFromCache(S.chatCache[id])), ...(tab === 'tasks' && !columnOn() ? { tab } : {}) }; // RP79: cached messages at once, state unknown (no get: opening must not reorder the cache)
   $('#msgBox').value = S.drafts[id] || '';
   draw();
@@ -61,6 +62,7 @@ function closeChat() {
   saveDraft();
   flushNotes();
   S.recall = {};
+  S.chatResults = Object.create(null);
   if (chatCtl) { chatCtl.abort(); chatCtl = null; }
   S.chat = { id: null, seq: S.chat.seq + 1 };
   chatShown = null;

@@ -532,6 +532,11 @@ body.tab-conformity #viewbar { display: none; }
 .tc b { font-weight: 600; }
 .tc i { font-style: normal; color: var(--text); opacity: .8; }
 .tc small { opacity: .7; }
+button.tc { font: inherit; color: inherit; background: none; cursor: pointer; }
+button.tc:hover { border-color: var(--muted); }
+.tres { align-self: flex-start; max-width: 90%; margin: 0; padding: 6px 10px; font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; }
+.tresnote { align-self: flex-start; font-size: 12px; color: var(--muted); }
+.tresnote.bad { color: #e07a7a; }
 .tc small.chg { opacity: 1; color: var(--green); }
 .tc small.sz { font-variant-numeric: tabular-nums; }
 .tc.ok { border-color: #2c4f3a; }
