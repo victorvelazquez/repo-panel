@@ -732,7 +732,10 @@
   }
   function rpcTail(c, who) {
     const r = c.rpc && typeof c.rpc === 'object' ? c.rpc : {};
-    const streaming = r.text ? `<div class="m streaming"><span class="who">${esc(who)}</span>${mdHtml(r.text)}</div>` : r.streaming ? `<div class="m working">${r.thinking ? 'thinking…' : 'working…'}</div>` : '';
+    // RP105c: while pi retries a failed request the tail says so (the attempt and the wait when they are known), instead of «working…»
+    const rt = r.retry && typeof r.retry === 'object' ? r.retry : null;
+    const retry = rt ? `<div class="m working">⟳ Retrying${Number.isInteger(rt.attempt) ? ` · attempt ${rt.attempt}${Number.isInteger(rt.max) ? ` of ${rt.max}` : ''}` : ''}${Number.isInteger(rt.delayMs) ? ` · in ${Math.max(1, Math.round(rt.delayMs / 1000))}s` : ''}</div>` : '';
+    const streaming = (r.text ? `<div class="m streaming"><span class="who">${esc(who)}</span>${mdHtml(r.text)}</div>` : r.streaming && !retry ? `<div class="m working">${r.thinking ? 'thinking…' : 'working…'}</div>` : '') + retry;
     const asks = (Array.isArray(r.asks) ? r.asks : []).filter((d) => d && typeof d.requestId === 'string').map((d) => askCard(d, c.id, !!(c.askBusy && c.askBusy[d.requestId]))).join('');
     return streaming + asks;
   }

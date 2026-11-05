@@ -56,6 +56,7 @@ function freshSessionId(repo, suffix) {
 
 const CONTENT_MAX = 8 * 1024;
 const own = (o, ...keys) => Object.fromEntries(keys.filter((k) => o[k] !== undefined).map((k) => [k, o[k]]));
+const finiteOwn = (o, ...keys) => Object.fromEntries(keys.filter((k) => Number.isFinite(o[k])).map((k) => [k, o[k]]));
 // The text of a finished assistant turn (the page needs nothing else of it).
 const turnText = (m) => (m && Array.isArray(m.content) ? m.content.filter((c) => c && c.type === 'text' && typeof c.text === 'string').map((c) => c.text).join('\n\n') : '');
 // Per type, the small fields the page uses. `message_start`, `message_end` and `agent_end` carry the whole system prompt (about 180 KB) and
@@ -76,6 +77,9 @@ const WHITELIST = {
   agent_start: (r) => own(r, 'aborted'),
   agent_end: (r) => own(r, 'aborted'),
   agent_settled: (r) => own(r, 'aborted'),
+  // RP105c: a retry that pi does on its own. Only numbers and the verdict travel; the error texts (`errorMessage`, `finalError`) can hold the raw body of an API answer.
+  auto_retry_start: (r) => finiteOwn(r, 'attempt', 'maxAttempts', 'delayMs'),
+  auto_retry_end: (r) => ({ ...finiteOwn(r, 'attempt'), ...(typeof r.success === 'boolean' ? { success: r.success } : {}) }),
   tool_execution_start: (r) => own(r, 'toolName', 'isError', 'durationMs'),
   tool_execution_end: (r) => own(r, 'toolName', 'isError', 'durationMs'),
 };
