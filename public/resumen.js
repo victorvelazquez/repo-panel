@@ -653,10 +653,12 @@
   }
   const mdHtml = (text) => (typeof text === 'string' ? mdBlocks(text.replace(/\r\n?/g, '\n'), 0) : '');
 
+  // RP104: where the model reasoned the history shows «thinking…» (never the reasoning); an item that did not has no such line.
+  const thoughtLine = (it) => (it.thinking === true ? '<div class="tools thought">▸ thinking…</div>' : '');
   const bubble = (it, who) => {
     const time = hhmm(it.at);
-    if (it.role === 'assistant' && !it.text) return `${toolsLine(it.tools)}<div class="m working">working…</div>`;
-    return `${toolsLine(it.tools || [])}<div class="m${it.role === 'user' ? ' me' : ''}"><span class="who">${esc(it.role === 'user' ? 'You' : who)}${time ? ` · ${time}` : ''}</span>${mdHtml(it.text)}</div>`;
+    if (it.role === 'assistant' && !it.text) return `${thoughtLine(it)}${toolsLine(it.tools)}<div class="m working">working…</div>`;
+    return `${thoughtLine(it)}${toolsLine(it.tools || [])}<div class="m${it.role === 'user' ? ' me' : ''}"><span class="who">${esc(it.role === 'user' ? 'You' : who)}${time ? ` · ${time}` : ''}</span>${mdHtml(it.text)}</div>`;
   };
 
   // Pending messages of the composer (RP75): shown after the real ones until the history has them. `base` is how many user items
@@ -712,7 +714,7 @@
   }
   function rpcTail(c, who) {
     const r = c.rpc && typeof c.rpc === 'object' ? c.rpc : {};
-    const streaming = r.text ? `<div class="m streaming"><span class="who">${esc(who)}</span>${mdHtml(r.text)}</div>` : r.streaming ? '<div class="m working">working…</div>' : '';
+    const streaming = r.text ? `<div class="m streaming"><span class="who">${esc(who)}</span>${mdHtml(r.text)}</div>` : r.streaming ? `<div class="m working">${r.thinking ? 'thinking…' : 'working…'}</div>` : '';
     const asks = (Array.isArray(r.asks) ? r.asks : []).filter((d) => d && typeof d.requestId === 'string').map((d) => askCard(d, c.id, !!(c.askBusy && c.askBusy[d.requestId]))).join('');
     return streaming + asks;
   }
