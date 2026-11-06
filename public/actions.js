@@ -103,6 +103,15 @@ const ACTIONS = {
     setPref(pref, v);
     syncPrefControls();
   },
+  // RP121: the header of the repos column. Search and menu are page-only state (S.lh); the clears undo the shared filters.
+  'lh-search-open': () => { S.lh.search = true; S.lh.legend = false; S.lh.focus = true; draw(); },
+  'lh-search-close': () => { S.lh.search = false; draw(); },
+  'lh-filters': () => { S.lh.menu = !S.lh.menu; S.lh.legend = false; draw(); },
+  'lh-menu-close': () => { S.lh.menu = false; S.lh.focusBtn = true; draw(); }, // the close button of the filter menu: only closes it (the filters stay) and gives the focus back to the funnel
+  'lh-legend': () => { S.lh.legend = !S.lh.legend; S.lh.menu = false; draw(); }, // RP121: the legend of the bars; it and the filter menu never show together
+  'lh-clear-q': () => { S.q = ''; draw(); },
+  'lh-clear-group': () => { S.group = ''; draw(); },
+  'lh-clear': () => { S.q = ''; S.group = ''; S.scope = { kind: 'all' }; S.sfilter = 'all'; draw(); },
   'sfilter': (el) => { S.sfilter = el.dataset.filter === 'attention' ? 'attention' : 'all'; draw(); },
   'toggle-group': (el) => { S.collapsed[el.dataset.group] = !S.collapsed[el.dataset.group]; draw(); },
   'scope': (el) => { S.scope = el.dataset.kind === 'room' ? { kind: 'room', name: el.dataset.name } : { kind: el.dataset.kind === 'none' ? 'none' : 'all' }; draw(); },

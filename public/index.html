@@ -38,7 +38,6 @@
       <select id="groupFilter"></select>
       <div id="scope" class="rs-scope" role="group" aria-label="Scope"></div>
     </div>
-    <div id="summaryTools" class="own"></div>
     <span class="spacer"></span>
     <div id="workTools" class="own">
       <label class="opt" title="Show the Clean column on the board instead of the collapsible Idle bar">
@@ -47,7 +46,32 @@
     </div>
   </div>
   <div id="sumLayout" class="chatlayout">
-    <section id="summary" class="rs-panel" role="tabpanel" aria-labelledby="tab-summary"></section>
+    <div id="listCol">
+      <div id="listHead" role="group" aria-label="Repo filters">
+        <div class="lh-bar">
+          <div id="lhTitle" class="lh-title"><b>REPOS</b> <span id="lhCount" class="lh-n"></span></div>
+          <label id="lhSearchBox" class="lh-search" hidden>
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg>
+            <input id="lhSearch" type="search" placeholder="Filter repos…" aria-label="Filter repos" autocomplete="off">
+            <button type="button" class="lh-x" data-act="lh-search-close" aria-label="Close search">✕</button>
+          </label>
+          <div id="lhIcons" class="lh-icons">
+            <button type="button" class="lh-ic" data-act="lh-search-open" aria-label="Search repos" title="Search (/)"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg></button>
+            <button type="button" id="lhFilterBtn" class="lh-ic" data-act="lh-filters" aria-label="Filters" title="Filters" aria-expanded="false" aria-controls="lhMenu"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h12l-4.5 5.5V13l-3-1.5V8.5z"/></svg><i id="lhDot" class="lh-dot" hidden></i></button>
+            <button type="button" id="lhInfoBtn" class="lh-ic" data-act="lh-legend" aria-label="Bar legend" title="Bar legend" aria-expanded="false" aria-controls="lhLegend"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M8 7.2V11M8 5v.1"/></svg></button>
+            <span id="lhAttention"></span>
+          </div>
+        </div>
+        <div id="lhActive" class="lh-active" aria-label="Active filters" hidden></div>
+        <div id="lhLegend" class="lh-menu lh-legend" role="group" aria-label="Bar legend" hidden></div>
+        <div id="lhMenu" class="lh-menu" role="group" aria-label="Filters" hidden>
+          <button type="button" class="lh-x lh-menu-x" data-act="lh-menu-close" aria-label="Close filters" title="Close">✕</button>
+          <div><h4>Scope</h4><div id="lhScope" class="rs-scope"></div></div>
+          <div><h4>Group</h4><select id="lhGroup" aria-label="Group"></select></div>
+        </div>
+      </div>
+      <section id="summary" class="rs-panel" role="tabpanel" aria-labelledby="tab-summary"></section>
+    </div>
     <div id="split" role="separator" aria-orientation="vertical" tabindex="0" aria-label="Adjust the list width (left and right arrows; double click to reset)" hidden></div>
     <aside id="chat" hidden aria-label="Chat">
       <div id="chatHead" class="ch-head"></div>

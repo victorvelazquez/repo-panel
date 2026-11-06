@@ -216,9 +216,10 @@ test('a failed refresh keeps the cards and adds a small note', () => {
   assert.match(html, /alpha/);
 });
 
-test('the one-line bar legend is drawn', () => {
-  const html = view(SCOPE_ROWS);
-  for (const t of ['Completed', 'In review', 'Blocked', 'Pending']) assert.ok(html.includes(t), t);
+test('the bar legend is no longer part of the list (RP121: it is the panel of the info icon in the header of the repos column)', () => {
+  assert.doesNotMatch(view(SCOPE_ROWS), /rs-legend/);
+  const legend = require('../public/resumen.js').legendHtml();
+  for (const t of ['Completed', 'In review', 'Blocked', 'Pending']) assert.ok(legend.includes(t), t);
 });
 
 // ---------- page ----------
@@ -436,7 +437,7 @@ test('index.html: tab bar, scope container, summary and work wrappers, no Activi
 test('style: only the view-specific zones hide by tab (RP61) and the tabs have a visible focus style', () => {
   const css = fs.readFileSync(path.join(PUBLIC, 'style.css'), 'utf8');
   assert.match(css, /body\.tab-summary[^{]*#workTools/);
-  assert.match(css, /body\.tab-work[^{]*#summaryTools/);
+  assert.match(css, /body\.tab-summary #viewbar\s*\{[^}]*display:\s*none/, 'RP121: the bar under the tabs is out in Summary (its filters live in the repos column header)');
   assert.match(css, /\.rs-tabs button:focus-visible|:focus-visible/);
   assert.match(css, /prefers-reduced-motion/);
 });

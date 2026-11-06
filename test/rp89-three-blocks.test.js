@@ -96,7 +96,7 @@ test('h2: the layout is a named container, the column shows only from 1100 px, t
   assert.match(css, /\.chatlayout\s*\{[^}]*container-name:\s*sum/);
   assert.match(css, /#col,\s*#split2\s*\{\s*display:\s*none;\s*\}/);
   assert.match(css, /@container sum \(min-width: 1100px\)\s*\{[^}]*#col[^}]*display:\s*flex/);
-  assert.match(css, /\.chatlayout\.chat-open #summary\s*\{[^}]*width:\s*var\(--list-w/);
+  assert.match(css, /\.chatlayout\.chat-open #listCol\s*\{[^}]*width:\s*var\(--list-w/);
   assert.match(css, /#col\s*\{[^}]*width:\s*var\(--col-w/);
   assert.match(css, /#chat\s*\{[^}]*flex:\s*1 1 0/);
   assert.doesNotMatch(css, /#chat\s*\{[^}]*width:\s*var\(--chat-w/);
@@ -159,7 +159,7 @@ function open(page, width = 1400) {
   page.run("ACTIONS['chat-open']({ dataset: { id: 'abc' } })");
   page.flush();
 }
-const listW = (page) => page.get('#summary').style['--list-w'];
+const listW = (page) => page.get('#listCol').style['--list-w']; // RP121: the width is the repos column's
 const colW = (page) => page.get('#col').style['--col-w'];
 const saved = (page) => page.store['repo-panel.layout'];
 const fireOn = (el, type, e = {}) => { for (const fn of el.listeners[type] || []) fn({ type, preventDefault() {}, ...e }); };

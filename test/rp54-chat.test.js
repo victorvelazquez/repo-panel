@@ -365,7 +365,7 @@ const chatTick = (page) => page.intervals.find((i) => i.ms === 5000).fn;
 
 test('index.html: the static wrapper, the dividers, the chat aside, the column and the read-only footer', () => {
   const html = fs.readFileSync(path.join(PUBLIC, 'index.html'), 'utf8');
-  assert.match(html, /<div id="sumLayout" class="chatlayout">\s*<section id="summary"[^>]*><\/section>\s*<div id="split" role="separator" aria-orientation="vertical" tabindex="0" aria-label="Adjust the list width \(left and right arrows; double click to reset\)" hidden><\/div>\s*<aside id="chat" hidden aria-label="Chat">/);
+  assert.match(html, /<div id="sumLayout" class="chatlayout">\s*<div id="listCol">[\s\S]*?<section id="summary"[^>]*><\/section>\s*<\/div>\s*<div id="split" role="separator" aria-orientation="vertical" tabindex="0" aria-label="Adjust the list width \(left and right arrows; double click to reset\)" hidden><\/div>\s*<aside id="chat" hidden aria-label="Chat">/);
   assert.match(html, /id="chatHead"/);
   assert.match(html, /id="chatBody"[^>]*role="log"[^>]*aria-live="polite"|id="chatBody"[^>]*aria-live="polite"[^>]*role="log"/);
   const aside = /<aside id="chat"[\s\S]*?<\/aside>/.exec(html);
@@ -575,7 +575,7 @@ function withDivider(page, width = 1400) {
   page.run("ACTIONS['chat-open']({ dataset: { id: 'abc' } })");
   page.flush();
 }
-const listWidth = (page) => page.get('#summary').style['--list-w'];
+const listWidth = (page) => page.get('#listCol').style['--list-w']; // RP121: the width is the repos column's
 const ls = (page) => page.store['repo-panel.layout'];
 const fireOn = (el, type, e = {}) => { for (const fn of el.listeners[type] || []) fn({ type, preventDefault() {}, ...e }); };
 

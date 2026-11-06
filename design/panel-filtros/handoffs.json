@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "chosen": "05-barra-de-iconos-activa.html",
+  "handoffs": {
+    "05-barra-de-iconos-activa.html": {
+      "status": "implemented",
+      "queued": false,
+      "sentAt": "2026-11-06T09:56:07.298Z",
+      "startedAt": "2026-11-06T09:56:59.204Z",
+      "implementedAt": "2026-11-06T10:09:16.352Z",
+      "feature": "odd/tasks/panel-layout.md",
+      "note": "RP121 implementada en el panel real (barra de iconos en la cabecera de la columna de repos). Sin verificar en un navegador: lupa, embudo, tecla / y Escape los prueba la persona mirándolos."
+    }
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "title": "Repo Panel — Filtros en la columna de repos",
+  "brief": "Move the filters of the Summary tab (search, group select, scope buttons and Needs attention) from the bar under the tabs into the header of the repos column, so the three zones (repos, chat, right column) use the full height. Work keeps its own bar. Based on the current panel look (tokens of public/style.css).",
+  "feature": "odd/tasks/panel-layout.md",
+  "artboards": [
+    {
+      "file": "01-dos-filas-fijas.html",
+      "title": "A · Two fixed rows",
+      "tradeoff": "Search plus a Needs attention counter button on row one, scope chips and group select on row two; everything visible and one click away, but the header takes about 90 px of the list",
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "file": "02-boton-filtros-menu.html",
+      "title": "B · Filters button with a menu",
+      "tradeoff": "One row (search and a Filters button) with the active filters as removable chips and a menu for the rest; the most room for the list, one more click to change a filter",
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "file": "03-linea-plegable.html",
+      "title": "C · Collapsible summary line",
+      "tradeoff": "A single line that says what is filtered and expands on click; the lowest at rest and the state always readable, but every change needs the unfold first",
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "file": "04-barra-de-iconos.html",
+      "title": "D · Title bar with icons",
+      "tradeoff": "One 40 px bar: title and count, then search (it turns the bar into the search box), a funnel menu and a red attention counter; nothing else shows at rest, but a filter in use is not visible until you open the menu",
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "file": "05-barra-de-iconos-activa.html",
+      "title": "E · Icon bar with filters on",
+      "tradeoff": "The same bar plus a dot on the funnel and a strip of removable chips that exists only while a filter is set; the state stays readable and costs space only when it matters",
+      "width": 1440,
+      "height": 900
+    }
+  ]
+}

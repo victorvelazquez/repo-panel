@@ -876,15 +876,41 @@ ${status}</div>`;
     </article>`;
   }
 
-  // RP94b: the legend is behind a "?" (a native details element: no script, it opens with the keyboard too).
-  const LEGEND = '<details class="rs-legend"><summary title="Bar legend" aria-label="Bar legend">?</summary><div class="rs-legend-body"><span><i class="rs-key rs-done"></i>Completed</span><span><i class="rs-key rs-pr"></i>In review</span><span><i class="rs-key rs-blk"></i>Blocked</span><span><i class="rs-key rs-pend"></i>Pending</span><span>The button on the right is the best next action</span></div></details>';
+  // RP121: the legend of the bars is the panel of the info icon in the header of the repos column (it used to sit under the cards behind a "?"): the four keys in two columns and the note about the button, in muted text.
+  const legendHtml = () => '<div class="rs-legend-body"><span><i class="rs-key rs-done"></i>Completed</span><span><i class="rs-key rs-pr"></i>In review</span><span><i class="rs-key rs-blk"></i>Blocked</span><span><i class="rs-key rs-pend"></i>Pending</span><p class="rs-legend-note">The button on the right is the best next action</p></div>';
 
   // The view-specific part of the view bar: the one Needs attention toggle (the button sets the value it is NOT in); it sits next to the scope buttons (RP82).
+  // RP121: with `ctx.compact` it is the icon of the repos column header (a flag and the count; the words are the label and the tooltip).
   function summaryTools(payload, ctx = {}) {
     if (!payload || !Array.isArray(payload.rows)) return '';
     const attention = ctx.filter === 'attention';
     const n = visibleRows(payload.rows, ctx).filter((r) => r.needs).length;
+    if (ctx.compact) {
+      const flag = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 14V2M3.5 2.5h8l-1.8 3 1.8 3h-8"/></svg>';
+      return `<button type="button" class="lh-ic lh-att${n ? ' on' : ''}" data-act="sfilter" data-filter="${attention ? 'all' : 'attention'}" aria-pressed="${attention}" aria-label="Needs attention · ${n}" title="Needs attention · ${n}">${flag}<small>${n}</small></button>`;
+    }
     return `<button type="button" data-act="sfilter" data-filter="${attention ? 'all' : 'attention'}" aria-pressed="${attention}">Needs attention · ${n}</button>`;
+  }
+
+  // RP121: how many repos the list shows after every filter (the scope, the group, the text and Needs attention); null while there is no data.
+  function listCount(payload, ctx = {}) {
+    if (!payload || !Array.isArray(payload.rows)) return null;
+    const rows = visibleRows(payload.rows, ctx);
+    return ctx.filter === 'attention' ? rows.filter((r) => r.needs).length : rows.length;
+  }
+  // RP121: the strip under the header bar: one removable chip per filter that is set (scope, group, text, Needs attention, in that order) and Clear; '' when none is set. Total: everything it prints is escaped.
+  function listHeadChips(ctx = {}) {
+    const scope = normalizeScope(ctx.scope, ctx.rooms);
+    const group = ctx.group && ctx.group !== 'all' ? String(ctx.group) : '';
+    const q = String(ctx.q || '').trim();
+    const chip = (attrs, label) => `<button type="button" ${attrs}>${esc(label)} ✕</button>`;
+    const out = [];
+    if (scope.kind === 'room') out.push(chip('data-act="scope" data-kind="all"', scope.name));
+    else if (scope.kind === 'none') out.push(chip('data-act="scope" data-kind="all"', 'No room'));
+    if (group) out.push(chip('data-act="lh-clear-group"', group));
+    if (q) out.push(chip('data-act="lh-clear-q"', q));
+    if (ctx.filter === 'attention') out.push(chip('data-act="sfilter" data-filter="all"', 'Needs attention'));
+    return out.length ? `${out.join('')}<button type="button" class="lh-clr" data-act="lh-clear">Clear</button>` : '';
   }
 
   // ctx: { now, scope, rooms, q, group, roomData, filter, collapsed, failed, flowFor(id), changesFor(id), sending, busy }
@@ -912,8 +938,8 @@ ${status}</div>`;
       }
       body = rows.length ? parts.join('') : '<div class="empty">No repositories in this scope.</div>';
     }
-    return `${ctx.failed ? '<div class="rs-note" role="status">⚠ Summary unavailable: showing the last data we have.</div>' : ''}<div class="rs-list">${body}</div>${rows.length ? LEGEND : ''}`;
+    return `${ctx.failed ? '<div class="rs-note" role="status">⚠ Summary unavailable: showing the last data we have.</div>' : ''}<div class="rs-list">${body}</div>`;
   }
 
-  return { esc, mdHtml, settingsView, memoryChipHtml, sessionChip, blockWidths, columnView, composerState, askAllowed, actionMenu, actionButtonsHtml, composerNote, chatHead, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, sessionCloseHtml, sessionTerminalHtml, terminalBlockHtml, recentlyActive, chatBody, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
+  return { esc, mdHtml, settingsView, memoryChipHtml, legendHtml, listCount, listHeadChips, sessionChip, blockWidths, columnView, composerState, askAllowed, actionMenu, actionButtonsHtml, composerNote, chatHead, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, sessionCloseHtml, sessionTerminalHtml, terminalBlockHtml, recentlyActive, chatBody, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
 }));

@@ -265,7 +265,7 @@ a.repo-name:hover { text-decoration: none; color: var(--blue); }
 .mono { font-family: ui-monospace, Consolas, monospace; font-size: 12px; color: var(--muted); }
 .rs-scope { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .rs-scope button[aria-pressed="true"] { border-color: var(--blue); background: #12253d; }
-body.tab-summary #workTools, body.tab-work #summaryTools { display: none; }
+body.tab-summary #workTools { display: none; }
 .rs-tabs { display: flex; gap: 2px; padding: 0 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
 .rs-tabs button { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; padding: 8px 14px; color: var(--muted); }
 .rs-tabs button[aria-selected="true"] { color: var(--text); border-bottom-color: var(--blue); }
@@ -309,13 +309,11 @@ details.pop > summary:focus-visible { outline: 2px solid var(--blue); outline-of
 .rs-bar { display: flex; height: 6px; border-radius: 3px; overflow: hidden; background: var(--line); flex: 1; min-width: 60px; }
 .rs-seg { display: block; }
 .rs-done { background: var(--green); } .rs-pr { background: var(--blue); } .rs-blk { background: var(--red); } .rs-pend { background: #3a4350; }
-.rs-legend { color: var(--muted); font-size: 12px; margin: 10px 2px; }
-.rs-legend summary { display: inline-block; cursor: pointer; list-style: none; width: 20px; height: 20px; line-height: 18px; text-align: center; border: 1px solid #222a33; border-radius: 50%; }
-.rs-legend summary::-webkit-details-marker { display: none; }
-.rs-legend summary:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
-.rs-legend[open] summary { color: var(--text); }
-.rs-legend-body { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 8px; }
-.rs-key { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+/* RP121: the legend of the bars lives in the panel of the info icon (two columns, a muted note); the Pending key has a border so it shows on the dark page. */
+.rs-legend-body { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 16px; color: var(--muted); font-size: 12px; }
+.rs-legend-note { grid-column: 1 / -1; margin: 4px 0 0; padding-top: 8px; border-top: 1px solid var(--line); color: var(--muted); }
+.rs-key { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -2px; }
+.rs-key.rs-pend { border: 1px solid #5b6674; }
 @container cards (max-width: 320px) {
   .rs-when { display: none; }
 }
@@ -403,9 +401,40 @@ body.tab-settings #viewbar { display: none; }
 .st-status.bad { color: var(--red); }
 .st button:focus-visible, .st select:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { .st-sw::after { transition: none; } }
-.chatlayout #summary { flex: 1 1 0; min-width: 0; }
+/* RP121: the repos column is a wrapper (header of filters above the list that scrolls). */
+.chatlayout #listCol { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; min-height: 0; }
+.chatlayout #summary { flex: 1 1 auto; min-width: 0; min-height: 0; max-width: none; margin: 0; }
+body.tab-summary #viewbar { display: none; }
 .chatlayout.chat-open { height: calc(100vh - 140px); min-height: 480px; }
-.chatlayout.chat-open #summary { flex: none; width: var(--list-w, 25%); max-width: none; margin: 0; min-width: 260px; overflow: auto; }
+.chatlayout.chat-open #listCol { flex: none; width: var(--list-w, 25%); min-width: 260px; }
+.chatlayout.chat-open #summary { overflow: auto; }
+/* RP121: the header of the repos column: a thin bar (title and count, three icons), a strip of active filters that exists only while one is set, and a menu over the list. */
+#listHead { flex: none; position: relative; z-index: 3; background: var(--bg); border-bottom: 1px solid var(--line); }
+.lh-title[hidden], .lh-icons[hidden], .lh-search[hidden], .lh-active[hidden], .lh-menu[hidden], .lh-legend[hidden], .lh-dot[hidden] { display: none; }
+.lh-bar { display: flex; align-items: center; gap: 6px; min-height: 40px; padding: 4px 12px; }
+.lh-title { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 8px; }
+.lh-title b { font-size: 13px; letter-spacing: .02em; }
+.lh-n { color: var(--muted); font-size: 12px; }
+.lh-icons { display: flex; align-items: center; gap: 2px; }
+.lh-ic { position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 3px; min-width: 30px; height: 30px; padding: 0 6px; background: transparent; border-color: transparent; color: var(--muted); }
+.lh-ic:hover:not(:disabled) { color: var(--text); border-color: var(--line); }
+.lh-ic[aria-expanded="true"] { color: var(--text); background: var(--panel2); border-color: var(--line); }
+.lh-ic small { font-size: 12px; font-weight: 600; }
+.lh-att.on { color: var(--red); }
+.lh-att[aria-pressed="true"] { border-color: var(--red); background: #2a1213; }
+.lh-dot { position: absolute; top: 4px; right: 4px; width: 7px; height: 7px; border-radius: 50%; background: var(--blue); }
+.lh-search { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; padding: 0 6px 0 8px; color: var(--muted); }
+.lh-search input { flex: 1; min-width: 0; border: 0; background: transparent; padding: 5px 0; }
+.lh-x { border: 0; background: transparent; color: var(--muted); padding: 2px 4px; }
+.lh-x:hover:not(:disabled) { color: var(--text); }
+/* The close button of the filter menu: in its top right corner, over the block. */
+.lh-menu-x { position: absolute; top: 6px; right: 6px; width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px; }
+.lh-active { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 0 12px 8px; font-size: 12px; }
+.lh-active button { padding: 1px 8px; font-size: 12px; }
+.lh-clr { border-color: transparent; background: transparent; color: var(--muted); text-decoration: underline; }
+.lh-menu { position: absolute; left: 8px; right: 8px; top: 100%; margin-top: 6px; display: grid; gap: 10px; padding: 12px; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 12px 32px #0009; }
+.lh-menu h4 { margin: 0 0 4px; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+#listHead button:focus-visible, #listHead select:focus-visible, #listHead input:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 /* RP120: the chat and the column with no repo chosen. */
 .rs-empty { padding: 28px 16px; text-align: center; }
 .rs-card[data-act="chat-open"] { cursor: pointer; }
@@ -608,7 +637,7 @@ button.tc:hover { border-color: var(--muted); }
 .ch-last { margin-top: 4px; overflow-wrap: anywhere; }
 @media (max-width: 720px) {
   .chatlayout.chat-open { flex-direction: column; height: auto; }
-  .chatlayout.chat-open #summary { min-width: 0; max-height: 50vh; width: auto; }
+  .chatlayout.chat-open #listCol { min-width: 0; max-height: 50vh; width: auto; }
   #split, #split2 { display: none; }
   #chat { width: auto; min-width: 0; height: 60vh; border-top: 1px solid var(--line); }
 }

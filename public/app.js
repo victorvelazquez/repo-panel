@@ -34,6 +34,7 @@ const S = {
   tab: 'summary', scope: { kind: 'all' }, summary: null, summaryKey: '', summaryFailed: false, sfilter: 'all', collapsed: {},
   timeouts: { get: 25000, post: 70000 },
   tasks: {}, tasksFilter: '', tasksOpenDone: false, changes: {}, files: {}, filesOpen: {}, fileData: {}, pad: {},
+  lh: { search: false, menu: false, legend: false, focus: false }, // RP121: the header of the repos column (search box open, filter menu open, focus the box on the next draw)
   chat: { id: null, seq: 0 }, chatCache: {}, drafts: {}, recall: {}, notes: {}, askBusy: {}, chatResults: Object.create(null), rpc: {},
 };
 S.tab = S.prefs.tab === 'work' ? 'work' : 'summary';
@@ -50,6 +51,7 @@ document.addEventListener('pointercancel', releasePress, true);
 
 document.addEventListener('click', (e) => {
   if (S.menu && !e.target.closest('.more')) { S.menu = null; draw(); }
+  if ((S.lh.menu || S.lh.legend) && !e.target.closest('#listHead')) { S.lh.menu = false; S.lh.legend = false; draw(); } // RP121: a click outside the header closes the filter menu
   const el = e.target.closest('[data-act]');
   if (!el || el.disabled) return;
   if (el.tagName === 'A') return;
@@ -66,6 +68,7 @@ document.addEventListener('submit', (e) => {
 // Escape closes the card menu first; with nothing else open it closes the chat. A focused repo card opens the chat with Enter or
 // Space (the buttons inside it have no chat-open act, so they are untouched).
 document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && (S.lh.menu || S.lh.search || S.lh.legend)) { S.lh.menu = false; S.lh.search = false; S.lh.legend = false; draw(); return; } // RP121: the bar of the repos column first
   if (e.key === 'Escape' && S.menu) { S.menu = null; draw(); return; }
   if (e.key === 'Escape') {
     const menu = $('#mergeMenu');
@@ -124,6 +127,16 @@ document.addEventListener('click', (e) => {
 });
 
 $('#search').addEventListener('input', (e) => { S.q = e.target.value; draw(); });
+$('#lhSearch').addEventListener('input', (e) => { S.q = e.target.value; draw(); });
+$('#lhGroup').addEventListener('change', (e) => { S.group = e.target.value; draw(); });
+// RP121: the key / opens the search of the repos column from anywhere in Summary, unless a field has the focus (the message box keeps its slashes), a dialog is open or a modifier is down.
+document.addEventListener('keydown', (e) => {
+  if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey || e.isComposing || S.tab !== 'summary') return;
+  const t = e.target || {};
+  if (['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName) || t.isContentEditable || ['#addDialog', '#roomDialog'].some((d) => $(d) && $(d).open)) return;
+  e.preventDefault();
+  ACTIONS['lh-search-open']();
+});
 $('#groupFilter').addEventListener('change', (e) => { S.group = e.target.value; draw(); });
 
 // Auto-refresh while the tab is visible: everything every minute, plus the lighter

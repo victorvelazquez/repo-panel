@@ -321,10 +321,10 @@ test('a failed refresh keeps the cards and adds the note; empty and missing payl
   assert.match(R.summaryView(null, { now: NOW, failed: true }), /Summary unavailable/);
 });
 
-test('the one-line bar legend stays at the bottom', () => {
+test('the bar legend left the bottom of the list (RP121: it is the info icon of the repos column header)', () => {
   const html = view([row()]);
-  for (const t of ['Completed', 'In review', 'Blocked', 'Pending']) assert.ok(html.includes(t), t);
-  assert.ok(html.lastIndexOf('rs-legend') > html.lastIndexOf('rs-card'));
+  assert.doesNotMatch(html, /rs-legend/);
+  for (const t of ['Completed', 'In review', 'Blocked', 'Pending']) assert.ok(R.legendHtml().includes(t), t);
 });
 
 // ---------- escaping ----------
