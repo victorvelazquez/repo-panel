@@ -243,6 +243,16 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
       }
       return { ok: true };
     },
+    // RP118: what the line for a normal terminal needs: the folder, the launcher of the active runtime and the id of the session the panel would use (a live session's own id, else the adopted
+    // one, else the default). It only reads: nothing is started, adopted or written.
+    async terminalInfo(id) {
+      const repo = repoOf(id);
+      let found;
+      try { found = await resolve(); } catch { found = null; }
+      if (!found || !found.active) throw new HttpError(409, 'No pi runtime is available');
+      const entry = live.get(id);
+      return { cwd: repo.path, launcher: found.active.command, sessionId: entry && entry.sessionId ? entry.sessionId : sessionIdFor(repo, adoptedOf(id)) };
+    },
     async status(id) { repoOf(id); return statusOf(live.get(id)); },
     closeAll() {
       epoch++;

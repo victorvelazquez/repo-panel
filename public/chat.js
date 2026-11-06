@@ -312,7 +312,8 @@ function drawChat() {
   prunePending(S.chat.id);
   const shown = chatView();
   const hasSession = !!(S.chat.info && S.chat.info.adopted) || !!(S.rpc[S.chat.id] && S.rpc[S.chat.id].state !== 'closed'); // RP98: a session to close
-  paint($('#sessState'), R.sessionLabelHtml(shown) + R.memoryChipHtml(shown) + R.sessionCloseHtml(hasSession, S.chat.closing));
+  paint($('#sessState'), R.sessionLabelHtml(shown) + R.memoryChipHtml(shown) + R.sessionTerminalHtml(hasSession, S.chat.terminal) + R.sessionCloseHtml(hasSession, S.chat.closing));
+  paint($('#termBlock'), R.terminalBlockHtml(hasSession ? S.chat.terminal : null)); // RP118: the line for a normal terminal, only while the button is open
   const body = $('#chatBody');
   const atBottom = chatShown !== S.chat.id || !(body.scrollHeight > 0) || body.scrollHeight - body.scrollTop - body.clientHeight < 24;
   if (paint(body, R.chatBody(shown, { now: Date.now() })) && atBottom) body.scrollTop = body.scrollHeight;
