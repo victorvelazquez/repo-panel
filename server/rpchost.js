@@ -92,12 +92,15 @@ const slim = (r) => {
 // and what is still huge after that is cut to its type.
 // RP110b: what the page may know of the memory plugin of a session: ONE category of this closed list, never the text of its notice (it can hold the name of the project or an error message).
 const MEMORY = ['ready', 'offline', 'disabled', 'error'];
-// The text of the notice of the key `engram` -> a category, or null when it says nothing lasting: a step in progress (`· saving…`), the result of one call or a text nobody knows. null never changes the
+// The text of the notice of the key `engram` -> a category, or null when it says nothing lasting: a step in progress (`· saving…`) or a text nobody knows. null never changes the
 // category already known. The plugin writes `🧠 <project> · ready|offline|error|ambiguous project` and `🧠 memory disabled`; only those two shapes count, and only at the END of the text.
 function memoryOf(text) {
   if (typeof text !== 'string') return null;
   const t = text.replace(/\s+/g, ' ').trim();
   if (t.replace(/^[^A-Za-z0-9]+/, '').toLowerCase() === 'memory disabled') return 'disabled';
+  // RP123: after a call the plugin writes `✓ <result>` when it went well and `✗ <text>` when it failed: a recovery and an error (the failure first, because its text is free). `✓`, `✗` and the `·` before them are all it reads.
+  if (/\u00b7 ?\u2717/.test(t)) return 'error';
+  if (/\u00b7 ?\u2713/.test(t)) return 'ready';
   const m = /\u00b7 ?(ready|offline|error|ambiguous project)$/i.exec(t);
   if (!m) return null;
   return m[1].toLowerCase() === 'ready' ? 'ready' : m[1].toLowerCase() === 'offline' ? 'offline' : 'error';
