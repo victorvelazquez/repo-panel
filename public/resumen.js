@@ -675,6 +675,42 @@
     }
     return out;
   }
+  // RP124: a Markdown table is a header line with a bar, then a separator line with the SAME number of cells (`---`, `:---`, `---:`, `:---:`), then body lines that still have a bar.
+  // Cells are cut at the bars that are not escaped (`\|` stays a bar), each goes through mdInline (escaped, no HTML), the alignment is a CLASS (no inline style), a row is cut or padded
+  // to the width of the head, and the columns and the rows are capped: what is over the cap is not lost, it is drawn after the table as the text it is.
+  const TABLE_COLS = 30;
+  const TABLE_ROWS = 300;
+  function mdCells(line) {
+    let t = line.trim();
+    if (t.startsWith('|')) t = t.slice(1);
+    if (t.endsWith('|') && !t.endsWith('\\|')) t = t.slice(0, -1);
+    const cells = [];
+    let cur = '';
+    for (let i = 0; i < t.length; i++) {
+      const c = t[i];
+      if (c === '\\' && t[i + 1] === '|') { cur += '|'; i++; } else if (c === '|') { cells.push(cur.trim()); cur = ''; } else cur += c;
+    }
+    cells.push(cur.trim());
+    return cells;
+  }
+  const mdSepCells = (l) => (l.includes('-') && mdCells(l).every((x) => /^:?-+:?$/.test(x)) ? mdCells(l) : null);
+  function mdTableAt(lines, i) {
+    if (i + 1 >= lines.length || !lines[i].includes('|')) return null;
+    const sep = mdSepCells(lines[i + 1]);
+    if (!sep) return null;
+    const head = mdCells(lines[i]);
+    return head.length === sep.length ? { head, sep } : null;
+  }
+  const mdAlign = (s) => (s[0] === ':' && s[s.length - 1] === ':' ? ' class="al-c"' : s[s.length - 1] === ':' ? ' class="al-r"' : '');
+  function mdTable(lines, i, t) {
+    const n = Math.min(t.head.length, TABLE_COLS);
+    const al = t.sep.slice(0, n).map(mdAlign);
+    const row = (cells, tag) => `<tr>${Array.from({ length: n }, (_, k) => `<${tag}${al[k]}>${mdInline(cells[k] || '', 0)}</${tag}>`).join('')}</tr>`;
+    const body = [];
+    let j = i + 2;
+    for (; j < lines.length && lines[j].trim() && lines[j].includes('|') && body.length < TABLE_ROWS; j++) body.push(row(mdCells(lines[j]), 'td'));
+    return { html: `<div class="md-table"><table><thead>${row(t.head, 'th')}</thead><tbody>${body.join('')}</tbody></table></div>`, next: j };
+  }
   const mdFence = (l) => /^\s*```/.test(l);
   const mdQuote = (l, d) => d < 3 && (l === '>' || l.startsWith('> '));
   const mdStarts = (l, d) => mdFence(l) || /^#{1,6} /.test(l) || mdQuote(l, d) || MD_ITEM.test(l);
@@ -685,6 +721,7 @@
     while (i < lines.length) {
       const l = lines[i];
       let m;
+      let tb;
       if (!l.trim()) { i++; continue; }
       if (mdFence(l)) {
         const code = [];
@@ -704,9 +741,13 @@
         const items = [];
         for (; i < lines.length && (m = MD_ITEM.exec(lines[i])) && (m[1] ? 'ul' : 'ol') === tag; i++) items.push(`<li>${mdInline(m[2], 0)}</li>`);
         out.push(`<${tag}>${items.join('')}</${tag}>`);
+      } else if ((tb = mdTableAt(lines, i))) {
+        const made = mdTable(lines, i, tb);
+        out.push(made.html);
+        i = made.next;
       } else {
         const para = [l];
-        for (i++; i < lines.length && lines[i].trim() && !mdStarts(lines[i], d); i++) para.push(lines[i]);
+        for (i++; i < lines.length && lines[i].trim() && !mdStarts(lines[i], d) && !mdTableAt(lines, i); i++) para.push(lines[i]);
         out.push(`<p>${para.map((x) => mdInline(x, 0)).join('<br>')}</p>`);
       }
     }
