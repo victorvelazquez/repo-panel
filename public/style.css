@@ -406,12 +406,16 @@ body.tab-settings #viewbar { display: none; }
 .chatlayout #summary { flex: 1 1 0; min-width: 0; }
 .chatlayout.chat-open { height: calc(100vh - 140px); min-height: 480px; }
 .chatlayout.chat-open #summary { flex: none; width: var(--list-w, 25%); max-width: none; margin: 0; min-width: 260px; overflow: auto; }
+/* RP120: the chat and the column with no repo chosen. */
+.rs-empty { padding: 28px 16px; text-align: center; }
 .rs-card[data-act="chat-open"] { cursor: pointer; }
 .rs-card[data-act="chat-open"]:hover { border-color: #3a4553; }
 .rs-card[aria-current="true"] { border-color: var(--blue); background: #12253d; }
 .rs-card:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 #split, #split2 { flex: none; width: 10px; cursor: col-resize; position: relative; touch-action: none; background: var(--panel); border-left: 1px solid var(--line); }
 #split::after, #split2::after { content: ""; position: absolute; top: 50%; left: 50%; width: 4px; height: 36px; transform: translate(-50%, -50%); border-radius: 2px; background: var(--line); }
+/* RP120: the column looks like the list (the page background, no line of its own) and its separator mirrors the left one: the line goes on the column side, so only the chat has the panel color. */
+#split2 { border-left: 0; border-right: 1px solid var(--line); }
 #split:hover::after, #split:focus-visible::after, #split2:hover::after, #split2:focus-visible::after { background: var(--blue); }
 #split:focus-visible, #split2:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
 #split[hidden], #chat[hidden] { display: none; }
@@ -419,7 +423,7 @@ body.tab-settings #viewbar { display: none; }
 #chat { flex: 1 1 0; min-width: 340px; display: flex; flex-direction: column; min-height: 0; background: var(--panel); }
 /* RP89: the right column (RP91 and RP92 will fill it); out below 1100 px of layout. */
 #col, #split2 { display: none; }
-#col { flex: none; width: var(--col-w, 25%); min-width: 220px; flex-direction: column; min-height: 0; overflow: auto; background: var(--panel); border-left: 1px solid var(--line); }
+#col { flex: none; width: var(--col-w, 25%); min-width: 220px; flex-direction: column; min-height: 0; overflow: auto; }
 @container sum (min-width: 1100px) {
   #col { display: flex; }
   #split2 { display: block; }

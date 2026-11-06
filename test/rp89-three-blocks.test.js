@@ -164,7 +164,7 @@ const colW = (page) => page.get('#col').style['--col-w'];
 const saved = (page) => page.store['repo-panel.layout'];
 const fireOn = (el, type, e = {}) => { for (const fn of el.listeners[type] || []) fn({ type, preventDefault() {}, ...e }); };
 
-test('p1: opening a repo shows the three blocks with the default widths and the two separators; closing it hides them', () => {
+test('p1: opening a repo shows the three blocks with the default widths and the two separators; closing it keeps them (RP120) and only empties them', () => {
   const page = loadPage();
   open(page);
   assert.equal(listW(page), '345px');
@@ -174,7 +174,9 @@ test('p1: opening a repo shows the three blocks with the default widths and the 
   assert.match(page.get('#colBody').html, /demo/);
   page.run("ACTIONS['chat-close']()");
   page.flush();
-  for (const id of ['#chat', '#split', '#split2', '#col']) assert.equal(page.get(id).hidden, true, id);
+  for (const id of ['#chat', '#split', '#split2', '#col']) assert.equal(page.get(id).hidden, false, id + ' (RP120: the three blocks stay in with no repo open)');
+  assert.doesNotMatch(page.get('#colBody').html, /demo/, 'the column no longer holds the closed repo');
+  assert.equal(listW(page), '345px');
 });
 
 test('p2: the list separator: the arrows move the list 24 px, the ratio is saved under the new key, and the chat keeps what is left', () => {
@@ -300,4 +302,83 @@ test('p11: the old single-divider code is gone: no --chat-w, no chatRatio key', 
   const src = appSource();
   assert.doesNotMatch(src, /--chat-w|chatRatio|repo-panel\.chatRatio/);
   assert.match(src, /repo-panel\.layout/);
+});
+
+// ---------- RP120 (S14): the three blocks are in from the first start, with no repo open ----------
+function noRepo(page, width = 1400) {
+  const S = page.run('S');
+  S.groups = [{ name: 'G', repos: [{ id: 'abc', name: 'demo', path: 'p' }] }];
+  S.summary = { rows: [card()], generatedAt: 'x' };
+  const layout = page.get('#sumLayout');
+  const names = new Set();
+  layout.classList = { add: (c) => names.add(c), remove: (c) => names.delete(c), toggle: (c, on) => { if (on === undefined ? !names.has(c) : on) names.add(c); else names.delete(c); }, contains: (c) => names.has(c) };
+  layout.clientWidth = width;
+  layout.getBoundingClientRect = () => ({ left: 0, right: width, width });
+  page.get('#split').offsetWidth = 10;
+  page.get('#split2').offsetWidth = 10;
+  page.run('drawChat()');
+  page.flush();
+  return names;
+}
+
+test('r1: with no repo open the list, the chat and the column are in, the list takes a quarter and not the whole window, and the layout class is on', () => {
+  const page = loadPage();
+  const names = noRepo(page);
+  for (const id of ['#chat', '#split', '#split2', '#col']) assert.equal(page.get(id).hidden, false, id);
+  assert.ok(names.has('chat-open'), 'the class that gives the list its width var(--list-w)');
+  assert.equal(listW(page), '345px');
+  assert.equal(colW(page), '345px');
+});
+
+test('r2: with no repo open the chat and the column say what to do, and there is no composer to write in', () => {
+  const page = loadPage();
+  noRepo(page);
+  assert.match(page.get('#chatBody').html, /role="status"[^>]*>[^<]*Pick a repo/);
+  assert.match(page.get('#colBody').html, /role="status"[^>]*>[^<]*Pick a repo/);
+  assert.equal(page.get('#composer').hidden, true, 'nothing to send to');
+  assert.equal(page.get('#chatHead').html, '', 'no repo, no head');
+});
+
+test('r3: the separators work with no repo open: the arrows move the list and the column and the shares are saved', () => {
+  const page = loadPage();
+  noRepo(page);
+  fireOn(page.get('#split'), 'keydown', { key: 'ArrowRight' });
+  assert.equal(listW(page), '369px');
+  fireOn(page.get('#split2'), 'keydown', { key: 'ArrowLeft' });
+  assert.equal(colW(page), '369px');
+  assert.deepEqual(JSON.parse(saved(page)), { list: 369 / 1380, col: 369 / 1380 });
+});
+
+test('r4: the widths do not jump when a repo is chosen after, or closed again', () => {
+  const page = loadPage();
+  noRepo(page);
+  fireOn(page.get('#split'), 'keydown', { key: 'ArrowRight' });
+  page.run("ACTIONS['chat-open']({ dataset: { id: 'abc' } })");
+  page.flush();
+  assert.equal(listW(page), '369px');
+  page.run("ACTIONS['chat-close']()");
+  page.flush();
+  assert.equal(listW(page), '369px');
+});
+
+test('r5: in a narrow window the chat is in with no repo open too, and the column stays out as RP89 decided', () => {
+  const page = loadPage();
+  noRepo(page, 900);
+  assert.equal(page.get('#chat').hidden, false);
+  assert.equal(listW(page), '445px');
+  assert.match(page.get('#chatBody').html, /Pick a repo/);
+});
+
+test('r6: the right column looks like the list: no panel color and no line of its own, and its separator mirrors the left one; only the chat has the panel color', () => {
+  // The body of the rule that starts a line with `sel {` (the first one: the later ones are inside media or container queries).
+  const rule = (sel) => { const at = css.indexOf(`\n${sel} {`); return at < 0 ? '' : css.slice(at, css.indexOf('}', at)); };
+  const col = rule('#col');
+  assert.ok(col, 'the #col rule');
+  assert.doesNotMatch(col, /background/, 'the column takes the page background, like the list');
+  assert.doesNotMatch(col, /border-left/, 'no line of its own: the separator draws it');
+  assert.match(rule('#chat'), /background:\s*var\(--panel\)/, 'the chat keeps the panel color');
+  const split2 = rule('#split2');
+  assert.match(split2, /border-left:\s*0/, 'the line goes on the column side, not on the chat side');
+  assert.match(split2, /border-right:\s*1px solid var\(--line\)/, 'mirror of the left separator, whose line is on the list side');
+  assert.match(rule('#split, #split2'), /border-left:\s*1px solid var\(--line\)/, 'the left separator is untouched');
 });

@@ -250,13 +250,20 @@ function resetLayout() {
 let padShown = null; // the notepad painted in #chatBody: `id:loaded:gen`
 function drawChat() {
   const on = !!S.chat.id && !!R;
-  $('#chat').hidden = !on;
-  $('#split').hidden = !on;
-  $('#split2').hidden = !on;
-  $('#col').hidden = !on;
-  if (document.body && document.body.classList) $('#sumLayout').classList.toggle('chat-open', on);
-  if (!on) return;
+  // RP120: the three blocks (list, chat, column) and their two separators are ALWAYS in, with a repo open or not: the list takes its share of the window from the first start instead
+  // of all of it, and the person can size the three before choosing a repo. With no repo the chat and the column say what to do and the composer is out (no session to write to).
+  for (const id of ['#chat', '#split', '#split2', '#col']) $(id).hidden = false;
+  if (document.body && document.body.classList) $('#sumLayout').classList.toggle('chat-open', true);
   applyLayout();
+  if (!on) {
+    paint($('#chatHead'), '');
+    paint($('#chatBody'), '<p class="rs-sub rs-empty" role="status">Pick a repo to see its chat</p>');
+    paint($('#colBody'), '<p class="rs-sub rs-empty" role="status">Pick a repo to see its tasks and files</p>');
+    $('#composer').hidden = true;
+    padShown = null;
+    chatShown = null;
+    return;
+  }
   const column = columnOn();
   // RP91: with the column in, its tasks card is read when the repo OPENS (once per opening); the filter box keeps the focus across redraws.
   if (column) loadTasks();
