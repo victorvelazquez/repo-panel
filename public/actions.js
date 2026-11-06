@@ -180,6 +180,7 @@ const ACTIONS = {
     if (S.chat.starting) return; // RP99: a new session is starting: the server would refuse (409) and the list is disabled
     // RP100: pi does not lock its session files; a session written to a moment ago may be open in a terminal, and two programs on the same session mix up its history.
     if (el.dataset.recent === '1' && !confirm('This session was written to a moment ago, so it may be open in a terminal. Two programs on the same session mix up its history. Open it here anyway?')) return;
+    if (S.chat.terminal) { S.chat.terminal = null; draw(); } // RP118: another session is adopted: the line of the old one must not stay (repainted here: loadChat only redraws when what it read changed)
     try { await api('/api/sessions/adopt', { id, session }); } catch (e) { toast(e.message, 'bad'); }
     if (S.chat.id === id) loadChat(id);
   },
@@ -187,6 +188,7 @@ const ACTIONS = {
     const { id } = el.dataset;
     if (S.chat.starting) return;
     S.chat.starting = true;
+    S.chat.terminal = null; // RP118: a NEW session has its own id
     el.disabled = true;
     setRpc(id, { state: 'starting', error: '' }); // RP99: the composer waits and the list is disabled until it answers
     draw();
@@ -196,12 +198,40 @@ const ACTIONS = {
     if (S.chat.id === id) loadChat(id);
     draw();
   },
+  // RP118: shows (or hides) the line to open the session of the open chat in a normal terminal. The line is read when the button is clicked, never when a chat opens; the server writes it. An answer that
+  // arrives after another chat was opened, or after the block was hidden, is dropped; a failure says one fixed thing and never the raw error.
+  'session-terminal': async () => {
+    const id = S.chat.id;
+    if (!id) return;
+    if (S.chat.terminal) { S.chat.terminal = null; draw(); return; }
+    const seq = S.chat.seq;
+    const mine = { open: true, loading: true };
+    S.chat.terminal = mine;
+    draw();
+    let next;
+    try {
+      const r = await api(`/api/terminal?id=${encodeURIComponent(id)}`);
+      next = r && r.available === true && typeof r.command === 'string' ? { open: true, available: true, cwd: r.cwd, command: r.command, sessionId: r.sessionId, shell: r.shell } : { open: true, available: false, reason: r && typeof r.reason === 'string' ? r.reason : '' };
+    } catch (e) { next = { open: true, failed: true }; }
+    if (S.chat.id !== id || S.chat.seq !== seq || S.chat.terminal !== mine) return;
+    S.chat.terminal = next;
+    draw();
+  },
+  // Copies the command kept in the page state (never text read back from the screen).
+  'terminal-copy': async () => {
+    const t = S.chat.terminal;
+    if (!t || typeof t.command !== 'string') return;
+    try { await navigator.clipboard.writeText(t.command); } catch (e) { toast('Could not copy: select the command and copy it by hand', 'bad'); return; }
+    if (S.chat.terminal === t) { t.copied = true; draw(); }
+  },
+  'terminal-hide': () => { S.chat.terminal = null; draw(); },
   // RP98: stops the session of the open chat and releases its adoption, so the chat comes back to the list of sessions. A session that is working or asking is confirmed first (closing stops what it is doing).
   'session-close': async () => {
     const id = S.chat.id;
     if (!id || S.chat.closing) return;
     const st = S.rpc[id] && S.rpc[id].state;
     if ((st === 'busy' || st === 'asking') && !confirm('This session is working. Close it anyway? What it is doing is stopped.')) return;
+    S.chat.terminal = null; // RP118: the line of a session that is going away is never shown again
     S.chat.closing = true;
     draw();
     try {

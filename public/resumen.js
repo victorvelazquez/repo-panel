@@ -226,6 +226,19 @@
   // chat header to the repo name and the ✕, which only hides the chat) and is there while the repo has a session: adopted or live.
   const sessionCloseHtml = (show, closing) => (show ? `<button type="button" class="ss-close" data-act="session-close"${closing ? ' disabled' : ''} title="Stop this session and go back to the list of sessions">Close session</button>` : '');
 
+  // RP118: "Terminal" next to "Close session" shows the line to open this session in a normal terminal. The server writes the line (GET /api/terminal); the page only shows it, escaped, and copies it from its
+  // own state: the command is never put in an attribute. `term` is { open, loading | failed | available + command + reason, copied }.
+  const sessionTerminalHtml = (show, term) => (show ? `<button type="button" class="ss-term" data-act="session-terminal" aria-expanded="${term && term.open ? 'true' : 'false'}" title="Show the command to open this session in a normal terminal">Terminal</button>` : '');
+  function terminalBlockHtml(term) {
+    if (!term || !term.open) return '';
+    const SHELLS = { powershell: ['PowerShell', 'Paste it in PowerShell: cmd reads some characters differently'], posix: ['bash or zsh', 'Paste it in bash or zsh'] };
+    const head = (shell) => `<div class="term-head"><b>Open this session in a normal terminal</b>${Object.hasOwn(SHELLS, shell) ? `<span class="term-shell" title="${SHELLS[shell][1]}">${SHELLS[shell][0]}</span>` : ''}<button type="button" class="term-hide" data-act="terminal-hide" aria-label="Hide the command">✕</button></div>`;
+    if (term.loading) return `${head()}<p class="term-note">Loading the command…</p>`;
+    if (term.failed) return `${head()}<p class="term-note">Could not read the command</p>`;
+    if (term.available !== true || typeof term.command !== 'string') return `${head()}<p class="term-note">${esc(typeof term.reason === 'string' && term.reason ? term.reason : 'No command is available for this session')}</p>`;
+    return `${head(term.shell)}<code class="term-cmd">${esc(term.command)}</code><div class="term-row"><button type="button" data-act="terminal-copy">${term.copied ? 'Copied' : 'Copy'}</button><span class="term-note">Close the session here first: two programs on the same session mix up its history.</span></div>`;
+  }
+
   // The header: the repo name (the session id is only its tooltip) and the close button.
   function chatHead(c, ctx = {}) {
     const adopted = c.info && c.info.adopted;
@@ -902,5 +915,5 @@ ${status}</div>`;
     return `${ctx.failed ? '<div class="rs-note" role="status">⚠ Summary unavailable: showing the last data we have.</div>' : ''}<div class="rs-list">${body}</div>${rows.length ? LEGEND : ''}`;
   }
 
-  return { esc, mdHtml, settingsView, memoryChipHtml, sessionChip, blockWidths, columnView, composerState, askAllowed, actionMenu, actionButtonsHtml, composerNote, chatHead, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, sessionCloseHtml, recentlyActive, chatBody, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
+  return { esc, mdHtml, settingsView, memoryChipHtml, sessionChip, blockWidths, columnView, composerState, askAllowed, actionMenu, actionButtonsHtml, composerNote, chatHead, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, sessionCloseHtml, sessionTerminalHtml, terminalBlockHtml, recentlyActive, chatBody, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
 }));

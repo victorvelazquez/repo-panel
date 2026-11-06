@@ -26,6 +26,7 @@ const { summaryFor } = require('./summary.js');
 const { createSummaryStore } = require('./summarystore.js');
 const { createEventHub } = require('./events.js');
 const { createRpcHost, rpcApi } = require('./rpchost.js');
+const { terminalAnswer } = require('./terminal.js');
 const { readUsage, usageFile } = require('./usage.js');
 const { sessionsState, chatState, chatResult, adoptSession, releaseSession, adoptIfNone } = require('./sessions.js');
 const { readSettings, writeSetting } = require('./settings.js');
@@ -102,6 +103,8 @@ const routes = {
   'GET /api/chat/result': (q, b, d) => chatResult(q.id, q.call, d.sessionsDir),
   // RP111b: the options the page may read and write, a CLOSED list (server/settings.js); never the whole configuration.
   'GET /api/settings': () => readSettings(),
+  // RP118: the line to open the session of a repo in a normal terminal (read only; the server writes it so a folder or an id can never become another command).
+  'GET /api/terminal': (q, b, d) => terminalAnswer(d.rpcHost, q.id),
   'POST /api/settings': (q, b) => {
     if (!b || typeof b !== 'object' || Array.isArray(b)) throw new HttpError(400, 'The body must be an object { key, value }');
     return writeSetting(b.key, b.value);
