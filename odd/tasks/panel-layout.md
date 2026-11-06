@@ -9,6 +9,7 @@ Las citas son textuales de la persona (ver `- [x] **RP96** · S12, S13 · inline
 - [x] **RP120** · S14, S15 · inline · `feat(summary): always show list, chat and column, resizable, with no repo chosen (RP120)` (lo crea `/flow-commit`). Pruebas primero (RED 5 de 55) y 491 vecinas; sin worker ni verificación independiente (solo presentación).
 - [x] **RP121** · S16, S17 · inline · `feat(summary): move the Summary filters into the header of the repos column (RP121)` (lo crea `/flow-commit`). Vista previa aprobada (D y E), pruebas primero (RED 18 de 19) y vecinas actualizadas; sin worker ni verificación independiente (solo presentación).
 - [x] **RP125** · S18 · inline · `feat(summary): add a close button to the legend panel (RP125)` (lo crea `/flow-commit`). Pruebas primero (RED 5 de 31) y vecinas; sin worker ni verificación independiente (solo presentación).
+- [x] **RP126** · S19 · inline · `fix(summary): fill the window height with the three zones (RP126)` (lo crea `/flow-commit`). Pruebas primero (RED 4 de 35) y vecinas; sin worker ni verificación independiente (solo presentación).
 ## Log`). No se resumen ni se agregan requisitos.
 
 - **S1. Filtros juntos y sin la hora.** «el boton 'Needs attention · 1' no te parece que deberia estar al lado de los botones de: All groups, All 15, UPEN 6, No room 9? y eliminar ese mensaje de updated 3 min ago.» *(RP82)*
@@ -29,6 +30,7 @@ Las citas son textuales de la persona (ver `- [x] **RP96** · S12, S13 · inline
 - **S16. Filtros dentro de la columna de repos.** «toda esta barra donde estan los botones de filtro podemos eliminar y hacer que los filtros esten dentro del bloque de columna izquierda de los repos en la cabecera como las opciones disponibles, podes organizar o mejorar esa ux/ui. entiendes lo que quiero y que me propones?» y, tras la propuesta: «opcion A,» *(RP121; la opción A es: Work conserva su barra)*
 - **S17. Leyenda de las barras.** «esta parte como podriamos mejorar tambien:» (con la captura de la leyenda abierta: «Completed, In review, Blocked, Pending» y «The button on the right is the best next action») y, tras la propuesta: «sumala a RP121» *(RP121)*
 - **S18. Cerrar la leyenda con su botón.** «al bloque de  los filtros y la leyenda ⓘ le falta el boton para cerrar como el bloque de los filtros.» *(RP125; se leyó: a la leyenda ⓘ le falta el ✕ que ya tiene el menú de filtros)*
+- **S19. Sin espacio sobrante abajo.** «tenemos un espacio sobrando debajo de toda la ventana, fijate bien debajo del chat vas a ver un espacio sobrando.:» (con la captura: una franja vacía bajo el chat, la lista y la columna) *(RP126)*
 - **S17. Botón de cerrar en el menú de filtros.** «esta parte de mostrar las opciones de filtro: [captura] al bloque podriamos agregar el boton de cerrar en la esquina superior derecha.» *(RP121)*
 
 ## Tasks
@@ -111,3 +113,5 @@ barra de consumo arriba o abajo del porcentaje de consumo y horas faltantes de s
 - **L42.** La persona pidió mejorar la leyenda de las barras (S17) y, tras la propuesta, que se sume a RP121 y no a una unidad aparte. Se corrigió una afirmación mía: la leyenda estaba al pie de la lista, no arriba. Hecho: icono ⓘ en la cabecera con el panel de la leyenda. La suite completa dejó ver una prueba de `rp52` que fijaba la leyenda vieja; se actualizó.
 - L43. La persona pidió que el panel de la leyenda ⓘ tenga su botón ✕ como el menú de filtros (S18). Se leyó así porque el menú de filtros ya traía su ✕ (RP121) y la leyenda era la única sin él; si quería otra cosa, lo corrige. Es una unidad chica aparte (RP125), tomada con RP124 ya fusionada.
 - **L44.** RP125 hecha: la leyenda ⓘ tiene su ✕ (`lh-legend-close`) como el menú de filtros, con el foco de vuelta al icono. El texto se pinta en `#lhLegendBody` para que el repintado no borre el botón. Queda para la persona verlo en el navegador real.
+- L45. La persona mostró una captura con un espacio vacío debajo de las tres zonas (S19). Causa leída en el CSS: `calc(100vh - 140px)` incluía la altura de la barra de filtros, que RP121 dejó de mostrar en Summary. Se mide lo de arriba en vez de ajustar el número a mano (RP126).
+- **L46.** RP126 hecha: `applyLayout` mide lo que hay sobre el layout y lo deja en `--sum-top`; el CSS lo resta de 100vh. Queda para la persona verlo en el navegador real, también con la ventana angosta.
