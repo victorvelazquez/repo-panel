@@ -87,6 +87,10 @@ test('memoryOf: the text of the plugin becomes ONE category of a closed list; a 
     ['  🧠 x · ready  ', 'ready'], ['🧠 x · READY', 'ready'], ['🧠 memory disabled ', 'disabled'],
     ['🧠 x · saving…', null], ['🧠 x · searching memories…', null], ['🧠 x · saved 3 observations', null], ['', null], ['   ', null], ['ready', null], ['offline', null], ['🧠 x · ready for more', null],
     ['🧠 x · offline · ready', 'ready'], ['🧠 memory disabled · ready', 'ready'],
+    // RP123: the label of a call that went well (✓) is a recovery, the one of a call that failed (✗) is an error; the in-progress label and an unknown one still change nothing.
+    ['🧠 repo-panel · ✓ saved #15516', 'ready'], ['🧠 x · ✓ 3 results', 'ready'], ['🧠 x · ✓ loaded', 'ready'], ['🧠 x · ✓ saved', 'ready'], ['🧠 x · ✓ observation #7', 'ready'],
+    ['🧠 x · ✗ unable to open database file (14)', 'error'], ['🧠 x · ✗ boom', 'error'], ['🧠 x · ✗ boom · ready', 'error'], ['🧠 x · ✗', 'error'],
+    ['🧠 x · ✓saved', 'ready'], ['🧠 x ✓ saved', null], ['✓ saved', null], ['🧠 x · saved ✓', null], ['🧠 x · ✓✓', 'ready'],
   ];
   for (const [text, want] of cases) assert.equal(memoryOf(text), want, JSON.stringify(text));
   for (const bad of [undefined, null, 5, {}, [], true]) assert.equal(memoryOf(bad), null);
@@ -125,6 +129,21 @@ test('host: a category that has not changed is not published again', async () =>
   emit(status('🧠 x · offline'));
   emit(status('🧠 x · offline'));
   assert.deepEqual(published.filter((p) => p.kind === 'memory').map((p) => p.memory), ['ready', 'offline']);
+});
+
+test('host (RP123): the chip recovers after a call that went well and falls again after one that failed, and no text of the labels reaches the page', async () => {
+  const { published, host, emit } = await hostWith();
+  emit(status('🧠 SECRET-PROJECT · error'));
+  emit(status('🧠 SECRET-PROJECT · saving…'));
+  assert.deepEqual(published.filter((p) => p.kind === 'memory').map((p) => p.memory), ['error'], 'the step in progress changes nothing');
+  emit(status('🧠 SECRET-PROJECT · ✓ saved #15516'));
+  emit(status('🧠 SECRET-PROJECT · ✓ 3 results'));
+  assert.deepEqual(published.filter((p) => p.kind === 'memory').map((p) => p.memory), ['error', 'ready'], 'a second success does not publish again');
+  assert.equal((await host.start('aaa')).memory, 'ready');
+  emit(status('🧠 SECRET-PROJECT · ✗ unable to open SECRET-FILE'));
+  assert.deepEqual(published.filter((p) => p.kind === 'memory').map((p) => p.memory), ['error', 'ready', 'error']);
+  assert.doesNotMatch(JSON.stringify(published), /SECRET/);
+  assert.doesNotMatch(JSON.stringify(await host.start('aaa')), /SECRET/);
 });
 
 test('host: a raw status record never reaches the page, whatever its key', async () => {

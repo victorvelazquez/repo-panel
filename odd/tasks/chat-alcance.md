@@ -12,10 +12,12 @@ Series that widens what the panel chat shows and studies how to use subagents, u
 - S6. Room Director (RP109): «el Director lanza y ordena». Repo agents report to the Director; the Director resolves by itself only technical, reversible matters inside the already authorized scope, and ALWAYS asks the person for any decision («las deciciones debe preguntarme siempre que yo las decida»). When in doubt it asks. What it resolved alone is logged and visible. Agents leave work at `ready-to-commit`; delivery stays with the person.
 - S7. «analiza si el repo panel al usar gentle shell o pi en el chat si igual les funciona engram? y las otras conexiones mcps?» (RP110, prerequisite of RP109).
 - S8. «no podemos hacer que se muestre todo el mensaje para estos casos y despues hacer la pregunta?» y «quiero que hagas el Estudio opcional tambien» (RP122): study of why the approval questions arrive cut and whether the panel can show the whole command first; it writes no code.
+- S9. «el input del chat sigue teniendo este mensaje:» (con la captura del chip rojo «memory error» junto al estado de la sesión, después de que el servicio de Engram ya se había arreglado) (RP123).
+- S10. «podemos mejorar cuando se muestra una tabla en el chat? porque se ve mal, no estructurada:» (con la captura de una tabla de Markdown dibujada como líneas con barras verticales) (RP124).
 
 ## Tasks
 
-- RP104 (S1, S2) · RP105 (S3) · RP106 (S4) · RP107 (S5) · RP108 (S5) · RP109 (S5, S6) · RP110 (S7) · RP122 (S8)
+- RP104 (S1, S2) · RP105 (S3) · RP106 (S4) · RP107 (S5) · RP108 (S5) · RP109 (S5, S6) · RP110 (S7) · RP122 (S8) · RP123 (S9) · RP124 (S10)
 
 ## Log
 
@@ -53,3 +55,5 @@ Series that widens what the panel chat shows and studies how to use subagents, u
 
 - L17. RP110b closed, split by the person («Partir: indicador ahora, lista de variables en RP110c»): the memory-status chip. The RPC client keeps only the `setStatus` notice of the key `engram` (its last 200 characters); the host reduces it to one category of a closed list (`ready`, `offline`, `disabled`, `error`) and publishes only changes; the text never leaves the server. RP110c (allow-list of environment variables) is `Bloqueada` until the person defines own variables. Read in code, not live: the plugin emits `ready`/`offline` (`index.ts:2519`) and `memory disabled` (`:2450`). Tests `test/rp110b-memory.test.js`.
 - L18. RP122 closed: `docs/ESTUDIO-preguntas-cortadas.md`. The cut is made by gentle-pi (`guardedCommandPreview`, 180 columns, `extensions/gentle-ai.ts:1698`) before the question reaches the panel; the question carries no tool-call id; pairing it with the call by order is a guess and showing the whole command goes against RP105. Recommendation: keep cut questions Deny-only and ask gentle-pi for the whole message or a `toolCallId`. The person authorized reading outside the repo (gentle-pi, pi, session history). Pending decision of the person: whether to ask upstream.
+- L19. The person approved option A of RP122 («la opcion A esta bien entonces»: ask gentle-pi to send the whole command in RPC mode; a request text was drafted in the chat and nothing was filed). Two visual points came with it. RP123 (the memory chip stays on «memory error» after Engram works again) is taken now: it is the limit RP110b wrote down, seen for real. RP124 (Markdown tables in the chat) is registered `Pendiente`, a separate PR.
+- L20. RP123 done: the chip of the memory recovers. The plugin writes `· ✓ <result>` after a call that went well and `· ✗ <text>` after one that failed; `memoryOf` now reads them (`ready` and `error`) and the chip no longer stays on `memory error` once Engram works again. Only the category travels. The limit that stays: the chip shows the LAST thing the plugin said. Not seen in a real session yet.
