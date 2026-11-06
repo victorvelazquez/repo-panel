@@ -390,8 +390,8 @@ test('opening a card shows the chat and the divider, marks the card, and reads s
   const page = loadPage({ answers: { '/api/sessions': ADOPTED, '/api/chat': HIST } });
   seed(page);
   page.run('render()');
-  assert.equal(page.get('#chat').hidden, true);
-  assert.equal(page.get('#split').hidden, true);
+  assert.equal(page.get('#chat').hidden, false, 'RP120: the chat block is in even with no repo open');
+  assert.equal(page.get('#split').hidden, false);
   assert.doesNotMatch(page.get('#summary').html, /aria-current/);
   page.fetches.length = 0;
   page.run("ACTIONS['chat-open']({ dataset: { id: 'abc' } })");
@@ -407,8 +407,9 @@ test('opening a card shows the chat and the divider, marks the card, and reads s
   page.fetches.length = 0;
   page.run("ACTIONS['chat-close']()");
   await page.tick();
-  assert.equal(page.get('#chat').hidden, true);
-  assert.equal(page.get('#split').hidden, true);
+  assert.equal(page.get('#chat').hidden, false, 'RP120: closing the repo empties the chat block, it does not remove it');
+  assert.equal(page.get('#split').hidden, false);
+  assert.doesNotMatch(page.get('#chatBody').html, /hello there/, 'the closed repo no longer shows its chat');
   assert.doesNotMatch(page.get('#summary').html, /aria-current/);
   chatTick(page)();
   await page.tick();
