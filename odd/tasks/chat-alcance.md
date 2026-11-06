@@ -11,10 +11,11 @@ Series that widens what the panel chat shows and studies how to use subagents, u
 - S5. Studies RP107 and RP108 write no code; each ends in a short document with `path:line` evidence.
 - S6. Room Director (RP109): «el Director lanza y ordena». Repo agents report to the Director; the Director resolves by itself only technical, reversible matters inside the already authorized scope, and ALWAYS asks the person for any decision («las deciciones debe preguntarme siempre que yo las decida»). When in doubt it asks. What it resolved alone is logged and visible. Agents leave work at `ready-to-commit`; delivery stays with the person.
 - S7. «analiza si el repo panel al usar gentle shell o pi en el chat si igual les funciona engram? y las otras conexiones mcps?» (RP110, prerequisite of RP109).
+- S8. «no podemos hacer que se muestre todo el mensaje para estos casos y despues hacer la pregunta?» y «quiero que hagas el Estudio opcional tambien» (RP122): study of why the approval questions arrive cut and whether the panel can show the whole command first; it writes no code.
 
 ## Tasks
 
-- RP104 (S1, S2) · RP105 (S3) · RP106 (S4) · RP107 (S5) · RP108 (S5) · RP109 (S5, S6) · RP110 (S7)
+- RP104 (S1, S2) · RP105 (S3) · RP106 (S4) · RP107 (S5) · RP108 (S5) · RP109 (S5, S6) · RP110 (S7) · RP122 (S8)
 
 ## Log
 
@@ -51,3 +52,4 @@ Series that widens what the panel chat shows and studies how to use subagents, u
 - L16. RP109 closed: `docs/ESTUDIO-director.md`. Recommended architecture C (the panel is the mechanical Director with a fixed order vocabulary; an optional model assistant only reads and proposes). The escalation list of what the Director may resolve alone STARTS EMPTY and only the person changes it. The Director cannot chain tasks inside a repo (the gate of AGENTS.md needs the person's delivery) and keeps a log, never a parallel state (AGENTS.md forbids it). Eight stages proposed (D1 to D8) and NOT added to the roadmap: the person decides.
 
 - L17. RP110b closed, split by the person («Partir: indicador ahora, lista de variables en RP110c»): the memory-status chip. The RPC client keeps only the `setStatus` notice of the key `engram` (its last 200 characters); the host reduces it to one category of a closed list (`ready`, `offline`, `disabled`, `error`) and publishes only changes; the text never leaves the server. RP110c (allow-list of environment variables) is `Bloqueada` until the person defines own variables. Read in code, not live: the plugin emits `ready`/`offline` (`index.ts:2519`) and `memory disabled` (`:2450`). Tests `test/rp110b-memory.test.js`.
+- L18. RP122 closed: `docs/ESTUDIO-preguntas-cortadas.md`. The cut is made by gentle-pi (`guardedCommandPreview`, 180 columns, `extensions/gentle-ai.ts:1698`) before the question reaches the panel; the question carries no tool-call id; pairing it with the call by order is a guess and showing the whole command goes against RP105. Recommendation: keep cut questions Deny-only and ask gentle-pi for the whole message or a `toolCallId`. The person authorized reading outside the repo (gentle-pi, pi, session history). Pending decision of the person: whether to ask upstream.
