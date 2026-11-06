@@ -342,6 +342,58 @@ test('x3: the close button only closes the menu: the filters that were set stay,
   assert.equal(S.sfilter, 'attention');
 });
 
+// ---------- the close button of the legend (RP125, S18): the same button the filter menu has ----------
+test('y1: the legend panel has a close button in its top right corner, first in the block, with a name for assistive tools; the text lives in its own body', () => {
+  const m = /<div id="lhLegend"[^>]*>([\s\S]*?)<div id="lhMenu"/.exec(html);
+  assert.ok(m, 'the legend block');
+  const body = m[1];
+  assert.match(body, /<button type="button" class="lh-x lh-menu-x" data-act="lh-legend-close" aria-label="Close legend" title="Close">/);
+  assert.ok(body.indexOf('lh-menu-x') < body.indexOf('id="lhLegendBody"'), 'the button comes first, so the keyboard reaches it first');
+  assert.match(body, /<div id="lhLegendBody"><\/div>/);
+});
+
+test('y2: the close button closes the legend, says so to assistive tools and gives the focus back to the info icon', () => {
+  const page = loadPage();
+  const S = seed(page);
+  page.run("ACTIONS['lh-legend']()");
+  page.flush();
+  assert.equal(S.lh.legend, true);
+  const before = page.get('#lhInfoBtn').focused || 0;
+  page.run("ACTIONS['lh-legend-close']()");
+  page.flush();
+  assert.equal(S.lh.legend, false);
+  assert.equal(page.get('#lhLegend').hidden, true);
+  assert.equal(page.get('#lhInfoBtn').attrs['aria-expanded'], 'false');
+  assert.equal(page.get('#lhInfoBtn').focused, before + 1, 'the focus goes back to the icon that opened the legend');
+});
+
+test('y3: the close button only closes the legend: the filters stay, the filter menu does not open, and a closed legend stays closed', () => {
+  const page = loadPage();
+  const S = seed(page);
+  Object.assign(S, { q: 'alp', group: 'G', scope: { kind: 'room', name: 'R1' }, sfilter: 'attention' });
+  page.run("ACTIONS['lh-legend']()");
+  page.run("ACTIONS['lh-legend-close']()");
+  page.run("ACTIONS['lh-legend-close']()");
+  assert.equal(S.lh.legend, false);
+  assert.equal(S.lh.menu, false);
+  assert.equal(S.q, 'alp');
+  assert.equal(S.group, 'G');
+  assert.deepEqual(JSON.parse(JSON.stringify(S.scope)), { kind: 'room', name: 'R1' });
+  assert.equal(S.sfilter, 'attention');
+});
+
+test('y4: the legend text is painted only in its body, so a redraw never erases the close button', () => {
+  const page = loadPage();
+  const S = seed(page);
+  assert.equal(page.get('#lhLegend').writes, 0, 'the block itself is never repainted');
+  S.q = 'x';
+  page.run('drawSummary()');
+  page.run("ACTIONS['lh-legend']()");
+  page.flush();
+  assert.equal(page.get('#lhLegend').writes, 0);
+  assert.equal(page.get('#lhLegendBody').html, R.legendHtml());
+});
+
 // ---------- the legend of the bars: the info icon of the header (it used to sit under the cards) ----------
 test('i1: the header has an info icon that opens the legend panel, closed by default and wired for assistive tools', () => {
   const m = /<div id="listHead"[\s\S]*?<section id="summary"/.exec(html);
@@ -356,7 +408,7 @@ test('i1: the header has an info icon that opens the legend panel, closed by def
 test('i2: the panel is painted once with the legend text and the info button opens and closes it', () => {
   const page = loadPage();
   const S = seed(page);
-  assert.equal(page.get('#lhLegend').html, R.legendHtml());
+  assert.equal(page.get('#lhLegendBody').html, R.legendHtml());
   assert.equal(page.get('#lhLegend').hidden, true);
   page.run("ACTIONS['lh-legend']()");
   page.flush();

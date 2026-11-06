@@ -333,7 +333,7 @@ function drawListHead(ctx, kept) {
   $('#lhMenu').hidden = !lh.menu;
   $('#lhLegend').hidden = !lh.legend;
   $('#lhInfoBtn').setAttribute('aria-expanded', String(lh.legend));
-  paint($('#lhLegend'), R.legendHtml());
+  paint($('#lhLegendBody'), R.legendHtml()); // only the body is painted: the close button of the block stays
   $('#lhFilterBtn').setAttribute('aria-expanded', String(lh.menu));
   const chips = R.listHeadChips(ctx);
   paint($('#lhActive'), chips);
@@ -345,6 +345,7 @@ function drawListHead(ctx, kept) {
   if (paint($('#lhScope'), R.scopeBar(S.rooms, allRepos().length, ctx.scope)) && scopeHad) { const on = $('#lhScope [aria-pressed="true"]'); if (on && on.focus) on.focus(); }
   if (lh.focus) { lh.focus = false; $('#lhSearch').focus(); }
   if (lh.focusBtn) { lh.focusBtn = false; $('#lhFilterBtn').focus(); }
+  if (lh.focusInfo) { lh.focusInfo = false; $('#lhInfoBtn').focus(); }
 }
 
 function drawSummary() {
