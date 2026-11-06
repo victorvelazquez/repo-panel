@@ -63,7 +63,10 @@
           </div>
         </div>
         <div id="lhActive" class="lh-active" aria-label="Active filters" hidden></div>
-        <div id="lhLegend" class="lh-menu lh-legend" role="group" aria-label="Bar legend" hidden></div>
+        <div id="lhLegend" class="lh-menu lh-legend" role="group" aria-label="Bar legend" hidden>
+          <button type="button" class="lh-x lh-menu-x" data-act="lh-legend-close" aria-label="Close legend" title="Close">✕</button>
+          <div id="lhLegendBody"></div>
+        </div>
         <div id="lhMenu" class="lh-menu" role="group" aria-label="Filters" hidden>
           <button type="button" class="lh-x lh-menu-x" data-act="lh-menu-close" aria-label="Close filters" title="Close">✕</button>
           <div><h4>Scope</h4><div id="lhScope" class="rs-scope"></div></div>
