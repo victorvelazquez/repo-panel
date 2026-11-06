@@ -225,6 +225,9 @@ function layoutNow() {
   return total > 0 && R ? { total, column, ...R.blockWidths(total, layoutRatios, { column }) } : null;
 }
 function applyLayout() {
+  // RP126: how much sits above the layout (0 while it is hidden in another tab: then the last good value stays; a page without the measure sets nothing).
+  const top = $('#sumLayout').offsetTop;
+  if (Number.isFinite(top) && top > 0 && $('#sumLayout').style.setProperty) $('#sumLayout').style.setProperty('--sum-top', `${Math.round(top)}px`);
   const w = layoutNow();
   if (!w) return;
   if ($('#listCol').style.setProperty) $('#listCol').style.setProperty('--list-w', `${w.list}px`); // RP121: the width is the repos column's (its header and its list)

@@ -394,6 +394,56 @@ test('y4: the legend text is painted only in its body, so a redraw never erases 
   assert.equal(page.get('#lhLegendBody').html, R.legendHtml());
 });
 
+// ---------- RP126 (S19): the three zones fill the height of the window ----------
+test('z1: the height of the layout is the window minus what is above it, measured by the page, and not a fixed number', () => {
+  assert.match(css, /\.chatlayout\.chat-open\s*\{[^}]*height:\s*calc\(100vh - var\(--sum-top,\s*\d+px\)\)/);
+  assert.doesNotMatch(css, /calc\(100vh - 140px\)/, 'the 140 included the bar under the tabs, which Summary no longer shows');
+});
+
+test('z2: the page leaves in --sum-top how much sits above the layout, so the zones end at the bottom edge of the window', () => {
+  const page = loadPage();
+  seed(page);
+  const layout = page.get('#sumLayout');
+  layout.offsetTop = 98;
+  page.run('applyLayout()');
+  assert.equal(layout.style['--sum-top'], '98px');
+});
+
+test('z3: it follows the real position (a header that wraps, a window that changes) and a hidden layout keeps the last good value', () => {
+  const page = loadPage();
+  seed(page);
+  const layout = page.get('#sumLayout');
+  layout.offsetTop = 98;
+  page.run('applyLayout()');
+  layout.offsetTop = 131;
+  page.run('applyLayout()');
+  assert.equal(layout.style['--sum-top'], '131px');
+  layout.offsetTop = 0;
+  page.run('applyLayout()');
+  assert.equal(layout.style['--sum-top'], '131px', 'hidden (another tab): the position reads 0 and the value stays');
+});
+
+test('z4: it is set with no repo open and with one, and a page without the measure never throws or sets a wrong value', () => {
+  const page = loadPage();
+  const S = seed(page);
+  const layout = page.get('#sumLayout');
+  layout.offsetTop = 98;
+  page.run('drawChat()');
+  assert.equal(layout.style['--sum-top'], '98px', 'no repo open');
+  S.chat.id = 'a';
+  layout.offsetTop = 120;
+  page.run('drawChat()');
+  assert.equal(layout.style['--sum-top'], '120px', 'with a repo open');
+  const bare = loadPage();
+  seed(bare);
+  bare.get('#sumLayout').offsetTop = undefined;
+  assert.doesNotThrow(() => bare.run('applyLayout()'));
+  assert.equal(bare.get('#sumLayout').style['--sum-top'], undefined);
+  bare.get('#sumLayout').offsetTop = -5;
+  bare.run('applyLayout()');
+  assert.equal(bare.get('#sumLayout').style['--sum-top'], undefined, 'a negative or missing measure is ignored');
+});
+
 // ---------- the legend of the bars: the info icon of the header (it used to sit under the cards) ----------
 test('i1: the header has an info icon that opens the legend panel, closed by default and wired for assistive tools', () => {
   const m = /<div id="listHead"[\s\S]*?<section id="summary"/.exec(html);
