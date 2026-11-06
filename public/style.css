@@ -602,6 +602,13 @@ body.tab-summary #viewbar { display: none; }
 .m code { font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
 .m :not(pre) > code { padding: 1px 4px; border-radius: 4px; background: rgba(110, 118, 129, .2); }
 .m pre code { white-space: pre; }
+/* RP124: a Markdown table: thin rows with a muted head and no background of its own; a wide table scrolls inside its own box instead of stretching the chat. */
+.md-table { overflow-x: auto; margin: 8px 0; max-width: 100%; }
+.md-table table { border-collapse: collapse; width: max-content; min-width: 100%; font-size: 13px; }
+.md-table th, .md-table td { padding: 4px 14px 4px 0; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+.md-table th { color: var(--muted); font-weight: 600; border-bottom-color: #3a4553; white-space: nowrap; }
+.md-table .al-c { text-align: center; }
+.md-table .al-r { text-align: right; }
 .m a { color: var(--blue); }
 .m strong { font-weight: 600; }
 .m .who { display: block; margin-bottom: 2px; font-size: 11px; color: var(--muted); }
