@@ -132,26 +132,24 @@ test('r4: the notice stays where it was on the cards: after the top line and bef
 });
 
 // ---------- the legend ----------
-test('l1: the legend is a closed <details> behind a "?", with the four bar keys and the note about the button inside it', () => {
-  const html = view([row()]);
-  const m = /<details class="rs-legend">([\s\S]*?)<\/details>/.exec(html);
-  assert.ok(m, 'a details element');
-  assert.match(m[1], /^<summary title="Bar legend" aria-label="Bar legend">\?<\/summary>/);
-  for (const k of ['rs-done', 'rs-pr', 'rs-blk', 'rs-pend']) assert.match(m[1], new RegExp(`<i class="rs-key ${k}"></i>`));
-  for (const w of ['Completed', 'In review', 'Blocked', 'Pending', 'The button on the right is the best next action']) assert.ok(m[1].includes(w), w);
-  assert.doesNotMatch(html, /<details[^>]* open/, 'closed by default');
+test('l1: the legend (R.legendHtml) has the four bar keys in two columns and the note about the button, in muted text', () => {
+  const h = require('../public/resumen.js').legendHtml();
+  for (const k of ['rs-done', 'rs-pr', 'rs-blk', 'rs-pend']) assert.match(h, new RegExp(`<i class="rs-key ${k}"></i>`));
+  for (const w of ['Completed', 'In review', 'Blocked', 'Pending', 'The button on the right is the best next action']) assert.ok(h.includes(w), w);
+  assert.match(h, /^<div class="rs-legend-body">/);
+  assert.match(h, /<p class="rs-legend-note">The button on the right is the best next action<\/p>/, 'the note is its own muted line');
+  assert.doesNotMatch(h, /<details|<summary/, 'no details: the header menu opens it');
 });
 
-test('l2: the legend comes after the list, and an empty scope has none', () => {
-  const html = view([row()]);
-  assert.ok(html.lastIndexOf('rs-legend') > html.lastIndexOf('rs-card'));
+test('l2: the list no longer carries a legend, with rows or without', () => {
+  assert.doesNotMatch(view([row()]), /rs-legend/);
   assert.doesNotMatch(view([]), /rs-legend/);
 });
 
-test('l3: the styles: the "?" is a pointer with a visible keyboard focus, and the body keeps the legend layout', () => {
-  assert.match(css, /\.rs-legend summary\s*\{[^}]*cursor:\s*pointer/);
-  assert.match(css, /\.rs-legend summary:focus-visible/);
-  assert.match(css, /\.rs-legend-body\s*\{[^}]*display:\s*flex[^}]*flex-wrap:\s*wrap/);
+test('l3: the styles: two columns, a Pending key with a border so it shows on the dark page, and a muted note (never the link blue)', () => {
+  assert.match(css, /\.rs-legend-body\s*\{[^}]*display:\s*grid[^}]*grid-template-columns:\s*repeat\(2/);
+  assert.match(css, /\.rs-key\.rs-pend\s*\{[^}]*border:/);
+  assert.match(css, /\.rs-legend-note\s*\{[^}]*color:\s*var\(--muted\)/);
 });
 
 // ---------- Updating… ----------

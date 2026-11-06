@@ -132,11 +132,10 @@ test('summaryView no longer paints the filter head inside #summary', () => {
 // ---------- index.html: three levels ----------
 test('index.html (RP82): Needs attention sits right after the scope buttons, before the spacer that pushes the Work tools right', () => {
   const html = read('public/index.html');
-  const bar = html.slice(html.indexOf('id="viewbar"'), html.indexOf('<section id="summary"'));
+  const bar = html.slice(html.indexOf('id="viewbar"'), html.indexOf('<div id="sumLayout"'));
   const at = (s) => bar.indexOf(s);
   assert.ok(at('id="search"') < at('id="groupFilter"') && at('id="groupFilter"') < at('id="scope"'));
-  assert.ok(at('id="scope"') < at('id="summaryTools"'), 'the toggle comes after the scope buttons');
-  assert.ok(at('id="summaryTools"') < at('class="spacer"'), 'and before the spacer, so it stays next to them');
+  assert.ok(at('id="scope"') < at('class="spacer"') && !bar.includes('id="summaryTools"'), 'RP121: the Needs attention toggle left this bar for the header of the repos column (it lives in #lhAttention)');
   assert.ok(at('class="spacer"') < at('id="workTools"'), 'the Work tools stay at the right end');
   assert.equal((bar.match(/class="spacer"/g) || []).length, 1);
 });
@@ -144,9 +143,9 @@ test('index.html (RP82): Needs attention sits right after the scope buttons, bef
 test('index.html: header, tabs and view bar in that order; shared controls in the view bar, Merge menu in the header', () => {
   const html = read('public/index.html');
   const at = (s) => html.indexOf(s);
-  assert.ok(at('<header>') < at('<nav class="rs-tabs"') && at('<nav class="rs-tabs"') < at('id="viewbar"') && at('id="viewbar"') < at('<section id="summary"'));
+  assert.ok(at('<header>') < at('<nav class="rs-tabs"') && at('<nav class="rs-tabs"') < at('id="viewbar"') && at('id="viewbar"') < at('<div id="sumLayout"'));
   const header = html.slice(at('<header>'), at('</header>'));
-  const bar = html.slice(at('id="viewbar"'), at('<section id="summary"'));
+  const bar = html.slice(at('id="viewbar"'), at('<div id="sumLayout"'));
   for (const id of ['search', 'groupFilter', 'scope']) { assert.match(bar, new RegExp(`id="${id}"`)); assert.doesNotMatch(header, new RegExp(`id="${id}"`)); }
   for (const id of ['alerts', 'cleanAsColumn']) { assert.match(bar, new RegExp(`id="${id}"`)); assert.doesNotMatch(header, new RegExp(`id="${id}"`)); }
   assert.match(header, /<details class="pop" id="mergeMenu"><summary aria-label="Merge settings">⚙ Merge<\/summary><div class="pop-body">/);
@@ -156,14 +155,14 @@ test('index.html: header, tabs and view bar in that order; shared controls in th
   assert.doesNotMatch(header, /id="conformity"|confBadge/, 'RP60: the duplicate Conformity button is gone from the header');
   assert.match(html, /id="tab-conformity"[^>]*>Conformity <span id="confBadge"/);
   assert.match(header, /data-act="refresh-all"[^>]*><span class="ico">↻<\/span> Refresh<\/button>/);
-  assert.match(bar, /id="summaryTools"/);
+  assert.doesNotMatch(bar, /id="summaryTools"/, 'RP121: the Summary tools left the bar for the header of the repos column');
   assert.match(bar, /<input id="cleanAsColumn" type="checkbox" data-pref="cleanAsColumn">/);
 });
 
 test('style: the view-specific zones hide by body class; the shared controls are never hidden', () => {
   const css = read('public/style.css');
   assert.match(css, /body\.tab-summary[^{]*#workTools[^{]*\{[^}]*display:\s*none/);
-  assert.match(css, /body\.tab-work[^{]*#summaryTools[^{]*\{[^}]*display:\s*none/);
+  assert.match(css, /body\.tab-summary #viewbar\s*\{[^}]*display:\s*none/, 'RP121: Summary has no bar under the tabs');
   assert.doesNotMatch(css, /body\.tab-summary[^{]*#(search|groupFilter|alerts)/);
   assert.doesNotMatch(css, /body\.tab-work #scope/);
   assert.match(css, /\.viewbar\s*\{/);
@@ -269,7 +268,7 @@ test('the Summary cards honour S.q and S.group, and the tools are painted outsid
   S.q = 'alphab';
   page.run('render()');
   assert.deepEqual(ids(page.get('#summary').html), ['c']);
-  assert.match(page.get('#summaryTools').html, /Needs attention · 1</);
+  assert.match(page.get('#lhAttention').html, /aria-label="Needs attention · 1"/, 'RP121: the toggle lives in the header of the repos column');
   assert.doesNotMatch(page.get('#summary').html, /sfilter/);
   S.q = '';
   S.group = 'G2';
@@ -289,11 +288,11 @@ test('the sfilter action toggles between attention and all and the button carrie
   const S = withRepos(page);
   S.summary = payload(ROWS.map((r, i) => ({ ...r, id: ['a', 'b', 'c', 'd'][i] })));
   page.run('render()');
-  assert.match(page.get('#summaryTools').html, /data-filter="attention" aria-pressed="false"/);
+  assert.match(page.get('#lhAttention').html, /data-filter="attention" aria-pressed="false"/);
   page.run("ACTIONS.sfilter({ dataset: { filter: 'attention' } })");
   page.flush();
   assert.equal(S.sfilter, 'attention');
-  assert.match(page.get('#summaryTools').html, /data-filter="all" aria-pressed="true"/);
+  assert.match(page.get('#lhAttention').html, /data-filter="all" aria-pressed="true"/);
   page.run("ACTIONS.sfilter({ dataset: { filter: 'all' } })");
   page.flush();
   assert.equal(S.sfilter, 'all');
@@ -304,7 +303,7 @@ test('the keyboard focus stays on the Needs attention button after the redraw', 
   const page = loadPage();
   const S = withRepos(page);
   page.ctx.document.activeElement = btn;
-  const found = page.get('#summaryTools [data-act="sfilter"]');
+  const found = page.get('#lhAttention [data-act="sfilter"]');
   found.focus = () => btn.focus();
   S.summary = payload(ROWS);
   page.run('render()');

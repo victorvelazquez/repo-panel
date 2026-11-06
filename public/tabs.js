@@ -317,6 +317,36 @@ function chatView() {
   return { ...S.chat, pending: S.pending[id], askBusy: S.askBusy, results: S.chatResults, rpc: S.rpc[id] };
 }
 
+// RP121: the header of the repos column (the filters of the Summary): the count, the icons, the strip of active filters and the menu. The state is the shared one; the inputs are
+// only set when they differ, so the caret stays while typing, and the bar of Work (#search, #groupFilter) shows the same values the next time it is in view.
+function drawListHead(ctx, kept) {
+  const count = R.listCount(S.summary, ctx);
+  $('#lhCount').textContent = count === null ? '' : String(count);
+  const same = (el, v) => { if (el.value !== v) el.value = v; };
+  same($('#lhSearch'), S.q);
+  same($('#search'), S.q);
+  same($('#groupFilter'), S.group);
+  const lh = S.lh;
+  $('#lhSearchBox').hidden = !lh.search;
+  $('#lhTitle').hidden = lh.search;
+  $('#lhIcons').hidden = lh.search;
+  $('#lhMenu').hidden = !lh.menu;
+  $('#lhLegend').hidden = !lh.legend;
+  $('#lhInfoBtn').setAttribute('aria-expanded', String(lh.legend));
+  paint($('#lhLegend'), R.legendHtml());
+  $('#lhFilterBtn').setAttribute('aria-expanded', String(lh.menu));
+  const chips = R.listHeadChips(ctx);
+  paint($('#lhActive'), chips);
+  $('#lhActive').hidden = !chips;
+  $('#lhDot').hidden = !chips;
+  if (paint($('#lhAttention'), R.summaryTools(S.summary, { ...ctx, compact: true })) && kept && kept.act === 'sfilter') { const on = $('#lhAttention [data-act="sfilter"]'); if (on && on.focus) on.focus(); }
+  paint($('#lhGroup'), `<option value="">All groups</option>${S.groups.map((g) => `<option ${S.group === g.name ? 'selected' : ''}>${esc(g.name)}</option>`).join('')}`);
+  const scopeHad = !!(document.activeElement && document.activeElement.dataset && document.activeElement.dataset.act === 'scope' && lh.menu);
+  if (paint($('#lhScope'), R.scopeBar(S.rooms, allRepos().length, ctx.scope)) && scopeHad) { const on = $('#lhScope [aria-pressed="true"]'); if (on && on.focus) on.focus(); }
+  if (lh.focus) { lh.focus = false; $('#lhSearch').focus(); }
+  if (lh.focusBtn) { lh.focusBtn = false; $('#lhFilterBtn').focus(); }
+}
+
 function drawSummary() {
   applyTab();
   if (!R) return;
@@ -331,7 +361,7 @@ function drawSummary() {
     now: Date.now(), scope, rooms: S.rooms, q: S.q, group: S.group, roomData: S.roomData.data, filter: S.sfilter, collapsed: S.collapsed, failed: S.summaryFailed,
     flowFor: summaryFlow, changesFor: summaryChanges, prsFor: summaryPrs, idleFor: summaryIdle, sending: S.sending, busy: busyView(), chatId: S.chat.id,
   };
-  if (paint($('#summaryTools'), R.summaryTools(S.summary, ctx)) && kept && kept.act === 'sfilter') { const on = $('#summaryTools [data-act="sfilter"]'); if (on && on.focus) on.focus(); }
+  drawListHead(ctx, kept);
   const changed = paint(box, R.summaryView(summaryShown(), ctx));
   if (changed && kept && kept.act === 'toggle-group' && box.querySelectorAll) {
     const again = Array.from(box.querySelectorAll('[data-act]')).find((b) => b.dataset && b.dataset.act === kept.act && b.dataset.filter === kept.filter && b.dataset.group === kept.group);

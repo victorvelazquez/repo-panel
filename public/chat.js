@@ -227,7 +227,7 @@ function layoutNow() {
 function applyLayout() {
   const w = layoutNow();
   if (!w) return;
-  if ($('#summary').style.setProperty) $('#summary').style.setProperty('--list-w', `${w.list}px`);
+  if ($('#listCol').style.setProperty) $('#listCol').style.setProperty('--list-w', `${w.list}px`); // RP121: the width is the repos column's (its header and its list)
   if ($('#col').style.setProperty) $('#col').style.setProperty('--col-w', `${w.col}px`);
   $('#split').setAttribute('aria-valuenow', String(Math.round((w.list / w.total) * 100)));
   $('#split2').setAttribute('aria-valuenow', String(Math.round((w.col / w.total) * 100)));
