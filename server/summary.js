@@ -75,7 +75,7 @@ function actionOf(f, session, next) {
   const [a] = lib.workQueue([{
     id: f.repo.id, name: f.repo.name, ...flags,
     ready: prs.filter((p) => p.ready && !snoozed.has(`${f.repo.id}:${p.number}`)).map((p) => ({ number: p.number, title: p.title })),
-    stale: !!(f.prs && f.prs.stale), dirty: f.local.files.length > 0, unpushed: (f.local.ahead || 0) > 0, hasPrs: prs.length > 0,
+    stale: !!(f.prs && f.prs.stale), dirty: f.local.files.length > 0, unpushed: (f.local.ahead || 0) > 0, hasPrs: V.taskPrs(prs, f.roadmap && f.roadmap.available === true ? f.roadmap.rows : null).length > 0, // RP138: a pull request that is nobody's task does not hide the start
     next: next ? { id: next.id, entrega: next.entrega } : null,
   }]);
   return a ? { kind: a.kind, label: LABELS[a.kind](a), pr: a.kind === 'merge' ? a.pr : null } : null;

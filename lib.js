@@ -330,20 +330,8 @@ function parseRoadmap(markdown) {
   return result(rows, rmNext(rows, byId, cyclic, {}));
 }
 
-// True when `id` appears in `text` as a complete token, case-insensitive. Letters and digits are
-// token characters; a "." followed by one is too, so "p2" does not match "p2.1-x".
-function matchesUnitId(text, id) {
-  if (!text || !id) return false;
-  const t = String(text).toLowerCase();
-  const needle = String(id).toLowerCase();
-  const alnum = (c) => c !== undefined && /[\p{L}\p{N}]/u.test(c);
-  const joins = (c, other) => alnum(c) || (c === '.' && alnum(other));
-  for (let i = t.indexOf(needle); i !== -1; i = t.indexOf(needle, i + 1)) {
-    const end = i + needle.length;
-    if (!joins(t[i - 1], t[i - 2]) && !joins(t[end], t[end + 1])) return true;
-  }
-  return false;
-}
+// RP138: the matcher lives in view.js (the page needs it too); this is the same function.
+const { matchesUnitId } = require('./public/view.js');
 
 const DERIVED_ORDER = ['En revisión', 'Lista', 'En curso'];
 

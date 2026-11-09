@@ -255,6 +255,29 @@
   // must not be delivered: `manual` (why the repo needs a person's hands: manualAction, else the reason of an
   // attention verdict) and `waiting` ({ state, next } of a usable needs-input or blocked declared state, not when
   // the person lifted the gating with `override`). Keys are absent when they do not apply.
+  // RP138: the open pull requests that BELONG to a unit of the roadmap: its id is a whole token of the title or of the head branch (the rule deriveUnitStates uses for "En revisión"). Only those hold the
+  // start of another unit back; the one release-please keeps open, or a bot's, is nobody's task. With no usable roadmap (no rows, or not an array) every pull request counts, as before.
+  // Total: always a new array, and a malformed entry is skipped.
+  // True when `id` appears in `text` as a complete token, case-insensitive. Letters and digits are
+  // token characters; a "." followed by one is too, so "p2" does not match "p2.1-x".
+  function matchesUnitId(text, id) {
+    if (!text || !id) return false;
+    const t = String(text).toLowerCase();
+    const needle = String(id).toLowerCase();
+    const alnum = (c) => c !== undefined && /[\p{L}\p{N}]/u.test(c);
+    const joins = (c, other) => alnum(c) || (c === '.' && alnum(other));
+    for (let i = t.indexOf(needle); i !== -1; i = t.indexOf(needle, i + 1)) {
+      const end = i + needle.length;
+      if (!joins(t[i - 1], t[i - 2]) && !joins(t[end], t[end + 1])) return true;
+    }
+    return false;
+  }
+  function taskPrs(prs, rows) {
+    const list = Array.isArray(prs) ? prs.filter((p) => isObject(p)) : [];
+    const ids = Array.isArray(rows) ? [...new Set(rows.filter((r) => isObject(r) && typeof r.id === 'string' && r.id).map((r) => r.id))] : [];
+    if (!ids.length) return list;
+    return list.filter((p) => ids.some((id) => matchesUnitId(p.title, id) || matchesUnitId(p.head, id)));
+  }
   function queueFlags(local, stateData, verdict, { now = Date.now(), override = false } = {}) {
     const out = {};
     const manual = manualAction(local, local && local.base) || (verdict && verdict.state === 'attention' ? verdict.reason : null);
@@ -891,5 +914,5 @@
     return `${meters.join('')}${age}<div class="usage-pop" role="group" aria-label="Claude usage details">${details.join('')}${note}${foot}</div>`;
   }
 
-  return { repoModel, changeChips, prChip, idleChip, conflictChip, sizeChip, RepoCard, stateLineHidden, usageView, usageHtml, usageRemaining, boardApply, boardWait, chatCachePut, chatCacheGet, chatFromCache, API_VERSION, mergeButton, rerunButton, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, dirtyRepos, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, parseSse, rpcEvent, rpcReduce, rpcFromStatus, eventsPlan, eventsRetryMs, eventsStale };
+  return { repoModel, changeChips, prChip, idleChip, conflictChip, sizeChip, RepoCard, stateLineHidden, usageView, usageHtml, usageRemaining, boardApply, boardWait, chatCachePut, chatCacheGet, chatFromCache, API_VERSION, mergeButton, rerunButton, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, dirtyRepos, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, taskPrs, matchesUnitId, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, parseSse, rpcEvent, rpcReduce, rpcFromStatus, eventsPlan, eventsRetryMs, eventsStale };
 }));
