@@ -459,7 +459,7 @@ body.tab-summary #viewbar { display: none; }
   #split2 { display: block; }
 }
 /* RP128: the right column is tabs (design D of RP127). The bar stays on top while the panel scrolls; only the open tab shows its name and in a narrow column (the container query on #col) none does. */
-#colBody { min-width: 0; }
+#colBody { min-width: 0; display: flex; flex-direction: column; min-height: 100%; }
 .col-tabs { position: sticky; top: 0; z-index: 2; display: flex; gap: 2px; padding: 0 8px; background: var(--bg); border-bottom: 1px solid var(--line); }
 .col-tab { display: inline-flex; align-items: center; gap: 6px; padding: 8px 9px; background: transparent; border: 0; border-bottom: 2px solid transparent; border-radius: 0; color: var(--muted); font-size: 13px; }
 .col-tab:hover:not(:disabled) { border-color: transparent; color: var(--text); }
@@ -469,16 +469,52 @@ body.tab-summary #viewbar { display: none; }
 .col-tab .lb { display: none; }
 .col-tab[aria-selected="true"] .lb { display: inline; }
 .col-tab .n { font-size: 11px; padding: 0 6px; border-radius: 9px; background: var(--panel2); border: 1px solid var(--line); color: var(--muted); }
+.col-tab .n.y { background: var(--yellow); border-color: var(--yellow); color: #06101c; font-weight: 700; }
 @container col (max-width: 300px) {
   .col-tab[aria-selected="true"] .lb { display: none; }
   .col-tabs { padding: 0 4px; gap: 0; }
   .col-tab { padding: 8px 7px; }
+  .ck-s { display: none; }
+  .ck-c .w { display: none; }
 }
-.col-pane { padding: 4px 8px 12px; min-width: 0; }
+.col-pane { flex: 1; padding: 4px 8px 12px; min-width: 0; }
 .col-sum { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 6px 4px 8px; color: var(--muted); font-size: 12px; }
 .col-sum b { color: var(--text); }
 .col-sum .a { color: var(--green); }
 .col-sum .d { color: var(--red); }
+/* RP129: the footer stays at the bottom of the column in every tab (the pane takes the height that is left); the Status tab shows the PR, a summary of its checks and one row per check. */
+.col-foot { position: sticky; bottom: 0; z-index: 2; display: flex; align-items: center; gap: 8px; min-width: 0; padding: 8px 12px; background: var(--bg); border-top: 1px solid var(--line); font-size: 12px; }
+.ft-br { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; color: var(--muted); }
+.ft-br svg { flex: none; }
+.ft-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: ui-monospace, Consolas, monospace; }
+.ft-ci { flex: none; display: inline-grid; }
+.ft-ci-success { color: var(--green); }
+.ft-ci-pending { color: var(--yellow); }
+.ft-ci-failed { color: var(--red); }
+.ft-merge { flex: none; padding: 3px 10px; }
+.st-pr { display: grid; gap: 4px; min-width: 0; padding: 6px 4px 8px; }
+.st-t { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.st-n { font-weight: 700; }
+.st-ti { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; font-size: 13px; }
+.st-mt { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.ck-sum { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 6px 4px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+.ck-c { display: inline-flex; align-items: center; gap: 4px; }
+.ck-c b { color: var(--text); }
+.ck-success { color: var(--green); }
+.ck-pending { color: var(--yellow); }
+.ck-failed { color: var(--red); }
+.ck-pending svg, .ft-ci-pending svg { animation: ck-spin 1.4s linear infinite; }
+@keyframes ck-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .ck-pending svg, .ft-ci-pending svg { animation: none; } }
+.ck-list { display: grid; min-width: 0; }
+.ck-r { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 4px; border-radius: 6px; font-size: 13px; }
+.ck-r:hover { background: var(--panel2); }
+.ck-i { flex: none; display: inline-grid; }
+.ck-nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+.ck-s { flex: none; color: var(--muted); font-size: 12px; }
+.ck-l { flex: none; color: var(--muted); }
+.ck-l:hover { color: var(--blue); }
+.ck-rerun { margin: 8px 4px 4px; }
 /* The changes tree: one button per folder and per file, indented by depth (cf-d0 to cf-d8: deeper paths stop getting deeper); the name is clipped, the counts and the status letter keep their place. */
 .cf-tree { display: grid; min-width: 0; }
 .cf-item, .cf-dir { display: flex; align-items: center; gap: 6px; width: 100%; min-width: 0; text-align: left; border: 1px solid transparent; background: transparent; border-radius: 6px; padding: 3px 6px 3px calc(6px + var(--cf-d, 0) * 14px); }

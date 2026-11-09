@@ -295,6 +295,30 @@
     return `Running ${name} (${running.label}): wait for it to finish`;
   }
 
+  // RP129: the Merge button of a pull request, ONE rule for the card of the board and the footer of the right column. The server is the real guard (mergePr reads the PR again and refuses one that is
+  // not open or not ready); this is what the page OFFERS. It is enabled only for a ready PR with nothing in flight (`busy`: true or 'done'), nothing held after a merge (`held`) and no command
+  // running in the session (`hold`: the reason, from runningReason). Without a PR it is off and says why (`noPr`, or the default). Total: anything that is not a PR object is no PR.
+  const MERGE_METHODS = ['squash', 'merge', 'rebase'];
+  function mergeButton(pr, ctx = {}) {
+    const c = ctx && typeof ctx === 'object' ? ctx : {};
+    const word = `Merge · ${MERGE_METHODS.includes(c.method) ? c.method : 'squash'}`;
+    if (!pr || typeof pr !== 'object' || Array.isArray(pr) || typeof pr.ready !== 'boolean') return { enabled: false, label: word, title: String(c.noPr || 'No open pull request for this branch') };
+    const hold = c.hold ? String(c.hold) : '';
+    return {
+      enabled: pr.ready === true && !c.busy && !c.held && !hold,
+      label: c.held || c.busy === 'done' ? 'Merged ✓' : c.busy ? 'Merging…' : word,
+      title: hold || (pr.ready ? `Merge into ${pr.base}` : pr.blockedReason || 'Not ready to merge'),
+    };
+  }
+  // The Re-run failed button, with the same rule of flight, hold and running: shown only when the PR has failed runs.
+  function rerunButton(pr, ctx = {}) {
+    const runs = pr && typeof pr === 'object' && pr.checks && Array.isArray(pr.checks.failedRuns) ? pr.checks.failedRuns : [];
+    if (!runs.length) return { show: false, enabled: false, title: '' };
+    const c = ctx && typeof ctx === 'object' ? ctx : {};
+    const hold = c.hold ? String(c.hold) : '';
+    return { show: true, enabled: !c.busy && !c.held && !hold, title: hold };
+  }
+
   // The flow buttons of a repo's LOCAL card, in order: [{ cmd, label, reason?, disabled? }] with cmd flow-commit |
   // flow-commit-unstage | flow-pr | flow-base | flow-base-stash, or []. The one source of truth for the page and the
   // tests. `ctx` is { override (the person lifted the declared-state gating of /flow-commit), verdict ('running' |
@@ -867,5 +891,5 @@
     return `${meters.join('')}${age}<div class="usage-pop" role="group" aria-label="Claude usage details">${details.join('')}${note}${foot}</div>`;
   }
 
-  return { repoModel, changeChips, prChip, idleChip, conflictChip, sizeChip, RepoCard, stateLineHidden, usageView, usageHtml, usageRemaining, boardApply, boardWait, chatCachePut, chatCacheGet, chatFromCache, API_VERSION, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, dirtyRepos, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, parseSse, rpcEvent, rpcReduce, rpcFromStatus, eventsPlan, eventsRetryMs, eventsStale };
+  return { repoModel, changeChips, prChip, idleChip, conflictChip, sizeChip, RepoCard, stateLineHidden, usageView, usageHtml, usageRemaining, boardApply, boardWait, chatCachePut, chatCacheGet, chatFromCache, API_VERSION, mergeButton, rerunButton, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, dirtyRepos, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, parseSse, rpcEvent, rpcReduce, rpcFromStatus, eventsPlan, eventsRetryMs, eventsStale };
 }));

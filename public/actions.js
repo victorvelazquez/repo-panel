@@ -127,7 +127,7 @@ const ACTIONS = {
   'notes-mine': () => { const p = S.pad[S.chat.id]; if (p && p.status === 'conflict' && p.disk) { p.base = p.disk.rev; p.status = 'saving'; saveNotes(S.chat.id); draw(); } },
   'tasks-done': () => { S.tasksOpenDone = !S.tasksOpenDone; draw(); },
   // RP128: the right column. The tab and the folded folders belong to the opening (S.chat is replaced when another repo opens); a tab that does not exist reads as Changes.
-  'col-tab': (el) => { const t = el && el.dataset && el.dataset.tab === 'tasks' ? 'tasks' : 'changes'; S.chat.colTab = t; S.chat.colFocus = { id: `coltab-${t}` }; draw(); },
+  'col-tab': (el) => { const t = el && el.dataset && ['tasks', 'status'].includes(el.dataset.tab) ? el.dataset.tab : 'changes'; S.chat.colTab = t; S.chat.colFocus = { id: `coltab-${t}` }; draw(); },
   'col-folder': (el) => {
     const p = el && el.dataset && el.dataset.path;
     const facts = S.local[S.chat.id];

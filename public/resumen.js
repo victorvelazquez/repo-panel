@@ -168,13 +168,14 @@
   // Only the open tab shows its name (the CSS), the others are icons. `tab` is what the page keeps for the opening; anything else reads as Changes. Changes is a TREE by folders of the files with
   // uncommitted changes (`files`, the board's facts: path, status, added, deleted): a chain of single folders is ONE row, folders come first, each has a count and the total is on top; each file is the
   // button that opens it in the diff tab (`selected` marks the one open there) and `fold` ({path: true}) holds the closed folders. Tasks is `tasksHtml`, the compact answer of R.tasksView. Total.
-  const COLUMN_TABS = ['changes', 'tasks'];
+  const COLUMN_TABS = ['changes', 'status', 'tasks'];
   const FILES_MAX = 200;
   const TREE_DEPTH_MAX = 8;
   const svgIcon = (d, s = 14) => `<svg width="${s}" height="${s}" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
   const ICON_TAB = {
     changes: svgIcon('<circle cx="8" cy="8" r="2"/><path d="M8 2v4M8 10v4M2 8h4M10 8h4"/>', 16),
     tasks: svgIcon('<path d="M3 4.5l1.3 1.3L7 3.2M3 10.5l1.3 1.3L7 9.2M9.5 5h3.5M9.5 11h3.5"/>', 16),
+    status: svgIcon('<circle cx="4" cy="3.5" r="1.6"/><circle cx="4" cy="12.5" r="1.6"/><circle cx="12" cy="12.5" r="1.6"/><path d="M4 5.1v5.8M12 10.9V7a2 2 0 0 0-2-2H8"/>', 16),
   };
   const ICON_DIR = svgIcon('<path d="M2 4.5A1.5 1.5 0 0 1 3.5 3h2.6l1.4 1.5h5A1.5 1.5 0 0 1 14 6v5.5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 11.5z"/>');
   const ICON_FILE = svgIcon('<path d="M4 2h5l3 3v8.5a.5.5 0 0 1-.5.5h-7a.5.5 0 0 1-.5-.5z"/><path d="M9 2v3h3"/>');
@@ -241,13 +242,73 @@
     const more = files.length > FILES_MAX ? `<p class="rs-sub" role="status">and ${files.length - FILES_MAX} more</p>` : '';
     return `<div class="col-sum"><b>${files.length} file${files.length === 1 ? '' : 's'}</b> <span class="a">+${added}</span> <span class="d">−${deleted}</span></div><div class="cf-tree" role="group" aria-label="Files with changes${c.name ? ` of ${esc(c.name)}` : ''}">${rows.join('')}</div>${more}`;
   };
+  // RP129 (S20, S21): the FOOTER of the column and its STATUS tab. Both come from `ctx.git` ({ id, branch, ahead, pr, merge, rerun, noPr }), which the page builds: the PR is the open one of THIS branch (never
+  // another one), and `merge` and `rerun` are what view.js decides for the two buttons (the ONE rule of the card of the board), so nothing is decided here: the buttons are drawn as they come and they are the
+  // same actions of the cards (data-act merge and rerun). Without `git` there is neither footer nor Status tab. Total: nothing the PR or the repo says becomes markup, and only a plain http(s) link is a link.
+  const ICON_BRANCH = svgIcon('<circle cx="4" cy="3.5" r="1.6"/><circle cx="4" cy="12.5" r="1.6"/><circle cx="12" cy="6" r="1.6"/><path d="M4 5.1v5.8M12 7.6c0 3-4 2.4-8 4"/>');
+  const ICON_CK = {
+    success: svgIcon('<circle cx="8" cy="8" r="6"/><path d="M5.2 8.2l2 2 3.6-4"/>'),
+    pending: svgIcon('<circle cx="8" cy="8" r="6" stroke-dasharray="3 2.2"/>'),
+    failed: svgIcon('<circle cx="8" cy="8" r="6"/><path d="M6 6l4 4M10 6l-4 4"/>'),
+  };
+  const CK_STATES = ['success', 'pending', 'failed'];
+  const CK_WORD = { success: 'Successful', pending: 'In progress', failed: 'Failed' };
+  const CK_SUM = { pending: 'pending', failed: 'failed', success: 'passed' };
+  const CHECKS_MAX = 50;
+  const gitOf = (c) => (c.git && typeof c.git === 'object' && !Array.isArray(c.git) ? c.git : null);
+  const prOf = (g) => (g.pr && typeof g.pr === 'object' && !Array.isArray(g.pr) && Number.isInteger(g.pr.number) ? g.pr : null);
+  const checksOf = (pr) => {
+    const k = pr && pr.checks && typeof pr.checks === 'object' ? pr.checks : {};
+    return { state: CK_STATES.includes(k.state) ? k.state : 'none', total: num(k.total), passed: num(k.passed), failed: num(k.failed), pending: num(k.pending), items: Array.isArray(k.items) ? k.items : [] };
+  };
+  const ciMark = (pr) => {
+    const k = checksOf(pr);
+    if (k.state === 'none' || !k.total) return '';
+    const label = k.state === 'success' ? `All ${k.total} checks passed` : k.state === 'failed' ? `${k.failed} failed · ${k.passed}/${k.total} passed` : `${k.pending} running · ${k.passed}/${k.total} passed`;
+    return `<span class="ft-ci ft-ci-${k.state}" role="img" aria-label="${esc(label)}" title="${esc(label)}">${ICON_CK[k.state]}</span>`;
+  };
+  const footHtml = (g) => {
+    const pr = prOf(g);
+    const m = g.merge && typeof g.merge === 'object' ? g.merge : {};
+    const branch = typeof g.branch === 'string' ? g.branch : '';
+    const ahead = Number.isInteger(g.ahead) && g.ahead > 0 ? `<span class="chip" title="Commits ahead of the base">↑${g.ahead}</span>` : '';
+    return `<div class="col-foot" role="group" aria-label="Branch and pull request"><span class="ft-br"${branch ? ` title="${esc(branch)}"` : ''}>${ICON_BRANCH}<span class="ft-name">${branch ? esc(branch) : '—'}</span></span>${ahead}${ciMark(pr)}<button type="button" class="merge ft-merge" data-act="merge" data-id="${esc(g.id ?? '')}"${pr ? ` data-n="${pr.number}"` : ''}${m.enabled === true ? '' : ' disabled'} title="${esc(m.title || 'No open pull request for this branch')}">${esc(m.label || 'Merge · squash')}</button></div>`;
+  };
+  const statusPanel = (g) => {
+    const pr = prOf(g);
+    if (!pr) return `<p class="rs-sub" role="status">${esc(typeof g.noPr === 'string' && g.noPr ? g.noPr : 'No open pull request for this branch')}</p>`;
+    const k = checksOf(pr);
+    const link = (url, cls, attrs, text) => (MD_URL.test(String(url)) ? `<a class="${cls}" href="${esc(url)}" target="_blank" rel="noopener noreferrer"${attrs}>${text}</a>` : '');
+    const number = link(pr.url, 'st-n', '', `#${pr.number}`) || `<span class="st-n">#${pr.number}</span>`;
+    const state = pr.isDraft ? '<span class="chip gray">draft</span>' : '<span class="chip green">open</span>';
+    const review = pr.reviewDecision === 'REVIEW_REQUIRED' ? '<span class="chip yellow">review required</span>' : pr.reviewDecision === 'CHANGES_REQUESTED' ? '<span class="chip red">changes requested</span>' : '';
+    const fin = (v) => typeof v === 'number' && Number.isFinite(v) && v >= 0;
+    const size = [];
+    if (fin(pr.additions) && fin(pr.deletions)) size.push(`+${pr.additions} −${pr.deletions}`);
+    if (fin(pr.changedFiles)) size.push(`${pr.changedFiles} file${pr.changedFiles === 1 ? '' : 's'}`);
+    const meta = `${esc(pr.head ?? '')} → ${esc(pr.base ?? '')}${size.length ? ` · ${size.join(' · ')}` : ''}`;
+    const count = { pending: k.pending, failed: k.failed, success: k.passed };
+    const sum = k.total ? `<div class="ck-sum">${['pending', 'failed', 'success'].filter((s) => count[s] > 0).map((s) => `<span class="ck-c ck-${s}" title="${CK_SUM[s]}">${ICON_CK[s]}<b>${count[s]}</b><span class="w"> ${CK_SUM[s]}</span></span>`).join('')}</div>` : '<p class="rs-sub" role="status">No checks</p>';
+    const items = k.items.filter((i) => i && typeof i === 'object' && typeof i.name === 'string');
+    const rows = items.slice(0, CHECKS_MAX).map((i) => {
+      const s = CK_STATES.includes(i.state) ? i.state : 'pending';
+      return `<div class="ck-r"><span class="ck-i ck-${s}" aria-hidden="true">${ICON_CK[s]}</span><span class="ck-nm" title="${esc(i.name)}">${esc(i.name)}</span><span class="ck-s">${CK_WORD[s]}</span>${link(i.url, 'ck-l', ` aria-label="Open ${esc(i.name)} on GitHub"`, '↗')}</div>`;
+    }).join('');
+    const more = items.length > CHECKS_MAX ? `<p class="rs-sub" role="status">and ${items.length - CHECKS_MAX} more</p>` : '';
+    const rerun = g.rerun && typeof g.rerun === 'object' && g.rerun.show === true ? `<button type="button" class="ck-rerun" data-act="rerun" data-id="${esc(g.id ?? '')}" data-n="${pr.number}"${g.rerun.enabled === true ? '' : ' disabled'}${g.rerun.title ? ` title="${esc(g.rerun.title)}"` : ''}>Re-run failed</button>` : '';
+    const reason = !pr.ready && pr.blockedReason && k.state !== 'pending' && k.state !== 'failed' ? `<p class="rs-sub" role="status">${esc(pr.blockedReason)}</p>` : '';
+    return `<div class="st-pr"><div class="st-t">${number}${state}${review}</div><div class="st-ti">${esc(pr.title ?? '')}</div><div class="st-mt">${meta}</div></div>${sum}<div class="ck-list">${rows}</div>${more}${rerun}${reason}`;
+  };
   const columnView = (ctx) => {
     const c = ctx && typeof ctx === 'object' ? ctx : {};
-    const tab = c.tab === 'tasks' ? 'tasks' : 'changes';
+    const g = gitOf(c);
+    const tab = c.tab === 'tasks' ? 'tasks' : c.tab === 'status' && g ? 'status' : 'changes';
     const files = validFiles(c.files);
-    const tabBtn = ([id, label]) => `<button type="button" role="tab" class="col-tab" id="coltab-${id}" data-act="col-tab" data-tab="${id}" aria-selected="${id === tab}" aria-controls="colpane" aria-label="${label}" title="${label}">${ICON_TAB[id]}<span class="lb">${label}</span>${id === 'changes' && files ? `<span class="n">${files.length}</span>` : ''}</button>`;
-    const body = tab === 'tasks' ? (typeof c.tasksHtml === 'string' && c.tasksHtml ? c.tasksHtml : '<p class="rs-sub" role="status">No tasks to show</p>') : changesPanel(c, files);
-    return `<div class="col-tabs" role="tablist" aria-label="Column views">${[['changes', 'Changes'], ['tasks', 'Tasks']].map(tabBtn).join('')}</div><div class="col-pane" id="colpane" role="tabpanel" aria-labelledby="coltab-${tab}">${body}</div>`;
+    const pending = g ? checksOf(prOf(g)).pending : 0;
+    const tabBtn = ([id, label]) => `<button type="button" role="tab" class="col-tab" id="coltab-${id}" data-act="col-tab" data-tab="${id}" aria-selected="${id === tab}" aria-controls="colpane" aria-label="${label}" title="${label}">${ICON_TAB[id]}<span class="lb">${label}</span>${id === 'changes' && files ? `<span class="n">${files.length}</span>` : id === 'status' && pending > 0 ? `<span class="n y">${pending}</span>` : ''}</button>`;
+    const body = tab === 'tasks' ? (typeof c.tasksHtml === 'string' && c.tasksHtml ? c.tasksHtml : '<p class="rs-sub" role="status">No tasks to show</p>') : tab === 'status' ? statusPanel(g) : changesPanel(c, files);
+    const list = g ? [['changes', 'Changes'], ['status', 'Status'], ['tasks', 'Tasks']] : [['changes', 'Changes'], ['tasks', 'Tasks']];
+    return `<div class="col-tabs" role="tablist" aria-label="Column views">${list.map(tabBtn).join('')}</div><div class="col-pane" id="colpane" role="tabpanel" aria-labelledby="coltab-${tab}">${body}</div>${g ? footHtml(g) : ''}`;
   };
   // The state of the session (RPC2-1), shown inside the composer frame. Icon + word, never colour alone. c = { info, rpc } (rpc: what V.rpcReduce keeps).
   const SESS_TITLE = {
