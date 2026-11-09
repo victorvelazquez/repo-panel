@@ -1,0 +1,42 @@
+{
+  "title": "Repo Panel — Columna derecha de Summary",
+  "brief": "Reorganize the right column of the Summary tab (about 360 px wide, 220 px minimum, hidden under 1100 px of layout): the Tasks card is too tall and goes last, the changed files get a tree like a code editor, the repo files get an explorer, and a status block shows the branch, the pull request, its CI checks and a merge button. Three directions plus a catalog of states. Tokens taken from the :root of public/style.css.",
+  "feature": "odd/tasks/panel-layout.md",
+  "artboards": [
+    {
+      "file": "01-estado-fijo-y-pestanas.html",
+      "title": "A · Fixed status and tabs",
+      "tradeoff": "The branch and PR status stays pinned at the top; below it three tabs (Changes, Files, Tasks) show one thing at a time at full height; the most direct and easy to read, but only one list is visible at once",
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "file": "02-secciones-plegables.html",
+      "title": "B · Collapsible sections",
+      "tradeoff": "Stacked sections that fold: Status and Changes open, Files closed and Tasks closed at the bottom with a one-line summary; several things visible together and nothing hidden behind a tab, but each open section shares the height",
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "file": "03-barra-lateral-de-iconos.html",
+      "title": "C · Icon rail with a status footer",
+      "tradeoff": "A thin icon rail picks the panel (Status, Changes, Files, Tasks, Notes) and a footer keeps branch, CI and the merge button always visible; the most room for the content and the closest to a code editor, but the icons need to be learned and the PR detail is one click away",
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "file": "05-pestanas-y-pie.html",
+      "title": "D · Top tabs with a status footer",
+      "tradeoff": "The clean look of C without its side strip: the five tabs run along the top in one row (Changes, Files, Status, Tasks, Notes), only the open one shows its label and the rest are icons with counters, so it costs height (the column is tall) and not width (it is narrow); a fixed footer keeps branch, CI and merge in sight; five icon tabs are dense on the narrowest column",
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "file": "04-estados-del-pr.html",
+      "title": "Catalog · PR and task states",
+      "tradeoff": "Not a direction: the states the status block must handle (no PR, pending, failed, conflicts, behind, ready, merged) and the compact Tasks block with its folds, so the choice is made knowing the cases",
+      "width": 1440,
+      "height": 900
+    }
+  ]
+}

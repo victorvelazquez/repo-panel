@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "chosen": "05-pestanas-y-pie.html",
+  "handoffs": {
+    "03-barra-lateral-de-iconos.html": {
+      "status": "sent",
+      "queued": false,
+      "sentAt": "2026-11-09T10:50:59.879Z",
+      "startedAt": null,
+      "implementedAt": null,
+      "feature": "odd/tasks/panel-layout.md"
+    },
+    "05-pestanas-y-pie.html": {
+      "status": "sent",
+      "queued": false,
+      "sentAt": "2026-11-09T11:26:47.184Z",
+      "startedAt": null,
+      "implementedAt": null,
+      "feature": "odd/tasks/panel-layout.md"
+    }
+  }
+}
