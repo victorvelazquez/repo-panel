@@ -51,9 +51,9 @@ test('t4: the name is the last part of the path (either slash), the whole path i
   assert.match(R.chatHead({ id: 'abc', dfile: 'README.md', tab: 'diff' }, { name: 'demo' }), /title="README\.md"[^>]*>README\.md<\/button>/);
 });
 
-test('t5: with the column in the diff tab is still there, after Chat and Files (RP92: the Changes tab is the files card)', () => {
+test('t5: with the column in the diff tab is still there, after Chat and Notes (RP92: the Changes tab is the files card)', () => {
   const h = R.chatHead({ id: 'abc', dfile: 'x.js', tab: 'chat' }, { name: 'demo', column: true });
-  assert.deepEqual(tabsOf(h), ['chat', 'files', 'notes', 'diff']);
+  assert.deepEqual(tabsOf(h), ['chat', 'notes', 'diff']);
 });
 
 // ---------- pure: the viewer for ONE file ----------

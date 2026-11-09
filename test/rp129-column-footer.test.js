@@ -156,10 +156,10 @@ test('r4: the footer is total: no branch, odd values, and nothing from the repo 
   assert.match(foot(R.columnView({ files: [], git: { id: 'a', merge: MERGE(null) } })), /<span class="ft-name">—<\/span>/, 'no branch');
 });
 
-test('r5: with the git data the column has THREE tabs in the order Changes, Status, Tasks, and Status counts the pending checks; without it the column is as before', () => {
-  assert.deepEqual(tabs(R.columnView({ files: [], git: GIT(CASES.ready) })), ['changes', 'status', 'tasks']);
-  assert.deepEqual(R.COLUMN_TABS, ['changes', 'status', 'tasks']);
-  assert.deepEqual(tabs(R.columnView({ files: [] })), ['changes', 'tasks']);
+test('r5: with the git data the column has FOUR tabs in the order Changes, Files, Status, Tasks, and Status counts the pending checks; without it the column is as before', () => {
+  assert.deepEqual(tabs(R.columnView({ files: [], git: GIT(CASES.ready) })), ['changes', 'files', 'status', 'tasks']);
+  assert.deepEqual(R.COLUMN_TABS, ['changes', 'files', 'status', 'tasks']);
+  assert.deepEqual(tabs(R.columnView({ files: [] })), ['changes', 'files', 'tasks']);
   assert.doesNotMatch(R.columnView({ files: [] }), /col-foot/);
   assert.match(R.columnView({ files: [], git: GIT(CASES.pending) }), /<span class="lb">Status<\/span><span class="n y">1<\/span><\/button>/);
   assert.doesNotMatch(R.columnView({ files: [], git: GIT(CASES.ready) }), /<span class="n y">/);
@@ -431,12 +431,14 @@ test('p9: the Status tab lists the checks of the PR and the yellow badge counts 
   assert.match(col(page), /class="tk-bar"/);
 });
 
-test('p10: the arrows now cycle Changes, Status, Tasks and back; a fresh opening starts on Changes again', async () => {
+test('p10: the arrows now cycle Changes, Files, Status, Tasks and back; a fresh opening starts on Changes again', async () => {
   const page = boot();
   await open(page);
   const el = (t) => ({ dataset: { act: 'col-tab', tab: t }, tagName: 'BUTTON' });
   const sel = () => (/id="coltab-(\w+)"[^>]*aria-selected="true"/.exec(col(page)) || [])[1];
   page.key('ArrowRight', el('changes')); page.flush();
+  assert.equal(sel(), 'files');
+  page.key('ArrowRight', el('files')); page.flush();
   assert.equal(sel(), 'status');
   page.key('ArrowRight', el('status')); page.flush();
   assert.equal(sel(), 'tasks');

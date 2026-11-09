@@ -32,14 +32,14 @@ test('t1: the column has a tab bar with Changes and Tasks, in that order, each w
   const h = R.columnView({ name: 'demo', files: FILES });
   assert.match(h, /^<div class="col-tabs" role="tablist" aria-label="Column views">/);
   const tabs = [...h.matchAll(/<button type="button" role="tab" class="col-tab" id="coltab-(\w+)" data-act="col-tab" data-tab="(\w+)" aria-selected="(true|false)" aria-controls="colpane" aria-label="([^"]+)" title="([^"]+)">/g)];
-  assert.deepEqual(tabs.map((m) => [m[1], m[2], m[3], m[4], m[5]]), [['changes', 'changes', 'true', 'Changes', 'Changes'], ['tasks', 'tasks', 'false', 'Tasks', 'Tasks']]);
+  assert.deepEqual(tabs.map((m) => [m[1], m[2], m[3], m[4], m[5]]), [['changes', 'changes', 'true', 'Changes', 'Changes'], ['files', 'files', 'false', 'Files', 'Files'], ['tasks', 'tasks', 'false', 'Tasks', 'Tasks']]);
   assert.match(h, /<span class="lb">Changes<\/span><span class="n">6<\/span><\/button>/);
   assert.match(h, /<span class="lb">Tasks<\/span><\/button>/, 'Tasks has no count');
-  assert.equal((h.match(/role="tab"/g) || []).length, 2, 'no tab without content: Status, Files and Notes are not drawn yet');
+  assert.equal((h.match(/role="tab"/g) || []).length, 3, 'no tab without content: Status needs the git data and Notes live in the centre (RP130)');
 });
 
 test('t2: the tab asked for is the one open; an unknown one, or one that does not exist yet, reads as Changes; the panel is labelled by its tab', () => {
-  for (const tab of [undefined, null, '', 'changes', 'files', 'notes', 'status', 'nope', 5, {}]) {
+  for (const tab of [undefined, null, '', 'changes', 'notes', 'status', 'nope', 5, {}]) {
     const h = R.columnView({ name: 'demo', files: FILES, tab });
     assert.match(h, /id="coltab-changes"[^>]*aria-selected="true"/, String(tab));
     assert.match(h, /<div class="col-pane" id="colpane" role="tabpanel" aria-labelledby="coltab-changes">/);
@@ -330,7 +330,7 @@ test('p2: the Tasks tab shows the compact tasks and the Changes tab brings the t
   act(page, 'col-tab', { tab: 'status' }); // RP129: Status is a real tab of the column now
   page.flush();
   assert.equal(selected(col(page)), 'status');
-  for (const t of ['files', 'notes', '', undefined, '<x>']) { act(page, 'col-tab', { tab: t }); page.flush(); assert.equal(selected(col(page)), 'changes', String(t)); }
+  for (const t of ['notes', '', undefined, '<x>']) { act(page, 'col-tab', { tab: t }); page.flush(); assert.equal(selected(col(page)), 'changes', String(t)); }
   act(page, 'col-folder', { path: 'public' });
   act(page, 'tasks-fold', { fold: 'done' });
   page.flush();
@@ -400,9 +400,12 @@ test('p6: the arrows, Home and End move between the tabs and the new one takes t
   const tabEl = (t) => ({ dataset: { act: 'col-tab', tab: t }, tagName: 'BUTTON' });
   const e = page.key('ArrowRight', tabEl('changes'));
   page.flush();
-  assert.equal(selected(col(page)), 'status', 'RP129: Changes, Status, Tasks');
+  assert.equal(selected(col(page)), 'files', 'RP130: Changes, Files, Status, Tasks');
   assert.equal(e.prevented, true);
-  assert.ok(page.get('#coltab-status').focused >= 1, 'the focus goes to the tab that opened');
+  assert.ok(page.get('#coltab-files').focused >= 1, 'the focus goes to the tab that opened');
+  page.key('ArrowRight', tabEl('files'));
+  page.flush();
+  assert.equal(selected(col(page)), 'status');
   page.key('ArrowRight', tabEl('status'));
   page.flush();
   assert.equal(selected(col(page)), 'tasks');
@@ -410,6 +413,9 @@ test('p6: the arrows, Home and End move between the tabs and the new one takes t
   page.flush();
   assert.equal(selected(col(page)), 'status');
   page.key('ArrowLeft', tabEl('status'));
+  page.flush();
+  assert.equal(selected(col(page)), 'files');
+  page.key('ArrowLeft', tabEl('files'));
   page.flush();
   assert.equal(selected(col(page)), 'changes');
   page.key('End', tabEl('changes'));
