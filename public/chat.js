@@ -273,7 +273,16 @@ function drawChat() {
   const colFocus = column && document.activeElement && document.activeElement.id === 'tasksFilter';
   // RP92: the files card is drawn from the facts the board keeps fresh (S.local), so it reads nothing.
   const facts = S.local[S.chat.id];
-  paint($('#colBody'), R.columnView({ name: nameOf(S.chat.id), files: facts && !facts.error && Array.isArray(facts.files) ? facts.files : null, failed: !!(facts && facts.error), selected: S.chat.dfile || '', tasksHtml: column ? R.tasksView(S.tasks[S.chat.id] || null, { filter: S.tasksFilter, openDone: S.tasksOpenDone, loading: !!S.chat.tasksLoading, failed: !!S.chat.tasksFailed }) : '' }));
+  // RP128: the column is tabs (Changes, Tasks). The open one belongs to the opening (S.chat.colTab, Changes by default), the closed folders too (S.chat.colFold); with no column nothing is painted.
+  const colTab = S.chat.colTab === 'tasks' ? 'tasks' : 'changes';
+  paint($('#colBody'), !column ? '' : R.columnView({ name: nameOf(S.chat.id), tab: colTab, fold: S.chat.colFold, files: facts && !facts.error && Array.isArray(facts.files) ? facts.files : null, failed: !!(facts && facts.error), selected: S.chat.dfile || '', tasksHtml: colTab === 'tasks' ? R.tasksView(S.tasks[S.chat.id] || null, { compact: true, filter: S.tasksFilter, open: S.tasksFold, loading: !!S.chat.tasksLoading, failed: !!S.chat.tasksFailed }) : '' }));
+  // What the person touched in the column keeps the focus across the repaint: a tab by its id, a folder or a fold by its button.
+  const want = S.chat.colFocus;
+  if (want) {
+    S.chat.colFocus = null;
+    const el = want.id ? $(`#${want.id}`) : Array.from(document.querySelectorAll(`#colBody [data-act="${want.act}"]`)).find((b) => b.dataset && b.dataset[want.key] === want.val);
+    if (el && el.focus) el.focus();
+  }
   const colBox = colFocus ? $('#tasksFilter') : null;
   if (colBox && colBox.focus && document.activeElement !== colBox) { colBox.focus(); if (colBox.setSelectionRange) colBox.setSelectionRange(colBox.value.length, colBox.value.length); }
   paint($('#chatHead'), R.chatHead(S.chat, { name: nameOf(S.chat.id), column }));

@@ -120,12 +120,31 @@ const ACTIONS = {
   'focus-repo': (el) => { S.q = nameOf(el.dataset.id); $('#search').value = S.q; setTab('work'); },
   'chat-open': (el) => openChat(el.dataset.id),
   // RP91: with the column in, setChatTab turns the Tasks tab into the Chat one (the tasks card is already there); without it the chat opens on its Tasks tab as before.
-  'tasks-open': (el) => { openChat(el.dataset.id, 'tasks'); if (S.chat.id === el.dataset.id) setChatTab('tasks'); },
+  'tasks-open': (el) => { openChat(el.dataset.id, 'tasks'); if (S.chat.id === el.dataset.id) { if (columnOn()) S.chat.colTab = 'tasks'; setChatTab('tasks'); } }, // RP128: with the column in, the tasks are ITS tab
   'chat-tab': (el) => setChatTab(el.dataset.tab),
   'notes-retry': () => flushNotes(),
   'notes-disk': () => { const p = S.pad[S.chat.id]; if (p && p.status === 'conflict' && p.disk) { Object.assign(p, { text: p.disk.text, savedText: p.disk.text, base: p.disk.rev, status: 'saved', error: '', gen: p.gen + 1 }); p.req++; draw(); } },
   'notes-mine': () => { const p = S.pad[S.chat.id]; if (p && p.status === 'conflict' && p.disk) { p.base = p.disk.rev; p.status = 'saving'; saveNotes(S.chat.id); draw(); } },
   'tasks-done': () => { S.tasksOpenDone = !S.tasksOpenDone; draw(); },
+  // RP128: the right column. The tab and the folded folders belong to the opening (S.chat is replaced when another repo opens); a tab that does not exist reads as Changes.
+  'col-tab': (el) => { const t = el && el.dataset && el.dataset.tab === 'tasks' ? 'tasks' : 'changes'; S.chat.colTab = t; S.chat.colFocus = { id: `coltab-${t}` }; draw(); },
+  'col-folder': (el) => {
+    const p = el && el.dataset && el.dataset.path;
+    const facts = S.local[S.chat.id];
+    if (typeof p !== 'string' || !p || !facts || !R.treeFolderPaths(facts.files).includes(p)) return; // only a folder of the tree on screen
+    const fold = Object.assign(Object.create(null), S.chat.colFold);
+    if (fold[p]) delete fold[p]; else fold[p] = true;
+    S.chat.colFold = fold;
+    S.chat.colFocus = { act: 'col-folder', key: 'path', val: p };
+    draw();
+  },
+  'tasks-fold': (el) => {
+    const k = el && el.dataset && el.dataset.fold;
+    if (!['pending', 'blocked', 'done'].includes(k)) return;
+    S.tasksFold = { ...S.tasksFold, [k]: !S.tasksFold[k] };
+    S.chat.colFocus = { act: 'tasks-fold', key: 'fold', val: k };
+    draw();
+  },
   'tasks-filter': (el) => { S.tasksFilter = String((el && el.value) || ''); draw(); },
   'chat-close': () => closeChat(),
   'chat-send': () => sendChatMessage(),

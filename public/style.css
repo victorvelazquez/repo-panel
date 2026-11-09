@@ -453,30 +453,67 @@ body.tab-summary #viewbar { display: none; }
 #chat { flex: 1 1 0; min-width: 340px; display: flex; flex-direction: column; min-height: 0; background: var(--panel); }
 /* RP89: the right column (RP91 and RP92 will fill it); out below 1100 px of layout. */
 #col, #split2 { display: none; }
-#col { flex: none; width: var(--col-w, 25%); min-width: 220px; flex-direction: column; min-height: 0; overflow: auto; }
+#col { flex: none; width: var(--col-w, 25%); min-width: 220px; flex-direction: column; min-height: 0; overflow: auto; container-type: inline-size; container-name: col; }
 @container sum (min-width: 1100px) {
   #col { display: flex; }
   #split2 { display: block; }
 }
-#colBody { padding: 12px; display: grid; gap: 8px; align-content: start; }
-.col-tasks { min-width: 0; align-content: start; }
-/* RP92: the files card: one row per changed file (status, name clipped with an ellipsis, +added -deleted that keep their place); the whole path is the tooltip. */
-.col-files { min-width: 0; align-content: start; }
-.col-n { color: var(--muted); font-weight: 400; }
-.cf-list { display: grid; gap: 2px; min-width: 0; }
-.cf-item { display: flex; align-items: center; gap: 8px; width: 100%; min-width: 0; text-align: left; border: 1px solid transparent; background: transparent; padding: 3px 6px; border-radius: 6px; }
-.cf-on { border-color: var(--blue); background: #12253d; }
-.cf-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
+/* RP128: the right column is tabs (design D of RP127). The bar stays on top while the panel scrolls; only the open tab shows its name and in a narrow column (the container query on #col) none does. */
+#colBody { min-width: 0; }
+.col-tabs { position: sticky; top: 0; z-index: 2; display: flex; gap: 2px; padding: 0 8px; background: var(--bg); border-bottom: 1px solid var(--line); }
+.col-tab { display: inline-flex; align-items: center; gap: 6px; padding: 8px 9px; background: transparent; border: 0; border-bottom: 2px solid transparent; border-radius: 0; color: var(--muted); font-size: 13px; }
+.col-tab:hover:not(:disabled) { border-color: transparent; color: var(--text); }
+.col-tab[aria-selected="true"] { color: var(--text); border-bottom-color: var(--blue); }
+.col-tab[aria-selected="true"]:hover:not(:disabled) { border-bottom-color: var(--blue); }
+.col-tab:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
+.col-tab .lb { display: none; }
+.col-tab[aria-selected="true"] .lb { display: inline; }
+.col-tab .n { font-size: 11px; padding: 0 6px; border-radius: 9px; background: var(--panel2); border: 1px solid var(--line); color: var(--muted); }
+@container col (max-width: 300px) {
+  .col-tab[aria-selected="true"] .lb { display: none; }
+  .col-tabs { padding: 0 4px; gap: 0; }
+  .col-tab { padding: 8px 7px; }
+}
+.col-pane { padding: 4px 8px 12px; min-width: 0; }
+.col-sum { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 6px 4px 8px; color: var(--muted); font-size: 12px; }
+.col-sum b { color: var(--text); }
+.col-sum .a { color: var(--green); }
+.col-sum .d { color: var(--red); }
+/* The changes tree: one button per folder and per file, indented by depth (cf-d0 to cf-d8: deeper paths stop getting deeper); the name is clipped, the counts and the status letter keep their place. */
+.cf-tree { display: grid; min-width: 0; }
+.cf-item, .cf-dir { display: flex; align-items: center; gap: 6px; width: 100%; min-width: 0; text-align: left; border: 1px solid transparent; background: transparent; border-radius: 6px; padding: 3px 6px 3px calc(6px + var(--cf-d, 0) * 14px); }
+.cf-d0 { --cf-d: 0; } .cf-d1 { --cf-d: 1; } .cf-d2 { --cf-d: 2; } .cf-d3 { --cf-d: 3; } .cf-d4 { --cf-d: 4; } .cf-d5 { --cf-d: 5; } .cf-d6 { --cf-d: 6; } .cf-d7 { --cf-d: 7; } .cf-d8 { --cf-d: 8; }
+.cf-item:hover:not(:disabled), .cf-dir:hover:not(:disabled) { background: var(--panel2); border-color: transparent; }
+.cf-item.cf-on, .cf-item.cf-on:hover:not(:disabled) { border-color: var(--blue); background: #12253d; }
+.cf-ch { flex: none; width: 12px; color: var(--muted); font-size: 10px; text-align: center; }
+.cf-ic { flex: none; display: inline-grid; color: var(--muted); }
+.cf-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.cf-dir .cf-name { color: var(--muted); }
 .cf-n { flex: none; font-size: 11px; color: var(--muted); font-family: ui-monospace, Consolas, monospace; }
 .cf-n .a { font-style: normal; color: var(--green); }
 .cf-n .d { font-style: normal; color: var(--red); }
-.cf-item:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
-.col-title { margin: 0; font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
-/* RP91: in a narrow column the id sits above the text, which wraps freely. */
-#col .task-text { flex: 1 1 100%; overflow-wrap: anywhere; }
-.col-card { border: 1px solid var(--line); border-radius: 8px; background: var(--panel2); padding: 10px 12px; display: grid; gap: 6px; min-width: 0; }
-.col-card p { margin: 0; }
-.col-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cf-st { flex: none; width: 14px; text-align: center; font-size: 12px; font-weight: 700; color: var(--muted); }
+.st-M { color: var(--yellow); }
+.st-A, .st-\? { color: var(--green); }
+.st-D { color: var(--red); }
+.cf-item:focus-visible, .cf-dir:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
+/* The compact tasks: a segmented bar, its legend, one line per row (the detail is the tooltip) and folds with a count. */
+.tk-bar { display: flex; height: 8px; margin: 8px 4px 6px; border-radius: 4px; background: #3a424d; overflow: hidden; }
+.tk-bar i { display: block; height: 100%; }
+.tk-ready { background: var(--purple); }
+.tk-prog { background: var(--yellow); }
+.tk-leg { display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 0 4px 6px; font-size: 12px; color: var(--muted); }
+.tk-leg b { color: var(--text); }
+.tk-k { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+.tk-row { display: flex; align-items: center; gap: 8px; min-width: 0; margin: 2px 4px; padding: 5px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel2); font-size: 13px; }
+.tk-next { border-color: var(--blue); }
+.tk-id { flex: none; font-size: 12px; color: var(--muted); }
+.tk-tx { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tk-fold { display: flex; align-items: center; gap: 8px; width: 100%; padding: 5px 8px; background: transparent; border: 0; border-radius: 6px; color: var(--muted); text-align: left; font-size: 13px; }
+.tk-fold:hover:not(:disabled) { background: var(--panel2); color: var(--text); }
+.tk-fold:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
+.tk-fold .sp { flex: 1; }
+.tk-sub { display: grid; }
 .ch-head { border-bottom: 1px solid var(--line); }
 .ch-row { display: flex; align-items: center; gap: 8px; padding: 10px 14px; min-width: 0; }
 /* RP63: the Chat / Tasks tabs of the right panel and the task list. */

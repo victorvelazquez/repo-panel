@@ -33,7 +33,7 @@ const S = {
   boardRev: 0, boardRefreshing: [], factAt: {},
   tab: 'summary', scope: { kind: 'all' }, summary: null, summaryKey: '', summaryFailed: false, sfilter: 'all', collapsed: {},
   timeouts: { get: 25000, post: 70000 },
-  tasks: {}, tasksFilter: '', tasksOpenDone: false, changes: {}, files: {}, filesOpen: {}, fileData: {}, pad: {},
+  tasks: {}, tasksFilter: '', tasksOpenDone: false, tasksFold: {}, changes: {}, files: {}, filesOpen: {}, fileData: {}, pad: {},
   lh: { search: false, menu: false, legend: false, focus: false }, // RP121: the header of the repos column (search box open, filter menu open, focus the box on the next draw)
   chat: { id: null, seq: 0 }, chatCache: {}, drafts: {}, recall: {}, notes: {}, askBusy: {}, chatResults: Object.create(null), rpc: {},
 };
@@ -75,6 +75,18 @@ document.addEventListener('keydown', (e) => {
     if (S.chat.id && !(menu && menu.open) && document.activeElement !== $('#usage') && !['#addDialog', '#roomDialog'].some((d) => $(d) && $(d).open)) closeChat();
   } else if ((e.key === 'Enter' || e.key === ' ') && e.target && e.target.dataset && e.target.dataset.act === 'chat-open') { e.preventDefault(); ACTIONS['chat-open'](e.target); }
   else if ((e.key === 'Enter' || e.key === ' ') && e.target && e.target.dataset && e.target.dataset.act === 'tasks-open') { e.preventDefault(); e.stopPropagation(); ACTIONS['tasks-open'](e.target); }
+});
+
+// RP128: the arrows, Home and End move between the tabs of the right column (the tab pattern) and the one reached takes the focus; nothing else is touched.
+document.addEventListener('keydown', (e) => {
+  const t = e.target;
+  if (!R || !t || !t.dataset || t.dataset.act !== 'col-tab' || e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+  const tabs = R.COLUMN_TABS;
+  const i = tabs.indexOf(t.dataset.tab);
+  const to = e.key === 'ArrowRight' ? tabs[(i + 1) % tabs.length] : e.key === 'ArrowLeft' ? tabs[(i + tabs.length - 1) % tabs.length] : e.key === 'Home' ? tabs[0] : e.key === 'End' ? tabs[tabs.length - 1] : null;
+  if (!to) return;
+  e.preventDefault();
+  ACTIONS['col-tab']({ dataset: { tab: to } });
 });
 
 // RP83 (S3): in the message box Up recalls what was sent to this session (again Up for the one before) and Down walks forward, giving back
