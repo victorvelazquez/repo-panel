@@ -459,7 +459,8 @@ body.tab-summary #viewbar { display: none; }
   #split2 { display: block; }
 }
 /* RP128: the right column is tabs (design D of RP127). The bar stays on top while the panel scrolls; only the open tab shows its name and in a narrow column (the container query on #col) none does. */
-#colBody { min-width: 0; display: flex; flex-direction: column; min-height: 100%; }
+/* RP132: #colBody is a flex item of #col; without `flex: none` it shrank to the visible height while its content kept growing, so the sticky bars (whose box it is) stopped sticking on a long list. */
+#colBody { flex: none; min-width: 0; display: flex; flex-direction: column; min-height: 100%; }
 .col-tabs { position: sticky; top: 0; z-index: 2; display: flex; gap: 2px; padding: 0 8px; background: var(--bg); border-bottom: 1px solid var(--line); }
 .col-tab { display: inline-flex; align-items: center; gap: 6px; padding: 8px 9px; background: transparent; border: 0; border-bottom: 2px solid transparent; border-radius: 0; color: var(--muted); font-size: 13px; }
 .col-tab:hover:not(:disabled) { border-color: transparent; color: var(--text); }
@@ -615,6 +616,8 @@ body.tab-summary #viewbar { display: none; }
 }
 /* RP65: the Files tab. The tree scrolls on its own so the file below it keeps its room; the changed lines of a file are a soft amber, apart from the green and red of a diff. */
 .ft-tree { flex: none; max-height: 40vh; overflow: auto; display: flex; flex-direction: column; margin-bottom: 12px; font-size: 13px; }
+/* RP132: that cap is for the chat's own Files tab (the file is below the tree); in the column the tree takes its natural height and the column scrolls. */
+#colBody .ft-tree { flex: none; max-height: none; overflow: visible; }
 .ft-row { display: flex; align-items: center; gap: 6px; width: 100%; text-align: left; border: 1px solid transparent; background: transparent; padding: 2px 6px 2px calc(6px + var(--d, 0) * 14px); border-radius: 6px; }
 .ft-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
 .ft-dir { color: var(--muted); }
