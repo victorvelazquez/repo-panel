@@ -122,7 +122,8 @@ async function loadFiles() {
     if (chat.filesReq === req && S.chat.seq === seq) chat.filesFailed = true;
   }
   if (chat.filesReq === req && S.chat.seq === seq) { chat.filesLoading = false; draw(); }
-  if (chat.filesReq === req && chat.fpath) loadFile(chat.fpath);
+  const again = chat.ffile || chat.fpath; // RP130: the file open in the centre is read again with the tree
+  if (chat.filesReq === req && again) loadFile(again);
 }
 async function loadFile(p) {
   const chat = S.chat;
@@ -205,7 +206,7 @@ function notesInput(text) {
 function setChatTab(tab) {
   const was = S.chat.tab;
   if (was === 'notes' && tab !== 'notes') flushNotes();
-  S.chat.tab = ['tasks', 'changes', 'files', 'notes'].includes(tab) && !((tab === 'tasks' || tab === 'changes') && columnOn()) ? tab : tab === 'diff' && S.chat.dfile ? 'diff' : 'chat'; // RP91, RP92: with the column in, the tasks and the changed files are its cards, not tabs; RP90: the diff tab needs a file
+  S.chat.tab = ['tasks', 'changes', 'files', 'notes'].includes(tab) && !((tab === 'tasks' || tab === 'changes' || tab === 'files') && columnOn()) ? tab : tab === 'diff' && S.chat.dfile ? 'diff' : tab === 'file' && S.chat.ffile ? 'file' : 'chat'; // RP91, RP92: with the column in, the tasks and the changed files are its cards, not tabs; RP90: the diff tab needs a file
   if (S.chat.tab === 'tasks') loadTasks();
   else if ((S.chat.tab === 'changes' || S.chat.tab === 'diff') && was !== S.chat.tab) loadChanges();
   else if (S.chat.tab === 'files' && was !== 'files') loadFiles();
@@ -213,6 +214,12 @@ function setChatTab(tab) {
   draw();
 }
 
+// The status letter of every changed file of a repo (from the board facts), to mark them in the tree.
+function changedOf(id) {
+  const changed = {};
+  for (const f of (modelOf(id).l.files || [])) changed[f.path] = f.untracked ? '?' : f.status;
+  return changed;
+}
 // RP91: whether the right column is in (from COLUMN_FROM px of layout): then the tasks are its card and the chat has no Tasks tab.
 function columnOn() {
   return ($('#sumLayout').clientWidth || 0) >= COLUMN_FROM;
@@ -294,8 +301,8 @@ function drawChat() {
   // RP92: the files card is drawn from the facts the board keeps fresh (S.local), so it reads nothing.
   const facts = S.local[S.chat.id];
   // RP128: the column is tabs (Changes, Tasks). The open one belongs to the opening (S.chat.colTab, Changes by default), the closed folders too (S.chat.colFold); with no column nothing is painted.
-  const colTab = S.chat.colTab === 'tasks' || S.chat.colTab === 'status' ? S.chat.colTab : 'changes';
-  paint($('#colBody'), !column ? '' : R.columnView({ name: nameOf(S.chat.id), tab: colTab, fold: S.chat.colFold, git: columnGit(S.chat.id, facts), files: facts && !facts.error && Array.isArray(facts.files) ? facts.files : null, failed: !!(facts && facts.error), selected: S.chat.dfile || '', tasksHtml: colTab === 'tasks' ? R.tasksView(S.tasks[S.chat.id] || null, { compact: true, filter: S.tasksFilter, open: S.tasksFold, loading: !!S.chat.tasksLoading, failed: !!S.chat.tasksFailed }) : '' }));
+  const colTab = ['tasks', 'status', 'files'].includes(S.chat.colTab) ? S.chat.colTab : 'changes';
+  paint($('#colBody'), !column ? '' : R.columnView({ name: nameOf(S.chat.id), tab: colTab, fold: S.chat.colFold, git: columnGit(S.chat.id, facts), files: facts && !facts.error && Array.isArray(facts.files) ? facts.files : null, failed: !!(facts && facts.error), selected: S.chat.dfile || '', tree: colTab === 'files' ? S.files[S.chat.id] || null : null, changed: colTab === 'files' ? changedOf(S.chat.id) : null, fselected: S.chat.ffile || '', fopen: S.filesOpen[S.chat.id] || {}, filesFailed: !!S.chat.filesFailed, tasksHtml: colTab === 'tasks' ? R.tasksView(S.tasks[S.chat.id] || null, { compact: true, filter: S.tasksFilter, open: S.tasksFold, loading: !!S.chat.tasksLoading, failed: !!S.chat.tasksFailed }) : '' }));
   // What the person touched in the column keeps the focus across the repaint: a tab by its id, a folder or a fold by its button.
   const want = S.chat.colFocus;
   if (want) {
@@ -308,10 +315,11 @@ function drawChat() {
   paint($('#chatHead'), R.chatHead(S.chat, { name: nameOf(S.chat.id), column }));
   const tasksTab = S.chat.tab === 'tasks' && !column;
   const changesTab = S.chat.tab === 'changes' && !column; // RP92: with the column in, the files card replaces the tab
-  const filesTab = S.chat.tab === 'files';
+  const filesTab = S.chat.tab === 'files' && !column; // RP130: the explorer is the column's; only without it the chat keeps its Files tab
+  const fileTab = S.chat.tab === 'file' && !!S.chat.ffile;
   const notesTab = S.chat.tab === 'notes';
   const diffTab = S.chat.tab === 'diff' && !!S.chat.dfile; // RP90
-  $('#composer').hidden = tasksTab || changesTab || filesTab || diffTab || notesTab;
+  $('#composer').hidden = tasksTab || changesTab || filesTab || diffTab || fileTab || notesTab;
   if (!notesTab) padShown = null;
   if (notesTab) {
     // The textarea is painted once per opening (and when its text is replaced from outside); after that only the status line changes, so the caret and the focus stay.
@@ -327,10 +335,14 @@ function drawChat() {
     chatShown = null;
     return;
   }
+  if (fileTab) {
+    paint($('#chatBody'), R.fileView(S.fileData[S.chat.id] || null, { selected: S.chat.ffile, fileLoading: !!S.chat.fileLoading, fileFailed: S.chat.fileFailed || '' }));
+    chatShown = null;
+    return;
+  }
   if (filesTab) {
     const id = S.chat.id;
-    const changed = {};
-    for (const f of (modelOf(id).l.files || [])) changed[f.path] = f.untracked ? '?' : f.status;
+    const changed = changedOf(id);
     paint($('#chatBody'), R.filesView(S.files[id] || null, { selected: S.chat.fpath || '', open: S.filesOpen[id] || {}, changed, loading: !!S.chat.filesLoading, failed: !!S.chat.filesFailed, fileLoading: !!S.chat.fileLoading, fileFailed: S.chat.fileFailed || '' }, S.fileData[id] || null));
     chatShown = null;
     return;

@@ -15,15 +15,15 @@ const PUBLIC = path.join(__dirname, '..', 'public');
 const css = fs.readFileSync(path.join(PUBLIC, 'style.css'), 'utf8').replace(/\r\n/g, '\n');
 
 // ---------- pure ----------
-test('c1 (RP92: no Changes tab either): with the column in, the head has no Tasks tab (Chat, Files) and a Tasks tab left over reads as the chat; without the flag nothing changes', () => {
+test('c1 (RP92: no Changes tab either): with the column in, the head has no Tasks tab (Chat, Notes) and a Tasks tab left over reads as the chat; without the flag nothing changes', () => {
   const h = R.chatHead({ id: 'abc', tab: 'tasks' }, { name: 'demo', column: true });
   const tabs = [...h.matchAll(/data-tab="(\w+)"/g)].map((m) => m[1]);
-  assert.deepEqual(tabs, ['chat', 'files', 'notes']);
+  assert.deepEqual(tabs, ['chat', 'notes']);
   assert.match(h, /data-tab="chat"[^>]*aria-selected="true"/);
   const all = [...R.chatHead({ id: 'abc' }, { name: 'demo' }).matchAll(/data-tab="(\w+)"/g)].map((m) => m[1]);
   assert.deepEqual(all, ['chat', 'tasks', 'changes', 'files', 'notes'], 'no column: the four tabs as before');
   assert.deepEqual([...R.chatHead({ id: 'abc' }, { name: 'demo', column: false }).matchAll(/data-tab="(\w+)"/g)].map((m) => m[1]), all);
-  assert.match(R.chatHead({ id: 'abc', tab: 'files' }, { name: 'demo', column: true }), /data-tab="files"[^>]*aria-selected="true"/);
+  assert.doesNotMatch(R.chatHead({ id: 'abc', tab: 'files' }, { name: 'demo', column: true }), /data-tab="files"/, 'RP130: with the column in the explorer belongs to the column, not to a tab of the chat');
 });
 
 test('c2 (RP128: tabs): the Tasks tab draws what the page gives it inside the panel; the repo name of the Changes panel is escaped in its label', () => {

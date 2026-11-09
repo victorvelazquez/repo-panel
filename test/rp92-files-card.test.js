@@ -66,15 +66,15 @@ test('f4 (RP128: tree): names, paths and status are escaped; a long list is cut 
   assert.match(m, /<p class="rs-sub" role="status">and 5 more<\/p>/);
 });
 
-test('f5: with the column in the head has no Changes tab either (Chat, Files; Tasks is its own card) and a Changes tab left over reads as the chat; without the column nothing changes', () => {
+test('f5: with the column in the head has no Changes tab either (Chat, Notes; Tasks is its own card) and a Changes tab left over reads as the chat; without the column nothing changes', () => {
   const tabs = (c, x) => [...R.chatHead(c, x).matchAll(/data-tab="(\w+)"/g)].map((m) => m[1]);
-  assert.deepEqual(tabs({ id: 'abc' }, { name: 'd', column: true }), ['chat', 'files', 'notes']);
+  assert.deepEqual(tabs({ id: 'abc' }, { name: 'd', column: true }), ['chat', 'notes']);
   const h = R.chatHead({ id: 'abc', tab: 'changes' }, { name: 'd', column: true });
   assert.match(h, /data-tab="chat"[^>]*aria-selected="true"/);
   assert.doesNotMatch(h, /aria-selected="true"[^>]*>(Changes|Files)/);
   assert.deepEqual(tabs({ id: 'abc' }, { name: 'd' }), ['chat', 'tasks', 'changes', 'files', 'notes'], 'no column: the four tabs as before');
   assert.match(R.chatHead({ id: 'abc', tab: 'changes' }, { name: 'd' }), /data-tab="changes"[^>]*aria-selected="true"/);
-  assert.deepEqual(tabs({ id: 'abc', tab: 'diff', dfile: 'a/b.js' }, { name: 'd', column: true }), ['chat', 'files', 'notes', 'diff']);
+  assert.deepEqual(tabs({ id: 'abc', tab: 'diff', dfile: 'a/b.js' }, { name: 'd', column: true }), ['chat', 'notes', 'diff']);
 });
 
 test('f6 (RP128: tree): the styles: the panel fits a narrow column, a long name is clipped and the counts keep their place', () => {
@@ -165,7 +165,7 @@ test('g1: with the column in, opening a repo draws the card from the board facts
   assert.match(col(page), /class="cf-tree"/);
   assert.equal(items(col(page)).length, 4);
   assert.equal(diffReads(page), 0, 'the card reads nothing');
-  assert.deepEqual(tabsOf(page), ['chat', 'files', 'notes']);
+  assert.deepEqual(tabsOf(page), ['chat', 'notes']);
 });
 
 test('g2: touching a file of the card opens it in the diff tab (the diff is read) and marks it in the card; touching another reuses the tab', async () => {
@@ -181,10 +181,10 @@ test('g2: touching a file of the card opens it in the diff tab (the diff is read
   assert.equal(diffReads(page), 1);
   assert.match(page.get('#chatBody').html.replace(/<[^>]+>/g, ''), /new app/); // RP66b: the .js rows are colored, the text is the same
   assert.match(col(page), /cf-on cf-d1" data-act="changes-file" data-path="src\/app\.js" aria-pressed="true"/);
-  assert.deepEqual(tabsOf(page), ['chat', 'files', 'notes', 'diff']);
+  assert.deepEqual(tabsOf(page), ['chat', 'notes', 'diff']);
   page.run("ACTIONS['changes-file']({ dataset: { path: 'new.txt' } })");
   await page.tick();
-  assert.deepEqual(tabsOf(page), ['chat', 'files', 'notes', 'diff'], 'one diff tab');
+  assert.deepEqual(tabsOf(page), ['chat', 'notes', 'diff'], 'one diff tab');
   assert.match(col(page), /cf-on cf-d0" data-act="changes-file" data-path="new\.txt"/);
   assert.equal((col(page).match(/cf-on/g) || []).length, 1);
 });
@@ -245,7 +245,7 @@ test('g5: the card and the diff tab follow the repo: another repo shows its own 
   await page.tick();
   assert.match(col(page), /z\.js/);
   assert.doesNotMatch(col(page), /app\.js/);
-  assert.deepEqual(tabsOf(page), ['chat', 'files', 'notes']);
+  assert.deepEqual(tabsOf(page), ['chat', 'notes']);
 });
 
 test('g6: the chip "N files" of a card (action diff) with the column in opens the repo on the chat, where the card is; it reads no diff', async () => {

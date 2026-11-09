@@ -60,12 +60,12 @@ test('n3: the text and the reason are escaped, and the view is total for odd inp
 
 test('n4: the head has a Notes tab: with and without the column; selected when c.tab is notes; the other tabs are as before', () => {
   const tabs = (c, x) => [...R.chatHead(c, x).matchAll(/data-tab="(\w+)"/g)].map((m) => m[1]);
-  assert.deepEqual(tabs({ id: 'abc' }, { name: 'd', column: true }), ['chat', 'files', 'notes']);
+  assert.deepEqual(tabs({ id: 'abc' }, { name: 'd', column: true }), ['chat', 'notes']);
   assert.deepEqual(tabs({ id: 'abc' }, { name: 'd' }), ['chat', 'tasks', 'changes', 'files', 'notes']);
   assert.match(R.chatHead({ id: 'abc', tab: 'notes' }, { name: 'd', column: true }), /data-tab="notes"[^>]*aria-selected="true"[^>]*>Notes</);
   assert.match(R.chatHead({ id: 'abc', tab: 'notes' }, { name: 'd' }), /data-tab="notes"[^>]*aria-selected="true"/);
   assert.doesNotMatch(R.chatHead({ id: 'abc', tab: 'notes' }, { name: 'd' }), /data-tab="chat"[^>]*aria-selected="true"/);
-  assert.deepEqual(tabs({ id: 'abc', tab: 'diff', dfile: 'a.js' }, { name: 'd', column: true }), ['chat', 'files', 'notes', 'diff']);
+  assert.deepEqual(tabs({ id: 'abc', tab: 'diff', dfile: 'a.js' }, { name: 'd', column: true }), ['chat', 'notes', 'diff']);
   assert.match(R.chatHead({ id: 'abc', tab: 'tasks' }, { name: 'd', column: true }), /data-tab="chat"[^>]*aria-selected="true"/, 'Tasks still reads as chat with the column');
 });
 
