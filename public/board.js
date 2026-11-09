@@ -367,6 +367,9 @@ function prCard(r, pr, meta, running = null) {
   const hold = running && V ? V.runningReason({ cmd: running.cmd, label: running.label }) : '';
   const showReason = !pr.ready && pr.blockedReason && pr.checks.state !== 'pending' && pr.checks.state !== 'failed';
   const n = `data-id="${r.id}" data-n="${pr.number}"`;
+  // RP129: the Merge and Re-run buttons follow the ONE rule of view.js (the footer of the right column asks it too); without view.js neither is ever offered.
+  const m = V ? V.mergeButton(pr, { method: S.prefs.method, busy, held, hold }) : { enabled: false, label: `Merge · ${S.prefs.method}`, title: 'view.js did not load' };
+  const rr = V ? V.rerunButton(pr, { busy, held, hold }) : { show: false, enabled: false, title: '' };
   return `<div class="card ${isProblem(pr) ? 'attn' : ''} ${pr.ready ? 'ready' : ''}">
     ${cardTop(r, meta?.url, `pr${pr.number}`)}
     ${reqWarn(r)}
@@ -380,11 +383,11 @@ function prCard(r, pr, meta, running = null) {
       ${showReason ? `<span class="chip ${pr.mergeStateStatus === 'DIRTY' || pr.mergeStateStatus === 'BEHIND' ? 'red' : 'gray'}">${esc(pr.blockedReason)}</span>` : ''}
     </div>
     <div class="merge-row">
-      <button class="merge" data-act="merge" ${n} ${pr.ready && !busy && !held && !hold ? '' : 'disabled'}
-        title="${esc(hold || (pr.ready ? 'Merge into ' + pr.base : pr.blockedReason))}">${held || busy === 'done' ? 'Merged ✓' : busy ? 'Merging…' : `Merge · ${S.prefs.method}`}</button>
+      <button class="merge" data-act="merge" ${n} ${m.enabled ? '' : 'disabled'}
+        title="${esc(m.title)}">${esc(m.label)}</button>
       <button data-act="snooze" ${n} title="Park this PR at the bottom of the column until it is ready to merge (stays parked if it is already ready)">💤</button>
     </div>
-    ${(pr.checks && pr.checks.failedRuns || []).length ? `<button data-act="rerun" ${n} ${busy || held || hold ? 'disabled' : ''}${hold ? ` title="${esc(hold)}"` : ''}>Re-run failed</button>` : ''}
+    ${rr.show ? `<button data-act="rerun" ${n} ${rr.enabled ? '' : 'disabled'}${rr.title ? ` title="${esc(rr.title)}"` : ''}>Re-run failed</button>` : ''}
     ${V && V.fixPrAction(pr).show ? piBtn(r, 'fix-pr', 'Fix CI', { pr: pr.number, title: hold || FIX_PR_HINT, disabled: !!hold }) : ''}
   </div>`;
 }

@@ -224,6 +224,26 @@ function layoutNow() {
   const total = width - ($('#split').offsetWidth || 0) - (column ? ($('#split2').offsetWidth || 0) : 0);
   return total > 0 && R ? { total, column, ...R.blockWidths(total, layoutRatios, { column }) } : null;
 }
+// RP129: what the footer and the Status tab of the column need. The branch and the commits ahead are the board's facts; the PR is the open one of THAT branch and never another (on the base branch, on a
+// detached HEAD, or with nothing loaded there is none); and the two buttons are what view.js decides with the ONE rule of the card of the board: the same busy, held and running-command facts the card reads.
+// What is not known yet (loading, a failed read, no remote) is never read as a PR that is ready: it keeps the button off and says so.
+function columnGit(id, facts) {
+  const prs = S.prs[id];
+  const branch = facts && !facts.error && typeof facts.branch === 'string' ? facts.branch : '';
+  const known = !prs ? 'loading' : prs.error ? 'failed' : prs.noRemote ? 'noRemote' : 'ok';
+  const pr = known === 'ok' && branch && Array.isArray(prs.prs) ? prs.prs.find((p) => p && p.head === branch) || null : null;
+  const noPr = { loading: 'Loading pull requests…', failed: 'Pull requests unavailable', noRemote: 'This repository has no GitHub remote', ok: 'No open pull request for this branch' }[known];
+  const busy = pr ? S.busy[`${id}:${pr.number}`] : undefined;
+  const held = !!pr && !busy && mergeHeld(id, pr.number);
+  const verdict = verdictOf({ id });
+  const hold = verdict && verdict.state === 'running' && V ? V.runningReason({ cmd: verdict.cmd, label: verdict.label }) : '';
+  const ctx = { method: S.prefs.method, busy, held, hold, noPr };
+  return {
+    id, branch, ahead: facts && Number.isInteger(facts.ahead) ? facts.ahead : 0, pr, noPr,
+    merge: V ? V.mergeButton(pr, ctx) : { enabled: false, label: `Merge · ${S.prefs.method}`, title: 'view.js did not load' },
+    rerun: V ? V.rerunButton(pr, ctx) : { show: false, enabled: false, title: '' },
+  };
+}
 function applyLayout() {
   // RP126: how much sits above the layout (0 while it is hidden in another tab: then the last good value stays; a page without the measure sets nothing).
   const top = $('#sumLayout').offsetTop;
@@ -274,8 +294,8 @@ function drawChat() {
   // RP92: the files card is drawn from the facts the board keeps fresh (S.local), so it reads nothing.
   const facts = S.local[S.chat.id];
   // RP128: the column is tabs (Changes, Tasks). The open one belongs to the opening (S.chat.colTab, Changes by default), the closed folders too (S.chat.colFold); with no column nothing is painted.
-  const colTab = S.chat.colTab === 'tasks' ? 'tasks' : 'changes';
-  paint($('#colBody'), !column ? '' : R.columnView({ name: nameOf(S.chat.id), tab: colTab, fold: S.chat.colFold, files: facts && !facts.error && Array.isArray(facts.files) ? facts.files : null, failed: !!(facts && facts.error), selected: S.chat.dfile || '', tasksHtml: colTab === 'tasks' ? R.tasksView(S.tasks[S.chat.id] || null, { compact: true, filter: S.tasksFilter, open: S.tasksFold, loading: !!S.chat.tasksLoading, failed: !!S.chat.tasksFailed }) : '' }));
+  const colTab = S.chat.colTab === 'tasks' || S.chat.colTab === 'status' ? S.chat.colTab : 'changes';
+  paint($('#colBody'), !column ? '' : R.columnView({ name: nameOf(S.chat.id), tab: colTab, fold: S.chat.colFold, git: columnGit(S.chat.id, facts), files: facts && !facts.error && Array.isArray(facts.files) ? facts.files : null, failed: !!(facts && facts.error), selected: S.chat.dfile || '', tasksHtml: colTab === 'tasks' ? R.tasksView(S.tasks[S.chat.id] || null, { compact: true, filter: S.tasksFilter, open: S.tasksFold, loading: !!S.chat.tasksLoading, failed: !!S.chat.tasksFailed }) : '' }));
   // What the person touched in the column keeps the focus across the repaint: a tab by its id, a folder or a fold by its button.
   const want = S.chat.colFocus;
   if (want) {

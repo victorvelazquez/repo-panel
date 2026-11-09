@@ -327,7 +327,10 @@ test('p2: the Tasks tab shows the compact tasks and the Changes tab brings the t
   page.flush();
   assert.equal(selected(col(page)), 'changes');
   assert.equal(fileRows(col(page)).length, 6);
-  for (const t of ['files', 'notes', 'status', '', undefined, '<x>']) { act(page, 'col-tab', { tab: t }); page.flush(); assert.equal(selected(col(page)), 'changes', String(t)); }
+  act(page, 'col-tab', { tab: 'status' }); // RP129: Status is a real tab of the column now
+  page.flush();
+  assert.equal(selected(col(page)), 'status');
+  for (const t of ['files', 'notes', '', undefined, '<x>']) { act(page, 'col-tab', { tab: t }); page.flush(); assert.equal(selected(col(page)), 'changes', String(t)); }
   act(page, 'col-folder', { path: 'public' });
   act(page, 'tasks-fold', { fold: 'done' });
   page.flush();
@@ -397,10 +400,16 @@ test('p6: the arrows, Home and End move between the tabs and the new one takes t
   const tabEl = (t) => ({ dataset: { act: 'col-tab', tab: t }, tagName: 'BUTTON' });
   const e = page.key('ArrowRight', tabEl('changes'));
   page.flush();
-  assert.equal(selected(col(page)), 'tasks');
+  assert.equal(selected(col(page)), 'status', 'RP129: Changes, Status, Tasks');
   assert.equal(e.prevented, true);
-  assert.ok(page.get('#coltab-tasks').focused >= 1, 'the focus goes to the tab that opened');
+  assert.ok(page.get('#coltab-status').focused >= 1, 'the focus goes to the tab that opened');
+  page.key('ArrowRight', tabEl('status'));
+  page.flush();
+  assert.equal(selected(col(page)), 'tasks');
   page.key('ArrowLeft', tabEl('tasks'));
+  page.flush();
+  assert.equal(selected(col(page)), 'status');
+  page.key('ArrowLeft', tabEl('status'));
   page.flush();
   assert.equal(selected(col(page)), 'changes');
   page.key('End', tabEl('changes'));
