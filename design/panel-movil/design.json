@@ -1,0 +1,56 @@
+{
+  "title": "Repo Panel — Summary on a phone",
+  "brief": "Mobile version of the Summary tab (RP131): the three desktop zones (repos list, chat, right column with Changes, Files, Status and Tasks and the fixed footer with Merge) become one zone per screen. The right column stays navigation and quick reading; the centre stays the action zone (chat, Notes and ONE viewer tab with the file or diff, with its ✕); the explorer is never in the centre. Three structures plus a catalog of states and cuts. Tokens taken from the :root of public/style.css.",
+  "feature": "odd/tasks/panel-layout.md",
+  "artboards": [
+    {
+      "file": "01-barra-abajo.html",
+      "title": "A · Bottom tab bar",
+      "tradeoff": "One zone per screen and a bottom bar with Repos, Chat and Repo, reachable with the thumb and each zone a whole screen with the desktop names; costs a tap to move between the repo and the chat, and two fixed bars (footer and bar) in the Repo zone",
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "02-hoja-inferior.html",
+      "title": "B · Chat first with a bottom sheet",
+      "tradeoff": "Chat is always home and the repo rises over it as a sheet, so the conversation stays in view; the list is a drawer. Fewer taps for the chat, but the repo is a layer and not a place, and the sheet hides part of the chat",
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "03-selector-arriba.html",
+      "title": "C · Repo selector on top",
+      "tradeoff": "A single level: the repo name opens the list and six chips hold every view; nothing else on screen. The chips scroll sideways and hide the last ones, and switching repo is one more tap",
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "05-barra-solo-en-listas.html",
+      "title": "E · Bar only on Repos and Repo",
+      "tradeoff": "A with the room of B: the bottom bar stays on Repos and Repo and leaves the Chat zone, which keeps only its message box and moves between zones with the buttons of its header (back to the list, open the repo with a badge); the chat gains about 64 px and a file gets the whole screen; but the chat has no bar to jump to Repo with one tap, and the navigation is not the same in every zone",
+      "width": 1900,
+      "height": 1000
+    },
+    {
+      "file": "06-sin-barra-pila.html",
+      "title": "F · No bottom bar, a stack",
+      "tradeoff": "No bar at all: Repos, then Chat, then Repo as a stack with a back button; the header of the chat has a second line with the branch, the commits ahead and the checks that is also the button that opens Repo, plus a repo button with a badge. The most room for every zone and the fewest controls; the way into Repo is one tap in the header, not a permanent bar, and it needs a real address for each screen so that the phone back button works",
+      "width": 1900,
+      "height": 1000
+    },
+    {
+      "file": "07-pestana-repo.html",
+      "title": "G · Repo as a tab",
+      "tradeoff": "No bar and no stack: three tabs at the top of the repo (Chat, Notes, Repo), each named for what it holds, and Repo is the column of the desktop with its four views and the footer with Merge; a badge on Repo says that checks are pending. The names say what is inside and there is no back button to learn; but Repo is two levels of tabs (Repo, then Changes, Files, Status, Tasks) and the file viewer is one more tab",
+      "width": 1900,
+      "height": 1000
+    },
+    {
+      "file": "04-estados-y-cortes.html",
+      "title": "Catalog · states and cuts",
+      "tradeoff": "Not a direction: the merge confirmation, why Merge is off (written, not a tooltip), 360 px, no pull request and the tablet cut, so the choice is made knowing the cases",
+      "width": 1440,
+      "height": 1720
+    }
+  ]
+}
