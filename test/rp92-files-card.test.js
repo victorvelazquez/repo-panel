@@ -22,47 +22,47 @@ const FILES = [
 const items = (h) => [...h.matchAll(/<button type="button" class="cf-item[^"]*"[^>]*>/g)].map((m) => m[0]);
 
 // ---------- pure ----------
-test('f1: the card has a title with the count and one button per file (status, name, +added -deleted); the whole path is its tooltip and the file to open', () => {
+test('f1 (RP128: tree): the Changes tab counts the files and the panel has the total on top and one button per file (name, +added -deleted, status letter); the whole path is its tooltip and the file to open', () => {
   const h = R.columnView({ name: 'demo', files: FILES });
-  assert.match(h, /<section class="col-card col-files" aria-label="Files with changes of demo"><h3 class="col-title">Files <span class="col-n">4<\/span><\/h3>/);
+  assert.match(h, /<span class="lb">Changes<\/span><span class="n">4<\/span>/);
+  assert.match(h, /<div class="col-sum"><b>4 files<\/b> <span class="a">\+18<\/span> <span class="d">−3<\/span><\/div>/);
   assert.equal(items(h).length, 4);
-  assert.match(h, /<button type="button" class="cf-item" data-act="changes-file" data-path="src\/app\.js" aria-pressed="false" title="src\/app\.js"><span class="cv-st">M<\/span><span class="cf-name">app\.js<\/span><span class="cf-n"><i class="a">\+12<\/i> <i class="d">−3<\/i><\/span><\/button>/);
-  assert.match(h, /data-path="docs\\notes\.md"[^>]*><span class="cv-st">A<\/span><span class="cf-name">notes\.md<\/span>/, 'either slash: only the last part is the name');
-  assert.match(h, /data-path="new\.txt"[^>]*><span class="cv-st">\?<\/span>/);
+  assert.match(h, /<button type="button" class="cf-item cf-d1" data-act="changes-file" data-path="src\/app\.js" aria-pressed="false" title="src\/app\.js">.*<span class="cf-name">app\.js<\/span><span class="cf-n"><i class="a">\+12<\/i> <i class="d">−3<\/i><\/span><span class="cf-st st-M">M<\/span><\/button>/);
+  assert.match(h, /data-path="docs\\notes\.md"[^>]*>.*<span class="cf-name">notes\.md<\/span>.*<span class="cf-st st-A">A<\/span>/, 'either slash: only the last part is the name');
+  assert.match(h, /data-path="new\.txt"[^>]*>.*<span class="cf-st st-\?">\?<\/span>/);
   assert.match(h, /data-path="img\/logo\.png"[^>]*>.*<span class="cf-n">bin<\/span>/, 'a binary file has no line counts');
   assert.doesNotMatch(h, /col-soon|will appear here/);
 });
 
-test('f2: the file open in the diff tab is marked in the card (aria-pressed and cf-on); the others are not', () => {
+test('f2 (RP128: tree): the file open in the diff tab is marked in the tree (aria-pressed and cf-on); the others are not', () => {
   const h = R.columnView({ name: 'demo', files: FILES, selected: 'new.txt' });
   assert.equal((h.match(/cf-on/g) || []).length, 1);
-  assert.match(h, /class="cf-item cf-on" data-act="changes-file" data-path="new\.txt" aria-pressed="true"/);
+  assert.match(h, /class="cf-item cf-on cf-d0" data-act="changes-file" data-path="new\.txt" aria-pressed="true"/);
   assert.equal((h.match(/aria-pressed="false"/g) || []).length, 3);
   assert.equal(items(R.columnView({ name: 'demo', files: FILES, selected: 'nope' })).filter((x) => /cf-on/.test(x)).length, 0);
 });
 
-test('f3: without a list the card says why: loading, unavailable, or no changes; it never shows the old notice and it is total for odd input', () => {
-  assert.match(R.columnView({ name: 'x' }), /<section class="col-card col-files"[^>]*><h3 class="col-title">Files<\/h3><p class="rs-sub" role="status">Loading files…<\/p><\/section>$/);
+test('f3 (RP128: tree): without a list the panel says why: loading, unavailable, or no changes; it never shows the old notice and it is total for odd input', () => {
+  assert.match(R.columnView({ name: 'x' }), /<p class="rs-sub" role="status">Loading files…<\/p><\/div>$/);
   assert.match(R.columnView({ name: 'x', failed: true }), /Files unavailable/);
-  assert.match(R.columnView({ name: 'x', files: [] }), /<h3 class="col-title">Files <span class="col-n">0<\/span><\/h3><p class="rs-sub" role="status">No uncommitted changes<\/p>/);
+  assert.match(R.columnView({ name: 'x', files: [] }), /<span class="n">0<\/span>[\s\S]*<p class="rs-sub" role="status">No uncommitted changes<\/p>/);
   for (const arg of [undefined, null, {}, { files: 'x' }, { files: [null, 3, {}] }, { files: [{ path: 5 }] }]) {
     const h = R.columnView(arg);
-    assert.match(h, /col-files/, JSON.stringify(arg));
+    assert.match(h, /^<div class="col-tabs"/, JSON.stringify(arg));
     assert.doesNotMatch(h, /undefined|null|col-soon/, JSON.stringify(arg));
   }
   assert.equal(items(R.columnView({ files: [null, 3, {}, { path: '' }] })).length, 0, 'entries without a path are skipped');
 });
 
-test('f4: the card goes after the tasks card; names, paths and status are escaped; a long list is cut at 200 with the rest counted', () => {
-  const h = R.columnView({ name: 'a<b>"c', tasksHtml: '<p class="t">T</p>', files: [{ path: 'x/<i>.js', status: '<', added: 1, deleted: 1 }] });
-  assert.ok(h.indexOf('col-tasks') >= 0 && h.indexOf('col-tasks') < h.indexOf('col-files'));
-  assert.doesNotMatch(h, /<i>\.js|<b>/);
+test('f4 (RP128: tree): names, paths and status are escaped; a long list is cut at 200 with the rest counted', () => {
+  const h = R.columnView({ name: 'a<b>"c', files: [{ path: 'x/<i>.js', status: '<', added: 1, deleted: 1 }] });
+  assert.doesNotMatch(h, /<i>\.js|a<b>/);
   assert.match(h, /aria-label="Files with changes of a&lt;b&gt;&quot;c"/);
   assert.match(h, /data-path="x\/&lt;i&gt;\.js"/);
   const many = Array.from({ length: 205 }, (_, i) => ({ path: `f${i}.js`, status: 'M', added: 1, deleted: 0 }));
   const m = R.columnView({ name: 'x', files: many });
   assert.equal(items(m).length, 200);
-  assert.match(m, /<span class="col-n">205<\/span>/);
+  assert.match(m, /<span class="n">205<\/span>/);
   assert.match(m, /<p class="rs-sub" role="status">and 5 more<\/p>/);
 });
 
@@ -77,13 +77,13 @@ test('f5: with the column in the head has no Changes tab either (Chat, Files; Ta
   assert.deepEqual(tabs({ id: 'abc', tab: 'diff', dfile: 'a/b.js' }, { name: 'd', column: true }), ['chat', 'files', 'notes', 'diff']);
 });
 
-test('f6: the styles: the files card fits a narrow column, a long name is clipped and the counts keep their place', () => {
-  assert.match(css, /\.col-files\s*\{[^}]*min-width:\s*0/);
-  assert.match(css, /\.cf-item\s*\{[^}]*display:\s*flex/);
+test('f6 (RP128: tree): the styles: the panel fits a narrow column, a long name is clipped and the counts keep their place', () => {
+  assert.match(css, /\.col-pane\s*\{[^}]*min-width:\s*0/);
+  assert.match(css, /\.cf-item, \.cf-dir\s*\{[^}]*display:\s*flex/);
   assert.match(css, /\.cf-name\s*\{[^}]*overflow:\s*hidden[^}]*text-overflow:\s*ellipsis/);
   assert.match(css, /\.cf-n\s*\{[^}]*flex:\s*none/);
   assert.match(css, /\.cf-item:focus-visible/);
-  assert.match(css, /\.cf-on\s*\{/);
+  assert.match(css, /\.cf-item\.cf-on[^{]*\{/);
 });
 
 // ---------- the page ----------
@@ -162,7 +162,7 @@ test('g1: with the column in, opening a repo draws the card from the board facts
   page.run('S').local.abc = L(FILES);
   open(page, 'abc');
   await page.tick();
-  assert.match(col(page), /class="col-card col-files"/);
+  assert.match(col(page), /class="cf-tree"/);
   assert.equal(items(col(page)).length, 4);
   assert.equal(diffReads(page), 0, 'the card reads nothing');
   assert.deepEqual(tabsOf(page), ['chat', 'files', 'notes']);
@@ -180,12 +180,12 @@ test('g2: touching a file of the card opens it in the diff tab (the diff is read
   assert.equal(page.run('S.chat.dfile'), 'src/app.js');
   assert.equal(diffReads(page), 1);
   assert.match(page.get('#chatBody').html.replace(/<[^>]+>/g, ''), /new app/); // RP66b: the .js rows are colored, the text is the same
-  assert.match(col(page), /cf-on" data-act="changes-file" data-path="src\/app\.js" aria-pressed="true"/);
+  assert.match(col(page), /cf-on cf-d1" data-act="changes-file" data-path="src\/app\.js" aria-pressed="true"/);
   assert.deepEqual(tabsOf(page), ['chat', 'files', 'notes', 'diff']);
   page.run("ACTIONS['changes-file']({ dataset: { path: 'new.txt' } })");
   await page.tick();
   assert.deepEqual(tabsOf(page), ['chat', 'files', 'notes', 'diff'], 'one diff tab');
-  assert.match(col(page), /cf-on" data-act="changes-file" data-path="new\.txt"/);
+  assert.match(col(page), /cf-on cf-d0" data-act="changes-file" data-path="new\.txt"/);
   assert.equal((col(page).match(/cf-on/g) || []).length, 1);
 });
 
@@ -255,7 +255,7 @@ test('g6: the chip "N files" of a card (action diff) with the column in opens th
   await page.tick();
   assert.equal(page.run('S.chat.id'), 'abc');
   assert.equal(page.run('S.chat.tab || "chat"'), 'chat');
-  assert.match(col(page), /class="col-card col-files"/);
+  assert.match(col(page), /class="cf-tree"/);
   assert.equal(diffReads(page), 0);
 });
 

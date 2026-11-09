@@ -164,28 +164,90 @@
     const col = within(Math.round(t * share(r.col, 0.25)), COL_MIN, t - CHAT_MIN - list);
     return { list, chat: t - list - col, col };
   }
-  // RP91 (S4, S5), RP92 (S6): what the right column holds: the TASKS card of the open repo (`tasksHtml` is R.tasksView's answer, drawn by the page; left out when empty) and the FILES card:
-  // the files with uncommitted changes (`files`, the board's facts: path, status, added, deleted), each a button that opens it in the diff tab (`selected` marks the one open there). Total.
+  // RP128 (S20, S21): the right column is TABS (design D of RP127): Changes and Tasks for now. A tab with nothing to show is not drawn (Status comes with RP129, Files and Notes with RP130).
+  // Only the open tab shows its name (the CSS), the others are icons. `tab` is what the page keeps for the opening; anything else reads as Changes. Changes is a TREE by folders of the files with
+  // uncommitted changes (`files`, the board's facts: path, status, added, deleted): a chain of single folders is ONE row, folders come first, each has a count and the total is on top; each file is the
+  // button that opens it in the diff tab (`selected` marks the one open there) and `fold` ({path: true}) holds the closed folders. Tasks is `tasksHtml`, the compact answer of R.tasksView. Total.
+  const COLUMN_TABS = ['changes', 'tasks'];
   const FILES_MAX = 200;
-  const filesCard = (c) => {
-    const label = `Files with changes${c.name ? ` of ${esc(c.name)}` : ''}`;
-    const frame = (n, body) => `<section class="col-card col-files" aria-label="${label}"><h3 class="col-title">Files${n === null ? '' : ` <span class="col-n">${n}</span>`}</h3>${body}</section>`;
-    if (!Array.isArray(c.files)) return frame(null, `<p class="rs-sub" role="status">${c.failed ? 'Files unavailable' : 'Loading files…'}</p>`);
-    const files = c.files.filter((f) => f && typeof f.path === 'string' && f.path);
-    if (!files.length) return frame(0, '<p class="rs-sub" role="status">No uncommitted changes</p>');
-    const item = (f) => {
+  const TREE_DEPTH_MAX = 8;
+  const svgIcon = (d, s = 14) => `<svg width="${s}" height="${s}" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+  const ICON_TAB = {
+    changes: svgIcon('<circle cx="8" cy="8" r="2"/><path d="M8 2v4M8 10v4M2 8h4M10 8h4"/>', 16),
+    tasks: svgIcon('<path d="M3 4.5l1.3 1.3L7 3.2M3 10.5l1.3 1.3L7 9.2M9.5 5h3.5M9.5 11h3.5"/>', 16),
+  };
+  const ICON_DIR = svgIcon('<path d="M2 4.5A1.5 1.5 0 0 1 3.5 3h2.6l1.4 1.5h5A1.5 1.5 0 0 1 14 6v5.5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 11.5z"/>');
+  const ICON_FILE = svgIcon('<path d="M4 2h5l3 3v8.5a.5.5 0 0 1-.5.5h-7a.5.5 0 0 1-.5-.5z"/><path d="M9 2v3h3"/>');
+  const validFiles = (files) => (Array.isArray(files) ? files.filter((f) => f && typeof f.path === 'string' && f.path) : null);
+  const treeByName = (a, b) => {
+    const x = a.name.toLowerCase();
+    const y = b.name.toLowerCase();
+    return x < y ? -1 : x > y ? 1 : a.name < b.name ? -1 : a.name > b.name ? 1 : 0;
+  };
+  // The files as a tree of folders: { name, path, dirs: Map, files: [{ name, f }], count } (count: the files under it). Either slash groups a path; `f.path` keeps its own text to open the diff.
+  function fileTree(files) {
+    const root = { name: '', path: '', dirs: new Map(), files: [], count: 0 };
+    for (const f of files) {
+      const parts = f.path.replace(/\\/g, '/').split('/').filter(Boolean);
+      const name = parts.pop();
+      if (!name) continue;
+      let node = root;
+      for (const p of parts) {
+        let child = node.dirs.get(p);
+        if (!child) { child = { name: p, path: node.path ? `${node.path}/${p}` : p, dirs: new Map(), files: [], count: 0 }; node.dirs.set(p, child); }
+        child.count++;
+        node = child;
+      }
+      node.files.push({ name, f });
+    }
+    return root;
+  }
+  // A folder with no file of its own and a single folder inside is shown as ONE row ("odd/tasks"): follow the chain to its end.
+  const chainOf = (d) => {
+    let label = d.name;
+    while (!d.files.length && d.dirs.size === 1) { d = d.dirs.values().next().value; label += `/${d.name}`; }
+    return { d, label };
+  };
+  function treeRows(node, depth, c, out) {
+    const dd = Math.min(depth, TREE_DEPTH_MAX);
+    for (const child of [...node.dirs.values()].sort(treeByName)) {
+      const { d, label } = chainOf(child);
+      const closed = !!c.fold && Object.hasOwn(c.fold, d.path) && c.fold[d.path] === true;
+      out.push(`<button type="button" class="cf-dir cf-d${dd}" data-act="col-folder" data-path="${esc(d.path)}" aria-expanded="${!closed}"><span class="cf-ch" aria-hidden="true">${closed ? '▸' : '▾'}</span><span class="cf-ic" aria-hidden="true">${ICON_DIR}</span><span class="cf-name">${esc(label)}</span><span class="cf-n">${d.count}</span></button>`);
+      if (!closed) treeRows(d, depth + 1, c, out);
+    }
+    for (const { name, f } of node.files.sort(treeByName)) {
       const on = f.path === c.selected;
-      const name = f.path.split(/[\\/]/).pop() || f.path;
+      const st = String(f.status ?? '');
       const n = f.binary ? 'bin' : `<i class="a">+${Number(f.added) || 0}</i> <i class="d">−${Number(f.deleted) || 0}</i>`;
-      return `<button type="button" class="cf-item${on ? ' cf-on' : ''}" data-act="changes-file" data-path="${esc(f.path)}" aria-pressed="${on}" title="${esc(f.path)}"><span class="cv-st">${esc(f.status ?? '')}</span><span class="cf-name">${esc(name)}</span><span class="cf-n">${n}</span></button>`;
-    };
+      out.push(`<button type="button" class="cf-item${on ? ' cf-on' : ''} cf-d${dd}" data-act="changes-file" data-path="${esc(f.path)}" aria-pressed="${on}" title="${esc(f.path)}"><span class="cf-ic" aria-hidden="true">${ICON_FILE}</span><span class="cf-name">${esc(name)}</span><span class="cf-n">${n}</span><span class="cf-st st-${esc(st)}">${esc(st)}</span></button>`);
+    }
+  }
+  // The paths of the folder rows the tree of this list has (the ones a button can fold): the page uses it to ignore a path that is not one of them.
+  function treeFolderPaths(files) {
+    const valid = validFiles(files);
+    const out = [];
+    const walk = (node) => { for (const child of node.dirs.values()) { const { d } = chainOf(child); out.push(d.path); walk(d); } };
+    if (valid) walk(fileTree(valid.slice(0, FILES_MAX)));
+    return out;
+  }
+  const changesPanel = (c, files) => {
+    if (!files) return `<p class="rs-sub" role="status">${c.failed ? 'Files unavailable' : 'Loading files…'}</p>`;
+    if (!files.length) return '<p class="rs-sub" role="status">No uncommitted changes</p>';
+    const added = files.reduce((a, f) => a + (f.binary ? 0 : Number(f.added) || 0), 0);
+    const deleted = files.reduce((a, f) => a + (f.binary ? 0 : Number(f.deleted) || 0), 0);
+    const rows = [];
+    treeRows(fileTree(files.slice(0, FILES_MAX)), 0, c, rows);
     const more = files.length > FILES_MAX ? `<p class="rs-sub" role="status">and ${files.length - FILES_MAX} more</p>` : '';
-    return frame(files.length, `<div class="cf-list" role="group" aria-label="Changed files">${files.slice(0, FILES_MAX).map(item).join('')}</div>${more}`);
+    return `<div class="col-sum"><b>${files.length} file${files.length === 1 ? '' : 's'}</b> <span class="a">+${added}</span> <span class="d">−${deleted}</span></div><div class="cf-tree" role="group" aria-label="Files with changes${c.name ? ` of ${esc(c.name)}` : ''}">${rows.join('')}</div>${more}`;
   };
   const columnView = (ctx) => {
     const c = ctx && typeof ctx === 'object' ? ctx : {};
-    const tasks = typeof c.tasksHtml === 'string' && c.tasksHtml ? `<section class="col-card col-tasks" aria-label="Tasks${c.name ? ` of ${esc(c.name)}` : ''}"><h3 class="col-title">Tasks</h3>${c.tasksHtml}</section>` : '';
-    return `${tasks}${filesCard(c)}`;
+    const tab = c.tab === 'tasks' ? 'tasks' : 'changes';
+    const files = validFiles(c.files);
+    const tabBtn = ([id, label]) => `<button type="button" role="tab" class="col-tab" id="coltab-${id}" data-act="col-tab" data-tab="${id}" aria-selected="${id === tab}" aria-controls="colpane" aria-label="${label}" title="${label}">${ICON_TAB[id]}<span class="lb">${label}</span>${id === 'changes' && files ? `<span class="n">${files.length}</span>` : ''}</button>`;
+    const body = tab === 'tasks' ? (typeof c.tasksHtml === 'string' && c.tasksHtml ? c.tasksHtml : '<p class="rs-sub" role="status">No tasks to show</p>') : changesPanel(c, files);
+    return `<div class="col-tabs" role="tablist" aria-label="Column views">${[['changes', 'Changes'], ['tasks', 'Tasks']].map(tabBtn).join('')}</div><div class="col-pane" id="colpane" role="tabpanel" aria-labelledby="coltab-${tab}">${body}</div>`;
   };
   // The state of the session (RPC2-1), shown inside the composer frame. Icon + word, never colour alone. c = { info, rpc } (rpc: what V.rpcReduce keeps).
   const SESS_TITLE = {
@@ -278,6 +340,51 @@
   const TASK_MAX = 200;
   const TASK_GROUPS = [['review', 'In review'], ['ready', 'Ready'], ['progress', 'In progress'], ['next', 'Next'], ['pending', 'Pending'], ['blocked', 'Blocked'], ['done', 'Completed']];
   const TASK_OF = { 'En revisión': 'review', Lista: 'ready', 'En curso': 'progress', Pendiente: 'pending', Bloqueada: 'blocked', Completada: 'done' };
+  // RP128 (S20, S21): the compact list of the right column. A segmented bar and its legend say how many tasks are in each state (all of them, whatever the filter); only the rows that ask for an
+  // action are shown (in review, ready, in progress and the next one), one line each (the detail is the tooltip); Pending, Blocked and Completed are folded behind a button with their count (`open`
+  // says which are open; a filter opens the ones it matches). The same cap of rows as the full list; what does not fit is counted.
+  const TK_SEGMENTS = [['done', 'rs-done', 'completed'], ['review', 'rs-pr', 'in review'], ['ready', 'tk-ready', 'ready'], ['progress', 'tk-prog', 'in progress'], ['pending', 'rs-pend', 'pending'], ['blocked', 'rs-blk', 'blocked']];
+  const TK_TONE = { review: 'blue', ready: 'green', progress: 'yellow', next: 'blue' };
+  const TK_FOLDS = [['pending', 'Pending', ''], ['blocked', 'Blocked', ' red'], ['done', 'Completed', '']];
+  function compactTasks({ all, groups, keyOf, derived, byId, ctx, q }) {
+    const counts = {};
+    for (const r of all) { const k = keyOf(r); counts[k] = (counts[k] || 0) + 1; }
+    counts.pending = (counts.pending || 0) + (counts.next || 0);
+    const segs = TK_SEGMENTS.filter(([k]) => counts[k] > 0);
+    const bar = `<div class="tk-bar" role="img" aria-label="${esc(segs.map(([k, , w]) => `${counts[k]} ${w}`).join(', '))}">${segs.map(([k, cls]) => `<i class="${cls}" style="width:${pct(counts[k], all.length)}%"></i>`).join('')}</div>`;
+    const legend = `<div class="tk-leg">${segs.map(([k, cls, w]) => `<span><i class="tk-k ${cls}"></i><b>${counts[k]}</b> ${w}</span>`).join('')}</div>`;
+    const row = (r, key, withChip) => {
+      const d = derived[r.id] || {};
+      const waits = (Array.isArray(r.dependsOn) ? r.dependsOn : []).filter((x) => byId.has(x) && byId.get(x).estado !== 'Completada');
+      const bits = [];
+      if (key === 'review' && Number.isFinite(d.pr)) bits.push(`PR #${d.pr}`);
+      if (key === 'ready' && d.branch) bits.push(d.branch);
+      if (key === 'pending' && waits.length) bits.push(`waiting: ${waits.join(', ')}`);
+      if (key === 'blocked' && r.notas) bits.push(String(r.notas).slice(0, 140));
+      const word = key === 'review' ? (Number.isFinite(d.pr) ? `PR #${d.pr}` : 'in review') : key === 'progress' ? 'in progress' : key;
+      const chip = withChip && TK_TONE[key] ? `<span class="chip ${TK_TONE[key]}">${esc(word)}</span>` : '';
+      const next = key === 'next';
+      return `<div class="tk-row${next ? ' tk-next' : ''}"${next ? ' aria-current="true"' : ''} title="${esc([`${r.id} · ${r.entrega ?? ''}`, ...bits].join(' · '))}"><span class="tk-id mono">${esc(r.id)}</span><span class="tk-tx">${esc(r.entrega ?? '')}</span>${chip}</div>`;
+    };
+    let left = TASK_MAX;
+    let cut = 0;
+    const take = (list, key, withChip) => {
+      let html = '';
+      for (const r of list) { if (left > 0) { html += row(r, key, withChip); left--; } else cut++; }
+      return html;
+    };
+    const parts = [bar, legend];
+    for (const key of ['review', 'ready', 'progress', 'next']) parts.push(take(groups.get(key), key, true));
+    for (const [key, title, tone] of TK_FOLDS) {
+      const list = groups.get(key);
+      if (!list.length) continue;
+      const open = !!q || (!!ctx.open && Object.hasOwn(ctx.open, key) && ctx.open[key] === true);
+      parts.push(`<button type="button" class="tk-fold" data-act="tasks-fold" data-fold="${key}" aria-expanded="${open}"><span class="chev" aria-hidden="true">${open ? '▾' : '▸'}</span>${title}<span class="sp"></span><span class="chip${tone}">${list.length}</span></button>`);
+      if (open) parts.push(`<div class="tk-sub">${take(list, key, false)}</div>`);
+    }
+    if (cut) parts.push(`<div class="task-more rs-sub">+${cut} more</div>`);
+    return parts.join('');
+  }
   function tasksView(rp, ctx = {}) {
     const note = (t) => `<div class="empty" role="status">${t}</div>`;
     if (!rp) return note(ctx.failed ? 'Roadmap unavailable' : 'Loading tasks…');
@@ -290,14 +397,17 @@
     const box = `<input id="tasksFilter" type="search" class="task-filter" aria-label="Filter tasks" placeholder="Filter tasks…" value="${esc(ctx.filter ?? '')}">`;
     if (!all.length) return note('No tasks in the roadmap');
     const groups = new Map(TASK_GROUPS.map(([k]) => [k, []]));
+    const keyOf = (r) => {
+      const d = derived[r.id];
+      const key = TASK_OF[d && TASK_OF[d.state] ? d.state : r.estado];
+      return key === 'pending' && r.id === nextId ? 'next' : key;
+    };
     for (const r of all) {
       if (q && !`${r.id} ${r.entrega ?? ''}`.toLowerCase().includes(q)) continue;
-      const d = derived[r.id];
-      let key = TASK_OF[d && TASK_OF[d.state] ? d.state : r.estado];
-      if (key === 'pending' && r.id === nextId) key = 'next';
-      groups.get(key).push(r);
+      groups.get(keyOf(r)).push(r);
     }
     if (![...groups.values()].some((g) => g.length)) return `${box}${note('No task matches')}`;
+    if (ctx.compact) return `${box}${compactTasks({ all, groups, keyOf, derived, byId, ctx, q })}`; // RP128: the column's list
     let left = TASK_MAX;
     let cut = 0;
     const rowHtml = (r, key) => {
@@ -982,5 +1092,5 @@ ${status}</div>`;
     return `${ctx.failed ? '<div class="rs-note" role="status">⚠ Summary unavailable: showing the last data we have.</div>' : ''}<div class="rs-list">${body}</div>`;
   }
 
-  return { esc, mdHtml, settingsView, memoryChipHtml, legendHtml, listCount, listHeadChips, sessionChip, blockWidths, columnView, composerState, askAllowed, actionMenu, actionButtonsHtml, composerNote, chatHead, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, sessionCloseHtml, sessionTerminalHtml, terminalBlockHtml, recentlyActive, chatBody, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
+  return { esc, mdHtml, settingsView, memoryChipHtml, legendHtml, listCount, listHeadChips, sessionChip, blockWidths, columnView, treeFolderPaths, COLUMN_TABS, composerState, askAllowed, actionMenu, actionButtonsHtml, composerNote, chatHead, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, sessionCloseHtml, sessionTerminalHtml, terminalBlockHtml, recentlyActive, chatBody, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
 }));

@@ -26,27 +26,27 @@ test('c1 (RP92: no Changes tab either): with the column in, the head has no Task
   assert.match(R.chatHead({ id: 'abc', tab: 'files' }, { name: 'demo', column: true }), /data-tab="files"[^>]*aria-selected="true"/);
 });
 
-test('c2: the column draws the tasks card (a title and the tasks inside) and then the files card (RP92); the repo name is escaped in the label', () => {
-  const h = R.columnView({ name: 'a<b>"c', tasksHtml: '<p class="t">T</p>' });
-  assert.match(h, /^<section class="col-card col-tasks" aria-label="Tasks of a&lt;b&gt;&quot;c"><h3 class="col-title">Tasks<\/h3><p class="t">T<\/p><\/section>/);
-  assert.match(h, /<section class="col-card col-files" aria-label="Files with changes of a&lt;b&gt;&quot;c">.*Loading files…<\/p><\/section>$/);
-  assert.doesNotMatch(h, /<b>|a<b>/);
+test('c2 (RP128: tabs): the Tasks tab draws what the page gives it inside the panel; the repo name of the Changes panel is escaped in its label', () => {
+  const t = R.columnView({ name: 'a<b>"c', tab: 'tasks', tasksHtml: '<p class="t">T</p>' });
+  assert.match(t, /aria-labelledby="coltab-tasks"><p class="t">T<\/p><\/div>$/);
+  const c = R.columnView({ name: 'a<b>"c', files: [{ path: 'x.js', status: 'M' }] });
+  assert.match(c, /aria-label="Files with changes of a&lt;b&gt;&quot;c"/);
+  assert.doesNotMatch(c, /a<b>/);
 });
 
-test('c3: without tasks to show (none, or empty) only the files card is drawn; it is total for odd input', () => {
-  for (const arg of [{ name: 'x', tasksHtml: '' }, { name: 'x' }, { tasksHtml: undefined }, {}, undefined, null]) {
+test('c3 (RP128: tabs): without tasks to show the Tasks tab says so; the column is total for odd input', () => {
+  for (const arg of [{ name: 'x', tab: 'tasks', tasksHtml: '' }, { tab: 'tasks' }, { tab: 'tasks', tasksHtml: undefined }, {}, undefined, null]) {
     const h = R.columnView(arg);
-    assert.doesNotMatch(h, /col-tasks/, JSON.stringify(arg));
-    assert.match(h, /col-files/);
+    assert.match(h, /^<div class="col-tabs"/, JSON.stringify(arg));
     assert.doesNotMatch(h, /undefined|null/);
   }
+  assert.match(R.columnView({ name: 'x', tab: 'tasks' }), /<p class="rs-sub" role="status">No tasks to show<\/p>/);
   assert.equal(R.columnNotice, undefined, 'the single notice of RP89 is gone');
 });
 
-test('c4: the styles: the tasks card has its own title and the rows of the tasks fit a narrow column', () => {
-  assert.match(css, /\.col-title\s*\{/);
-  assert.match(css, /\.col-tasks\s*\{[^}]*min-width:\s*0/);
-  assert.match(css, /#col \.task-text\s*\{[^}]*overflow-wrap:\s*anywhere/);
+test('c4 (RP128: tabs): the styles: the panel can shrink and a row of the compact tasks is one clipped line', () => {
+  assert.match(css, /\.col-pane\s*\{[^}]*min-width:\s*0/);
+  assert.match(css, /\.tk-tx\s*\{[^}]*text-overflow:\s*ellipsis/);
 });
 
 // ---------- the page ----------
@@ -113,6 +113,7 @@ const tab = (page, t) => page.run(`ACTIONS['chat-tab']({ dataset: { tab: '${t}' 
 const tasksOpen = (page, id) => page.run(`ACTIONS['tasks-open']({ dataset: { id: '${id}' } })`);
 const col = (page) => page.get('#colBody').html;
 const head = (page) => page.get('#chatHead').html;
+const tasksTab = (page) => { page.run("ACTIONS['col-tab']({ dataset: { tab: 'tasks' } })"); page.flush(); }; // RP128: the tasks are a tab of the column
 
 test('p1: with the column in, opening a repo reads its roadmap once and draws the tasks in the column; the chat stays on the Chat tab and the head has no Tasks tab', async () => {
   const page = boot();
@@ -120,13 +121,15 @@ test('p1: with the column in, opening a repo reads its roadmap once and draws th
   open(page, 'abc');
   await page.tick();
   assert.equal(reads(page, 'abc'), 1);
-  assert.match(col(page), /class="col-card col-tasks"/);
+  assert.doesNotMatch(col(page), /tk-bar/, 'the column opens on Changes');
+  tasksTab(page);
+  assert.match(col(page), /class="tk-bar"/);
   assert.match(col(page), /Delivery of B1/);
   assert.match(col(page), /Delivery of C1/);
   assert.doesNotMatch(col(page), /Delivery of A1/, 'the completed one is folded');
   assert.equal(page.run('S.chat.tab || "chat"'), 'chat');
   assert.doesNotMatch(head(page), /data-tab="tasks"/);
-  assert.match(col(page), /col-files/);
+  assert.match(col(page), /id="coltab-changes"/);
 });
 
 test('p2: the roadmap is read ONCE per opening: redraws, a resize and the filter never ask again', async () => {
@@ -142,18 +145,20 @@ test('p2: the roadmap is read ONCE per opening: redraws, a resize and the filter
   assert.equal(reads(page, 'abc'), 1);
 });
 
-test('p3: the card keeps working in the column: the filter narrows the rows and keeps its value, and the completed group opens and closes', async () => {
+test('p3: the tasks keep working in the column: the filter narrows the rows and keeps its value, and the completed fold opens (RP128: with its own button)', async () => {
   const page = boot();
   page.routes[RM('abc')] = () => Promise.resolve(ok(ROADMAP));
   open(page, 'abc');
   await page.tick();
+  tasksTab(page);
   page.run("ACTIONS['tasks-filter']({ value: 'B1' })");
   page.flush();
   assert.match(col(page), /Delivery of B1/);
   assert.doesNotMatch(col(page), /Delivery of C1/);
   assert.match(col(page), /id="tasksFilter"[^>]*value="B1"/);
   page.run("ACTIONS['tasks-filter']({ value: '' })");
-  page.run("ACTIONS['tasks-done']()");
+  assert.doesNotMatch(col(page), /Delivery of A1/, 'folded until its button is touched');
+  page.run("ACTIONS['tasks-fold']({ dataset: { fold: 'done' } })");
   page.flush();
   assert.match(col(page), /Delivery of A1/, 'the completed group is open');
 });
@@ -163,6 +168,7 @@ test('p3b: the filter box of the column keeps the focus (and the cursor) across 
   page.routes[RM('abc')] = () => Promise.resolve(ok(ROADMAP));
   open(page, 'abc');
   await page.tick();
+  tasksTab(page);
   const box = page.get('#tasksFilter');
   const calls = [];
   box.value = 'B1';
@@ -183,11 +189,14 @@ test('p4: while the roadmap is on its way the card says so, and a failed read sa
   const page = boot();
   open(page, 'abc');
   page.flush();
+  tasksTab(page);
   assert.match(col(page), /Loading tasks…/);
   const bad1 = boot();
   bad1.routes[RM('abc')] = () => Promise.resolve(bad());
   open(bad1, 'abc');
   await bad1.tick();
+  bad1.run("ACTIONS['col-tab']({ dataset: { tab: 'tasks' } })");
+  bad1.flush();
   assert.match(col(bad1), /Roadmap unavailable/);
 });
 
@@ -200,6 +209,7 @@ test('p5: switching repo draws the tasks of the NEW repo, and a late answer of t
   page.flush(); // the first draw starts the read of abc
   open(page, 'xyz');
   await page.tick();
+  tasksTab(page);
   assert.match(col(page), /Delivery of Z1/);
   late(ok(ROADMAP));
   await page.tick();
@@ -217,11 +227,12 @@ test('p5b: a chat read that starts while the roadmap is on its way (the 5 s poll
   page.run('S.chat.seq += 3'); // what loadChat does on every poll
   answer(ok(ROADMAP));
   await page.tick();
+  tasksTab(page);
   assert.match(col(page), /Delivery of B1/, 'the answer of THIS opening is applied');
   assert.equal(page.run('S.chat.tasksLoading'), false);
 });
 
-test('p6: tasks-open (the bar of a card) opens the repo; with the column in the tasks are already there, so the chat stays on the Chat tab', async () => {
+test('p6: tasks-open (the bar of a card) opens the repo; with the column in it opens the Tasks tab of the column (RP128), so the chat stays on the Chat tab', async () => {
   const page = boot();
   page.routes[RM('abc')] = () => Promise.resolve(ok(ROADMAP));
   tasksOpen(page, 'abc');
@@ -229,6 +240,7 @@ test('p6: tasks-open (the bar of a card) opens the repo; with the column in the 
   assert.equal(page.run('S.chat.id'), 'abc');
   assert.equal(page.run('S.chat.tab || "chat"'), 'chat');
   assert.equal(reads(page, 'abc'), 1);
+  assert.match(col(page), /id="coltab-tasks"[^>]*aria-selected="true"/);
   assert.match(col(page), /Delivery of B1/);
   tasksOpen(page, 'abc');
   await page.tick();
@@ -282,6 +294,7 @@ test('n3: when the window grows past 1100 px the column takes the tasks (read on
   page.run('draw()');
   await page.tick();
   assert.equal(reads(page, 'abc'), 1, 'it was already read: no second request');
+  tasksTab(page);
   assert.match(col(page), /Delivery of B1/);
   assert.doesNotMatch(head(page), /data-tab="tasks"/);
   assert.doesNotMatch(page.get('#chatBody').html, /tasksFilter/, 'the body is not the tasks view any more');

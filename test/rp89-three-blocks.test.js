@@ -72,10 +72,11 @@ test('b6: it is total: a width that is not a positive number gives zeros, and ti
   }
 });
 
-test('b7 (RP91 replaced the single notice by R.columnView; RP92 filled its files card): the column always has the files card (loading without facts), and the tasks card only when there are tasks to show', () => {
+test('b7 (RP128 replaced the two cards by tabs): the column is a tab bar and a panel; without facts the Changes panel says it is loading, and the notice of RP89 stays gone', () => {
   const none = R.columnView({ name: 'demo' });
-  assert.match(none, /^<section class="col-card col-files" aria-label="Files with changes of demo"><h3 class="col-title">Files<\/h3><p class="rs-sub" role="status">Loading files…<\/p><\/section>$/);
-  assert.match(R.columnView({ name: 'a<b>"c', tasksHtml: '<p>T</p>' }), /aria-label="Tasks of a&lt;b&gt;&quot;c"/);
+  assert.match(none, /^<div class="col-tabs" role="tablist"/);
+  assert.match(none, /<p class="rs-sub" role="status">Loading files…<\/p><\/div>$/);
+  assert.match(R.columnView({ name: 'a<b>"c', files: [{ path: 'x.js', status: 'M' }] }), /aria-label="Files with changes of a&lt;b&gt;&quot;c"/);
   assert.equal(R.columnNotice, undefined, 'the notice of RP89 is gone');
 });
 
@@ -170,12 +171,11 @@ test('p1: opening a repo shows the three blocks with the default widths and the 
   assert.equal(listW(page), '345px');
   assert.equal(colW(page), '345px');
   for (const id of ['#chat', '#split', '#split2', '#col']) assert.equal(page.get(id).hidden, false, id);
-  assert.match(page.get('#colBody').html, /col-card/);
-  assert.match(page.get('#colBody').html, /demo/);
+  assert.match(page.get('#colBody').html, /class="col-tabs"/, 'with a repo open the column has its tabs');
   page.run("ACTIONS['chat-close']()");
   page.flush();
   for (const id of ['#chat', '#split', '#split2', '#col']) assert.equal(page.get(id).hidden, false, id + ' (RP120: the three blocks stay in with no repo open)');
-  assert.doesNotMatch(page.get('#colBody').html, /demo/, 'the column no longer holds the closed repo');
+  assert.doesNotMatch(page.get('#colBody').html, /col-tabs/, 'the column no longer holds the closed repo');
   assert.equal(listW(page), '345px');
 });
 
