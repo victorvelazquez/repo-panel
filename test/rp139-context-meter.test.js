@@ -17,7 +17,16 @@ const REPO = path.join(scratch, 'repo');
 fs.mkdirSync(REPO);
 process.env.REPO_PANEL_CONFIG = path.join(scratch, 'config.json');
 // The fake pi runs with the repo as its folder: on Windows the folder is busy until the killed process is gone.
-test.after(async () => { await new Promise((r) => setTimeout(r, 1000)); fs.rmSync(scratch, { recursive: true, force: true, maxRetries: 50, retryDelay: 200 }); });
+// `maxRetries` of fs.rmSync only covers ENOTEMPTY, EEXIST and EPERM inside a folder: an EBUSY on the folder itself (the fake pi has it as its working folder on Windows) is thrown at once, so the retry is made here.
+test.after(async () => {
+  await new Promise((r) => setTimeout(r, 1000));
+  for (let i = 1; ; i += 1) {
+    try { fs.rmSync(scratch, { recursive: true, force: true }); return; } catch (e) {
+      if (!['EBUSY', 'EPERM', 'ENOTEMPTY'].includes(e.code) || i >= 100) throw e;
+      await new Promise((r) => setTimeout(r, 200));
+    }
+  }
+});
 
 const lib = require('../lib.js');
 const { createServer } = require('../server/http.js');
