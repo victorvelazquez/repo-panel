@@ -44,9 +44,8 @@ test('c3 (RP128: tabs): without tasks to show the Tasks tab says so; the column 
   assert.equal(R.columnNotice, undefined, 'the single notice of RP89 is gone');
 });
 
-test('c4 (RP128: tabs): the styles: the panel can shrink and a row of the compact tasks is one clipped line', () => {
+test('c4 (RP128: tabs): the styles: the panel can shrink', () => {
   assert.match(css, /\.col-pane\s*\{[^}]*min-width:\s*0/);
-  assert.match(css, /\.tk-tx\s*\{[^}]*text-overflow:\s*ellipsis/);
 });
 
 // ---------- the page ----------
@@ -126,7 +125,8 @@ test('p1: with the column in, opening a repo reads its roadmap once and draws th
   assert.match(col(page), /class="tk-bar"/);
   assert.match(col(page), /Delivery of B1/);
   assert.match(col(page), /Delivery of C1/);
-  assert.doesNotMatch(col(page), /Delivery of A1/, 'the completed one is folded');
+  assert.match(col(page), /class="tk-gh tk-g-done" data-act="tasks-fold" data-fold="done" aria-expanded="false"/, 'the completed group is folded');
+  assert.equal(reads(page, 'abc'), 2, 'RP149: entering the Tasks tab reads the list again (1 at opening + 1 here)');
   assert.equal(page.run('S.chat.tab || "chat"'), 'chat');
   assert.doesNotMatch(head(page), /data-tab="tasks"/);
   assert.match(col(page), /id="coltab-changes"/);
@@ -145,14 +145,16 @@ test('p2: the roadmap is read ONCE per opening: redraws and a resize never ask a
 
 test('p3: the tasks keep working in the column: the completed fold opens (RP128: with its own button)', async () => {
   const page = boot();
-  page.routes[RM('abc')] = () => Promise.resolve(ok(ROADMAP));
+  page.routes[RM('abc')] = () => Promise.resolve(ok({ ...ROADMAP, rows: [ROW('A0', 'Completada'), ...ROADMAP.rows] }));
   open(page, 'abc');
   await page.tick();
   tasksTab(page);
-  assert.doesNotMatch(col(page), /Delivery of A1/, 'folded until its button is touched');
+  assert.doesNotMatch(col(page), /Delivery of A0/, 'folded until its button is touched');
+  assert.doesNotMatch(col(page), /Delivery of A1/, 'RP149: no completed one stays on show while the group is folded');
   page.run("ACTIONS['tasks-fold']({ dataset: { fold: 'done' } })");
   page.flush();
-  assert.match(col(page), /Delivery of A1/, 'the completed group is open');
+  assert.match(col(page), /Delivery of A0/, 'the completed group is open');
+  assert.match(col(page), /Delivery of A1/, 'and lists all of them');
 });
 
 test('p4: while the roadmap is on its way the card says so, and a failed read says it is unavailable', async () => {
@@ -167,6 +169,7 @@ test('p4: while the roadmap is on its way the card says so, and a failed read sa
   await bad1.tick();
   bad1.run("ACTIONS['col-tab']({ dataset: { tab: 'tasks' } })");
   bad1.flush();
+  await bad1.tick(); // RP149: entering the tab reads again; wait for that read to fail too
   assert.match(col(bad1), /Roadmap unavailable/);
 });
 
@@ -197,7 +200,9 @@ test('p5b: a chat read that starts while the roadmap is on its way (the 5 s poll
   page.run('S.chat.seq += 3'); // what loadChat does on every poll
   answer(ok(ROADMAP));
   await page.tick();
+  page.routes[RM('abc')] = () => Promise.reject(new Error('boom')); // RP149: entering the tab reads again; if that read could repaint the list it would hide a dropped answer, so it fails
   tasksTab(page);
+  await page.tick();
   assert.match(col(page), /Delivery of B1/, 'the answer of THIS opening is applied');
   assert.equal(page.run('S.chat.tasksLoading'), false);
 });

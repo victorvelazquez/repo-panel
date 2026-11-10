@@ -130,7 +130,7 @@ const ACTIONS = {
   'notes-mine': () => { const p = S.pad[S.chat.id]; if (p && p.status === 'conflict' && p.disk) { p.base = p.disk.rev; p.status = 'saving'; saveNotes(S.chat.id); draw(); } },
   'tasks-done': () => { S.tasksOpenDone = !S.tasksOpenDone; draw(); },
   // RP128: the right column. The tab and the folded folders belong to the opening (S.chat is replaced when another repo opens); a tab that does not exist reads as Changes.
-  'col-tab': (el) => { const t = el && el.dataset && ['tasks', 'status', 'files'].includes(el.dataset.tab) ? el.dataset.tab : 'changes'; S.chat.colTab = t; S.chat.colFocus = { id: `coltab-${t}` }; if (t === 'files') loadFiles(); draw(); },
+  'col-tab': (el) => { const t = el && el.dataset && ['tasks', 'status', 'files'].includes(el.dataset.tab) ? el.dataset.tab : 'changes'; S.chat.colTab = t; S.chat.colFocus = { id: `coltab-${t}` }; if (t === 'files') loadFiles(); if (t === 'tasks') loadTasks({ force: true }); draw(); },
   'col-folder': (el) => {
     const p = el && el.dataset && el.dataset.path;
     const facts = S.local[S.chat.id];
@@ -141,9 +141,23 @@ const ACTIONS = {
     S.chat.colFocus = { act: 'col-folder', key: 'path', val: p };
     draw();
   },
+  // RP149: "+N more" of Pending opens and closes in place; the refresh button fetches the repo and then reads the list again (a failed fetch still reads what is on this machine and says so).
+  'tasks-more': () => { S.tasksMore = !S.tasksMore; S.chat.colFocus = { act: 'tasks-more', key: 'k', val: 'more' }; draw(); },
+  'tasks-refresh': async () => {
+    const chat = S.chat;
+    const { id } = chat;
+    if (!id || chat.tasksRefreshing) return;
+    chat.tasksRefreshing = true;
+    chat.tasksRefreshFailed = false;
+    draw();
+    try { await api('/api/fetch', { id }); } catch { chat.tasksRefreshFailed = true; }
+    if (S.chat === chat) await loadTasks({ force: true });
+    chat.tasksRefreshing = false;
+    if (S.chat === chat) draw();
+  },
   'tasks-fold': (el) => {
     const k = el && el.dataset && el.dataset.fold;
-    if (!['pending', 'blocked', 'done'].includes(k)) return;
+    if (k !== 'done') return; // RP149: Pending and Blocked are open lists now; only Completed folds
     S.tasksFold = { ...S.tasksFold, [k]: !S.tasksFold[k] };
     S.chat.colFocus = { act: 'tasks-fold', key: 'fold', val: k };
     draw();
