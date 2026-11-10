@@ -19,6 +19,8 @@ body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 sys
 a { color: var(--blue); text-decoration: none; }
 a:hover { text-decoration: underline; }
 button, select, input { font: inherit; color: var(--text); background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; padding: 4px 10px; }
+/* RP141: the rule above never covered textarea, so a textarea with no colour of its own (the Notes box, the editor field of a question) fell back to the browser's black on a dark box. Only the colour: each box keeps its own background, border and padding. */
+textarea { color: var(--text); }
 button { cursor: pointer; }
 button:hover:not(:disabled) { border-color: var(--blue); }
 button:disabled { opacity: .45; cursor: not-allowed; }
