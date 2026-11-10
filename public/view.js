@@ -581,7 +581,7 @@
   // the blocks in order (the index is the `contentIndex` of pi; thinking and tool blocks leave theirs empty), capped.
   const RPC_BLOCKS = 64;
   const RPC_TEXT_MAX = 200000;
-  const rpcBlank = () => ({ state: 'closed', text: '', blocks: [], error: '', startedAt: 0, streaming: false, thinking: false, retry: null, memory: null, ctx: null, asks: [] });
+  const rpcBlank = () => ({ state: 'closed', text: '', blocks: [], error: '', startedAt: 0, streaming: false, thinking: false, retry: null, memory: null, ctx: null, compacting: false, asks: [] });
   const rpcInt = (v, min, max) => (Number.isInteger(v) && v >= min && v <= max ? v : null);
   const rpcText = (blocks) => blocks.filter(Boolean).join('\n\n').slice(0, RPC_TEXT_MAX);
   // One pending dialog as the card needs it (RPC2-3), or null when it is not well formed. The server already caps what it sends; what is still
@@ -608,7 +608,7 @@
     let ctx = false; // RP139: the context of the session must be read again (a run or a compaction ended)
     if (!isObject(p)) return { entry: e, reload, ctx };
     if (p.kind === 'state' && RPC_STATES.includes(p.state)) { e.state = p.state; if (p.state === 'busy') e.streaming = true; }
-    else if (p.kind === 'exit') Object.assign(e, { state: 'closed', blocks: [], text: '', streaming: false, thinking: false, retry: null, memory: null, ctx: null, asks: [] });
+    else if (p.kind === 'exit') Object.assign(e, { state: 'closed', blocks: [], text: '', streaming: false, thinking: false, retry: null, memory: null, ctx: null, compacting: false, asks: [] });
     else if (p.kind === 'memory') { if (MEMORY_CATS.includes(p.memory)) e.memory = p.memory; }
     else if (p.kind === 'dialog') e.asks = rpcAsks(e.asks, rpcAskOf(p));
     else if (p.kind === 'dialog-closed' && typeof p.requestId === 'string') e.asks = rpcAsks(e.asks, null, p.requestId);
@@ -617,7 +617,10 @@
       const a = isObject(r.assistantMessageEvent) ? r.assistantMessageEvent : {};
       if (r.type === 'agent_start') Object.assign(e, { blocks: [], streaming: true, thinking: false, retry: null, error: '', startedAt: now });
       else if (r.type === 'agent_settled') { e.streaming = false; e.thinking = false; e.retry = null; reload = true; ctx = true; }
-      else if (r.type === 'agent_end' || r.type === 'compaction_end') ctx = true;
+      else if (r.type === 'agent_end') ctx = true;
+      // RP140: a compaction (the person's, or one pi starts by itself) is on from its start to its end; the end also asks for the context (RP139).
+      else if (r.type === 'compaction_start') e.compacting = true;
+      else if (r.type === 'compaction_end') { e.compacting = false; ctx = true; }
       // RP105c: pi is retrying a failed request on its own (live only: the history keeps no record). Only valid numbers are kept.
       else if (r.type === 'auto_retry_start') e.retry = { attempt: rpcInt(r.attempt, 1, 1000), max: rpcInt(r.maxAttempts, 1, 1000), delayMs: rpcInt(r.delayMs, 0, 3600000) };
       else if (r.type === 'auto_retry_end') e.retry = null;
@@ -648,6 +651,7 @@
     e.state = st.state;
     e.memory = MEMORY_CATS.includes(st.memory) ? st.memory : st.state === 'closed' ? null : e.memory; // RP110b: a closed session has no memory to report
     if (st.state === 'closed') e.ctx = null; // RP139: a closed session has no context to report
+    e.compacting = st.state !== 'closed' && st.compacting === true; // RP140: the status is the truth about a compaction in progress
     e.asks = (Array.isArray(st.pendingDialogs) ? st.pendingDialogs : []).map(rpcAskOf).filter(Boolean).slice(0, 20);
     e.streaming = st.state === 'busy' || st.state === 'asking';
     if (!e.streaming) Object.assign(e, { blocks: [], text: '', thinking: false, retry: null });

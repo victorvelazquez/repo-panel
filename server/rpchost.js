@@ -122,6 +122,11 @@ function contextOf(stats) {
   return { tokens: nonNeg(u.tokens), window: u.contextWindow, percent: percent === null ? null : Math.min(100, percent) };
 }
 
+// RP140: after a timeout, does the session still say it is compacting? Asked once with a short wait. Any doubt (no answer, a broken answer) reads as no, so the mark never stays on for a session that cannot say.
+async function stillCompacting(entry) {
+  try { const s = await entry.client.request('get_state', {}, { timeoutMs: 5000 }); return !!s && typeof s === 'object' && s.isCompacting === true; } catch { return false; }
+}
+
 function wire(e) {
   if (!e || typeof e !== 'object') return null;
   if (e.kind === 'status') return null; // a raw notice never goes to the page (the host turns it into `memory` first)
@@ -134,13 +139,13 @@ function wire(e) {
   return e;
 }
 
-function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClient, max = 6, adoptedOf = (id) => (loadConfig().sessions || {})[id], adopt = () => {}, env = process.env, contextMs = 10000, suffix = () => crypto.randomBytes(3).toString('hex') }) {
+function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClient, max = 6, adoptedOf = (id) => (loadConfig().sessions || {})[id], adopt = () => {}, env = process.env, contextMs = 10000, compactMs = 600000, suffix = () => crypto.randomBytes(3).toString('hex') }) {
   const live = new Map(); // repo id -> { client, sessionId, ready }
 
   const closedStatus = { state: 'closed', pendingDialogs: [], sessionId: null };
   // A pending dialog is named `requestId` here as in the SSE `dialog` event.
   const statusOf = (entry) => (entry && entry.client
-    ? { state: entry.client.state(), pendingDialogs: entry.client.pendingDialogs().map(({ id, ...rest }) => ({ requestId: id, ...rest })), sessionId: entry.sessionId, ...(entry.memory ? { memory: entry.memory } : {}) }
+    ? { state: entry.client.state(), pendingDialogs: entry.client.pendingDialogs().map(({ id, ...rest }) => ({ requestId: id, ...rest })), sessionId: entry.sessionId, ...(entry.memory ? { memory: entry.memory } : {}), ...(entry.compacting ? { compacting: true } : {}) }
     : closedStatus);
   const running = (id) => {
     const entry = live.get(id);
@@ -171,6 +176,8 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
       cwd: repo.path,
       env: runtimeEnv(found.active, env),
       onEvent: (e) => {
+        // RP140: the compaction mark follows the events of THIS session, so one that pi starts by itself (threshold, overflow) shows too.
+        if (e && e.kind === 'event' && e.record && live.get(id) === entry && (e.record.type === 'compaction_start' || e.record.type === 'compaction_end')) entry.compacting = e.record.type === 'compaction_start';
         if (e && e.kind === 'status') { // RP110b: only the notice of THIS session counts (an old client's is not the new one's), and only a change of category is published
           const cat = e.key === 'engram' && live.get(id) === entry ? memoryOf(e.text) : null;
           if (cat && cat !== entry.memory) { entry.memory = cat; publish(id, { kind: 'memory', memory: cat }); }
@@ -244,6 +251,7 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
       if (behavior !== undefined && !BEHAVIORS.includes(behavior)) throw new HttpError(400, 'behavior must be steer or followUp');
       const message = cleanText(value);
       const entry = running(id);
+      if (entry.compacting) throw new HttpError(409, 'The session is compacting its context: wait a moment'); // pi would refuse it too
       return ask(entry, 'prompt', { message, ...(behavior ? { streamingBehavior: behavior } : {}) });
     },
     async steer(id, value) {
@@ -277,6 +285,35 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
       repoOf(id);
       const entry = running(id);
       try { return contextOf(await entry.client.request('get_session_stats', {}, { timeoutMs: contextMs })); } catch { return { ...CONTEXT_NONE }; }
+    },
+    // RP140 (S28): compacts the context by hand. The server alone decides: only a running idle session gets `compact` (a busy one only with force === true, because pi aborts the turn in progress first; asking,
+    // starting and closed get nothing). `manual` closes the window of two simultaneous calls: the check and the mark are one synchronous step. No text of the page or of the session goes in or out.
+    async compact(id, { force = false } = {}) {
+      repoOf(id);
+      const entry = running(id);
+      const state = stateOf(id);
+      if (entry.compacting || entry.manual) throw new HttpError(409, 'The session is already compacting its context');
+      if (state === 'asking') throw new HttpError(409, 'A question is waiting for your answer: answer it before compacting');
+      if (state === 'starting') throw new HttpError(409, 'The session is still starting');
+      if (state === 'busy' && force !== true) throw new HttpError(409, 'The session is answering: compacting stops that answer first');
+      if (state !== 'idle' && state !== 'busy') throw new HttpError(409, 'The session is not started');
+      entry.manual = true;
+      entry.compacting = true;
+      let keep = false; // a timeout is not an end: while the session still reports compacting the mark stays (its end event clears it) and a second compact is refused
+      try {
+        await entry.client.request('compact', {}, { timeoutMs: compactMs });
+        return { compacted: true };
+      } catch (e) {
+        const why = e instanceof RpcError && typeof e.reason === 'string' ? e.reason : '';
+        if (why.startsWith('Already compacted')) throw new HttpError(409, 'The context is already compacted');
+        if (why.startsWith('Nothing to compact')) throw new HttpError(409, 'There is nothing to compact yet: the session is too small');
+        if (e instanceof RpcError && e.message === 'The agent did not answer in time') { keep = await stillCompacting(entry); throw new HttpError(504, 'The compaction did not finish in time'); }
+        throw new HttpError(502, 'The compaction failed');
+      } finally {
+        entry.manual = false;
+        // No end event arrived (it timed out or failed): the mark goes and the page is told with the event it already reads.
+        if (entry.compacting && !keep) { entry.compacting = false; if (live.get(id) === entry) publish(id, { kind: 'event', record: { type: 'compaction_end', reason: 'manual' } }); }
+      }
     },
     async status(id) { repoOf(id); return statusOf(live.get(id)); },
     closeAll() {
@@ -328,6 +365,8 @@ function rpcApi(host) {
     },
     status: (q) => host.status(idOf(bodyOf(q))),
     context: (q) => host.context(idOf(bodyOf(q))),
+    // RP140: `force` is a strict boolean; nothing else of the body is read (no instructions for the compaction come from the page).
+    compact: (b) => host.compact(idOf(bodyOf(b)), { force: b.force === true }),
   };
 }
 

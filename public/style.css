@@ -647,6 +647,8 @@ body.tab-summary #viewbar { display: none; }
 .ss-close { margin-left: auto; flex: none; font-size: 12px; padding: 1px 8px; }
 .ss-close:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 /* RP118: the Terminal button sits before Close session; the block with the command opens under the state row. */
+.ss-compact { flex: none; font-size: 12px; padding: 1px 8px; }
+.ss-compact:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 .ss-term { margin-left: auto; flex: none; font-size: 12px; padding: 1px 8px; }
 .ss-term + .ss-close { margin-left: 0; }
 .ss-term:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }

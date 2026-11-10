@@ -162,7 +162,8 @@ function createRpcClient({ command, args = [], cwd, env, spawn = cp.spawn, platf
     if (!entry) return; // unknown id: ignored
     pending.delete(rec.id);
     clearTimeout(entry.timer);
-    if (rec.success !== true) return entry.reject(fail('The agent rejected the command'));
+    // RP140: the text of a refusal stays in `reason` (never in the message): the host only matches its start to tell a known refusal; it is never forwarded.
+    if (rec.success !== true) { const err = fail('The agent rejected the command'); if (typeof rec.error === 'string') err.reason = rec.error.slice(0, 200); return entry.reject(err); }
     const data = rec.data === undefined || rec.data === null ? {} : rec.data;
     if (entry.type === 'prompt' && data.disposition === 'started') {
       streaming = true;

@@ -166,6 +166,8 @@ const routes = {
   'GET /api/rpc/status': (q, b, d) => rpcApi(d.rpcHost).status(q),
   // RP139: the share of the context window the session uses, as three clean numbers (read-only: it changes no setting of pi).
   'GET /api/rpc/context': (q, b, d) => rpcApi(d.rpcHost).context(q),
+  // RP140: compacts the context of the session by hand (the server decides if it may; it changes no setting of pi).
+  'POST /api/rpc/compact': (q, b, d) => rpcApi(d.rpcHost).compact(b),
   'POST /api/queue': (q, b) => queueFor(b),
   'POST /api/conformity': (q, b) => conformityFor(b),
   'POST /api/repos': (q, b) => addRepo(b.path, b.group),
