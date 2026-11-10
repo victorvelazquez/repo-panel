@@ -24,7 +24,7 @@ const ROWS = [
 ];
 const DERIVED = { E1: { state: 'En revisión', via: 'pr', pr: 12 }, F1: { state: 'Lista', via: 'branch', branch: 'feat/f1' } };
 const rp = (over = {}) => ({ available: true, reason: undefined, rows: ROWS, derived: DERIVED, next: ROWS.find((r) => r.id === 'C2'), ...over });
-const view = (p = rp(), ctx = {}) => R.tasksView(p, { filter: '', openDone: false, loading: false, failed: false, ...ctx });
+const view = (p = rp(), ctx = {}) => R.tasksView(p, { openDone: false, loading: false, failed: false, ...ctx });
 const headings = (html) => Array.from(html.matchAll(/class="task-group[^"]*"[^>]*>\s*<[^>]*>([^<]+)/g)).map((m) => m[1].trim());
 const deepFreeze = (o) => { if (o && typeof o === 'object') { Object.values(o).forEach(deepFreeze); Object.freeze(o); } return o; };
 
@@ -110,36 +110,6 @@ test('tasksView: openDone shows the completed rows and aria-expanded true', () =
   assert.match(h, /data-act="tasks-done"[^>]*aria-expanded="true"/);
   assert.ok(h.includes('>A1<') && h.includes('>A2<'));
   assert.match(h, /Delivery of A1/);
-});
-
-// ---------- tasksView: filter ----------
-test('tasksView: the filter is a case-insensitive substring over id and entrega; counts follow the filtered rows', () => {
-  const byId = view(rp(), { filter: 'c1' });
-  assert.deepEqual(headings(byId), ['Pending (1)']);
-  assert.ok(byId.includes('>C1<') && !byId.includes('>C2<'));
-  const byText = view(rp(), { filter: 'DELIVERY OF B1' });
-  assert.deepEqual(headings(byText), ['In progress (1)']);
-  assert.equal(view(rp(), { filter: '  ' }).includes('>E1<'), true, 'a blank filter filters nothing');
-});
-
-test('tasksView: a filter that matches a completed row opens the group so the person sees it', () => {
-  const h = view(rp(), { filter: 'A2' });
-  assert.deepEqual(headings(h), ['Completed (1)']);
-  assert.ok(h.includes('>A2<'));
-});
-
-test('tasksView: nothing matches says "No task matches"', () => {
-  const h = view(rp(), { filter: 'zzz-nothing' });
-  assert.match(h, /No task matches/);
-  assert.ok(!/task-group/.test(h));
-});
-
-test('tasksView: the filter is text, never markup or a regex (a regex metacharacter and a tag are inert)', () => {
-  for (const f of ['.*', '(', '[', '<b>', '\\']) {
-    const h = view(rp(), { filter: f });
-    assert.match(h, /No task matches/, f);
-    assert.ok(!h.includes('<b>'), f);
-  }
 });
 
 // ---------- tasksView: hostile and missing fields, bounds ----------

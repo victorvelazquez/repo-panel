@@ -295,14 +295,19 @@ function drawChat() {
     return;
   }
   const column = columnOn();
-  // RP91: with the column in, its tasks card is read when the repo OPENS (once per opening); the filter box keeps the focus across redraws.
+  // RP91: with the column in, its tasks card is read when the repo OPENS (once per opening).
   if (column) loadTasks();
-  const colFocus = column && document.activeElement && document.activeElement.id === 'tasksFilter';
   // RP92: the files card is drawn from the facts the board keeps fresh (S.local), so it reads nothing.
   const facts = S.local[S.chat.id];
+  // RP148: the tab the column opens on follows the situation of the repo. It is decided ONCE per opening, as soon as the facts are known: never over a tab the person chose, never again when the situation changes.
+  if (column && !S.chat.colTab && V) {
+    const pr = !!columnGit(S.chat.id, facts).pr;
+    const pick = V.columnTabFor({ files: facts && !facts.error ? facts.files : null, ahead: facts ? facts.ahead : undefined, hasPr: pr, prsKnown: !!S.prs[S.chat.id] });
+    if (pick) S.chat.colTab = pick;
+  }
   // RP128: the column is tabs (Changes, Tasks). The open one belongs to the opening (S.chat.colTab, Changes by default), the closed folders too (S.chat.colFold); with no column nothing is painted.
   const colTab = ['tasks', 'status', 'files'].includes(S.chat.colTab) ? S.chat.colTab : 'changes';
-  paint($('#colBody'), !column ? '' : R.columnView({ name: nameOf(S.chat.id), tab: colTab, fold: S.chat.colFold, git: columnGit(S.chat.id, facts), files: facts && !facts.error && Array.isArray(facts.files) ? facts.files : null, failed: !!(facts && facts.error), selected: S.chat.dfile || '', tree: colTab === 'files' ? S.files[S.chat.id] || null : null, changed: colTab === 'files' ? changedOf(S.chat.id) : null, fselected: S.chat.ffile || '', fopen: S.filesOpen[S.chat.id] || {}, filesFailed: !!S.chat.filesFailed, tasksHtml: colTab === 'tasks' ? R.tasksView(S.tasks[S.chat.id] || null, { compact: true, filter: S.tasksFilter, open: S.tasksFold, loading: !!S.chat.tasksLoading, failed: !!S.chat.tasksFailed }) : '' }));
+  paint($('#colBody'), !column ? '' : R.columnView({ name: nameOf(S.chat.id), tab: colTab, fold: S.chat.colFold, git: columnGit(S.chat.id, facts), files: facts && !facts.error && Array.isArray(facts.files) ? facts.files : null, failed: !!(facts && facts.error), selected: S.chat.dfile || '', tree: colTab === 'files' ? S.files[S.chat.id] || null : null, changed: colTab === 'files' ? changedOf(S.chat.id) : null, fselected: S.chat.ffile || '', fopen: S.filesOpen[S.chat.id] || {}, filesFailed: !!S.chat.filesFailed, tasksHtml: colTab === 'tasks' ? R.tasksView(S.tasks[S.chat.id] || null, { compact: true, open: S.tasksFold, loading: !!S.chat.tasksLoading, failed: !!S.chat.tasksFailed }) : '' }));
   // What the person touched in the column keeps the focus across the repaint: a tab by its id, a folder or a fold by its button.
   const want = S.chat.colFocus;
   if (want) {
@@ -310,8 +315,6 @@ function drawChat() {
     const el = want.id ? $(`#${want.id}`) : Array.from(document.querySelectorAll(`#colBody [data-act="${want.act}"]`)).find((b) => b.dataset && b.dataset[want.key] === want.val);
     if (el && el.focus) el.focus();
   }
-  const colBox = colFocus ? $('#tasksFilter') : null;
-  if (colBox && colBox.focus && document.activeElement !== colBox) { colBox.focus(); if (colBox.setSelectionRange) colBox.setSelectionRange(colBox.value.length, colBox.value.length); }
   paint($('#chatHead'), R.chatHead(S.chat, { name: nameOf(S.chat.id), column }));
   const tasksTab = S.chat.tab === 'tasks' && !column;
   const changesTab = S.chat.tab === 'changes' && !column; // RP92: with the column in, the files card replaces the tab
@@ -353,11 +356,8 @@ function drawChat() {
     return;
   }
   if (tasksTab) {
-    const hadFocus = document.activeElement && document.activeElement.id === 'tasksFilter';
-    paint($('#chatBody'), R.tasksView(S.tasks[S.chat.id] || null, { filter: S.tasksFilter, openDone: S.tasksOpenDone, loading: !!S.chat.tasksLoading, failed: !!S.chat.tasksFailed }));
+    paint($('#chatBody'), R.tasksView(S.tasks[S.chat.id] || null, { openDone: S.tasksOpenDone, loading: !!S.chat.tasksLoading, failed: !!S.chat.tasksFailed }));
     chatShown = null;
-    const box = hadFocus ? $('#tasksFilter') : null;
-    if (box && box.focus && document.activeElement !== box) { box.focus(); if (box.setSelectionRange) box.setSelectionRange(box.value.length, box.value.length); }
     return;
   }
   prunePending(S.chat.id);

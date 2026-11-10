@@ -148,7 +148,6 @@ const ACTIONS = {
     S.chat.colFocus = { act: 'tasks-fold', key: 'fold', val: k };
     draw();
   },
-  'tasks-filter': (el) => { S.tasksFilter = String((el && el.value) || ''); draw(); },
   'chat-close': () => closeChat(),
   'chat-send': () => sendChatMessage(),
   // RP106b: the start of the text of one tool result, on request. The chip names the call; a second click folds it. An answer that arrives after the chat changed is dropped (the bag is replaced when a chat opens or closes).

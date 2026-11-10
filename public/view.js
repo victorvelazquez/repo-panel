@@ -18,6 +18,15 @@
     return !(typeof health === 'object' && Number.isInteger(health.api) && health.api === API_VERSION);
   }
 
+  // RP148: the tab the right column OPENS on, from the situation of the repo (the page decides once per opening, as soon as this stops answering null): uncommitted changes -> 'changes'; an open PR of the
+  // branch -> 'status'; a clean tree with nothing ahead to deliver -> 'tasks'; anything else -> 'changes'. null while what matters is not known yet: the files, or (with a clean tree) the answer of the PRs.
+  function columnTabFor(s) {
+    if (!isObject(s) || !Array.isArray(s.files)) return null;
+    if (s.files.length > 0) return 'changes';
+    if (s.prsKnown !== true) return null;
+    if (s.hasPr === true) return 'status';
+    return Number.isInteger(s.ahead) && s.ahead === 0 ? 'tasks' : 'changes';
+  }
   // RP143: the Conformity tab is an icon with an aria-label, so the count has to be in the label to be read.
   function conformityTabLabel(n) { return Number.isInteger(n) && n > 0 ? `Conformity: ${n} to review` : 'Conformity'; }
   // Single place that decides what the conformity drawer says.
@@ -934,5 +943,5 @@
     return `${dot}${meters.join('')}<div class="usage-pop" role="group" aria-label="Claude usage details">${details.join('')}${note}${foot}</div>`;
   }
 
-  return { conformityTabLabel, repoModel, changeChips, prChip, idleChip, conflictChip, sizeChip, RepoCard, stateLineHidden, usageView, usageHtml, usageRemaining, boardApply, boardWait, chatCachePut, chatCacheGet, rpcWithContext, chatFromCache, API_VERSION, mergeButton, rerunButton, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, dirtyRepos, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, taskPrs, matchesUnitId, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, parseSse, rpcEvent, rpcReduce, rpcFromStatus, eventsPlan, eventsRetryMs, eventsStale };
+  return { columnTabFor, conformityTabLabel, repoModel, changeChips, prChip, idleChip, conflictChip, sizeChip, RepoCard, stateLineHidden, usageView, usageHtml, usageRemaining, boardApply, boardWait, chatCachePut, chatCacheGet, rpcWithContext, chatFromCache, API_VERSION, mergeButton, rerunButton, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, dirtyRepos, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, taskPrs, matchesUnitId, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, parseSse, rpcEvent, rpcReduce, rpcFromStatus, eventsPlan, eventsRetryMs, eventsStale };
 }));
