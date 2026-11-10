@@ -59,6 +59,9 @@ const own = (o, ...keys) => Object.fromEntries(keys.filter((k) => o[k] !== undef
 const finiteOwn = (o, ...keys) => Object.fromEntries(keys.filter((k) => Number.isFinite(o[k])).map((k) => [k, o[k]]));
 // The text of a finished assistant turn (the page needs nothing else of it).
 const turnText = (m) => (m && Array.isArray(m.content) ? m.content.filter((c) => c && c.type === 'text' && typeof c.text === 'string').map((c) => c.text).join('\n\n') : '');
+// RP139: the reason of a compaction is one of this closed list (the page reads the context again when one ends); any other value is dropped.
+const COMPACTION_REASONS = ['manual', 'threshold', 'overflow'];
+const reasonOf = (r) => (COMPACTION_REASONS.includes(r.reason) ? { reason: r.reason } : {});
 // Per type, the small fields the page uses. `message_start`, `message_end` and `agent_end` carry the whole system prompt (about 180 KB) and
 // `agent_end` every message, so nothing is copied by default: what is not listed here never leaves the server.
 const WHITELIST = {
@@ -80,6 +83,8 @@ const WHITELIST = {
   // RP105c: a retry that pi does on its own. Only numbers and the verdict travel; the error texts (`errorMessage`, `finalError`) can hold the raw body of an API answer.
   auto_retry_start: (r) => finiteOwn(r, 'attempt', 'maxAttempts', 'delayMs'),
   auto_retry_end: (r) => ({ ...finiteOwn(r, 'attempt'), ...(typeof r.success === 'boolean' ? { success: r.success } : {}) }),
+  compaction_start: reasonOf,
+  compaction_end: reasonOf,
   tool_execution_start: (r) => own(r, 'toolName', 'isError', 'durationMs'),
   tool_execution_end: (r) => own(r, 'toolName', 'isError', 'durationMs'),
 };
@@ -106,6 +111,17 @@ function memoryOf(text) {
   return m[1].toLowerCase() === 'ready' ? 'ready' : m[1].toLowerCase() === 'offline' ? 'offline' : 'error';
 }
 
+// RP139: what the page may know of the context window of a session: three numbers, every one finite and not negative or null. Nothing else of the answer (no text, no other field) is kept.
+// A window that is not a positive integer makes the whole answer unknown; `tokens` and `percent` are null right after a compaction and stay null (never 0).
+const CONTEXT_NONE = { tokens: null, window: null, percent: null };
+const nonNeg = (v) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : null);
+function contextOf(stats) {
+  const u = stats && typeof stats === 'object' ? stats.contextUsage : null;
+  if (!u || typeof u !== 'object' || Array.isArray(u) || !Number.isSafeInteger(u.contextWindow) || u.contextWindow <= 0) return { ...CONTEXT_NONE };
+  const percent = nonNeg(u.percent);
+  return { tokens: nonNeg(u.tokens), window: u.contextWindow, percent: percent === null ? null : Math.min(100, percent) };
+}
+
 function wire(e) {
   if (!e || typeof e !== 'object') return null;
   if (e.kind === 'status') return null; // a raw notice never goes to the page (the host turns it into `memory` first)
@@ -118,7 +134,7 @@ function wire(e) {
   return e;
 }
 
-function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClient, max = 6, adoptedOf = (id) => (loadConfig().sessions || {})[id], adopt = () => {}, env = process.env, suffix = () => crypto.randomBytes(3).toString('hex') }) {
+function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClient, max = 6, adoptedOf = (id) => (loadConfig().sessions || {})[id], adopt = () => {}, env = process.env, contextMs = 10000, suffix = () => crypto.randomBytes(3).toString('hex') }) {
   const live = new Map(); // repo id -> { client, sessionId, ready }
 
   const closedStatus = { state: 'closed', pendingDialogs: [], sessionId: null };
@@ -256,6 +272,12 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
       const entry = live.get(id);
       return { cwd: repo.path, launcher: found.active.command, sessionId: entry && entry.sessionId ? entry.sessionId : sessionIdFor(repo, adoptedOf(id)) };
     },
+    // RP139: read-only. Any failure of the session (refused, no answer in time, a broken answer) is the unknown answer, never its text.
+    async context(id) {
+      repoOf(id);
+      const entry = running(id);
+      try { return contextOf(await entry.client.request('get_session_stats', {}, { timeoutMs: contextMs })); } catch { return { ...CONTEXT_NONE }; }
+    },
     async status(id) { repoOf(id); return statusOf(live.get(id)); },
     closeAll() {
       epoch++;
@@ -305,6 +327,7 @@ function rpcApi(host) {
       return host.answer(id, b.requestId, answerOf(b));
     },
     status: (q) => host.status(idOf(bodyOf(q))),
+    context: (q) => host.context(idOf(bodyOf(q))),
   };
 }
 

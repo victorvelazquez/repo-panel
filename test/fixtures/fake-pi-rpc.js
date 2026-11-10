@@ -11,6 +11,8 @@
 //   FAKE_DIALOG=select|confirm  a prompt raises that dialog (FAKE_DIALOG_TIMEOUT=<ms> adds a timeout) and the run ends when it is answered
 //   FAKE_RUN_MS     how long a prompt runs before agent_end (default 30)
 //   FAKE_FLOOD=<n>  a line of n characters after the first answer
+//   FAKE_STATS=<json>  the data that get_session_stats answers (default: 124000 of 200000 tokens, 62 percent); FAKE_STATS_FAIL=1 answers success false
+//   the command fake_emit { record } is answered and then written to stdout as an event (for example a compaction_end)
 //   FAKE_LOG=<file> every line received on stdin is appended to this file
 const fs = require('node:fs');
 
@@ -75,6 +77,8 @@ async function handle(line) {
   }
   if (msg.type === 'steer' || msg.type === 'follow_up') return reply(true, { disposition: 'queued' });
   if (msg.type === 'abort') { reply(true, {}); return endRun(); }
+  if (msg.type === 'get_session_stats') return env.FAKE_STATS_FAIL ? reply(false, null, 'stats failed: /home/secret/file.txt') : reply(true, env.FAKE_STATS ? JSON.parse(env.FAKE_STATS) : { contextUsage: { tokens: 124000, contextWindow: 200000, percent: 62 } });
+  if (msg.type === 'fake_emit') { reply(true, {}); return out(msg.record); }
   return reply(false, null, 'unknown command');
 }
 

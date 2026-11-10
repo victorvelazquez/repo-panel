@@ -581,7 +581,7 @@
   // the blocks in order (the index is the `contentIndex` of pi; thinking and tool blocks leave theirs empty), capped.
   const RPC_BLOCKS = 64;
   const RPC_TEXT_MAX = 200000;
-  const rpcBlank = () => ({ state: 'closed', text: '', blocks: [], error: '', startedAt: 0, streaming: false, thinking: false, retry: null, memory: null, asks: [] });
+  const rpcBlank = () => ({ state: 'closed', text: '', blocks: [], error: '', startedAt: 0, streaming: false, thinking: false, retry: null, memory: null, ctx: null, asks: [] });
   const rpcInt = (v, min, max) => (Number.isInteger(v) && v >= min && v <= max ? v : null);
   const rpcText = (blocks) => blocks.filter(Boolean).join('\n\n').slice(0, RPC_TEXT_MAX);
   // One pending dialog as the card needs it (RPC2-3), or null when it is not well formed. The server already caps what it sends; what is still
@@ -605,9 +605,10 @@
     const e = { ...rpcBlank(), ...(isObject(prev) ? prev : {}) };
     e.blocks = Array.isArray(e.blocks) ? e.blocks.slice(0, RPC_BLOCKS) : [];
     let reload = false;
-    if (!isObject(p)) return { entry: e, reload };
+    let ctx = false; // RP139: the context of the session must be read again (a run or a compaction ended)
+    if (!isObject(p)) return { entry: e, reload, ctx };
     if (p.kind === 'state' && RPC_STATES.includes(p.state)) { e.state = p.state; if (p.state === 'busy') e.streaming = true; }
-    else if (p.kind === 'exit') Object.assign(e, { state: 'closed', blocks: [], text: '', streaming: false, thinking: false, retry: null, memory: null, asks: [] });
+    else if (p.kind === 'exit') Object.assign(e, { state: 'closed', blocks: [], text: '', streaming: false, thinking: false, retry: null, memory: null, ctx: null, asks: [] });
     else if (p.kind === 'memory') { if (MEMORY_CATS.includes(p.memory)) e.memory = p.memory; }
     else if (p.kind === 'dialog') e.asks = rpcAsks(e.asks, rpcAskOf(p));
     else if (p.kind === 'dialog-closed' && typeof p.requestId === 'string') e.asks = rpcAsks(e.asks, null, p.requestId);
@@ -615,7 +616,8 @@
       const r = p.record;
       const a = isObject(r.assistantMessageEvent) ? r.assistantMessageEvent : {};
       if (r.type === 'agent_start') Object.assign(e, { blocks: [], streaming: true, thinking: false, retry: null, error: '', startedAt: now });
-      else if (r.type === 'agent_settled') { e.streaming = false; e.thinking = false; e.retry = null; reload = true; }
+      else if (r.type === 'agent_settled') { e.streaming = false; e.thinking = false; e.retry = null; reload = true; ctx = true; }
+      else if (r.type === 'agent_end' || r.type === 'compaction_end') ctx = true;
       // RP105c: pi is retrying a failed request on its own (live only: the history keeps no record). Only valid numbers are kept.
       else if (r.type === 'auto_retry_start') e.retry = { attempt: rpcInt(r.attempt, 1, 1000), max: rpcInt(r.maxAttempts, 1, 1000), delayMs: rpcInt(r.delayMs, 0, 3600000) };
       else if (r.type === 'auto_retry_end') e.retry = null;
@@ -629,7 +631,15 @@
       }
       if (r.type === 'agent_start' || r.type === 'message_update') e.text = rpcText(e.blocks);
     }
-    return { entry: e, reload };
+    return { entry: e, reload, ctx };
+  }
+  // RP139 (S28): the share of the context window a session uses, as three validated numbers and nothing else (GET /api/rpc/context). A null stays null (unknown); a percent is clamped to 0..100.
+  const ctxNum = (v) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : null);
+  function rpcWithContext(prev, a) {
+    const o = isObject(a) ? a : {};
+    const window = Number.isSafeInteger(o.window) && o.window > 0 ? o.window : null;
+    const percent = ctxNum(o.percent);
+    return { ...rpcBlank(), ...(isObject(prev) ? prev : {}), ctx: window === null ? { tokens: null, percent: null, window: null } : { tokens: ctxNum(o.tokens), percent: percent === null ? null : Math.min(100, percent), window } };
   }
   // GET /api/rpc/status: the state and the pending dialogs (by `requestId`). A run that is not on any more leaves no streaming text.
   function rpcFromStatus(prev, st) {
@@ -637,6 +647,7 @@
     if (!isObject(st) || !RPC_STATES.includes(st.state)) return e;
     e.state = st.state;
     e.memory = MEMORY_CATS.includes(st.memory) ? st.memory : st.state === 'closed' ? null : e.memory; // RP110b: a closed session has no memory to report
+    if (st.state === 'closed') e.ctx = null; // RP139: a closed session has no context to report
     e.asks = (Array.isArray(st.pendingDialogs) ? st.pendingDialogs : []).map(rpcAskOf).filter(Boolean).slice(0, 20);
     e.streaming = st.state === 'busy' || st.state === 'asking';
     if (!e.streaming) Object.assign(e, { blocks: [], text: '', thinking: false, retry: null });
@@ -914,5 +925,5 @@
     return `${meters.join('')}${age}<div class="usage-pop" role="group" aria-label="Claude usage details">${details.join('')}${note}${foot}</div>`;
   }
 
-  return { repoModel, changeChips, prChip, idleChip, conflictChip, sizeChip, RepoCard, stateLineHidden, usageView, usageHtml, usageRemaining, boardApply, boardWait, chatCachePut, chatCacheGet, chatFromCache, API_VERSION, mergeButton, rerunButton, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, dirtyRepos, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, taskPrs, matchesUnitId, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, parseSse, rpcEvent, rpcReduce, rpcFromStatus, eventsPlan, eventsRetryMs, eventsStale };
+  return { repoModel, changeChips, prChip, idleChip, conflictChip, sizeChip, RepoCard, stateLineHidden, usageView, usageHtml, usageRemaining, boardApply, boardWait, chatCachePut, chatCacheGet, rpcWithContext, chatFromCache, API_VERSION, mergeButton, rerunButton, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, dirtyRepos, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, taskPrs, matchesUnitId, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, parseSse, rpcEvent, rpcReduce, rpcFromStatus, eventsPlan, eventsRetryMs, eventsStale };
 }));

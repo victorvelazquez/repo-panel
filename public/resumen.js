@@ -346,6 +346,21 @@
     return `<span class="mem ${cls}" title="${esc(title)}">${word}</span>`;
   };
 
+  // RP139: the share of the context window the session uses, as a chip next to the memory one. c.rpc.ctx holds three validated numbers (V.rpcWithContext); unknown (null) reads `ctx —`, never 0.
+  // Quiet below 70%, warning from 70%, strong warning from 90%: icon + number + words in the help, never colour alone. Nothing is drawn while the session is closed or starting, or before the first reading.
+  const kTokens = (n) => (n >= 1000 ? `${Math.round(n / 1000)}k` : String(n));
+  const ctxChipHtml = (c) => {
+    const r = c && c.rpc && typeof c.rpc === 'object' ? c.rpc : null;
+    const x = r && r.ctx && typeof r.ctx === 'object' ? r.ctx : null;
+    if (!x || r.state === 'closed' || r.state === 'starting') return '';
+    const ok = (v) => typeof v === 'number' && Number.isFinite(v) && v >= 0;
+    if (!ok(x.percent) || !Number.isSafeInteger(x.window) || x.window <= 0) return '<span class="mem ctx" title="Context usage is unknown until the next answer"><i aria-hidden="true">◌</i> ctx —</span>';
+    const p = Math.min(100, x.percent);
+    const [cls, icon, more] = p >= 90 ? ['mem-bad', '✖', ' (almost full)'] : p >= 70 ? ['mem-warn', '▲', ' (getting full)'] : ['', '◔', ''];
+    const used = ok(x.tokens) ? kTokens(x.tokens) : `${Math.round(p)}%`;
+    return `<span class="mem ctx${cls ? ` ${cls}` : ''}" title="${esc(`Context used by this session: ${used} of ${kTokens(x.window)} tokens${more}`)}"><i aria-hidden="true">${icon}</i> ctx ${Math.round(p)}%</span>`;
+  };
+
   // RP98: "Close session" stops the pi process of the repo and releases its adoption (the chat goes back to the list of sessions). It lives next to the session state in the composer frame (RP72 keeps the
   // chat header to the repo name and the ✕, which only hides the chat) and is there while the repo has a session: adopted or live.
   const sessionCloseHtml = (show, closing) => (show ? `<button type="button" class="ss-close" data-act="session-close"${closing ? ' disabled' : ''} title="Stop this session and go back to the list of sessions">Close session</button>` : '');
@@ -1164,5 +1179,5 @@ ${status}</div>`;
     return `${ctx.failed ? '<div class="rs-note" role="status">⚠ Summary unavailable: showing the last data we have.</div>' : ''}<div class="rs-list">${body}</div>`;
   }
 
-  return { esc, mdHtml, settingsView, memoryChipHtml, legendHtml, listCount, listHeadChips, sessionChip, blockWidths, columnView, treeFolderPaths, fileView, COLUMN_TABS, composerState, askAllowed, actionMenu, actionButtonsHtml, composerNote, chatHead, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, sessionCloseHtml, sessionTerminalHtml, terminalBlockHtml, recentlyActive, chatBody, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
+  return { esc, mdHtml, settingsView, memoryChipHtml, ctxChipHtml, legendHtml, listCount, listHeadChips, sessionChip, blockWidths, columnView, treeFolderPaths, fileView, COLUMN_TABS, composerState, askAllowed, actionMenu, actionButtonsHtml, composerNote, chatHead, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, sessionCloseHtml, sessionTerminalHtml, terminalBlockHtml, recentlyActive, chatBody, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
 }));
