@@ -1,0 +1,42 @@
+{
+  "title": "Repo Panel — Global header",
+  "brief": "«podemos mejorar estos menus de la izquierda y botones de la derecha? si podemos prescindir de algunos que no son muy utiles? asi limpiar y reordenar para que quede mejor presentable ui/ux» (S30). The global header today has two rows: the logo and the usage meters, Refresh, Fetch all, + Room, + Repo and a Merge menu; then the tabs Summary, Work, Conformity and Settings. Three structures, each drawn at 1440, 820 and 390 px, plus a catalog of what happens to each control. Nothing the person needs disappears: every control keeps a stated home. Tokens taken from the :root of public/style.css.",
+  "feature": "odd/tasks/panel-layout.md",
+  "artboards": [
+    {
+      "file": "01-hoy.html",
+      "title": "Hoy · the header as it is now",
+      "tradeoff": "Not a direction: the reference to compare with, drawn from the facts of the code. Two rows of about 95 px and five buttons always on screen; on a phone it wraps into about 133 px of header with buttons under the touch size",
+      "width": 1440,
+      "height": 1129
+    },
+    {
+      "file": "02-una-fila.html",
+      "title": "A · Una sola fila (recommended)",
+      "tradeoff": "One 48 px row: logo, Summary and Work on the left; usage, ↻ ▾, + Add ▾, Conformity and Settings on the right. Gives back about 47 px of height to the right column and costs no width; Fetch all, Repo… and Room… take one more click, Conformity and Settings lose their written name, and the merge method moves to Settings › Delivery",
+      "width": 1440,
+      "height": 2412
+    },
+    {
+      "file": "03-dos-filas-podada.html",
+      "title": "B · Dos filas, podada",
+      "tradeoff": "The safest change: two rows and the tabs row untouched, the right side grouped into usage, ↻, + Add ▾ and a ⋯ menu (Fetch all repos, Merge settings). Every tab keeps its name and nothing is removed; but the header is still about 87 px tall, so almost no height is given back",
+      "width": 1440,
+      "height": 1774
+    },
+    {
+      "file": "04-barra-lateral.html",
+      "title": "C · Barra lateral de íconos",
+      "tradeoff": "A 48 px icon rail plus a 44 px top bar: the least header height, but it costs 48 px of width on a Summary that already has three columns, its icons have no written label, and on a phone it turns into A's menu and sheet",
+      "width": 1440,
+      "height": 1938
+    },
+    {
+      "file": "05-que-pasa-con-cada-control.html",
+      "title": "Qué pasa con cada control",
+      "tradeoff": "Not a direction: a catalog with one row per control of today and one column per direction, with the honest answer to whether something is lost, plus the cost in height, width, clicks and phone size",
+      "width": 1440,
+      "height": 1346
+    }
+  ]
+}

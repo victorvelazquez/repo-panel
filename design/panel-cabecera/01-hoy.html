@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Hoy · the header as it is now</title><style>
+:root{--bg:#0f1216;--panel:#171b21;--panel2:#1e242c;--line:#2a323c;--text:#d7dde5;--muted:#8b96a3;--green:#3fb950;--red:#f85149;--yellow:#d29922;--blue:#58a6ff;--purple:#a371f7;--gray:#6e7681}
+*{box-sizing:border-box}
+body{margin:0;width:1440px;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,"Segoe UI",sans-serif;padding-bottom:28px}
+h1,h2,h3,p{margin:0}
+button{font:inherit;color:var(--text);background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:4px 10px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:32px;white-space:nowrap}
+button:hover{border-color:var(--blue)}
+:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.i{flex:none;display:block}
+.page-h{padding:20px 16px 2px}
+.page-h h1{font-size:18px}
+.page-h p{color:var(--muted);max-width:1180px;margin-top:6px}
+.page-h p b{color:var(--text)}
+.sec{padding-top:20px}
+.sec>h2{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:0 16px 8px;font-weight:600}
+.sec>h2 b{color:var(--text)}
+.sec>.lead{padding:0 16px 8px;color:var(--muted);font-size:13px;max-width:1180px}
+.sec>.lead b{color:var(--text)}
+.row{display:flex;gap:24px;align-items:flex-start;padding:0 16px}
+.note{flex:1;min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px;color:var(--muted);font-size:13px}
+.note h3{font-size:13px;color:var(--text);margin-bottom:4px}
+.note b{color:var(--text)}
+.note ul{margin:6px 0 0;padding-left:18px}
+.note li{margin:3px 0}
+.frame{background:var(--bg);box-shadow:0 0 0 1px var(--line);position:relative}
+/* header pieces */
+.hd{background:var(--panel);border-bottom:1px solid var(--line)}
+.logo{font-weight:700;font-size:18px;letter-spacing:-.01em;white-space:nowrap}
+.logo b{color:var(--blue)}
+.sp{flex:1;min-width:0}
+.one{display:flex;align-items:center;gap:8px;height:48px;padding:0 12px 0 16px}
+.one .logo{margin-right:12px}
+.tabs{display:flex;gap:2px;align-self:stretch}
+.tab{background:transparent;border:0;border-bottom:2px solid transparent;border-radius:0;padding:0 12px;color:var(--muted);min-height:0;align-self:stretch}
+.tab:hover{color:var(--text);border-bottom-color:var(--line)}
+.tab[aria-selected=true]{color:var(--text);border-bottom-color:var(--blue)}
+.tab:focus-visible{outline-offset:-3px}
+.badge{margin-left:6px;padding:0 6px;border-radius:10px;background:var(--yellow);color:var(--bg);font-size:12px;font-weight:700}
+.ib{width:32px;padding:0;background:transparent;border-color:transparent;color:var(--muted);position:relative}
+.ib:hover{color:var(--text);border-color:var(--line)}
+.ib.bd{background:var(--panel2);border-color:var(--line);color:var(--text)}
+.ib.bd:hover{border-color:var(--blue)}
+.ib.warn{color:var(--yellow)}
+.cb{position:absolute;top:-3px;right:-4px;min-width:17px;height:17px;border-radius:9px;padding:0 4px;background:var(--yellow);color:var(--bg);font-size:12px;font-weight:700;line-height:17px;text-align:center}
+.primary{background:color-mix(in srgb,var(--blue) 20%,var(--panel));border-color:color-mix(in srgb,var(--blue) 62%,var(--panel));color:color-mix(in srgb,var(--blue) 40%,var(--text));font-weight:600}
+.primary:hover{background:color-mix(in srgb,var(--blue) 30%,var(--panel));border-color:var(--blue)}
+.merge{background:color-mix(in srgb,var(--green) 20%,var(--panel));border-color:color-mix(in srgb,var(--green) 62%,var(--panel));color:color-mix(in srgb,var(--green) 40%,var(--text));font-weight:600}
+.anchor{position:relative;display:inline-flex}
+.split{position:relative;display:inline-flex}
+.split .ib:first-child{border-radius:6px 0 0 6px}
+.split .ib+.ib{border-radius:0 6px 6px 0;margin-left:-1px;width:24px}
+.split [aria-expanded=true],.add[aria-expanded=true],.ib[aria-expanded=true]{border-color:var(--blue)}
+.spin .i{animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin .i{animation:none}}
+.udot{position:absolute;top:3px;right:3px;width:8px;height:8px;border-radius:50%;background:var(--blue);border:1px solid var(--panel2)}
+.vsep{width:1px;height:20px;background:var(--line);margin:0 4px}
+/* usage meters */
+.use{display:inline-flex;align-items:center;gap:12px;background:transparent;border-color:transparent;padding:0 8px;color:var(--muted);font-size:12px;min-height:32px}
+.use:hover{border-color:var(--line);color:var(--text)}
+.use .m{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.use .m b{color:var(--text);font-weight:600}
+.use .bar{width:48px;height:6px;border-radius:3px;background:var(--line);overflow:hidden}
+.use .bar i{display:block;height:100%;background:var(--green)}
+.use.stale .m b{color:var(--muted)}
+.use.stale .bar i{background:var(--gray)}
+.sdot{width:8px;height:8px;border-radius:50%;background:var(--yellow);flex:none}
+.use[aria-expanded=true]{background:var(--panel2);border-color:var(--blue)}
+.use.old{opacity:.6;cursor:default}
+.age{color:var(--muted);font-size:12px;margin-right:4px}
+.pop{position:absolute;z-index:6;top:calc(100% + 6px);left:0;width:310px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:12px 14px;box-shadow:0 8px 24px color-mix(in srgb,var(--bg) 85%,transparent);font-size:13px;white-space:normal;cursor:default}
+.pop h3{font-size:13px}
+.pop .pr{display:grid;grid-template-columns:1fr auto;gap:3px 8px;margin-top:10px;color:var(--muted);font-size:12px}
+.pop .pr b{color:var(--text);font-size:13px;font-weight:600}
+.pop .pr .bar{grid-column:1/3;width:100%;height:6px;border-radius:3px;background:var(--line);overflow:hidden}
+.pop .pr .bar i{display:block;height:100%;background:var(--green)}
+.pop .pf{margin-top:10px;color:var(--muted);font-size:12px;border-top:1px solid var(--line);padding-top:8px}
+.tt{position:absolute;z-index:6;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:5px 9px;font-size:12px;color:var(--text);white-space:nowrap;box-shadow:0 6px 18px color-mix(in srgb,var(--bg) 85%,transparent)}
+/* menus */
+.menu{position:absolute;z-index:6;top:calc(100% + 6px);right:0;width:276px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:4px;box-shadow:0 8px 24px color-mix(in srgb,var(--bg) 85%,transparent);white-space:normal}
+.mi{display:grid;grid-template-columns:20px 1fr;column-gap:10px;align-items:center;justify-content:start;width:100%;text-align:left;border:0;background:transparent;padding:6px 10px;border-radius:6px;min-height:44px;white-space:normal}
+.mi .i{grid-row:1/3;color:var(--muted)}
+.mi .t{grid-column:2}
+.mi small{grid-column:2;color:var(--muted);font-size:12px;line-height:1.3}
+.mi:hover,.mi.hl{background:var(--bg)}
+.mi.hl .i{color:var(--text)}
+/* context hint of the Summary */
+.hint{display:grid;grid-template-columns:22% 1fr 26%;gap:10px;padding:10px}
+.hb{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:var(--muted);font-size:12px}
+/* phone */
+.phone{width:390px;border-radius:22px;overflow:hidden;background:var(--bg);box-shadow:0 0 0 1px var(--line);position:relative;flex:none}
+.hint.solo{grid-template-columns:1fr}
+.touch button{min-height:44px}
+.touch .ib{width:44px}
+.ph-h{display:flex;align-items:center;gap:4px;height:56px;padding:0 8px}
+.ph-h .logo{margin-left:4px}
+.ph-h .use{gap:10px;padding:0 6px}
+.scrim{position:absolute;left:0;right:0;top:56px;bottom:0;background:color-mix(in srgb,var(--bg) 72%,transparent);z-index:4}
+.sheet{position:absolute;left:0;right:0;top:56px;z-index:5;background:var(--panel2);border-bottom:1px solid var(--line);border-radius:0 0 14px 14px;padding:4px 0 10px}
+.si{display:flex;align-items:center;gap:12px;width:100%;min-height:48px;padding:0 16px;border:0;border-left:3px solid transparent;border-radius:0;background:transparent;justify-content:flex-start;text-align:left;font-size:15px}
+.si .i{color:var(--muted)}
+.si[aria-selected=true]{border-left-color:var(--blue);background:var(--bg)}
+.si small{display:block;color:var(--muted);font-size:12px;line-height:1.2}
+.si .badge{margin-left:auto}
+.sg{padding:10px 16px 2px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+/* two rows (today and B) */
+.two1{display:flex;align-items:center;gap:8px;height:48px;padding:0 12px 0 16px}
+.two2{display:flex;gap:2px;padding:0 12px;border-bottom:1px solid var(--line);background:var(--panel)}
+.two2 .tab{padding:8px 14px;align-self:auto}
+.two2.touch{padding:0 4px}
+.two2.touch .tab{min-height:48px;padding:0 10px;flex:1 1 auto;justify-content:center;display:inline-flex;align-items:center}
+/* sidebar rail (C) */
+.cwrap{display:flex}
+.rail{width:48px;flex:none;background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 0}
+.rail .mark{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;background:var(--panel2);border:1px solid var(--line);margin-bottom:8px}
+.rail .mark i{color:var(--blue);font-style:normal}
+.rw{position:relative;display:block}
+.rail .ri{width:40px;height:40px;padding:0;background:transparent;border-color:transparent;color:var(--muted);border-radius:8px;position:relative}
+.rail .ri:hover{color:var(--text);border-color:var(--line)}
+.rail .ri[aria-selected=true]{color:var(--text);background:var(--panel2)}
+.rail .ri[aria-selected=true]::before{content:"";position:absolute;left:-4px;top:8px;bottom:8px;width:3px;border-radius:2px;background:var(--blue)}
+.rail .ri.warn{color:var(--yellow)}
+.rail .cb{top:2px;right:0}
+.rail .gap{flex:1}
+.cmain{flex:1;min-width:0}
+.top{display:flex;align-items:center;gap:8px;height:44px;padding:0 12px 0 16px;background:var(--panel);border-bottom:1px solid var(--line)}
+.top h1{font-size:15px;font-weight:600}
+.mark{font-weight:700}
+.mark-s{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;background:var(--panel2);border:1px solid var(--line);flex:none}
+.mark-s i{color:var(--blue);font-style:normal}
+/* states chunks */
+.chunks{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;padding:0 16px}
+.chunk{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px;display:grid;gap:10px;align-content:start;min-height:150px}
+.chunk .cap{color:var(--muted);font-size:12px}
+.chunk .cap b{color:var(--text)}
+.chunk .demo{display:flex;align-items:center;gap:10px;min-height:44px;position:relative}
+/* settings mini card */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px;display:grid;gap:10px;align-content:start}
+.card h3{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.fld{display:flex;align-items:center;gap:12px}
+.fld .l{width:150px;color:var(--text)}
+.sel{display:inline-flex;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:4px 10px}
+.cbx{width:16px;height:16px;border:1px solid var(--blue);border-radius:4px;background:color-mix(in srgb,var(--blue) 30%,var(--panel2));display:grid;place-items:center;color:var(--text)}
+.mv{background:color-mix(in srgb,var(--yellow) 12%,var(--panel));border:1px solid color-mix(in srgb,var(--yellow) 45%,var(--panel));border-radius:6px;padding:6px 10px;color:var(--text);font-size:13px}
+
+.t-h{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line)}
+.t-h .logo{font-size:24px;margin:0 8px 0 0}
+.t-h .ico{display:inline-block}
+.t-use{display:inline-flex;align-items:center;gap:12px;color:var(--muted);font-size:12px}
+.t-use.old{opacity:.6}
+.t-use .m{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.t-use .m b{color:var(--text);font-weight:600}
+.t-use .bar{width:48px;height:6px;border-radius:3px;background:var(--line);overflow:hidden}
+.t-use .bar i{display:block;height:100%;background:var(--green)}
+.t-tabs{display:flex;gap:2px;padding:0 16px;background:var(--panel);border-bottom:1px solid var(--line)}
+.t-tabs .tab{padding:8px 14px;align-self:auto}
+.t-h button{min-height:0}
+.tabs-m{padding:0 4px;flex-wrap:wrap}
+</style></head><body><div class="page-h"><h1>Hoy · the header as it is now (reference, not a direction)</h1><p>Two rows. Row 1: the logo, then the usage meters, <b>↻ Refresh</b>, <b>⇣ Fetch all</b>, <b>+ Room</b>, <b>+ Repo</b> and <b>⚙ Merge</b>. Row 2: the tabs. It is drawn from the facts of the code, so the other artboards can be compared with it. The usage meters are dimmed here because the usage file is 17 minutes old, as in the screenshot.</p></div><section class="sec"><h2><b>1440 px</b> · as in the screenshot</h2><p class="lead">The header block is about <b>95 px</b> tall. The dimmed meters are the only freshness signal and they drop below AA contrast when dimmed.</p><div class="frame " style="width:1440px"><div class="hdwrap"><header class="t-h"><span class="logo " style="font-size:24px">Kletus<b>.dev</b></span><span class="sp"></span><span style="color:var(--muted);font-size:12px">17 min ago</span><span class="t-use old" tabindex="0" role="status"><span class="m"><span>5h</span><span class="bar"><i style="width:4%"></i></span><b>4%</b><span>3h 45m</span></span><span class="m"><span>7d</span><span class="bar"><i style="width:21%"></i></span><b>21%</b><span>1d 21h</span></span></span>
+<button type="button" title="Refresh everything"><span class="ico">↻</span> Refresh</button><button type="button" title="git fetch --prune on every repo">⇣ Fetch all</button><button type="button">+ Room</button><button type="button" class="primary">+ Repo</button><button type="button" aria-label="Merge settings">⚙ Merge</button></header>
+<nav class="t-tabs" role="tablist" aria-label="Views"><button type="button" role="tab" class="tab" aria-selected="true">Summary</button><button type="button" role="tab" class="tab" aria-selected="false">Work</button><button type="button" role="tab" class="tab" aria-selected="false">Conformity<span class="badge">1</span></button><button type="button" role="tab" class="tab" aria-selected="false">Settings</button></nav></div><div class="hint" style="height:150px"><div class="hb">Repos</div><div class="hb">Chat</div><div class="hb">Right column: keeps the height it gets back</div></div></div></section><section class="sec"><h2><b>820 px</b> · it still fits on one row, with the percents only</h2><div class="row"><div class="frame " style="width:820px"><div class="hdwrap"><header class="t-h"><span class="logo " style="font-size:24px">Kletus<b>.dev</b></span><span class="sp"></span><span class="t-use old" tabindex="0" role="status"><span class="m"><span>5h</span><b>4%</b></span><span class="m"><span>7d</span><b>21%</b></span></span>
+<button type="button" title="Refresh everything"><span class="ico">↻</span> Refresh</button><button type="button" title="git fetch --prune on every repo">⇣ Fetch all</button><button type="button">+ Room</button><button type="button" class="primary">+ Repo</button><button type="button" aria-label="Merge settings">⚙ Merge</button></header>
+<nav class="t-tabs" role="tablist" aria-label="Views"><button type="button" role="tab" class="tab" aria-selected="true">Summary</button><button type="button" role="tab" class="tab" aria-selected="false">Work</button><button type="button" role="tab" class="tab" aria-selected="false">Conformity<span class="badge">1</span></button><button type="button" role="tab" class="tab" aria-selected="false">Settings</button></nav></div><div class="hint solo" style="height:150px"><div class="hb">Summary below (hint)</div></div></div><aside class="note"><h3>What happens today</h3><ul><li>The header wraps by itself (<b>flex-wrap</b>), nothing is designed for this size.</li><li>The meters hide their bars and the time left and keep the percents.</li><li>Five buttons stay on screen all the time, though <b>+ Room</b> and <b>+ Repo</b> are used mostly at the beginning.</li></ul></aside></div></section><section class="sec"><h2><b>390 px</b> · approximate: the header wraps into two rows, plus the tabs</h2><div class="row"><div class="phone"><div class="hdwrap"><header class="t-h" style="padding:10px 12px"><span class="logo " style="font-size:24px">Kletus<b>.dev</b></span><span class="sp"></span><span class="t-use old" tabindex="0" role="status"><span class="m"><span>5h</span><b>4%</b></span><span class="m"><span>7d</span><b>21%</b></span></span>
+<button type="button" title="Refresh everything"><span class="ico">↻</span> Refresh</button><button type="button" title="git fetch --prune on every repo">⇣ Fetch all</button><button type="button">+ Room</button><button type="button" class="primary">+ Repo</button><button type="button" aria-label="Merge settings">⚙ Merge</button></header>
+<nav class="t-tabs" role="tablist" aria-label="Views"><button type="button" role="tab" class="tab" aria-selected="true">Summary</button><button type="button" role="tab" class="tab" aria-selected="false">Work</button><button type="button" role="tab" class="tab" aria-selected="false">Conformity<span class="badge">1</span></button><button type="button" role="tab" class="tab" aria-selected="false">Settings</button></nav></div><div class="hint solo" style="height:220px"><div class="hb">Summary below (hint)</div></div></div><aside class="note"><h3>Why the phone needs a new header</h3><ul><li>Logo, meters and Refresh on row 1, the other four buttons on row 2, then the tabs row: about <b>133 px</b> of header before any content.</li><li>The buttons are about 30 px tall, under the 44 px touch target.</li><li>This is drawn from the current CSS (the header wraps); it has not been opened on a real phone.</li></ul></aside></div></section></body></html>
