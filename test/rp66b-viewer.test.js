@@ -120,10 +120,21 @@ test('S5: in every language a row with the spans removed is the escaped line, in
   }
 });
 
+// RP146: the file tree draws two icons of its OWN (a folder and a file, inline svg, aria-hidden), like the Changes tree. They are taken from a harmless render and removed from the output EXACTLY, so a tag that
+// comes from a hostile file (any other svg included) is still found and still fails this test.
+const OWN_ICONS = [...new Set([...R.filesView({ files: [{ path: 'd/f.txt' }] }, { selected: '', open: { d: true } }).matchAll(/<svg\b[^>]*>[\s\S]*?<\/svg>/g)].map((m) => m[0]))];
+const withoutOwnIcons = (html) => OWN_ICONS.reduce((h, icon) => h.split(icon).join(''), html);
+test('S5: the file tree icons are exactly two own svg, hidden from assistive tools, and nothing else is let through', () => {
+  assert.equal(OWN_ICONS.length, 2, 'a folder icon and a file icon');
+  for (const icon of OWN_ICONS) assert.match(icon, /^<svg [^>]*aria-hidden="true"/);
+  assert.doesNotMatch(withoutOwnIcons(OWN_ICONS.join('')), /<svg/i, 'removing them leaves no svg');
+  assert.match(withoutOwnIcons(`${OWN_ICONS[0]}<svg onload="x"></svg>`), /<svg onload/, 'a different svg is NOT removed');
+});
+
 test('S5: the whole viewer output of hostile files has no tag of the file, only the spans of the highlighter', () => {
   const allowed = /<\/?(?:span|div|section|h3|button)\b/;
   for (const p of PATHS) {
-    const html = fileHtml(p, HOSTILE.join('\n')) + diffHtml(p, `@@ -1,1 +1,1 @@\n+${HOSTILE.join(' ')}`);
+    const html = withoutOwnIcons(fileHtml(p, HOSTILE.join('\n'))) + diffHtml(p, `@@ -1,1 +1,1 @@\n+${HOSTILE.join(' ')}`);
     const tags = [...html.matchAll(/<[^>]*>/g)].map((m) => m[0]);
     for (const t of tags) assert.match(t, allowed, `${p}: unexpected tag ${t}`);
     assert.doesNotMatch(html, /<(?:script|img|svg|style|a|b|i|u|s|x)\b/i, p);
