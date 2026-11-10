@@ -103,12 +103,12 @@ const body = (page) => page.get('#chatBody').html;
 const chatTab = (page) => page.run('S.chat.tab');
 const reads = (page, prefix) => page.fetches.filter((f) => f.url.startsWith(prefix));
 
-test('f1: the column has a Files tab between Changes and the rest, with its own icon, and the order is Changes, Files, Status, Tasks', () => {
+test('f1: the column has a Files tab, the last one, with its own icon, and the order is Tasks, Changes, Status, Files', () => {
   const g = { id: 'abc', branch: 'feat/x', ahead: 0, pr: null, merge: { enabled: false, title: 'x' } };
   const tabs = (h) => [...h.matchAll(/id="coltab-(\w+)"/g)].map((m) => m[1]);
-  assert.deepEqual(tabs(R.columnView({ name: 'demo', files: FILES })), ['changes', 'files', 'tasks']);
-  assert.deepEqual(tabs(R.columnView({ name: 'demo', files: FILES, git: g })), ['changes', 'files', 'status', 'tasks']);
-  assert.deepEqual(R.COLUMN_TABS, ['changes', 'files', 'status', 'tasks']);
+  assert.deepEqual(tabs(R.columnView({ name: 'demo', files: FILES })), ['tasks', 'changes', 'files']);
+  assert.deepEqual(tabs(R.columnView({ name: 'demo', files: FILES, git: g })), ['tasks', 'changes', 'status', 'files']);
+  assert.deepEqual(R.COLUMN_TABS, ['tasks', 'changes', 'status', 'files']);
   const h = R.columnView({ name: 'demo', files: FILES, tab: 'files', tree: TREE });
   assert.match(h, /id="coltab-files"[^>]*aria-selected="true"[^>]*aria-label="Files" title="Files"><svg/);
   assert.match(h, /id="coltab-changes"[^>]*aria-selected="false"/);

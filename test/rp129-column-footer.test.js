@@ -156,10 +156,10 @@ test('r4: the footer is total: no branch, odd values, and nothing from the repo 
   assert.match(foot(R.columnView({ files: [], git: { id: 'a', merge: MERGE(null) } })), /<span class="ft-name">—<\/span>/, 'no branch');
 });
 
-test('r5: with the git data the column has FOUR tabs in the order Changes, Files, Status, Tasks, and Status counts the pending checks; without it the column is as before', () => {
-  assert.deepEqual(tabs(R.columnView({ files: [], git: GIT(CASES.ready) })), ['changes', 'files', 'status', 'tasks']);
-  assert.deepEqual(R.COLUMN_TABS, ['changes', 'files', 'status', 'tasks']);
-  assert.deepEqual(tabs(R.columnView({ files: [] })), ['changes', 'files', 'tasks']);
+test('r5: with the git data the column has FOUR tabs in the order Tasks, Changes, Status, Files, and Status counts the pending checks; without it the column is as before', () => {
+  assert.deepEqual(tabs(R.columnView({ files: [], git: GIT(CASES.ready) })), ['tasks', 'changes', 'status', 'files']);
+  assert.deepEqual(R.COLUMN_TABS, ['tasks', 'changes', 'status', 'files']);
+  assert.deepEqual(tabs(R.columnView({ files: [] })), ['tasks', 'changes', 'files']);
   assert.doesNotMatch(R.columnView({ files: [] }), /col-foot/);
   assert.match(R.columnView({ files: [], git: GIT(CASES.pending) }), /<span class="lb">Status<\/span><span class="n y">1<\/span><\/button>/);
   assert.doesNotMatch(R.columnView({ files: [], git: GIT(CASES.ready) }), /<span class="n y">/);
@@ -431,24 +431,25 @@ test('p9: the Status tab lists the checks of the PR and the yellow badge counts 
   assert.match(col(page), /class="tk-bar"/);
 });
 
-test('p10: the arrows now cycle Changes, Files, Status, Tasks and back; a fresh opening starts on Changes again', async () => {
+test('p10: the arrows cycle Tasks, Changes, Status, Files and back; a fresh opening with uncommitted files starts on Changes', async () => {
   const page = boot();
   await open(page);
   const el = (t) => ({ dataset: { act: 'col-tab', tab: t }, tagName: 'BUTTON' });
   const sel = () => (/id="coltab-(\w+)"[^>]*aria-selected="true"/.exec(col(page)) || [])[1];
+  assert.equal(sel(), 'changes');
   page.key('ArrowRight', el('changes')); page.flush();
-  assert.equal(sel(), 'files');
-  page.key('ArrowRight', el('files')); page.flush();
   assert.equal(sel(), 'status');
   page.key('ArrowRight', el('status')); page.flush();
+  assert.equal(sel(), 'files');
+  page.key('ArrowRight', el('files')); page.flush();
   assert.equal(sel(), 'tasks');
   page.key('ArrowRight', el('tasks')); page.flush();
   assert.equal(sel(), 'changes');
   page.key('ArrowLeft', el('changes')); page.flush();
   assert.equal(sel(), 'tasks');
-  page.key('Home', el('tasks')); page.flush();
-  assert.equal(sel(), 'changes');
-  page.key('End', el('changes')); page.flush();
+  page.key('End', el('tasks')); page.flush();
+  assert.equal(sel(), 'files');
+  page.key('Home', el('files')); page.flush();
   assert.equal(sel(), 'tasks');
 });
 

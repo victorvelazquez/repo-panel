@@ -33,7 +33,7 @@ const S = {
   boardRev: 0, boardRefreshing: [], factAt: {},
   tab: 'summary', scope: { kind: 'all' }, summary: null, summaryKey: '', summaryFailed: false, sfilter: 'all', collapsed: {},
   timeouts: { get: 25000, post: 70000 },
-  tasks: {}, tasksFilter: '', tasksOpenDone: false, tasksFold: {}, changes: {}, files: {}, filesOpen: {}, fileData: {}, pad: {},
+  tasks: {}, tasksOpenDone: false, tasksFold: {}, changes: {}, files: {}, filesOpen: {}, fileData: {}, pad: {},
   lh: { search: false, menu: false, legend: false, focus: false }, // RP121: the header of the repos column (search box open, filter menu open, focus the box on the next draw)
   chat: { id: null, seq: 0 }, chatCache: {}, drafts: {}, recall: {}, notes: {}, askBusy: {}, chatResults: Object.create(null), rpc: {},
 };
@@ -111,7 +111,7 @@ document.addEventListener('keydown', (e) => {
   e.preventDefault();
   sendChatMessage();
 });
-document.addEventListener('input', (e) => { if (e.target && e.target.id === 'msgBox') { delete S.recall[S.chat.id]; saveDraft(); } else if (e.target && e.target.id === 'tasksFilter') ACTIONS['tasks-filter'](e.target); else if (e.target && e.target.id === 'notesBox') notesInput(e.target.value); });
+document.addEventListener('input', (e) => { if (e.target && e.target.id === 'msgBox') { delete S.recall[S.chat.id]; saveDraft(); } else if (e.target && e.target.id === 'notesBox') notesInput(e.target.value); });
 
 // The passing list of a repo stays open (or closed) across redraws. `toggle` does not bubble, so capture it.
 document.addEventListener('toggle', (e) => {

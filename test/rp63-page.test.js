@@ -268,38 +268,6 @@ test('p10: tasks-done toggles the Completed group', async () => {
   assert.ok(!/>A1</.test(body(page)));
 });
 
-test('p11: the filter keeps its value across redraws and filters the rows', async () => {
-  const { page } = boot();
-  serve(page, 'abc', infoOf(FREE), histOf('hi'));
-  page.routes[RM('abc')] = () => Promise.resolve(ok(ROADMAP));
-  tasksOpen(page, 'abc');
-  await page.tick();
-  assert.match(body(page), /id="tasksFilter"/);
-  assert.match(body(page), /aria-label="Filter tasks"/);
-  page.get('#tasksFilter').value = 'c1';
-  page.run("ACTIONS['tasks-filter'] ? ACTIONS['tasks-filter'](document.querySelector('#tasksFilter')) : 0");
-  await page.tick();
-  assert.ok(/>C1</.test(body(page)) && !/>B1</.test(body(page)));
-  for (let i = 0; i < 3; i++) { page.run('draw()'); await page.tick(); }
-  assert.match(body(page), /id="tasksFilter"[^>]*value="c1"/, 'the box is painted with the value the person typed');
-  assert.ok(!/>B1</.test(body(page)));
-});
-
-test('p12: a filter typed in the box never reaches a request or the chat', async () => {
-  const { page } = boot();
-  serve(page, 'abc', infoOf(FREE), histOf('hi'));
-  page.routes[RM('abc')] = () => Promise.resolve(ok(ROADMAP));
-  tasksOpen(page, 'abc');
-  await page.tick();
-  const n = page.fetches.length;
-  const posts = page.fetches.filter((f) => f.method === 'POST').length;
-  page.get('#tasksFilter').value = 'anything';
-  page.run("ACTIONS['tasks-filter'] ? ACTIONS['tasks-filter'](document.querySelector('#tasksFilter')) : 0");
-  await page.tick();
-  assert.equal(page.fetches.length, n);
-  assert.equal(page.fetches.filter((f) => f.method === 'POST').length, posts, 'nothing is sent anywhere');
-});
-
 test('p13: switching to the chat of another repo goes back to the Chat tab', async () => {
   const { page } = boot();
   serve(page, 'abc', infoOf(FREE), histOf('abc chat'));
@@ -315,7 +283,7 @@ test('p13: switching to the chat of another repo goes back to the Chat tab', asy
 
 test('p14: the tab buttons and the card bar are reachable from the dispatcher (acts exist)', () => {
   const { page } = boot();
-  for (const act of ['tasks-open', 'chat-tab', 'tasks-done', 'tasks-filter']) assert.equal(page.run(`typeof ACTIONS['${act}']`), 'function', act);
+  for (const act of ['tasks-open', 'chat-tab', 'tasks-done']) assert.equal(page.run(`typeof ACTIONS['${act}']`), 'function', act);
 });
 
 test('p15: a late answer of the repo the person left is kept for it but never paints (or fails) the repo that is shown', async () => {

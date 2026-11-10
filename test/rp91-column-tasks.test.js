@@ -1,5 +1,5 @@
 'use strict';
-// RP91 (S4, S5): the tasks of the open repo are a CARD in the right column (RP89), drawn by the same R.tasksView (done folded, the current one and the pending ones open, with the filter) and
+// RP91 (S4, S5): the tasks of the open repo are a CARD in the right column (RP89), drawn by the same R.tasksView (done folded, the current one and the pending ones open) and
 // read from /api/roadmap when the repo OPENS, not when a tab is chosen. The Tasks tab of the chat only shows where there is no column (under 1100 px of layout), so nobody loses the tasks;
 // with the column in, the tab is gone. The files card (RP92) fills the second card. The Claude usage stays in the header. No network, no timers, no real clock.
 const test = require('node:test');
@@ -132,7 +132,7 @@ test('p1: with the column in, opening a repo reads its roadmap once and draws th
   assert.match(col(page), /id="coltab-changes"/);
 });
 
-test('p2: the roadmap is read ONCE per opening: redraws, a resize and the filter never ask again', async () => {
+test('p2: the roadmap is read ONCE per opening: redraws and a resize never ask again', async () => {
   const page = boot();
   page.routes[RM('abc')] = () => Promise.resolve(ok(ROADMAP));
   open(page, 'abc');
@@ -140,49 +140,19 @@ test('p2: the roadmap is read ONCE per opening: redraws, a resize and the filter
   page.run('draw()');
   page.flush();
   for (const fn of page.winL.resize || []) fn({ type: 'resize' });
-  page.run("ACTIONS['tasks-filter']({ value: 'B1' })");
-  page.flush();
   assert.equal(reads(page, 'abc'), 1);
 });
 
-test('p3: the tasks keep working in the column: the filter narrows the rows and keeps its value, and the completed fold opens (RP128: with its own button)', async () => {
+test('p3: the tasks keep working in the column: the completed fold opens (RP128: with its own button)', async () => {
   const page = boot();
   page.routes[RM('abc')] = () => Promise.resolve(ok(ROADMAP));
   open(page, 'abc');
   await page.tick();
   tasksTab(page);
-  page.run("ACTIONS['tasks-filter']({ value: 'B1' })");
-  page.flush();
-  assert.match(col(page), /Delivery of B1/);
-  assert.doesNotMatch(col(page), /Delivery of C1/);
-  assert.match(col(page), /id="tasksFilter"[^>]*value="B1"/);
-  page.run("ACTIONS['tasks-filter']({ value: '' })");
   assert.doesNotMatch(col(page), /Delivery of A1/, 'folded until its button is touched');
   page.run("ACTIONS['tasks-fold']({ dataset: { fold: 'done' } })");
   page.flush();
   assert.match(col(page), /Delivery of A1/, 'the completed group is open');
-});
-
-test('p3b: the filter box of the column keeps the focus (and the cursor) across redraws', async () => {
-  const page = boot();
-  page.routes[RM('abc')] = () => Promise.resolve(ok(ROADMAP));
-  open(page, 'abc');
-  await page.tick();
-  tasksTab(page);
-  const box = page.get('#tasksFilter');
-  const calls = [];
-  box.value = 'B1';
-  box.focus = () => calls.push('focus');
-  box.setSelectionRange = (a, b) => calls.push(`range ${a} ${b}`);
-  page.doc.activeElement = { id: 'tasksFilter' };
-  page.run("ACTIONS['tasks-filter']({ value: 'B1' })");
-  page.flush();
-  assert.deepEqual(calls, ['focus', 'range 2 2']);
-  page.doc.activeElement = { id: 'somethingElse' };
-  calls.length = 0;
-  page.run('draw()');
-  page.flush();
-  assert.deepEqual(calls, [], 'with the focus elsewhere nothing is focused');
 });
 
 test('p4: while the roadmap is on its way the card says so, and a failed read says it is unavailable', async () => {
@@ -266,12 +236,11 @@ test('n1: under 1100 px (no column) nothing changes: the Tasks tab is there, the
   await page.tick();
   assert.equal(reads(page, 'abc'), 0, 'not read until the tab is chosen');
   assert.match(head(page), /data-tab="tasks"/);
-  assert.doesNotMatch(col(page), /col-tasks|tasksFilter/);
+  assert.doesNotMatch(col(page), /col-tasks/);
   tab(page, 'tasks');
   await page.tick();
   assert.equal(reads(page, 'abc'), 1);
   assert.match(page.get('#chatBody').html, /Delivery of B1/);
-  assert.equal((page.get('#chatBody').html + col(page)).split('id="tasksFilter"').length - 1, 1, 'one filter box on the page, never two');
 });
 
 test('n2: under 1100 px tasks-open opens the repo on the Tasks tab, as before', async () => {
@@ -297,7 +266,7 @@ test('n3: when the window grows past 1100 px the column takes the tasks (read on
   tasksTab(page);
   assert.match(col(page), /Delivery of B1/);
   assert.doesNotMatch(head(page), /data-tab="tasks"/);
-  assert.doesNotMatch(page.get('#chatBody').html, /tasksFilter/, 'the body is not the tasks view any more');
+  assert.doesNotMatch(page.get('#chatBody').html, /Delivery of B1/, 'the body is not the tasks view any more');
 });
 
 test('s1: the Claude usage is not in the column (it stays in the header): the column code has no usage', () => {

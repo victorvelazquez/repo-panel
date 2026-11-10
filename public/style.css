@@ -595,9 +595,8 @@ body.tab-summary #viewbar { display: none; }
 .ch-dclose:hover { color: var(--text); background: var(--panel2); }
 .ch-dclose:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
 .ch-tab[aria-selected="true"] { color: var(--text); border-bottom-color: var(--blue); }
-.ch-tab:focus-visible, .task-head:focus-visible, .task-filter:focus-visible, .rs-prog[role="button"]:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.ch-tab:focus-visible, .task-head:focus-visible, .rs-prog[role="button"]:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 .rs-prog[role="button"] { cursor: pointer; }
-.task-filter { width: 100%; }
 .task-group { display: flex; flex-direction: column; gap: 4px; }
 .task-head { margin: 6px 0 0; font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; text-align: left; background: transparent; border: 0; padding: 2px 0; }
 .task-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel2); }

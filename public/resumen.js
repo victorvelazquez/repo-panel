@@ -168,7 +168,7 @@
   // Only the open tab shows its name (the CSS), the others are icons. `tab` is what the page keeps for the opening; anything else reads as Changes. Changes is a TREE by folders of the files with
   // uncommitted changes (`files`, the board's facts: path, status, added, deleted): a chain of single folders is ONE row, folders come first, each has a count and the total is on top; each file is the
   // button that opens it in the diff tab (`selected` marks the one open there) and `fold` ({path: true}) holds the closed folders. Tasks is `tasksHtml`, the compact answer of R.tasksView. Total.
-  const COLUMN_TABS = ['changes', 'files', 'status', 'tasks'];
+  const COLUMN_TABS = ['tasks', 'changes', 'status', 'files']; // RP148: the order of the cycle (what to do, do it, deliver it) and Files last, as a look-up
   const FILES_MAX = 200;
   const TREE_DEPTH_MAX = 8;
   const svgIcon = (d, s = 14) => `<svg width="${s}" height="${s}" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
@@ -308,7 +308,7 @@
     const pending = g ? checksOf(prOf(g)).pending : 0;
     const tabBtn = ([id, label]) => `<button type="button" role="tab" class="col-tab" id="coltab-${id}" data-act="col-tab" data-tab="${id}" aria-selected="${id === tab}" aria-controls="colpane" aria-label="${label}" title="${label}">${ICON_TAB[id]}<span class="lb">${label}</span>${id === 'changes' && files ? `<span class="n">${files.length}</span>` : id === 'status' && pending > 0 ? `<span class="n y">${pending}</span>` : ''}</button>`;
     const body = tab === 'tasks' ? (typeof c.tasksHtml === 'string' && c.tasksHtml ? c.tasksHtml : '<p class="rs-sub" role="status">No tasks to show</p>') : tab === 'status' ? statusPanel(g) : tab === 'files' ? treeHtml(c.tree, { selected: c.fselected, open: c.fopen, changed: c.changed, failed: c.filesFailed }).html : changesPanel(c, files);
-    const list = g ? [['changes', 'Changes'], ['files', 'Files'], ['status', 'Status'], ['tasks', 'Tasks']] : [['changes', 'Changes'], ['files', 'Files'], ['tasks', 'Tasks']];
+    const list = g ? [['tasks', 'Tasks'], ['changes', 'Changes'], ['status', 'Status'], ['files', 'Files']] : [['tasks', 'Tasks'], ['changes', 'Changes'], ['files', 'Files']];
     return `<div class="col-tabs" role="tablist" aria-label="Column views">${list.map(tabBtn).join('')}</div><div class="col-pane" id="colpane" role="tabpanel" aria-labelledby="coltab-${tab}">${body}</div>${g ? footHtml(g) : ''}`;
   };
   // The state of the session (RPC2-1), shown inside the composer frame. Icon + word, never colour alone. c = { info, rpc } (rpc: what V.rpcReduce keeps).
@@ -435,7 +435,7 @@
   const TK_SEGMENTS = [['done', 'rs-done', 'completed'], ['review', 'rs-pr', 'in review'], ['ready', 'tk-ready', 'ready'], ['progress', 'tk-prog', 'in progress'], ['pending', 'rs-pend', 'pending'], ['blocked', 'rs-blk', 'blocked']];
   const TK_TONE = { review: 'blue', ready: 'green', progress: 'yellow', next: 'blue' };
   const TK_FOLDS = [['pending', 'Pending', ''], ['blocked', 'Blocked', ' red'], ['done', 'Completed', '']];
-  function compactTasks({ all, groups, keyOf, derived, byId, ctx, q }) {
+  function compactTasks({ all, groups, keyOf, derived, byId, ctx }) {
     const counts = {};
     for (const r of all) { const k = keyOf(r); counts[k] = (counts[k] || 0) + 1; }
     counts.pending = (counts.pending || 0) + (counts.next || 0);
@@ -467,7 +467,7 @@
     for (const [key, title, tone] of TK_FOLDS) {
       const list = groups.get(key);
       if (!list.length) continue;
-      const open = !!q || (!!ctx.open && Object.hasOwn(ctx.open, key) && ctx.open[key] === true);
+      const open = !!ctx.open && Object.hasOwn(ctx.open, key) && ctx.open[key] === true;
       parts.push(`<button type="button" class="tk-fold" data-act="tasks-fold" data-fold="${key}" aria-expanded="${open}"><span class="chev" aria-hidden="true">${open ? '▾' : '▸'}</span>${title}<span class="sp"></span><span class="chip${tone}">${list.length}</span></button>`);
       if (open) parts.push(`<div class="tk-sub">${take(list, key, false)}</div>`);
     }
@@ -482,8 +482,6 @@
     const derived = rp.derived && typeof rp.derived === 'object' ? rp.derived : {};
     const byId = new Map(all.map((r) => [r.id, r]));
     const nextId = rp.next && typeof rp.next.id === 'string' ? rp.next.id : null;
-    const q = String(ctx.filter ?? '').trim().toLowerCase();
-    const box = `<input id="tasksFilter" type="search" class="task-filter" aria-label="Filter tasks" placeholder="Filter tasks…" value="${esc(ctx.filter ?? '')}">`;
     if (!all.length) return note('No tasks in the roadmap');
     const groups = new Map(TASK_GROUPS.map(([k]) => [k, []]));
     const keyOf = (r) => {
@@ -492,11 +490,9 @@
       return key === 'pending' && r.id === nextId ? 'next' : key;
     };
     for (const r of all) {
-      if (q && !`${r.id} ${r.entrega ?? ''}`.toLowerCase().includes(q)) continue;
       groups.get(keyOf(r)).push(r);
     }
-    if (![...groups.values()].some((g) => g.length)) return `${box}${note('No task matches')}`;
-    if (ctx.compact) return `${box}${compactTasks({ all, groups, keyOf, derived, byId, ctx, q })}`; // RP128: the column's list
+    if (ctx.compact) return compactTasks({ all, groups, keyOf, derived, byId, ctx }); // RP128: the column's list
     let left = TASK_MAX;
     let cut = 0;
     const rowHtml = (r, key) => {
@@ -515,7 +511,7 @@
       const list = groups.get(key);
       if (!list.length) continue;
       if (key === 'done') {
-        const open = !!ctx.openDone || !!q;
+        const open = !!ctx.openDone;
         parts.push(`<section class="task-group task-done"><button type="button" class="task-head" data-act="tasks-done" aria-expanded="${open}">${title} (${list.length})<span aria-hidden="true"> ${open ? '▾' : '▸'}</span></button>`);
         if (!open) { parts.push('</section>'); continue; }
       } else parts.push(`<section class="task-group"><h3 class="task-head">${title} (${list.length})</h3>`);
@@ -523,7 +519,7 @@
       parts.push('</section>');
     }
     if (cut) parts.push(`<div class="task-more rs-sub">+${cut} more</div>`);
-    return `${box}${parts.join('')}`;
+    return parts.join('');
   }
 
   // The single code viewer (RP64, S62): the text of GET /api/diff as files with numbered lines. Pure and total: any input gives a list.

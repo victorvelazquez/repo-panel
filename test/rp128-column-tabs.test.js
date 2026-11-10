@@ -1,8 +1,8 @@
 'use strict';
 // RP128 (S20, S21): the right column of the Summary is TABS (design D of RP127): Changes and Tasks for now (Status comes with RP129, Files and Notes with RP130; a tab with nothing to show
 // is never drawn). Only the open tab shows its name; the others are icons. Changes is a TREE by folders (a chain of single folders is one row, folders first, a count per folder, the status letter
-// and +added -deleted per file, the total on top); Tasks is COMPACT (a segmented bar with counters, the rows that ask for an action, and Pending, Blocked and Completed folded) and keeps its
-// filter box. Both read what the page already has: no new read, no new route, nothing is written. How it LOOKS (and the real clicks and keys) is for the person to try.
+// and +added -deleted per file, the total on top); Tasks is COMPACT (a segmented bar with counters, the rows that ask for an action, and Pending, Blocked and Completed folded) and has
+// no search box. Both read what the page already has: no new read, no new route, nothing is written. How it LOOKS (and the real clicks and keys) is for the person to try.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -28,11 +28,11 @@ const fileRows = (h) => [...h.matchAll(/<button type="button" class="cf-item( cf
 const order = (h) => [...h.matchAll(/data-act="(?:col-folder|changes-file)" data-path="([^"]*)"/g)].map((m) => m[1]);
 
 // ---------- the tabs ----------
-test('t1: the column has a tab bar with Changes and Tasks, in that order, each with a name for assistive tools; Changes shows the count of files and Tasks no count', () => {
+test('t1: the column has a tab bar with Tasks, Changes and Files, in that order, each with a name for assistive tools; Changes shows the count of files and Tasks no count', () => {
   const h = R.columnView({ name: 'demo', files: FILES });
   assert.match(h, /^<div class="col-tabs" role="tablist" aria-label="Column views">/);
   const tabs = [...h.matchAll(/<button type="button" role="tab" class="col-tab" id="coltab-(\w+)" data-act="col-tab" data-tab="(\w+)" aria-selected="(true|false)" aria-controls="colpane" aria-label="([^"]+)" title="([^"]+)">/g)];
-  assert.deepEqual(tabs.map((m) => [m[1], m[2], m[3], m[4], m[5]]), [['changes', 'changes', 'true', 'Changes', 'Changes'], ['files', 'files', 'false', 'Files', 'Files'], ['tasks', 'tasks', 'false', 'Tasks', 'Tasks']]);
+  assert.deepEqual(tabs.map((m) => [m[1], m[2], m[3], m[4], m[5]]), [['tasks', 'tasks', 'false', 'Tasks', 'Tasks'], ['changes', 'changes', 'true', 'Changes', 'Changes'], ['files', 'files', 'false', 'Files', 'Files']]);
   assert.match(h, /<span class="lb">Changes<\/span><span class="n">6<\/span><\/button>/);
   assert.match(h, /<span class="lb">Tasks<\/span><\/button>/, 'Tasks has no count');
   assert.equal((h.match(/role="tab"/g) || []).length, 3, 'no tab without content: Status needs the git data and Notes live in the centre (RP130)');
@@ -176,19 +176,14 @@ test('k3: only the rows that ask for an action are shown (in review, ready, in p
   assert.equal(trows(h).filter((r) => r.cur).length, 1);
 });
 
-test('k4: a folded group opens with the state of the page and shows its rows under its button; the filter opens what matches and hides the rest', () => {
+test('k4: a folded group opens with the state of the page and shows its rows under its button', () => {
   const h = compact(MANY, { open: { blocked: true, done: true } });
   assert.deepEqual(folds(h).map((f) => [f.fold, f.open]), [['pending', false], ['blocked', true], ['done', true]]);
   assert.match(h, /data-fold="blocked" aria-expanded="true">[\s\S]*?<div class="tk-sub">[\s\S]*?Delivery of D1/);
   assert.ok(trows(h).some((r) => r.id === 'D1') && trows(h).some((r) => r.id === 'A3'));
-  const f = compact(MANY, { filter: 'd1' });
-  assert.deepEqual(trows(f).map((r) => r.id), ['D1']);
-  assert.deepEqual(folds(f).map((x) => [x.fold, x.open, x.n]), [['blocked', true, 1]]);
-  assert.match(compact(MANY, { filter: 'zzz' }), /No task matches/);
 });
 
-test('k5: the filter box stays with its value (escaped); a row is one line whose tooltip carries the detail (PR, branch, what it waits for, why it is blocked)', () => {
-  assert.match(compact(MANY, { filter: 'a"<b>' }), /<input id="tasksFilter" type="search" class="task-filter" aria-label="Filter tasks" placeholder="Filter tasks…" value="a&quot;&lt;b&gt;">/);
+test('k5: a row is one line whose tooltip carries the detail (PR, branch, what it waits for, why it is blocked)', () => {
   const h = compact(MANY, { open: { pending: true, blocked: true } });
   const by = Object.fromEntries(trows(h).map((r) => [r.id, r]));
   assert.match(by.A1.title, /PR #7/);
@@ -372,7 +367,7 @@ test('p4: a folder button folds and unfolds its folder, and a path that is not a
   assert.equal(col(page), before);
 });
 
-test('p5: the folds of the tasks open and close, only the three that exist, and the filter keeps working in the compact list', async () => {
+test('p5: the folds of the tasks open and close, and only the three that exist', async () => {
   const page = boot();
   open(page, 'abc');
   await page.tick();
@@ -388,9 +383,6 @@ test('p5: the folds of the tasks open and close, only the three that exist, and 
   for (const f of ['', 'review', '__proto__', undefined]) act(page, 'tasks-fold', { fold: f });
   page.flush();
   assert.equal(col(page), before);
-  page.run("ACTIONS['tasks-filter']({ value: 'a1' })");
-  page.flush();
-  assert.deepEqual(trows(col(page)).map((r) => r.id), ['A1']);
 });
 
 test('p6: the arrows, Home and End move between the tabs and the new one takes the focus; other keys and other targets are left alone', async () => {
@@ -400,33 +392,33 @@ test('p6: the arrows, Home and End move between the tabs and the new one takes t
   const tabEl = (t) => ({ dataset: { act: 'col-tab', tab: t }, tagName: 'BUTTON' });
   const e = page.key('ArrowRight', tabEl('changes'));
   page.flush();
-  assert.equal(selected(col(page)), 'files', 'RP130: Changes, Files, Status, Tasks');
+  assert.equal(selected(col(page)), 'status', 'RP148: Tasks, Changes, Status, Files');
   assert.equal(e.prevented, true);
-  assert.ok(page.get('#coltab-files').focused >= 1, 'the focus goes to the tab that opened');
-  page.key('ArrowRight', tabEl('files'));
-  page.flush();
-  assert.equal(selected(col(page)), 'status');
+  assert.ok(page.get('#coltab-status').focused >= 1, 'the focus goes to the tab that opened');
   page.key('ArrowRight', tabEl('status'));
+  page.flush();
+  assert.equal(selected(col(page)), 'files');
+  page.key('ArrowRight', tabEl('files'));
   page.flush();
   assert.equal(selected(col(page)), 'tasks');
   page.key('ArrowLeft', tabEl('tasks'));
   page.flush();
-  assert.equal(selected(col(page)), 'status');
-  page.key('ArrowLeft', tabEl('status'));
-  page.flush();
   assert.equal(selected(col(page)), 'files');
   page.key('ArrowLeft', tabEl('files'));
+  page.flush();
+  assert.equal(selected(col(page)), 'status');
+  page.key('ArrowLeft', tabEl('status'));
   page.flush();
   assert.equal(selected(col(page)), 'changes');
   page.key('End', tabEl('changes'));
   page.flush();
-  assert.equal(selected(col(page)), 'tasks');
-  page.key('Home', tabEl('tasks'));
+  assert.equal(selected(col(page)), 'files');
+  page.key('Home', tabEl('files'));
   page.flush();
-  assert.equal(selected(col(page)), 'changes');
+  assert.equal(selected(col(page)), 'tasks');
   const quiet = page.key('ArrowRight', { dataset: { act: 'chat-open' }, tagName: 'ARTICLE' });
-  const other = page.key('a', tabEl('changes'));
-  assert.deepEqual([quiet.prevented, other.prevented, selected(col(page))], [false, false, 'changes']);
+  const other = page.key('a', tabEl('tasks'));
+  assert.deepEqual([quiet.prevented, other.prevented, selected(col(page))], [false, false, 'tasks']);
 });
 
 test('p7: a folder keeps the focus after it folds (the page repaints), a click on a tab gives the focus to that tab', async () => {
