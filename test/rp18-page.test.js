@@ -92,7 +92,7 @@ test('page: the Merge, Re-run failed and Fix CI buttons of a PR card are disable
 test('page: nothing running keeps the PR card and the enabled buttons exactly as before', () => {
   const page = loadPage();
   const html = page.get('prCard')(R, prOf(), {});
-  assert.match(html, /<button class="merge" data-act="merge" data-id="abc" data-n="7"\s+title="Merge into main">Merge · /);
+  assert.match(html, /<button class="merge" data-act="merge" data-id="abc" data-n="7"\s+title="Merge into main. Method: squash. Change it in Settings, Delivery.">Merge · /);
   assert.match(html, /<button data-act="rerun" data-id="abc" data-n="7"\s*>Re-run failed<\/button>/);
   assert.ok(html.includes('<button data-act="pi" data-id="abc" data-cmd="fix-pr" data-pr="7" title="Ask the open session to find out why the checks failed and fix it (it will not commit or push)">Fix CI</button>'));
   const page2 = loadPage();

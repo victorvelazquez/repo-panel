@@ -291,7 +291,7 @@ test('every tone has its class: error from 90, warn from 70, none below, dim whe
   const warn = await loadPage({ '/api/usage': () => ok(A_WARN) });
   assert.deepEqual(meterTones(warn.el('#usage').html), ['warn', '']);
   const old = await loadPage({ '/api/usage': () => ok(A_OLD) });
-  assert.ok(old.el('#usage').html.includes('<span class="um-age">20 min ago</span>'));
+  assert.ok(old.el('#usage').html.includes('<span class="um-old" aria-hidden="true" title="Usage data is 20 min old"></span>'));
   assert.deepEqual(meterTones(old.el('#usage').html), ['dim', 'dim']);
 });
 

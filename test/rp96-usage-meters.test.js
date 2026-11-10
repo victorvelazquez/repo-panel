@@ -97,7 +97,7 @@ test('r8: a dash window is a dim "–" with no bar; an old file dims both and sh
   const old = V.usageHtml(view(win(95, NOW + HOUR), win(50, NOW + DAY), { stale: true, updatedAt: NOW - 20 * MIN }));
   assert.equal((old.match(/class="um usage-dim"/g) || []).length, 2);
   assert.doesNotMatch(old, /usage-error|um-flag/);
-  assert.match(old, /<span class="um-age">20 min ago<\/span>/);
+  assert.match(old, /<span class="um-old" aria-hidden="true" title="Usage data is 20 min old"><\/span>/);
 });
 
 test('r9: with no data it is only the message: no bars and no popover', () => {
