@@ -140,21 +140,17 @@ test('index.html (RP82): Needs attention sits right after the scope buttons, bef
   assert.equal((bar.match(/class="spacer"/g) || []).length, 1);
 });
 
-test('index.html: header, tabs and view bar in that order; shared controls in the view bar, Merge menu in the header', () => {
+test('index.html: header (the tabs inside it, RP143) and view bar in that order; shared controls in the view bar, no Merge menu in the header', () => {
   const html = read('public/index.html');
   const at = (s) => html.indexOf(s);
-  assert.ok(at('<header>') < at('<nav class="rs-tabs"') && at('<nav class="rs-tabs"') < at('id="viewbar"') && at('id="viewbar"') < at('<div id="sumLayout"'));
+  assert.ok(at('<header>') < at('<nav class="rs-tabs"') && at('<nav class="rs-tabs"') < at('</header>') && at('</header>') < at('id="viewbar"') && at('id="viewbar"') < at('<div id="sumLayout"'));
   const header = html.slice(at('<header>'), at('</header>'));
   const bar = html.slice(at('id="viewbar"'), at('<div id="sumLayout"'));
   for (const id of ['search', 'groupFilter', 'scope']) { assert.match(bar, new RegExp(`id="${id}"`)); assert.doesNotMatch(header, new RegExp(`id="${id}"`)); }
   for (const id of ['alerts', 'cleanAsColumn']) { assert.match(bar, new RegExp(`id="${id}"`)); assert.doesNotMatch(header, new RegExp(`id="${id}"`)); }
-  assert.match(header, /<details class="pop" id="mergeMenu"><summary aria-label="Merge settings">⚙ Merge<\/summary><div class="pop-body">/);
-  assert.match(header, /id="method"[^>]*data-pref="method"|data-pref="method"[^>]*id="method"/);
-  assert.match(header, /id="delBranch"[^>]*data-pref="del"|data-pref="del"[^>]*id="delBranch"/);
-  assert.match(header, /Used by the Merge buttons of Summary and Work/);
-  assert.doesNotMatch(header, /id="conformity"|confBadge/, 'RP60: the duplicate Conformity button is gone from the header');
-  assert.match(html, /id="tab-conformity"[^>]*>Conformity <span id="confBadge"/);
-  assert.match(header, /data-act="refresh-all"[^>]*><span class="ico">↻<\/span> Refresh<\/button>/);
+  assert.doesNotMatch(header, /mergeMenu|id="method"|id="delBranch"|refresh-all/, 'RP143: the Merge menu and the Refresh button left the header');
+  assert.doesNotMatch(header, /id="conformity"\s/, 'RP60: no second Conformity button');
+  assert.match(html, /id="tab-conformity"[\s\S]*?<span id="confBadge"/);
   assert.doesNotMatch(bar, /id="summaryTools"/, 'RP121: the Summary tools left the bar for the header of the repos column');
   assert.match(bar, /<input id="cleanAsColumn" type="checkbox" data-pref="cleanAsColumn">/);
 });
@@ -310,10 +306,10 @@ test('the keyboard focus stays on the Needs attention button after the redraw', 
   assert.equal(btn.focused, 1);
 });
 
-// ---------- the Merge menu ----------
-test('the Merge menu closes with Escape and with a click outside, and stays open for a click inside', () => {
+// ---------- the Add menu (RP143: it was the Merge menu) ----------
+test('the Add menu closes with Escape and with a click outside, and stays open for a click inside', () => {
   const page = loadPage();
-  const menu = page.get('#mergeMenu');
+  const menu = page.get('#addMenu');
   menu.open = true;
   const target = (id) => ({ id, closest: () => null });
   const inside = target('inside');
@@ -330,9 +326,9 @@ test('the Merge menu closes with Escape and with a click outside, and stays open
   assert.equal(menu.open, false);
 });
 
-test('the Merge menu handlers tolerate a closed menu and stubs without contains', () => {
+test('the Add menu handlers tolerate a closed menu and stubs without contains', () => {
   const page = loadPage();
-  const menu = page.get('#mergeMenu');
+  const menu = page.get('#addMenu');
   menu.open = false;
   const fire = (type, e) => (page.handlers[type] || []).forEach((fn) => fn(e));
   assert.doesNotThrow(() => { fire('click', { target: { closest: () => null } }); fire('keydown', { key: 'Escape' }); });
@@ -340,10 +336,9 @@ test('the Merge menu handlers tolerate a closed menu and stubs without contains'
   assert.doesNotThrow(() => fire('click', { target: { closest: () => null } }));
 });
 
-test('the method and delete-branch controls keep their ids and prefs (change listener and load values)', () => {
+test('the controls of the bar keep their ids and prefs (RP143: the method and delete-branch controls live only in Settings now)', () => {
   const src = appSource();
-  assert.match(src, /\$\('#method'\)\.value = S\.prefs\.method/);
-  assert.match(src, /\$\('#delBranch'\)\.checked = S\.prefs\.del/);
+  assert.doesNotMatch(src, /#method|#delBranch/);
   assert.match(src, /\$\('#cleanAsColumn'\)\.checked = cleanAsColumn\(\)/);
 });
 

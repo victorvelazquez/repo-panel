@@ -447,10 +447,10 @@ test('Escape closes the chat only when it is open and no dialog or menu is open'
   page.fire('keydown', { key: 'Escape' });
   assert.equal(page.run('S.chat.id'), 'abc');
   page.get('#addDialog').open = false;
-  page.get('#mergeMenu').open = true;
+  page.get('#addMenu').open = true;
   page.fire('keydown', { key: 'Escape' });
   assert.equal(page.run('S.chat.id'), 'abc');
-  page.get('#mergeMenu').open = false;
+  page.get('#addMenu').open = false;
   page.run('S.menu = "x"');
   page.fire('keydown', { key: 'Escape' });
   assert.equal(page.run('S.chat.id'), 'abc');

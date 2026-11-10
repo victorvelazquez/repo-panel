@@ -13,7 +13,7 @@ const V = require('../public/view.js');
 
 const PUBLIC = path.join(__dirname, '..', 'public');
 const BASE = 1000000;
-const BUTTON = '[data-act="refresh-all"]';
+const BUTTON = '#syncState'; // RP143: the Updating indicator of the header
 
 // ---------- harness (rp79-page.test.js, plus: a fake clock, captured intervals and listeners, a queue of /api/board answers, optional auto answers) ----------
 function element(extra = {}) {

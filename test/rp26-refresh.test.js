@@ -21,7 +21,7 @@ const stub = () => new Proxy(function stubElement() {}, {
   apply: () => stub(),
 });
 
-const BUTTON = '[data-act="refresh-all"]';
+const BUTTON = '#syncState'; // RP143: the Updating indicator of the header (it was the icon of the Refresh button)
 
 async function loadPage() {
   const toggles = [];
@@ -96,10 +96,10 @@ test('page: render keeps the top icon in step with the loading count', () => {
   assert.ok(!/class="spin"/.test(src), 'no spinner markup is left in app.js');
 });
 
-test('the Refresh button has an icon element, and only that icon spins while loading', () => {
-  assert.match(read('index.html'), /data-act="refresh-all"[^>]*><span class="ico">↻<\/span> Refresh<\/button>/);
+test('the Updating indicator has an icon element, and only that icon spins while loading (RP143: no Refresh button any more)', () => {
+  assert.match(read('index.html'), /id="syncState"[^>]*><span class="ico">↻<\/span> Updating<\/span>/);
   const css = read('style.css');
-  assert.match(css, /button\.loading \.ico\s*\{[^}]*animation:\s*spin/);
+  assert.match(css, /\.sync\.loading \.ico\s*\{[^}]*animation:\s*spin/);
   assert.ok(!/(^|\n)\.spin\b/.test(css), 'the old per-card .spin rule is gone');
 });
 
