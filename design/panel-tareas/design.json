@@ -1,0 +1,35 @@
+{
+  "title": "Repo Panel — Tasks tab of the right column",
+  "brief": "«la pestaña de tasks podriamos mejorar para que sea mas entendible, todavia no me deja satisfecho con lo que vemos ahora. podriamos hacer que se vea y entienda mejor? las tareas que parecen una tarjetas medio que confunde porque parece que son clickeables. el buscador creo que no es muy importante porque no uso, no busco tareas de la lista, simplemente veo la lista completa en orden. si esta bien que sean plegables las que menos necesitamos ver siempre.» and «las A B y C me gustan, quisiera ver tambien el diseño de como quedara». Each direction is drawn at 360 px (default) and 220 px (narrowest). Tokens, tree icons, CI marks and column tabs taken from public/style.css and public/resumen.js.",
+  "feature": "odd/tasks/panel-layout.md",
+  "artboards": [
+    {
+      "file": "01-hoy.html",
+      "title": "Hoy · the Tasks tab as it is now",
+      "tradeoff": "Not a direction: the reference, drawn from the facts of the code. Bordered rows that look like buttons, a filter box nobody uses, state only as a clipped chip and counts without any explanation",
+      "width": 880,
+      "height": 760
+    },
+    {
+      "file": "02-lista-plana.html",
+      "title": "A2 · Flat list, one icon per group (chosen direction)",
+      "tradeoff": "Flat rows with only the task id and the title; one status icon per group header (In review, Ready, In progress, Next, Pending, Blocked, Completed), each group shown only when it has tasks. Extra data sits at the right of the same line when it fits and drops below only when it does not, so at 220 px several rows take two or three lines: nothing is clipped, at the cost of some height. It has seven headers instead of four, and icons are only learned through the header (a legend sits under the artboard)",
+      "width": 880,
+      "height": 1380
+    },
+    {
+      "file": "03-riel.html",
+      "title": "B · Riel",
+      "tradeoff": "A line that tells the story (now, next up, later) with the state written on each node; reads as a sequence, but the line takes a column of width and says less when two tasks are in the same state",
+      "width": 880,
+      "height": 1120
+    },
+    {
+      "file": "04-estados-y-orden.html",
+      "title": "Estados y orden de pestañas",
+      "tradeoff": "Not a direction: loading, empty, unavailable, stale freshness, long text and 220 px states of A, plus the tab order and which tab opens by situation",
+      "width": 1240,
+      "height": 1470
+    }
+  ]
+}
