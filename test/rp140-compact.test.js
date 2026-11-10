@@ -17,8 +17,17 @@ const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'rp140-'));
 const REPO = path.join(scratch, 'repo');
 fs.mkdirSync(REPO);
 process.env.REPO_PANEL_CONFIG = path.join(scratch, 'config.json');
-// The fake pi runs with the repo as its folder: on Windows the folder is busy until the killed process is gone.
-test.after(async () => { await new Promise((r) => setTimeout(r, 1000)); fs.rmSync(scratch, { recursive: true, force: true, maxRetries: 50, retryDelay: 200 }); });
+// The fake pi runs with the repo as its folder: on Windows the folder is busy until the killed process is gone. `maxRetries` of fs.rmSync only covers ENOTEMPTY, EEXIST and EPERM inside a folder: an EBUSY on the
+// folder itself is thrown at once, so the retry is made here (about 20 s at most, and a folder that never frees up is still an error).
+test.after(async () => {
+  await new Promise((r) => setTimeout(r, 1000));
+  for (let i = 1; ; i += 1) {
+    try { fs.rmSync(scratch, { recursive: true, force: true }); return; } catch (e) {
+      if (!['EBUSY', 'EPERM', 'ENOTEMPTY'].includes(e.code) || i >= 100) throw e;
+      await new Promise((r) => setTimeout(r, 200));
+    }
+  }
+});
 
 const lib = require('../lib.js');
 const { createServer } = require('../server/http.js');
@@ -32,7 +41,7 @@ const R = require('../public/resumen.js');
 const ID = lib.repoId(REPO);
 const ACTIVE = { id: 'gentle-shell', command: 'C:\\L\\gentle-shell.exe', agentDir: 'C:\\a' };
 const FIXTURE = path.join(__dirname, 'fixtures', 'fake-pi-rpc.js');
-const until = async (fn, ms = 5000) => { const end = Date.now() + ms; while (Date.now() < end) { const v = fn(); if (v) return v; await new Promise((r) => setTimeout(r, 10)); } throw new Error('timed out waiting'); };
+const until = async (fn, ms = 5000) => { const end = Date.now() + ms; while (Date.now() < end) { const v = await fn(); if (v) return v; await new Promise((r) => setTimeout(r, 10)); } throw new Error('timed out waiting'); };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let logN = 0;
 const newLog = () => path.join(scratch, `pi-${++logN}.log`);
@@ -45,7 +54,8 @@ const SECRET_PARTS = ['sk', 'live', 'ABC123'];
 const freePort = () => new Promise((resolve) => { const s = net.createServer().listen(0, '127.0.0.1', () => { const { port } = s.address(); s.close(() => resolve(port)); }); });
 const call = (port, method, p, { token, host, body, raw } = {}) => new Promise((resolve, reject) => {
   const payload = raw !== undefined ? raw : body === undefined ? undefined : JSON.stringify(body);
-  const req = http.request({ host: '127.0.0.1', port, path: p, method, headers: { ...(token ? { 'x-token': token } : {}), ...(host ? { host } : {}), ...(payload !== undefined ? { 'content-type': 'application/json' } : {}) } }, (res) => {
+  // agent: false = a new connection per call: the default agent reuses sockets and the server closes an idle one after 5 s, so a test that stalls on a loaded machine got ECONNRESET on the reused socket.
+  const req = http.request({ agent: false, host: '127.0.0.1', port, path: p, method, headers: { ...(token ? { 'x-token': token } : {}), ...(host ? { host } : {}), ...(payload !== undefined ? { 'content-type': 'application/json' } : {}) } }, (res) => {
     let d = ''; res.on('data', (c) => { d += c; }); res.on('end', () => { let json = null; try { json = JSON.parse(d); } catch { /* not json */ } resolve({ status: res.statusCode, body: d, json }); });
   });
   req.on('error', reject);
@@ -81,6 +91,16 @@ const busyRig = (fakeEnv, over, fn) => withRig({ FAKE_RUN_MS: '5000', ...fakeEnv
 const FIXED = /^[A-Za-z0-9 ,.:'-]+$/; // a fixed English sentence: no paths, no ids, no model text
 
 // ---------- abuse first: the ids and the guards ----------
+// The helper of every wait below: a condition that is an async function returns a promise (always truthy), so a `until` that did not await it returned at once and the wait was a no-op; on a slow machine
+// (the CI) the event it waited for had not been handled yet and the next step raced it.
+test('helper: until really waits for an async condition', async () => {
+  let n = 0;
+  const t0 = Date.now();
+  await until(async () => { await sleep(30); n += 1; return n >= 3; });
+  assert.ok(n >= 3, `the condition was asked ${n} times`);
+  assert.ok(Date.now() - t0 >= 60, 'it waited for the slow condition');
+  await assert.rejects(until(async () => false, 80), /timed out waiting/, 'and it still gives up');
+});
 test('abuse: a missing, empty, non-string or too long id is 400 like the other routes, and nothing is sent', async () => {
   await withRig({}, {}, async ({ host, post, log }) => {
     await host.start(ID);
