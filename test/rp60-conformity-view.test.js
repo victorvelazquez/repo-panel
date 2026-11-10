@@ -89,7 +89,7 @@ test('a5: the deep link #conformity opens the tab', () => {
 
 test('b1: index.html has the Conformity tab with its badge, the full-width panel and no drawer or duplicate button', () => {
   const html = read('index.html');
-  assert.match(html, /<button[^>]*id="tab-conformity"[^>]*aria-controls="conformityView"[^>]*>Conformity <span id="confBadge" class="badge" hidden><\/span><\/button>/);
+  assert.match(html, /<button[^>]*id="tab-conformity"[^>]*aria-controls="conformityView"[^>]*aria-label="Conformity"[^>]*>[\s\S]*?<span id="confBadge" class="badge" hidden><\/span><\/button>/);
   assert.match(html, /<section id="conformityView"[^>]*role="tabpanel"[^>]*aria-labelledby="tab-conformity"[^>]*hidden>/);
   assert.doesNotMatch(html, /id="drawer"|drawerBody|drawerTitle|close-drawer/);
   assert.doesNotMatch(html, /<button id="conformity"|data-act="conformity"/);

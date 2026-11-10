@@ -430,7 +430,7 @@ test('index.html: tab bar, scope container, summary and work wrappers, no Activi
   assert.match(html, /id="scope"/);
   assert.match(html, /<section id="summary"[^>]*role="tabpanel"/);
   assert.match(html, /<div id="work"[^>]*>[\s\S]*id="queue"[\s\S]*<main id="app">/);
-  for (const id of ['search', 'groupFilter', 'alerts', 'method', 'delBranch', 'cleanAsColumn']) assert.match(html, new RegExp(`id="${id}"`));
+  for (const id of ['search', 'groupFilter', 'alerts', 'cleanAsColumn']) assert.match(html, new RegExp(`id="${id}"`));
   assert.ok(html.indexOf('/view.js') < html.indexOf('/resumen.js') && html.indexOf('/resumen.js') < html.indexOf('/app.js'));
 });
 

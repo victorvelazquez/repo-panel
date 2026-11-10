@@ -163,8 +163,6 @@ function setPref(key, value) {
 }
 // RP111b: the controls of the bar are set once when the page starts; a preference changed from Settings puts them in step.
 function syncPrefControls() {
-  $('#method').value = S.prefs.method;
-  $('#delBranch').checked = S.prefs.del;
   $('#cleanAsColumn').checked = cleanAsColumn();
 }
 
@@ -176,10 +174,10 @@ function groupTag(name) {
   return `<span class="tag" style="background:hsl(${h} 40% 20%);color:hsl(${h} 70% 78%)">${esc(name)}</span>`;
 }
 
-// The only refresh signal: the icon of the top Refresh button spins while any repo is refreshing. Cards show nothing.
+// The only refresh signal: the small Updating indicator of the header shows and spins while any repo is refreshing. Cards show nothing.
 function syncRefreshIcon() {
   const on = (V ? V.isRefreshing(S.loading) : Object.values(S.loading).some((n) => n > 0)) || S.boardRefreshing.length > 0;
-  $('[data-act="refresh-all"]').classList.toggle('loading', on);
+  $('#syncState').classList.toggle('loading', on);
 }
 
 // The repo name is the link to the repository on GitHub (plain text when there is no GitHub remote).

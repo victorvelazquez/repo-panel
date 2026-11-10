@@ -214,6 +214,7 @@ function drawConformity() {
   const n = v.count;
   $('#confBadge').hidden = !n;
   $('#confBadge').textContent = n;
+  $('#tab-conformity').setAttribute('aria-label', V ? V.conformityTabLabel(n) : 'Conformity');
   if (S.tab !== 'conformity') return;
   const sum = v.summary ? `<div class="conf-sum">${esc(v.summary)}</div>` : '';
   const body = v.state === 'issues' ? S.conf.items.map(confBlock).join('') : `<div class="${v.state === 'error' ? 'conf-error' : 'empty'}">${esc(v.message)}</div>`;
@@ -267,7 +268,7 @@ function applyTab() {
   $('#conformityView').hidden = S.tab !== 'conformity';
   $('#settingsView').hidden = S.tab !== 'settings';
   if (document.body && document.body.classList) for (const t of ['summary', 'work', 'conformity', 'settings']) document.body.classList.toggle(`tab-${t}`, S.tab === t);
-  for (const b of Array.from((document.querySelectorAll && document.querySelectorAll('.rs-tabs [role=tab][data-tab]')) || [])) b.setAttribute('aria-selected', String(b.dataset.tab === S.tab));
+  for (const b of Array.from((document.querySelectorAll && document.querySelectorAll('header [role=tab][data-tab]')) || [])) b.setAttribute('aria-selected', String(b.dataset.tab === S.tab));
 }
 // Conformity is a tab like the others but never the saved one: a reload comes back to Summary or Work, and a repo picked in it returns there.
 function setTab(tab) {

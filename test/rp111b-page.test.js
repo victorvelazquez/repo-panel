@@ -72,7 +72,7 @@ const switchOf = (h, key) => new RegExp(`<button type="button" class="st-sw" rol
 
 // ---------- the tab ----------
 test('index.html: a Settings tab button after Conformity and its full-width panel, hidden at the start', () => {
-  assert.match(INDEX, /<button type="button" role="tab" id="tab-settings" data-act="tab" data-tab="settings" aria-selected="false" aria-controls="settingsView">Settings<\/button>/);
+  assert.match(INDEX, /<button type="button" role="tab" class="hd-icon" id="tab-settings" data-act="tab" data-tab="settings" aria-selected="false" aria-controls="settingsView" aria-label="Settings" title="Settings">/);
   assert.match(INDEX, /<section id="settingsView" class="rs-panel" role="tabpanel" aria-labelledby="tab-settings" hidden><\/section>/);
   assert.ok(INDEX.indexOf('id="tab-conformity"') < INDEX.indexOf('id="tab-settings"'));
 });
@@ -164,17 +164,15 @@ test('the privacy switch: a key the page does not know sends nothing', async () 
   assert.equal(page.fetches.filter((f) => f.method === 'POST' && f.url.startsWith('/api/settings')).length, 0);
 });
 
-test('the browser options: each click saves the preference, redraws, says «Saved in this browser» and keeps the controls of the bar in step', async () => {
+test('the browser options: each click saves the preference, redraws, says «Saved in this browser» and keeps the control of the bar in step', async () => {
   const page = await openSettings();
   await page.run("ACTIONS['pref-set']({ dataset: { pref: 'method', value: 'rebase' } })"); await page.tick();
   assert.equal(page.run('S.prefs.method'), 'rebase');
   assert.equal(JSON.parse(page.store.prefs).method, 'rebase');
-  assert.equal(page.get('#method').value, 'rebase');
   assert.match(html(page), /role="status"[^>]*>Saved in this browser/);
   assert.match(html(page), /aria-pressed="true"[^>]*data-value="rebase"|data-value="rebase"[^>]*aria-pressed="true"/);
   await page.run("ACTIONS['pref-set']({ dataset: { pref: 'del', value: 'false' } })"); await page.tick();
   assert.equal(page.run('S.prefs.del'), false);
-  assert.equal(page.get('#delBranch').checked, false);
   await page.run("ACTIONS['pref-set']({ dataset: { pref: 'cleanAsColumn', value: 'false' } })"); await page.tick();
   assert.equal(page.run('S.prefs.cleanAsColumn'), false);
   assert.equal(page.get('#cleanAsColumn').checked, false);

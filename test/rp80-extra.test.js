@@ -12,7 +12,7 @@ const R = require('../public/resumen.js');
 const V = require('../public/view.js');
 
 const BASE = 1000000;
-const BUTTON = '[data-act="refresh-all"]';
+const BUTTON = '#syncState'; // RP143: the Updating indicator of the header
 const KINDS = ['local', 'prs', 'roadmap', 'state', 'req'];
 const AUTO = { local: '/api/local', prs: '/api/prs', roadmap: '/api/roadmap', state: '/api/state', req: '/api/requirements' };
 

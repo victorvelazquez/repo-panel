@@ -71,7 +71,7 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && (S.lh.menu || S.lh.search || S.lh.legend)) { S.lh.menu = false; S.lh.search = false; S.lh.legend = false; draw(); return; } // RP121: the bar of the repos column first
   if (e.key === 'Escape' && S.menu) { S.menu = null; draw(); return; }
   if (e.key === 'Escape') {
-    const menu = $('#mergeMenu');
+    const menu = $('#addMenu');
     if (S.chat.id && !(menu && menu.open) && document.activeElement !== $('#usage') && !['#addDialog', '#roomDialog'].some((d) => $(d) && $(d).open)) closeChat();
   } else if ((e.key === 'Enter' || e.key === ' ') && e.target && e.target.dataset && e.target.dataset.act === 'chat-open') { e.preventDefault(); ACTIONS['chat-open'](e.target); }
   else if ((e.key === 'Enter' || e.key === ' ') && e.target && e.target.dataset && e.target.dataset.act === 'tasks-open') { e.preventDefault(); e.stopPropagation(); ACTIONS['tasks-open'](e.target); }
@@ -128,14 +128,14 @@ document.addEventListener('change', (e) => {
   setPref(key, e.target.type === 'checkbox' ? e.target.checked : e.target.value);
 });
 
-// The Merge menu is static HTML (never painted by draw()): it closes with Escape and with a click outside.
+// The Add menu is static HTML (never painted by draw()): it closes with Escape, with a click outside and with a click on one of its items.
 document.addEventListener('keydown', (e) => {
-  const menu = $('#mergeMenu');
+  const menu = $('#addMenu');
   if (e.key === 'Escape' && menu && menu.open) { menu.open = false; const s = menu.querySelector && menu.querySelector('summary'); if (s && s.focus) s.focus(); }
 });
 document.addEventListener('click', (e) => {
-  const menu = $('#mergeMenu');
-  if (menu && menu.open && !(menu.contains && menu.contains(e.target))) menu.open = false;
+  const menu = $('#addMenu');
+  if (menu && menu.open && (!(menu.contains && menu.contains(e.target)) || (e.target && e.target.closest && e.target.closest('[data-act]')))) menu.open = false;
 });
 
 $('#search').addEventListener('input', (e) => { S.q = e.target.value; draw(); });
@@ -177,8 +177,6 @@ document.addEventListener('visibilitychange', () => {
 
 (async () => {
   try { await loadConfig(); } catch (e) { toast(e.message, 'bad'); }
-  $('#method').value = S.prefs.method;
-  $('#delBranch').checked = S.prefs.del;
   $('#cleanAsColumn').checked = cleanAsColumn();
   draw();
   if (location.hash === '#conformity') openConformity(); // deep link

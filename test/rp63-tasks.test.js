@@ -256,7 +256,7 @@ test('tasksView: the notes of a blocked row are cut to 140 characters', () => {
 // right panel share those attributes and were set to aria-selected="false" at every redraw. The view tabs are looked up inside .rs-tabs only.
 test('app.js marks the view tabs inside .rs-tabs only, so the Chat / Tasks tabs keep their own aria-selected', () => {
   const app = appSource();
-  assert.ok(app.includes("querySelectorAll('.rs-tabs [role=tab][data-tab]')"));
+  assert.ok(app.includes("querySelectorAll('header [role=tab][data-tab]')")); // RP143: the view tabs live in the header (two tablists)
   assert.ok(!app.includes("querySelectorAll('[role=tab][data-tab]')"));
   assert.match(read('index.html'), /<nav class="rs-tabs"[^>]*role="tablist"/);
 });
