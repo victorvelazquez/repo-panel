@@ -519,13 +519,18 @@ body.tab-summary #viewbar { display: none; }
 .ck-l:hover { color: var(--blue); }
 .ck-rerun { margin: 8px 4px 4px; }
 /* The changes tree: one button per folder and per file, indented by depth (cf-d0 to cf-d8: deeper paths stop getting deeper); the name is clipped, the counts and the status letter keep their place. */
-.cf-tree { display: grid; min-width: 0; }
-.cf-item, .cf-dir { display: flex; align-items: center; gap: 6px; width: 100%; min-width: 0; text-align: left; border: 1px solid transparent; background: transparent; border-radius: 6px; padding: 3px 6px 3px calc(6px + var(--cf-d, 0) * 14px); }
+.cf-tree { display: grid; min-width: 0; --cf-step: 16px; }
+.cf-item, .cf-dir { display: flex; align-items: center; gap: 6px; width: 100%; min-width: 0; text-align: left; border: 1px solid transparent; background: transparent; border-radius: 6px; padding: 3px 6px 3px calc(6px + var(--cf-d, 0) * var(--cf-step, 16px)); }
+@container col (max-width: 300px) {
+  .cf-tree { --cf-step: 8px; }
+}
 .cf-d0 { --cf-d: 0; } .cf-d1 { --cf-d: 1; } .cf-d2 { --cf-d: 2; } .cf-d3 { --cf-d: 3; } .cf-d4 { --cf-d: 4; } .cf-d5 { --cf-d: 5; } .cf-d6 { --cf-d: 6; } .cf-d7 { --cf-d: 7; } .cf-d8 { --cf-d: 8; }
 .cf-item:hover:not(:disabled), .cf-dir:hover:not(:disabled) { background: var(--panel2); border-color: transparent; }
 .cf-item.cf-on, .cf-item.cf-on:hover:not(:disabled) { border-color: var(--blue); background: #12253d; }
 .cf-ch { flex: none; width: 12px; color: var(--muted); font-size: 10px; text-align: center; }
 .cf-ic { flex: none; display: inline-grid; color: var(--muted); }
+.cf-dir .cf-ic { color: var(--blue); }
+.cf-item .cf-ic { color: var(--gray); }
 .cf-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
 .cf-dir .cf-name { color: var(--muted); }
 .cf-n { flex: none; font-size: 11px; color: var(--muted); font-family: ui-monospace, Consolas, monospace; }

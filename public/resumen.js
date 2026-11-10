@@ -178,7 +178,7 @@
     tasks: svgIcon('<path d="M3 4.5l1.3 1.3L7 3.2M3 10.5l1.3 1.3L7 9.2M9.5 5h3.5M9.5 11h3.5"/>', 16),
     status: svgIcon('<circle cx="4" cy="3.5" r="1.6"/><circle cx="4" cy="12.5" r="1.6"/><circle cx="12" cy="12.5" r="1.6"/><path d="M4 5.1v5.8M12 10.9V7a2 2 0 0 0-2-2H8"/>', 16),
   };
-  const ICON_DIR = svgIcon('<path d="M2 4.5A1.5 1.5 0 0 1 3.5 3h2.6l1.4 1.5h5A1.5 1.5 0 0 1 14 6v5.5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 11.5z"/>');
+  const ICON_DIR = svgIcon('<path fill="currentColor" d="M2 4.5A1.5 1.5 0 0 1 3.5 3h2.6l1.4 1.5h5A1.5 1.5 0 0 1 14 6v5.5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 11.5z"/>');
   const ICON_FILE = svgIcon('<path d="M4 2h5l3 3v8.5a.5.5 0 0 1-.5.5h-7a.5.5 0 0 1-.5-.5z"/><path d="M9 2v3h3"/>');
   const validFiles = (files) => (Array.isArray(files) ? files.filter((f) => f && typeof f.path === 'string' && f.path) : null);
   const treeByName = (a, b) => {
@@ -222,7 +222,7 @@
       const on = f.path === c.selected;
       const st = String(f.status ?? '');
       const n = f.binary ? 'bin' : `<i class="a">+${Number(f.added) || 0}</i> <i class="d">−${Number(f.deleted) || 0}</i>`;
-      out.push(`<button type="button" class="cf-item${on ? ' cf-on' : ''} cf-d${dd}" data-act="changes-file" data-path="${esc(f.path)}" aria-pressed="${on}" title="${esc(f.path)}"><span class="cf-ic" aria-hidden="true">${ICON_FILE}</span><span class="cf-name">${esc(name)}</span><span class="cf-n">${n}</span><span class="cf-st st-${esc(st)}">${esc(st)}</span></button>`);
+      out.push(`<button type="button" class="cf-item${on ? ' cf-on' : ''} cf-d${dd}" data-act="changes-file" data-path="${esc(f.path)}" aria-pressed="${on}" title="${esc(f.path)}"><span class="cf-ch" aria-hidden="true"></span><span class="cf-ic" aria-hidden="true">${ICON_FILE}</span><span class="cf-name">${esc(name)}</span><span class="cf-n">${n}</span><span class="cf-st st-${esc(st)}">${esc(st)}</span></button>`);
     }
   }
   // The paths of the folder rows the tree of this list has (the ones a button can fold): the page uses it to ignore a path that is not one of them.
