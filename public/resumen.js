@@ -314,17 +314,18 @@
   // The state of the session (RPC2-1), shown inside the composer frame. Icon + word, never colour alone. c = { info, rpc } (rpc: what V.rpcReduce keeps).
   const SESS_TITLE = {
     loading: 'Loading the session', unknown: 'The session state is unknown', none: 'The session is not started: sending a message starts it', starting: 'The session is starting; this can take half a minute',
-    free: 'The session is idle: you can write to it', working: 'The session is working', waiting: 'pi is asking something: answer it in the card of the chat',
+    free: 'The session is idle: you can write to it', working: 'The session is working', compacting: 'The session is compacting its context: wait a moment', waiting: 'pi is asking something: answer it in the card of the chat',
   };
   const SESS_VIEW = {
     loading: ['gray', '○', 'Loading…'], unknown: ['gray', '?', 'Unknown'], none: ['gray', '○', 'Not started'], starting: ['yellow', '◌', 'Starting…'], free: ['gray', '○', 'Idle'],
-    working: ['green', '●', 'Working…'], waiting: ['yellow', '◐', 'Asking you something'],
+    working: ['green', '●', 'Working…'], compacting: ['yellow', '◍', 'Compacting…'], waiting: ['yellow', '◐', 'Asking you something'],
   };
   const SESS_OF = { closed: 'none', starting: 'starting', idle: 'free', busy: 'working', asking: 'waiting' };
   function sessionState(c) {
-    const key = !c.info ? 'loading' : SESS_OF[c.rpc && c.rpc.state] || 'unknown'; // no rpc entry yet: the status read has not answered
+    const compacting = !!(c.rpc && c.rpc.compacting === true && c.rpc.state !== 'closed' && c.rpc.state !== 'starting'); // RP140: the mark is not a state of the machine; it wins over Idle and Working…
+    const key = !c.info ? 'loading' : compacting ? 'compacting' : SESS_OF[c.rpc && c.rpc.state] || 'unknown'; // no rpc entry yet: the status read has not answered
     const [tone, icon, word] = SESS_VIEW[key];
-    return { key, tone, icon, word, title: SESS_TITLE[key], animate: key === 'working' || key === 'starting' };
+    return { key, tone, icon, word, title: SESS_TITLE[key], animate: key === 'working' || key === 'starting' || key === 'compacting' };
   }
   const sessionLabelHtml = (c) => {
     const s = sessionState(c);
@@ -359,6 +360,13 @@
     const [cls, icon, more] = p >= 90 ? ['mem-bad', '✖', ' (almost full)'] : p >= 70 ? ['mem-warn', '▲', ' (getting full)'] : ['', '◔', ''];
     const used = ok(x.tokens) ? kTokens(x.tokens) : `${Math.round(p)}%`;
     return `<span class="mem ctx${cls ? ` ${cls}` : ''}" title="${esc(`Context used by this session: ${used} of ${kTokens(x.window)} tokens${more}`)}"><i aria-hidden="true">${icon}</i> ctx ${Math.round(p)}%</span>`;
+  };
+
+  // RP140: "Compact" next to the ctx chip. Only a live session (idle or answering) that is not compacting already has it; the title says that an answer in progress is stopped first. The server decides anyway.
+  const compactButtonHtml = (c) => {
+    const r = c && c.info && c.rpc && typeof c.rpc === 'object' ? c.rpc : null;
+    if (!r || r.compacting === true || (r.state !== 'idle' && r.state !== 'busy')) return '';
+    return `<button type="button" class="ss-compact" data-act="compact" title="${r.state === 'busy' ? 'Compact the context of this session. It stops the answer in progress first' : 'Compact the context of this session'}">Compact</button>`;
   };
 
   // RP98: "Close session" stops the pi process of the repo and releases its adoption (the chat goes back to the list of sessions). It lives next to the session state in the composer frame (RP72 keeps the
@@ -723,7 +731,7 @@
     starting: 'The session is starting…', busy: 'The session is working: wait until it is idle, or press Stop',
     asking: 'pi is asking something: answer it in the card of the chat',
   };
-  const rpcWait = (c) => (c.rpc && COMPOSER_WAIT[c.rpc.state]) || (!c.rpc ? REASON.unknown : '');
+  const rpcWait = (c) => (c.rpc && c.rpc.compacting === true && c.rpc.state !== 'closed' ? 'The session is compacting its context: wait a moment' : '') || (c.rpc && COMPOSER_WAIT[c.rpc.state]) || (!c.rpc ? REASON.unknown : '');
   function composerState(c, ctx = {}) {
     // RP99: with no session adopted (the list is in view) nothing can be sent: it would start and adopt a new session without telling. Open one or start a new one first.
     const reason = !c.info ? 'Loading the chat…' : !c.info.adopted ? 'Open a session or start a new one to write' : c.sending ? 'Sending…' : rpcWait(c);
@@ -1179,5 +1187,5 @@ ${status}</div>`;
     return `${ctx.failed ? '<div class="rs-note" role="status">⚠ Summary unavailable: showing the last data we have.</div>' : ''}<div class="rs-list">${body}</div>`;
   }
 
-  return { esc, mdHtml, settingsView, memoryChipHtml, ctxChipHtml, legendHtml, listCount, listHeadChips, sessionChip, blockWidths, columnView, treeFolderPaths, fileView, COLUMN_TABS, composerState, askAllowed, actionMenu, actionButtonsHtml, composerNote, chatHead, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, sessionCloseHtml, sessionTerminalHtml, terminalBlockHtml, recentlyActive, chatBody, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
+  return { esc, mdHtml, settingsView, memoryChipHtml, ctxChipHtml, compactButtonHtml, legendHtml, listCount, listHeadChips, sessionChip, blockWidths, columnView, treeFolderPaths, fileView, COLUMN_TABS, composerState, askAllowed, actionMenu, actionButtonsHtml, composerNote, chatHead, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, sessionCloseHtml, sessionTerminalHtml, terminalBlockHtml, recentlyActive, chatBody, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
 }));

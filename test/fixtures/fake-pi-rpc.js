@@ -13,6 +13,8 @@
 //   FAKE_FLOOD=<n>  a line of n characters after the first answer
 //   FAKE_STATS=<json>  the data that get_session_stats answers (default: 124000 of 200000 tokens, 62 percent); FAKE_STATS_FAIL=1 answers success false
 //   the command fake_emit { record } is answered and then written to stdout as an event (for example a compaction_end)
+//   FAKE_COMPACT=ok|already|nothing|fail|slow|lost  what the command compact does (default ok); FAKE_COMPACT_MS=<ms> how long it takes (default 20; slow: 300). It emits compaction_start and compaction_end,
+//     get_state says isCompacting while it lasts, and a prompt is refused with the real text while it lasts. A running turn is aborted first, like the real one. 'fail' carries a secret-looking text built by parts.
 //   FAKE_LOG=<file> every line received on stdin is appended to this file
 const fs = require('node:fs');
 
@@ -23,6 +25,8 @@ const eol = env.FAKE_CRLF ? '\r\n' : '\n';
 let streaming = false;
 let ready = false;
 let runTimer = null;
+let compacting = false;
+let compacted = false;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // Writes go one after the other, so FAKE_SPLIT halves of two records never interleave.
@@ -58,6 +62,22 @@ function startRun(msg) {
   } else runTimer = setTimeout(endRun, Number(env.FAKE_RUN_MS) || 30);
 }
 
+// The command compact does not hold the queue: it answers later, so get_state and prompt are still answered while it lasts.
+function compact(reply) {
+  const mode = env.FAKE_COMPACT || 'ok';
+  if (mode === 'lost') return; // a pi that never answers compact and does not report compacting either (the host's timeout path)
+  endRun();
+  compacting = true;
+  out({ type: 'compaction_start', reason: 'manual' });
+  setTimeout(() => {
+    compacting = false;
+    const error = mode === 'already' ? 'Already compacted' : mode === 'nothing' ? 'Nothing to compact (session too small)' : mode === 'fail' ? `Compaction failed: provider said ${['sk', 'live', 'ABC123'].join('-')} at /home/secret/file.txt` : '';
+    if (!error) compacted = true;
+    out({ type: 'compaction_end', reason: 'manual', aborted: false, willRetry: false, ...(error ? { errorMessage: error } : {}) });
+    if (error) reply(false, null, error); else reply(true, { summary: 'SECRET-SUMMARY', firstKeptEntryId: 'e1', tokensBefore: 124000, details: {} });
+  }, Number(env.FAKE_COMPACT_MS) || (mode === 'slow' ? 300 : 20));
+}
+
 async function handle(line) {
   if (env.FAKE_LOG) fs.appendFileSync(env.FAKE_LOG, `${line}\n`);
   let msg;
@@ -68,8 +88,9 @@ async function handle(line) {
   }
   if (env.FAKE_NO_ANSWER === msg.type) return undefined;
   const reply = (success, data, error) => out({ id: msg.id, type: 'response', command: msg.type, success, ...(success ? { data } : { error }) });
-  if (msg.type === 'get_state') return reply(true, { isStreaming: streaming, isCompacting: false, sessionId: 'fake', sessionFile: null, sessionName: null, messageCount: 0, pendingMessageCount: 0, model: null });
+  if (msg.type === 'get_state') return reply(true, { isStreaming: streaming, isCompacting: compacting, sessionId: 'fake', sessionFile: null, sessionName: null, messageCount: 0, pendingMessageCount: 0, model: null });
   if (msg.type === 'prompt') {
+    if (compacting) return reply(false, null, 'Cannot submit a prompt while compaction is in progress');
     if (streaming && !msg.streamingBehavior) return reply(false, null, 'Agent is already processing: /home/secret/file.txt');
     if (streaming) return reply(true, { disposition: 'queued' });
     reply(true, { disposition: 'started' });
@@ -77,6 +98,8 @@ async function handle(line) {
   }
   if (msg.type === 'steer' || msg.type === 'follow_up') return reply(true, { disposition: 'queued' });
   if (msg.type === 'abort') { reply(true, {}); return endRun(); }
+  if (msg.type === 'compact') return compact(reply);
+  if (msg.type === 'get_session_stats' && compacted && !env.FAKE_STATS) return reply(true, { contextUsage: { tokens: null, contextWindow: 200000, percent: null } });
   if (msg.type === 'get_session_stats') return env.FAKE_STATS_FAIL ? reply(false, null, 'stats failed: /home/secret/file.txt') : reply(true, env.FAKE_STATS ? JSON.parse(env.FAKE_STATS) : { contextUsage: { tokens: 124000, contextWindow: 200000, percent: 62 } });
   if (msg.type === 'fake_emit') { reply(true, {}); return out(msg.record); }
   return reply(false, null, 'unknown command');

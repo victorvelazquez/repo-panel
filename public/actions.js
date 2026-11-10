@@ -70,6 +70,8 @@ async function createRoom() {
 // The commands whose result is judged from Git: the page reads a fresh baseline of the repo before sending them.
 const JUDGED_CMDS = ['flow-commit', 'flow-commit-unstage', 'flow-pr', 'flow-base', 'flow-base-stash'];
 
+// RP140: how long the page waits for a compaction (it calls the model): a little more than the server's ten minutes.
+const COMPACT_WAIT_MS = 605000;
 const ACTIONS = {
   'refresh-all': () => refreshAll({ force: true }),
   'fetch-all': async () => { toast('Fetching all repos…'); await Promise.all(allRepos().map((r) => fetchRepo(r.id))); toast('Fetch done', 'ok'); },
@@ -270,6 +272,28 @@ const ACTIONS = {
     } catch (e) { toast(e.message, 'bad'); }
     S.chat.closing = false;
     if (S.chat.id === id) loadChat(id);
+    draw();
+  },
+  // RP140 (S28): compacts the context of the open chat's session by hand. An answer in progress is stopped by compacting, so a busy session is confirmed first and only then sent with force; the server decides anyway.
+  // The mark goes on at the click (no second send, `Compacting…`); the verdict of the server comes back as a fixed message, and the status gives the true mark back. A success reads the history again (the
+  // `Context compacted` marker); the context is read by the end event of the session (RP139), not here.
+  'compact': async () => {
+    const id = S.chat.id;
+    const cur = id && S.rpc[id];
+    if (!cur || cur.compacting || (cur.state !== 'idle' && cur.state !== 'busy')) return;
+    const busy = cur.state === 'busy';
+    if (busy && !confirm('The session is answering. Compacting stops that answer first. Compact anyway?')) return;
+    delete S.notes[id];
+    setRpc(id, { compacting: true, error: '' });
+    draw();
+    try {
+      await api('/api/rpc/compact', busy ? { id, force: true } : { id }, { timeoutMs: COMPACT_WAIT_MS });
+      setRpc(id, { compacting: false });
+      if (S.chat.id === id) loadChat(id);
+    } catch (e) {
+      sayNote(id, e.message);
+      await rpcSync(id);
+    }
     draw();
   },
   'pi': async (el) => {
