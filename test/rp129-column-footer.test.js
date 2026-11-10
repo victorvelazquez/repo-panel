@@ -53,13 +53,13 @@ test('m1: the Merge button is enabled ONLY for a ready PR with nothing in flight
 
 test('m2: the label and the title say what is happening: merged, merging, the method, the target, the reason it is off, or what is running', () => {
   const ready = CASES.ready;
-  assert.deepEqual(V.mergeButton(ready, { method: 'squash' }), { enabled: true, label: 'Merge · squash', title: 'Merge into main' });
+  assert.deepEqual(V.mergeButton(ready, { method: 'squash' }), { enabled: true, label: 'Merge · squash', title: 'Merge into main. Method: squash. Change it in Settings, Delivery.' });
   assert.equal(V.mergeButton(ready, { method: 'rebase' }).label, 'Merge · rebase');
   assert.equal(V.mergeButton(ready, { method: 'squash', busy: true }).label, 'Merging…');
   assert.equal(V.mergeButton(ready, { method: 'squash', busy: 'done' }).label, 'Merged ✓');
   assert.equal(V.mergeButton(ready, { method: 'squash', held: true }).label, 'Merged ✓');
-  assert.equal(V.mergeButton(CASES.draft, { method: 'squash' }).title, 'Draft pull request');
-  assert.equal(V.mergeButton(CASES.conflict, { method: 'squash' }).title, CASES.conflict.blockedReason);
+  assert.equal(V.mergeButton(CASES.draft, { method: 'squash' }).title, 'Draft pull request. Method: squash. Change it in Settings, Delivery.');
+  assert.equal(V.mergeButton(CASES.conflict, { method: 'squash' }).title, CASES.conflict.blockedReason + '. Method: squash. Change it in Settings, Delivery.');
   assert.equal(V.mergeButton(ready, { method: 'squash', hold: 'Running x' }).title, 'Running x', 'what is running beats everything');
   assert.equal(V.mergeButton(CASES.failed, { method: 'squash', hold: 'Running x' }).title, 'Running x');
 });
@@ -68,8 +68,8 @@ test('m3: without a PR the button is off, whatever else the context says, and it
   for (const pr of [null, undefined, {}, 'x', 5, [], { ready: 'yes' }]) {
     for (const ctx of CTXS) assert.equal(V.mergeButton(pr, { method: 'squash', ...ctx }).enabled, false, JSON.stringify(pr));
   }
-  assert.equal(V.mergeButton(null, { method: 'squash' }).title, 'No open pull request for this branch');
-  assert.equal(V.mergeButton(null, { method: 'squash', noPr: 'Loading pull requests…' }).title, 'Loading pull requests…');
+  assert.equal(V.mergeButton(null, { method: 'squash' }).title, 'No open pull request for this branch. Method: squash. Change it in Settings, Delivery.');
+  assert.equal(V.mergeButton(null, { method: 'squash', noPr: 'Loading pull requests…' }).title, 'Loading pull requests… Method: squash. Change it in Settings, Delivery.');
   assert.equal(V.mergeButton({ ready: true, base: 'main' }, {}).enabled, true, 'a PR object is enough; the method has a default');
   assert.match(V.mergeButton({ ready: true, base: 'main' }, {}).label, /^Merge · squash$/);
   assert.equal(V.mergeButton(null, { method: '<x>' }).label, 'Merge · squash', 'a method that is not one of the three reads as squash');
@@ -112,7 +112,7 @@ test('r1: the footer has the branch, the commits ahead, the state of the CI and 
   assert.match(f, /<span class="ft-br" title="feat\/x">.*<span class="ft-name">feat\/x<\/span><\/span>/);
   assert.match(f, /<span class="chip" title="Commits ahead of the base">↑2<\/span>/);
   assert.match(f, /<span class="ft-ci ft-ci-success" role="img" aria-label="All 1 checks passed" title="All 1 checks passed">/);
-  assert.match(f, /<button type="button" class="merge ft-merge" data-act="merge" data-id="abc" data-n="7" title="Merge into main">Merge · squash<\/button><\/div>$/);
+  assert.match(f, /<button type="button" class="merge ft-merge" data-act="merge" data-id="abc" data-n="7" title="Merge into main. Method: squash. Change it in Settings, Delivery.">Merge · squash<\/button><\/div>$/);
   assert.doesNotMatch(f, /disabled/);
 });
 
@@ -138,10 +138,10 @@ test('r3: the footer button is the disabled one when the rule says so, with the 
   }
   const none = foot(R.columnView({ files: [], git: GIT(null, { merge: MERGE(null) }) }));
   const btn = /<button type="button" class="merge ft-merge"[^>]*>/.exec(none)[0];
-  assert.match(btn, / disabled title="No open pull request for this branch"/);
+  assert.match(btn, / disabled title="No open pull request for this branch. Method: squash. Change it in Settings, Delivery."/);
   assert.doesNotMatch(btn, /data-n=/);
   const busy = foot(R.columnView({ files: [], git: GIT(CASES.ready, { merge: MERGE(CASES.ready, { busy: true }) }) }));
-  assert.match(busy, / disabled title="Merge into main">Merging…<\/button>/);
+  assert.match(busy, / disabled title="Merge into main. Method: squash. Change it in Settings, Delivery.">Merging…<\/button>/);
 });
 
 test('r4: the footer is total: no branch, odd values, and nothing from the repo or the PR becomes markup', () => {
@@ -305,7 +305,7 @@ test('p1: with the column in, the footer is drawn in EVERY tab and its button is
   for (const t of ['changes', 'status', 'tasks']) {
     tab(page, t);
     assert.match(col(page), /<div class="col-foot"/, t);
-    assert.match(footBtn(page), /data-act="merge" data-id="abc" data-n="7" title="Merge into main">Merge · squash<\/button>/, t);
+    assert.match(footBtn(page), /data-act="merge" data-id="abc" data-n="7" title="Merge into main. Method: squash. Change it in Settings, Delivery.">Merge · squash<\/button>/, t);
     assert.doesNotMatch(footBtn(page), /disabled/, t);
   }
   assert.match(col(page), /<span class="ft-name">feat\/x<\/span>/);
@@ -333,7 +333,7 @@ test('p3: a second touch while the merge is in flight, or on a held one, sends n
   page.click(el);
   await page.tick();
   assert.equal(posts(page, '/api/merge').length, 1, 'doMerge ignores a PR that is already merging');
-  assert.match(footBtn(page), / disabled title="Merge into main">Merging…</);
+  assert.match(footBtn(page), / disabled title="Merge into main. Method: squash. Change it in Settings, Delivery.">Merging…</);
 });
 
 test('p4: THE MATRIX on the page: for every kind of PR the footer button is off where the card is off, and touching it calls nothing', async () => {
@@ -355,7 +355,7 @@ test('p5: the footer only ever points at the PR of the CURRENT branch: a ready P
   const other = PR({ number: 9, headRefName: 'feat/other' });
   const page = boot({ prs: { prs: [other] } });
   await open(page);
-  assert.match(footBtn(page), / disabled title="No open pull request for this branch">/);
+  assert.match(footBtn(page), / disabled title="No open pull request for this branch. Method: squash. Change it in Settings, Delivery.">/);
   assert.doesNotMatch(footBtn(page), /data-n=/);
   tab(page, 'status');
   assert.match(col(page), /No open pull request for this branch/);
@@ -374,16 +374,16 @@ test('p5: the footer only ever points at the PR of the CURRENT branch: a ready P
 test('p6: what is not known yet is never read as "ready": loading, a failed read, and a repo with no remote each keep the button off and say so', async () => {
   const a = boot({ prs: null });
   await open(a);
-  assert.match(footBtn(a), / disabled title="Loading pull requests…">/);
+  assert.match(footBtn(a), / disabled title="Loading pull requests… Method: squash. Change it in Settings, Delivery.">/);
   const b = boot({ prs: { error: 'gh failed' } });
   await open(b);
-  assert.match(footBtn(b), / disabled title="Pull requests unavailable">/);
+  assert.match(footBtn(b), / disabled title="Pull requests unavailable. Method: squash. Change it in Settings, Delivery.">/);
   const c = boot({ prs: { noRemote: true, prs: [] } });
   await open(c);
-  assert.match(footBtn(c), / disabled title="This repository has no GitHub remote">/);
+  assert.match(footBtn(c), / disabled title="This repository has no GitHub remote. Method: squash. Change it in Settings, Delivery.">/);
   const d = boot({ prs: { prs: [] } });
   await open(d);
-  assert.match(footBtn(d), / disabled title="No open pull request for this branch">/);
+  assert.match(footBtn(d), / disabled title="No open pull request for this branch. Method: squash. Change it in Settings, Delivery.">/);
 });
 
 test('p7: while a command of the session is running the footer is off with its reason, like the card; a merge in flight turns off the Re-run too', async () => {

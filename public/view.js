@@ -326,13 +326,15 @@
   const MERGE_METHODS = ['squash', 'merge', 'rebase'];
   function mergeButton(pr, ctx = {}) {
     const c = ctx && typeof ctx === 'object' ? ctx : {};
-    const word = `Merge · ${MERGE_METHODS.includes(c.method) ? c.method : 'squash'}`;
-    if (!pr || typeof pr !== 'object' || Array.isArray(pr) || typeof pr.ready !== 'boolean') return { enabled: false, label: word, title: String(c.noPr || 'No open pull request for this branch') };
+    const method = MERGE_METHODS.includes(c.method) ? c.method : 'squash';
+    const word = `Merge · ${method}`;
+    const hint = (why) => `${/[.…!?]$/.test(why) ? why : `${why}.`} Method: ${method}. Change it in Settings, Delivery.`; // RP147: the Merge menu left the header, so the title says where the method lives
+    if (!pr || typeof pr !== 'object' || Array.isArray(pr) || typeof pr.ready !== 'boolean') return { enabled: false, label: word, title: hint(String(c.noPr || 'No open pull request for this branch')) };
     const hold = c.hold ? String(c.hold) : '';
     return {
       enabled: pr.ready === true && !c.busy && !c.held && !hold,
       label: c.held || c.busy === 'done' ? 'Merged ✓' : c.busy ? 'Merging…' : word,
-      title: hold || (pr.ready ? `Merge into ${pr.base}` : pr.blockedReason || 'Not ready to merge'),
+      title: hold || hint(pr.ready ? `Merge into ${pr.base}` : pr.blockedReason || 'Not ready to merge'),
     };
   }
   // The Re-run failed button, with the same rule of flight, hold and running: shown only when the PR has failed runs.
@@ -925,10 +927,11 @@
       meters.push(`<span class="um${cls}" data-win="${name}"><span class="um-name">${name}</span>${bar('um-bar')}<span class="um-pct">${flag}${pct}%</span><span class="um-left">${usageEsc(w.left)}</span></span>`);
       details.push(`<div class="up-win${cls}"><div class="up-title">${title}</div>${bar('um-bar up-bar')}<div class="up-line"><span>${pct}% used</span><span>Resets in ${usageEsc(w.left)}</span></div><div class="up-sub">Resets at ${usageEsc(w.reset)} · ${run}% of the window gone</div>${w.ahead === true ? '<div class="up-warn">⚠ Using it faster than the clock</div>' : ''}</div>`);
     }
-    const age = v.state === 'old' && v.age ? `<span class="um-age">${usageEsc(v.age)}</span>` : '';
+    // RP147: an old file is a small yellow dot (first, as in the design) whose help text says how old the data is: never a loose «N min ago».
+    const dot = v.state === 'old' && v.age ? `<span class="um-old" aria-hidden="true" title="Usage data is ${usageEsc(String(v.age).replace(/ ago$/, ' old'))}"></span>` : '';
     const note = v.state === 'old' ? '<div class="up-note">The usage file is old: the numbers may have changed.</div>' : '';
     const foot = v.updated ? `<div class="up-foot">Updated ${usageEsc(v.updated)}</div>` : '';
-    return `${meters.join('')}${age}<div class="usage-pop" role="group" aria-label="Claude usage details">${details.join('')}${note}${foot}</div>`;
+    return `${dot}${meters.join('')}<div class="usage-pop" role="group" aria-label="Claude usage details">${details.join('')}${note}${foot}</div>`;
   }
 
   return { conformityTabLabel, repoModel, changeChips, prChip, idleChip, conflictChip, sizeChip, RepoCard, stateLineHidden, usageView, usageHtml, usageRemaining, boardApply, boardWait, chatCachePut, chatCacheGet, rpcWithContext, chatFromCache, API_VERSION, mergeButton, rerunButton, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, dirtyRepos, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, taskPrs, matchesUnitId, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, parseSse, rpcEvent, rpcReduce, rpcFromStatus, eventsPlan, eventsRetryMs, eventsStale };

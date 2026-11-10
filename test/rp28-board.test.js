@@ -148,7 +148,7 @@ test('page: a ready card carries the ready class and no other card does; text an
   assert.match(card(ready(3)), /^<div class="card  ?ready">/);
   assert.match(card(failing(2)), /^<div class="card attn ?">/);
   assert.match(card(pending(1)), /^<div class="card +">/);
-  assert.match(card(ready(3)), /<button class="merge" data-act="merge" data-id="id-prs-repo" data-n="3"\s+title="Merge into main">Merge · squash<\/button>/);
+  assert.match(card(ready(3)), /<button class="merge" data-act="merge" data-id="id-prs-repo" data-n="3"\s+title="Merge into main. Method: squash. Change it in Settings, Delivery.">Merge · squash<\/button>/);
 });
 
 test('page: the problems count stays in the alert total and the problems filter still works', async () => {
