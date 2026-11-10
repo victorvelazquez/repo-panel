@@ -429,47 +429,85 @@
   const TASK_MAX = 200;
   const TASK_GROUPS = [['review', 'In review'], ['ready', 'Ready'], ['progress', 'In progress'], ['next', 'Next'], ['pending', 'Pending'], ['blocked', 'Blocked'], ['done', 'Completed']];
   const TASK_OF = { 'En revisión': 'review', Lista: 'ready', 'En curso': 'progress', Pendiente: 'pending', Bloqueada: 'blocked', Completada: 'done' };
-  // RP128 (S20, S21): the compact list of the right column. A segmented bar and its legend say how many tasks are in each state (all of them, whatever the filter); only the rows that ask for an
-  // action are shown (in review, ready, in progress and the next one), one line each (the detail is the tooltip); Pending, Blocked and Completed are folded behind a button with their count (`open`
-  // says which are open; a filter opens the ones it matches). The same cap of rows as the full list; what does not fit is counted.
+  // RP128, RP149 (S38, S39): the compact list of the right column, design A2 of design/panel-tareas. A summary (how many are done and in progress, with a thin bar); the groups In review, Ready, In progress,
+  // Next, Pending, Blocked and Completed, each only when it has tasks, with ONE icon in its header (the rows have none); flat rows (the id and the title, the extra data at the right of the same line and below it
+  // only when it does not fit); Pending shows 5 and `ctx.more` shows all of them, the ones that wait for another task last; Completed is folded behind its header and shows the last completed one; and a freshness
+  // line with the refresh button (`ctx.readAt`, `ctx.now`, `ctx.refreshing`, `ctx.refreshFailed`). The same cap of rows as the full list; what does not fit is counted.
   const TK_SEGMENTS = [['done', 'rs-done', 'completed'], ['review', 'rs-pr', 'in review'], ['ready', 'tk-ready', 'ready'], ['progress', 'tk-prog', 'in progress'], ['pending', 'rs-pend', 'pending'], ['blocked', 'rs-blk', 'blocked']];
-  const TK_TONE = { review: 'blue', ready: 'green', progress: 'yellow', next: 'blue' };
-  const TK_FOLDS = [['pending', 'Pending', ''], ['blocked', 'Blocked', ' red'], ['done', 'Completed', '']];
+  const TK_NAME = { review: 'In review', ready: 'Ready', progress: 'In progress', next: 'Next', pending: 'Pending', blocked: 'Blocked', done: 'Completed' };
+  const TK_ICON = {
+    review: svgIcon('<circle cx="4" cy="3.5" r="1.6"/><circle cx="4" cy="12.5" r="1.6"/><circle cx="12" cy="6" r="1.6"/><path d="M4 5.1v5.8M12 7.6c0 3-4 2.4-8 4"/>', 16),
+    ready: svgIcon('<circle cx="8" cy="8" r="6"/><circle cx="8" cy="8" r="2" fill="currentColor"/>', 16),
+    progress: svgIcon('<circle cx="8" cy="8" r="6" stroke-dasharray="3 2.2"/>', 16),
+    next: svgIcon('<circle cx="8" cy="8" r="6"/><path d="M5.5 8h5M8.6 5.9L10.7 8l-2.1 2.1"/>', 16),
+    pending: svgIcon('<circle cx="8" cy="8" r="6"/>', 16),
+    blocked: svgIcon('<circle cx="8" cy="8" r="6"/><path d="M5.5 8h5"/>', 16),
+    done: svgIcon('<circle cx="8" cy="8" r="6"/><path d="M5.2 8.2l2 2 3.6-4"/>', 16),
+  };
+  const TK_REFRESH_ICON = svgIcon('<path d="M13 8a5 5 0 1 1-1.6-3.7"/><path d="M13 2.5v3h-3"/>', 16);
+  const TK_PENDING_SHOWN = 10;
+  const TK_REASON_MAX = 140;
+  const TK_OLD_MIN = 15; // minutes after which the read is called old
   function compactTasks({ all, groups, keyOf, derived, byId, ctx }) {
     const counts = {};
     for (const r of all) { const k = keyOf(r); counts[k] = (counts[k] || 0) + 1; }
+    const done = counts.done || 0;
+    const progress = counts.progress || 0;
     counts.pending = (counts.pending || 0) + (counts.next || 0);
     const segs = TK_SEGMENTS.filter(([k]) => counts[k] > 0);
     const bar = `<div class="tk-bar" role="img" aria-label="${esc(segs.map(([k, , w]) => `${counts[k]} ${w}`).join(', '))}">${segs.map(([k, cls]) => `<i class="${cls}" style="width:${pct(counts[k], all.length)}%"></i>`).join('')}</div>`;
-    const legend = `<div class="tk-leg">${segs.map(([k, cls, w]) => `<span><i class="tk-k ${cls}"></i><b>${counts[k]}</b> ${w}</span>`).join('')}</div>`;
-    const row = (r, key, withChip) => {
+    const now = Number.isFinite(ctx.now) ? ctx.now : Date.now();
+    const readAt = ctx.readAt;
+    const mins = readAt === undefined ? null : Math.floor((Number.isFinite(readAt) && readAt > 0 && readAt <= now ? now - readAt : 0) / 60000);
+    const old = mins !== null && mins >= TK_OLD_MIN;
+    const said = ctx.refreshing ? 'Updating…' : ctx.refreshFailed ? 'Could not update. Try again.' : mins === null ? '' : mins < 1 ? 'Read just now' : mins < 60 ? `Read ${mins} min ago` : `Read ${Math.floor(mins / 60)} h ago`;
+    const state = ctx.refreshing ? '' : ctx.refreshFailed ? ' bad' : old ? ' stale' : '';
+    const ft = said ? `<span class="tk-ft">${said}</span>` : '';
+    const button = `<button type="button" class="tk-rf${ctx.refreshing ? ' busy' : ''}" data-act="tasks-refresh" aria-label="Refresh the task list" title="Fetch from GitHub, then read the list again"${ctx.refreshing ? ' disabled aria-busy="true"' : ''}>${TK_REFRESH_ICON}</button>`;
+    // RP149: the freshness text and the refresh button live in the summary row, which stays under the tabs when the list scrolls (they were at the end of the list, out of reach).
+    const sum = `<div class="tk-sum"><div class="tk-top${state}"><span class="tk-sl"><b>${done} of ${all.length} done</b>${progress ? ` · ${progress} in progress` : ''}</span>${ft}${button}</div>${bar}</div>`;
+    const waitsOf = (r) => (Array.isArray(r.dependsOn) ? r.dependsOn : []).filter((x) => byId.has(x) && byId.get(x).estado !== 'Completada');
+    const extraOf = (r, key) => {
       const d = derived[r.id] || {};
-      const waits = (Array.isArray(r.dependsOn) ? r.dependsOn : []).filter((x) => byId.has(x) && byId.get(x).estado !== 'Completada');
-      const bits = [];
-      if (key === 'review' && Number.isFinite(d.pr)) bits.push(`PR #${d.pr}`);
-      if (key === 'ready' && d.branch) bits.push(d.branch);
-      if (key === 'pending' && waits.length) bits.push(`waiting: ${waits.join(', ')}`);
-      if (key === 'blocked' && r.notas) bits.push(String(r.notas).slice(0, 140));
-      const word = key === 'review' ? (Number.isFinite(d.pr) ? `PR #${d.pr}` : 'in review') : key === 'progress' ? 'in progress' : key;
-      const chip = withChip && TK_TONE[key] ? `<span class="chip ${TK_TONE[key]}">${esc(word)}</span>` : '';
-      const next = key === 'next';
-      return `<div class="tk-row${next ? ' tk-next' : ''}"${next ? ' aria-current="true"' : ''} title="${esc([`${r.id} · ${r.entrega ?? ''}`, ...bits].join(' · '))}"><span class="tk-id mono">${esc(r.id)}</span><span class="tk-tx">${esc(r.entrega ?? '')}</span>${chip}</div>`;
+      if (key === 'review' && Number.isFinite(d.pr)) return `PR #${d.pr}`;
+      if (key === 'ready' && d.branch) return String(d.branch);
+      if (key === 'pending' && waitsOf(r).length) return `waits for ${waitsOf(r).join(', ')}`;
+      if (key === 'blocked' && r.notas) return String(r.notas);
+      return '';
     };
     let left = TASK_MAX;
     let cut = 0;
-    const take = (list, key, withChip) => {
+    const rowHtml = (r, key) => {
+      const extra = extraOf(r, key);
+      const shown = key === 'blocked' && extra.length > TK_REASON_MAX ? `${extra.slice(0, TK_REASON_MAX)}…` : extra;
+      const cls = `${key === 'next' ? ' tk-next' : ''}${key === 'pending' && waitsOf(r).length ? ' tk-wait' : ''}${key === 'done' ? ' tk-done' : ''}`;
+      return `<div class="tk-row${cls}"${key === 'next' ? ' aria-current="true"' : ''} title="${esc([`${r.id} · ${r.entrega ?? ''}`, extra].filter(Boolean).join(' · '))}"><span class="tk-t"><span class="tk-id mono">${esc(r.id)}</span>${esc(r.entrega ?? '')}</span>${shown ? `<span class="tk-x">${esc(shown)}</span>` : ''}</div>`;
+    };
+    const take = (list, key) => {
       let html = '';
-      for (const r of list) { if (left > 0) { html += row(r, key, withChip); left--; } else cut++; }
+      for (const r of list) { if (left > 0) { html += rowHtml(r, key); left--; } else cut++; }
       return html;
     };
-    const parts = [bar, legend];
-    for (const key of ['review', 'ready', 'progress', 'next']) parts.push(take(groups.get(key), key, true));
-    for (const [key, title, tone] of TK_FOLDS) {
+    const head = (key, count) => `<h3 class="tk-gh tk-g-${key}"><span class="tk-gi">${TK_ICON[key]}</span><span class="tk-gn">${TK_NAME[key]}</span>${count === null ? '' : `<span class="tk-gc">${count}</span>`}</h3>`;
+    const parts = [sum];
+    for (const key of ['review', 'ready', 'progress', 'next']) {
       const list = groups.get(key);
-      if (!list.length) continue;
-      const open = !!ctx.open && Object.hasOwn(ctx.open, key) && ctx.open[key] === true;
-      parts.push(`<button type="button" class="tk-fold" data-act="tasks-fold" data-fold="${key}" aria-expanded="${open}"><span class="chev" aria-hidden="true">${open ? '▾' : '▸'}</span>${title}<span class="sp"></span><span class="chip${tone}">${list.length}</span></button>`);
-      if (open) parts.push(`<div class="tk-sub">${take(list, key, false)}</div>`);
+      if (list.length) parts.push(head(key, key === 'next' ? null : list.length), take(list, key));
+    }
+    const pending = groups.get('pending');
+    if (pending.length) {
+      const ordered = [...pending.filter((r) => !waitsOf(r).length), ...pending.filter((r) => waitsOf(r).length)];
+      const more = !!ctx.more;
+      parts.push(head('pending', pending.length), take(more ? ordered : ordered.slice(0, TK_PENDING_SHOWN), 'pending'));
+      if (ordered.length > TK_PENDING_SHOWN) parts.push(`<button type="button" class="tk-fold tk-more" data-act="tasks-more" data-k="more" aria-expanded="${more}"><span class="chev" aria-hidden="true">${more ? '▾' : '▸'}</span>${more ? 'Show fewer' : `+${ordered.length - TK_PENDING_SHOWN} more`}</button>`);
+    }
+    const blocked = groups.get('blocked');
+    if (blocked.length) parts.push(head('blocked', blocked.length), take(blocked, 'blocked'));
+    const finished = groups.get('done');
+    if (finished.length) {
+      const open = !!ctx.open && Object.hasOwn(ctx.open, 'done') && ctx.open.done === true;
+      parts.push(`<button type="button" class="tk-gh tk-g-done" data-act="tasks-fold" data-fold="done" aria-expanded="${open}"><span class="tk-gi">${TK_ICON.done}</span><span class="tk-gn">${TK_NAME.done}</span><span class="tk-gc">${finished.length}</span><span class="tk-ch" aria-hidden="true">${open ? '▾' : '▸'}</span></button>`);
+      parts.push(take(open ? finished : [], 'done'));
     }
     if (cut) parts.push(`<div class="task-more rs-sub">+${cut} more</div>`);
     return parts.join('');

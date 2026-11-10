@@ -74,19 +74,26 @@ const chatTick = () => { if (S.chat.id && (!S.chat.tab || S.chat.tab === 'chat')
 // is kept; a failure only shows when there is none. An answer for a repo the person left is stored but never painted for another.
 // RP91: the opening is identified by the S.chat OBJECT (openChat and closeChat replace it), not by `seq`: loadChat bumps `seq` on every read and, with the tasks in the column, the chat keeps
 // being read while the roadmap is on its way.
-async function loadTasks() {
+// RP149: it is also read again when the Tasks tab is entered and by the refresh button (`force`); a read already on its way is the one that answers, and a failed read keeps the last good list.
+function loadTasks(opts = {}) {
   const chat = S.chat;
   const { id } = chat;
-  if (!id || chat.tasksAsked) return;
+  if (!id || (chat.tasksAsked && !opts.force)) return undefined;
+  if (chat.tasksReading) return chat.tasksReading;
   chat.tasksAsked = true;
   chat.tasksLoading = true;
   chat.tasksFailed = false;
-  try {
-    S.tasks[id] = await api(`/api/roadmap?id=${id}`);
-  } catch {
-    if (S.chat === chat) chat.tasksFailed = true;
-  }
-  if (S.chat === chat) { chat.tasksLoading = false; draw(); }
+  chat.tasksReading = (async () => {
+    try {
+      S.tasks[id] = await api(`/api/roadmap?id=${id}`);
+      chat.tasksAt = Date.now();
+    } catch {
+      if (S.chat === chat) chat.tasksFailed = true;
+    }
+    chat.tasksReading = null;
+    if (S.chat === chat) { chat.tasksLoading = false; draw(); }
+  })();
+  return chat.tasksReading;
 }
 // RP64 (S62): the Changes tab reads /api/diff each time the person SWITCHES to it (the files change), keeps the last good answer of a repo,
 // and only the latest read of a chat opening counts. A read of a repo the person left is stored for that repo and never paints another.
@@ -307,7 +314,7 @@ function drawChat() {
   }
   // RP128: the column is tabs (Changes, Tasks). The open one belongs to the opening (S.chat.colTab, Changes by default), the closed folders too (S.chat.colFold); with no column nothing is painted.
   const colTab = ['tasks', 'status', 'files'].includes(S.chat.colTab) ? S.chat.colTab : 'changes';
-  paint($('#colBody'), !column ? '' : R.columnView({ name: nameOf(S.chat.id), tab: colTab, fold: S.chat.colFold, git: columnGit(S.chat.id, facts), files: facts && !facts.error && Array.isArray(facts.files) ? facts.files : null, failed: !!(facts && facts.error), selected: S.chat.dfile || '', tree: colTab === 'files' ? S.files[S.chat.id] || null : null, changed: colTab === 'files' ? changedOf(S.chat.id) : null, fselected: S.chat.ffile || '', fopen: S.filesOpen[S.chat.id] || {}, filesFailed: !!S.chat.filesFailed, tasksHtml: colTab === 'tasks' ? R.tasksView(S.tasks[S.chat.id] || null, { compact: true, open: S.tasksFold, loading: !!S.chat.tasksLoading, failed: !!S.chat.tasksFailed }) : '' }));
+  paint($('#colBody'), !column ? '' : R.columnView({ name: nameOf(S.chat.id), tab: colTab, fold: S.chat.colFold, git: columnGit(S.chat.id, facts), files: facts && !facts.error && Array.isArray(facts.files) ? facts.files : null, failed: !!(facts && facts.error), selected: S.chat.dfile || '', tree: colTab === 'files' ? S.files[S.chat.id] || null : null, changed: colTab === 'files' ? changedOf(S.chat.id) : null, fselected: S.chat.ffile || '', fopen: S.filesOpen[S.chat.id] || {}, filesFailed: !!S.chat.filesFailed, tasksHtml: colTab === 'tasks' ? R.tasksView(S.tasks[S.chat.id] || null, { compact: true, open: S.tasksFold, more: S.tasksMore, readAt: S.chat.tasksAt, now: Date.now(), refreshing: !!S.chat.tasksRefreshing, refreshFailed: !!S.chat.tasksRefreshFailed, loading: !!S.chat.tasksLoading, failed: !!S.chat.tasksFailed }) : '' }));
   // What the person touched in the column keeps the focus across the repaint: a tab by its id, a folder or a fold by its button.
   const want = S.chat.colFocus;
   if (want) {
@@ -315,6 +322,9 @@ function drawChat() {
     const el = want.id ? $(`#${want.id}`) : Array.from(document.querySelectorAll(`#colBody [data-act="${want.act}"]`)).find((b) => b.dataset && b.dataset[want.key] === want.val);
     if (el && el.focus) el.focus();
   }
+  // RP149: the summary row of the Tasks list sticks right under the tab bar, whatever the height of the bar is: the page measures it (the CSS has a default until then).
+  const tabsBar = column ? $('#colBody .col-tabs') : null;
+  if (tabsBar && tabsBar.offsetHeight > 0 && $('#col').style.setProperty) $('#col').style.setProperty('--col-tabs-h', `${tabsBar.offsetHeight}px`);
   paint($('#chatHead'), R.chatHead(S.chat, { name: nameOf(S.chat.id), column }));
   const tasksTab = S.chat.tab === 'tasks' && !column;
   const changesTab = S.chat.tab === 'changes' && !column; // RP92: with the column in, the files card replaces the tab

@@ -144,8 +144,8 @@ const RP = (rows, extra = {}) => ({ available: true, rows, derived: {}, next: nu
 const MANY = RP([ROW('A1', 'Completada'), ROW('A2', 'Completada'), ROW('A3', 'Completada'), ROW('B1', 'En curso'), ROW('C1', 'Pendiente'), ROW('C2', 'Pendiente'), ROW('D1', 'Bloqueada', { notas: 'Waiting for the person' }), ROW('E1', 'Pendiente', { dependsOn: ['B1'] })],
   { next: ROW('C1', 'Pendiente'), derived: { A1: { state: 'En revisión', pr: 7 }, A2: { state: 'Lista', branch: 'feat/a2' } } });
 const compact = (rp, ctx = {}) => R.tasksView(rp, { compact: true, ...ctx });
-const trows = (h) => [...h.matchAll(/<div class="tk-row( tk-next)?"( aria-current="true")? title="([^"]*)"><span class="tk-id mono">([^<]*)<\/span><span class="tk-tx">([^<]*)<\/span>(?:<span class="chip ([a-z]*)">([^<]*)<\/span>)?<\/div>/g)].map((m) => ({ next: !!m[1], cur: !!m[2], title: m[3], id: m[4], tx: m[5], tone: m[6] || '', chip: m[7] || '' }));
-const folds = (h) => [...h.matchAll(/<button type="button" class="tk-fold" data-act="tasks-fold" data-fold="(\w+)" aria-expanded="(true|false)"><span class="chev" aria-hidden="true">[▸▾]<\/span>([^<]*)<span class="sp"><\/span><span class="chip[^"]*">(\d+)<\/span><\/button>/g)].map((m) => ({ fold: m[1], open: m[2] === 'true', label: m[3], n: Number(m[4]) }));
+const trows = (h) => [...h.matchAll(/<div class="tk-row([^"]*)"((?: aria-current="true")?) title="([^"]*)"><span class="tk-t"><span class="tk-id mono">([^<]*)<\/span>([^<]*)<\/span>(?:<span class="tk-x">([^<]*)<\/span>)?<\/div>/g)].map((m) => ({ cls: m[1].trim(), next: m[1].includes('tk-next'), cur: !!m[2], title: m[3], id: m[4], tx: m[5], extra: m[6] }));
+const folds = (h) => [...h.matchAll(/<button type="button" class="tk-gh tk-g-\w+" data-act="tasks-fold" data-fold="(\w+)" aria-expanded="(true|false)">[\s\S]*?<span class="tk-gc">(\d+)<\/span>/g)].map((m) => ({ fold: m[1], open: m[2] === 'true', n: Number(m[3]) }));
 
 test('k1: the empty and failing states are the same words as the full list, and the full list does not change', () => {
   assert.match(compact(null), /Loading tasks…/);
@@ -155,40 +155,33 @@ test('k1: the empty and failing states are the same words as the full list, and 
   assert.doesNotMatch(R.tasksView(MANY, {}), /tk-bar|tk-fold|tk-row/, 'without the flag the output is the full list of before');
 });
 
-test('k2: a segmented bar says it all in a label and the legend lists only the groups that have something', () => {
+test('k2: a segmented bar says it all in a label; the legend is gone, so the summary lists no group and a lone completed task says nothing about the others', () => {
   const h = compact(MANY);
   assert.match(h, /<div class="tk-bar" role="img" aria-label="1 completed, 1 in review, 1 ready, 1 in progress, 3 pending, 1 blocked">/);
   const widths = [...h.match(/<div class="tk-bar"[\s\S]*?<\/div>/)[0].matchAll(/<i class="(tk-[a-z]+|rs-[a-z]+)" style="width:([\d.]+)%"><\/i>/g)].map((m) => [m[1], Number(m[2])]);
   assert.deepEqual(widths.map((w) => w[0]), ['rs-done', 'rs-pr', 'tk-ready', 'tk-prog', 'rs-pend', 'rs-blk']);
   assert.ok(widths.reduce((a, w) => a + w[1], 0) <= 100.0001, 'the segments never add up to more than the bar');
-  assert.match(h, /<div class="tk-leg"><span><i class="tk-k rs-done"><\/i><b>1<\/b> completed<\/span>/);
+  assert.doesNotMatch(h, /tk-leg|tk-k /);
   assert.doesNotMatch(compact(RP([ROW('A', 'Completada')])), /in progress|blocked|pending/);
 });
 
-test('k3: only the rows that ask for an action are shown (in review, ready, in progress, the next one); Pending, Blocked and Completed are folded with their count', () => {
+test('k4: the Completed fold opens with the state of the page and shows its rows under its button; closed it shows none (RP149); the other groups have no fold', () => {
+  const two = RP([ROW('A1', 'Completada'), ROW('A2', 'Completada'), ROW('A3', 'Completada'), ROW('B1', 'Bloqueada', { notas: 'Stuck' })]);
+  const shut = compact(two);
+  assert.deepEqual(folds(shut), [{ fold: 'done', open: false, n: 3 }]);
+  assert.deepEqual(trows(shut).filter((r) => r.cls.includes('tk-done')).map((r) => r.id), [], 'RP149: all the completed ones start folded, none is left on show');
+  const h = compact(two, { open: { blocked: true, done: true } });
+  assert.deepEqual(folds(h).map((f) => [f.fold, f.open]), [['done', true]]);
+  assert.deepEqual(trows(h).filter((r) => r.cls.includes('tk-done')).map((r) => r.id), ['A1', 'A2', 'A3']);
+  assert.ok(trows(shut).some((r) => r.id === 'B1'), 'Blocked is always open: no state of the page hides it');
+});
+
+test('k5: a row keeps its detail in the tooltip (PR, branch, what it waits for, why it is blocked), on top of showing it at the right', () => {
   const h = compact(MANY);
-  assert.deepEqual(trows(h).map((r) => [r.id, r.chip]), [['A1', 'PR #7'], ['A2', 'ready'], ['B1', 'in progress'], ['C1', 'next']]);
-  assert.deepEqual(trows(h).map((r) => r.tone), ['blue', 'green', 'yellow', 'blue']);
-  assert.deepEqual(folds(h), [{ fold: 'pending', open: false, label: 'Pending', n: 2 }, { fold: 'blocked', open: false, label: 'Blocked', n: 1 }, { fold: 'done', open: false, label: 'Completed', n: 1 }]);
-  assert.doesNotMatch(h, /Delivery of C2|Delivery of D1|Delivery of E1|Delivery of A3/, 'what is folded is not in the markup');
-  const next = trows(h).find((r) => r.id === 'C1');
-  assert.deepEqual([next.next, next.cur], [true, true]);
-  assert.equal(trows(h).filter((r) => r.cur).length, 1);
-});
-
-test('k4: a folded group opens with the state of the page and shows its rows under its button', () => {
-  const h = compact(MANY, { open: { blocked: true, done: true } });
-  assert.deepEqual(folds(h).map((f) => [f.fold, f.open]), [['pending', false], ['blocked', true], ['done', true]]);
-  assert.match(h, /data-fold="blocked" aria-expanded="true">[\s\S]*?<div class="tk-sub">[\s\S]*?Delivery of D1/);
-  assert.ok(trows(h).some((r) => r.id === 'D1') && trows(h).some((r) => r.id === 'A3'));
-});
-
-test('k5: a row is one line whose tooltip carries the detail (PR, branch, what it waits for, why it is blocked)', () => {
-  const h = compact(MANY, { open: { pending: true, blocked: true } });
   const by = Object.fromEntries(trows(h).map((r) => [r.id, r]));
   assert.match(by.A1.title, /PR #7/);
   assert.match(by.A2.title, /feat\/a2/);
-  assert.match(by.E1.title, /waiting: B1/);
+  assert.match(by.E1.title, /waits for B1/);
   assert.match(by.D1.title, /Waiting for the person/);
   assert.match(by.B1.title, /^B1 · Delivery of B1/);
 });
@@ -218,14 +211,13 @@ test('s1: the tabs are in a bar that stays on top while the panel scrolls; only 
   assert.match(css, /\.col-tab:focus-visible\s*\{[^}]*outline/);
 });
 
-test('s2: the tree has an indent for each depth up to 8, a clipped name, a status colour per letter and a visible focus; the compact tasks clip a row to one line', () => {
+test('s2: the tree has an indent for each depth up to 8, a clipped name, a status colour per letter and a visible focus; the compact tasks are flex rows with visible focus on their buttons', () => {
   for (let d = 0; d <= 8; d++) assert.match(css, new RegExp(`\\.cf-d${d}\\b`), `depth ${d}`);
   assert.match(css, /\.cf-dir\s*\{[^}]*display:\s*flex/);
   assert.match(css, /\.cf-name\s*\{[^}]*text-overflow:\s*ellipsis/);
   assert.match(css, /\.st-M\s*\{[^}]*color:\s*var\(--yellow\)/);
   assert.match(css, /\.cf-dir:focus-visible/);
   assert.match(css, /\.tk-row\s*\{[^}]*display:\s*flex/);
-  assert.match(css, /\.tk-tx\s*\{[^}]*text-overflow:\s*ellipsis[^}]*white-space:\s*nowrap|\.tk-tx\s*\{[^}]*white-space:\s*nowrap[^}]*text-overflow:\s*ellipsis/);
   assert.match(css, /\.tk-fold:focus-visible/);
   assert.match(css, /\.tk-ready\s*\{[^}]*background/);
   assert.match(css, /\.tk-prog\s*\{[^}]*background/);
@@ -315,13 +307,14 @@ test('p2: the Tasks tab shows the compact tasks and the Changes tab brings the t
   page.flush();
   assert.equal(selected(col(page)), 'tasks');
   assert.match(col(page), /<div class="tk-bar" role="img"/);
-  assert.deepEqual(trows(col(page)).map((r) => r.id), ['A1', 'A2', 'B1', 'C1']);
+  assert.deepEqual(trows(col(page)).map((r) => r.id), ['A1', 'A2', 'B1', 'C1', 'C2', 'E1', 'D1'], 'the completed one (A3) is folded and shows no row (RP149)');
   assert.equal(fileRows(col(page)).length, 0);
-  assert.equal(page.fetches.filter((f) => f.url === '/api/roadmap?id=abc').length, 1, 'switching tabs reads nothing');
+  assert.equal(page.fetches.filter((f) => f.url === '/api/roadmap?id=abc').length, 2, 'RP149: entering the Tasks tab reads the list again (1 at opening + 1 here)');
   act(page, 'col-tab', { tab: 'changes' });
   page.flush();
   assert.equal(selected(col(page)), 'changes');
   assert.equal(fileRows(col(page)).length, 6);
+  assert.equal(page.fetches.filter((f) => f.url === '/api/roadmap?id=abc').length, 2, 'going back to Changes reads no roadmap');
   act(page, 'col-tab', { tab: 'status' }); // RP129: Status is a real tab of the column now
   page.flush();
   assert.equal(selected(col(page)), 'status');
@@ -367,20 +360,21 @@ test('p4: a folder button folds and unfolds its folder, and a path that is not a
   assert.equal(col(page), before);
 });
 
-test('p5: the folds of the tasks open and close, and only the three that exist', async () => {
+test('p5: the Completed fold of the tasks opens and closes, and it is the only one that exists', async () => {
   const page = boot();
   open(page, 'abc');
   await page.tick();
   act(page, 'col-tab', { tab: 'tasks' });
-  act(page, 'tasks-fold', { fold: 'blocked' });
+  await page.tick();
+  assert.deepEqual(folds(col(page)).map((f) => [f.fold, f.open]), [['done', false]]);
+  act(page, 'tasks-fold', { fold: 'done' });
   page.flush();
-  assert.deepEqual(folds(col(page)).map((f) => [f.fold, f.open]), [['pending', false], ['blocked', true], ['done', false]]);
-  assert.ok(trows(col(page)).some((r) => r.id === 'D1'));
-  act(page, 'tasks-fold', { fold: 'blocked' });
+  assert.deepEqual(folds(col(page)).map((f) => [f.fold, f.open]), [['done', true]]);
+  act(page, 'tasks-fold', { fold: 'done' });
   page.flush();
-  assert.equal(folds(col(page)).find((f) => f.fold === 'blocked').open, false);
+  assert.equal(folds(col(page)).find((f) => f.fold === 'done').open, false);
   const before = col(page);
-  for (const f of ['', 'review', '__proto__', undefined]) act(page, 'tasks-fold', { fold: f });
+  for (const f of ['pending', 'blocked', '', 'review', '__proto__', undefined]) act(page, 'tasks-fold', { fold: f });
   page.flush();
   assert.equal(col(page), before);
 });
