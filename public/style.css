@@ -40,10 +40,12 @@ header h1 img { display: block; height: 24px; width: auto; } /* RP102: the logo 
 .um { display: inline-flex; align-items: center; gap: 6px; }
 .um-name { color: var(--muted); }
 .um-bar { position: relative; flex: none; width: 48px; height: 6px; border-radius: 3px; background: var(--panel2); border: 1px solid var(--line); overflow: hidden; }
-.um-fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--muted); }
+/* RP144: the fill is green in the normal state, yellow from 70 percent and red from 90 (the tone classes below); it was grey, so a normal use of 16 or 22 percent never showed a colour. Grey now only means an old usage file. */
+.um-fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--green); }
 .um-pace { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--text); opacity: .75; }
 .usage-warn .um-fill { background: var(--yellow); }
 .usage-error .um-fill { background: var(--red); }
+.usage-dim .um-fill { background: var(--gray); }
 .um-pct { min-width: 3ch; text-align: right; font-variant-numeric: tabular-nums; }
 .um-flag { font-weight: normal; margin-right: 2px; }
 .um-left { color: var(--muted); font-variant-numeric: tabular-nums; }
