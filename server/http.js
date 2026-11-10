@@ -164,6 +164,8 @@ const routes = {
   // RPC2b-1: the state of EVERY configured repo (closed by default), from the host's memory: nothing starts and nothing is read.
   'GET /api/rpc/states': (q, b, d) => ({ states: Object.fromEntries(loadConfig().groups.flatMap((g) => g.repos).map((r) => { const id = lib.repoId(r.path); return [id, d.rpcHost.stateOf(id)]; })) }),
   'GET /api/rpc/status': (q, b, d) => rpcApi(d.rpcHost).status(q),
+  // RP139: the share of the context window the session uses, as three clean numbers (read-only: it changes no setting of pi).
+  'GET /api/rpc/context': (q, b, d) => rpcApi(d.rpcHost).context(q),
   'POST /api/queue': (q, b) => queueFor(b),
   'POST /api/conformity': (q, b) => conformityFor(b),
   'POST /api/repos': (q, b) => addRepo(b.path, b.group),

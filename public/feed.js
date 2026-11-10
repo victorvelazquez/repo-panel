@@ -9,8 +9,9 @@ const ev = { ctl: null, timer: null, attempt: 0, connected: false, lastByteAt: 0
 
 // RPC2-1: the live session of each repo (S.rpc[id], kept by V.rpcReduce). `rpc` frames feed it; the status read puts it right on open and on every (re)connect.
 function applyRpc(p) {
-  const { entry, reload } = V.rpcReduce(S.rpc[p.id], p, Date.now());
+  const { entry, reload, ctx } = V.rpcReduce(S.rpc[p.id], p, Date.now());
   S.rpc[p.id] = entry;
+  if (ctx) loadContext(p.id);
   // RPC2-2: the verdict of a command sent from this page follows the session at once (the poll of /api/pi-status stays as the fallback).
   if (S.sent[p.id]) {
     const seen = p.kind === 'exit' ? 'closed' : p.kind === 'state' && entry.state !== 'starting' ? entry.state : null;
@@ -28,8 +29,23 @@ async function settled(id) {
   S.pending[id] = (S.pending[id] || []).filter((p) => p.state === 'sending');
   draw();
 }
+// RP139: the context of the OPEN chat's session, read when the chat opens (after its status), when a run ends and when a compaction ends; never on a timer and never while the session is closed or
+// starting. An answer that arrives after the person left the repo is dropped; a failed read is `unknown`, never the old number. A read that is already on its way is repeated once, not stacked.
+const ctxRun = Object.create(null);
+const ctxLive = (id) => { const e = S.rpc[id]; return !!id && S.chat.id === id && !!e && e.state !== 'closed' && e.state !== 'starting'; };
+async function loadContext(id) {
+  if (!ctxLive(id) || String(id).startsWith('room:')) return;
+  if (ctxRun[id]) { ctxRun[id] = 'again'; return; }
+  ctxRun[id] = 'busy';
+  let answer = null;
+  try { answer = await api(`/api/rpc/context?id=${encodeURIComponent(id)}`); } catch { /* unknown */ }
+  const again = ctxRun[id] === 'again';
+  delete ctxRun[id];
+  if (ctxLive(id)) { S.rpc[id] = V.rpcWithContext(S.rpc[id], answer); draw(); }
+  if (again) loadContext(id);
+}
 async function rpcSync(id) {
-  try { S.rpc[id] = V.rpcFromStatus(S.rpc[id], await api(`/api/rpc/status?id=${encodeURIComponent(id)}`)); draw(); } catch { if (!S.rpc[id]) S.rpc[id] = V.rpcFromStatus(undefined, null); } // the stream keeps it up to date; with no answer at all it reads as not started, never stuck on unknown
+  try { S.rpc[id] = V.rpcFromStatus(S.rpc[id], await api(`/api/rpc/status?id=${encodeURIComponent(id)}`)); draw(); loadContext(id); } catch { if (!S.rpc[id]) S.rpc[id] = V.rpcFromStatus(undefined, null); } // the stream keeps it up to date; with no answer at all it reads as not started, never stuck on unknown
 }
 // The open chat and the repos that have something going on; a closed one has nothing to read (rpcSeed already tells it).
 const rpcSyncAll = () => new Set([S.chat.id, ...Object.keys(S.rpc).filter((id) => S.rpc[id].state !== 'closed')].filter((id) => id && !String(id).startsWith('room:'))).forEach(rpcSync);
