@@ -70,7 +70,7 @@ test('c1: the folder icon is blue, the file icon is not, and the grey of the fil
 });
 
 test('c2: the indent is 16 px per level and the row padding uses it', () => {
-  assert.match(decls('.cf-tree').join(';'), /--cf-step:\s*16px/);
+  assert.match(decls('.cf-tree, .ft-tree').join(';'), /--cf-step:\s*16px/);
   assert.match(decls('.cf-item, .cf-dir').join(';'), /padding:[^;]*calc\(6px \+ var\(--cf-d, 0\) \* var\(--cf-step, 16px\)\)/);
   assert.doesNotMatch(css, /var\(--cf-d, 0\) \* 14px/);
 });
@@ -84,7 +84,7 @@ test('c3: there are no indent guides: no pseudo-element on a row of the tree, an
 });
 
 test('c5: in a narrow column the step shrinks, so the name keeps at least 60 px at depth 8 in a column of 220 px', () => {
-  const m = /@container col \(max-width: 300px\) \{\n\s*\.cf-tree \{ --cf-step: (\d+)px; \}/.exec(css);
+  const m = /@container col \(max-width: 300px\) \{\n\s*\.cf-tree, \.ft-tree \{ --cf-step: (\d+)px; \}/.exec(css);
   assert.ok(m, 'a narrow-column rule for the step');
   const step = Number(m[1]);
   assert.ok(step >= 6 && step < 16);
@@ -103,6 +103,7 @@ test('c5: in a narrow column the step shrinks, so the name keeps at least 60 px 
 test('p1: the Files tree (ft-*) and the focus ring, the counts and the status letters are untouched', () => {
   assert.match(decls('.cf-item:focus-visible, .cf-dir:focus-visible').join(';'), /outline:\s*2px solid var\(--blue\)/);
   assert.match(decls('.cf-st').join(';'), /width:\s*14px/);
-  assert.doesNotMatch(rulesWith('.ft-').map((r) => r.body).join(';'), /--cf-/);
+  // RP146: the step is shared on purpose (`.cf-tree, .ft-tree` and the padding of `.ft-row`); no other Files rule may depend on the Changes tree.
+  assert.doesNotMatch(rulesWith('.ft-').filter((r) => !r.sel.includes('.cf-tree') && r.sel !== '.ft-row').map((r) => r.body).join(';'), /--cf-/);
   assert.equal(rulesWith('.cf-').filter((r) => /animation|transition/.test(r.body)).length, 0, 'no animation is added');
 });

@@ -519,10 +519,12 @@ body.tab-summary #viewbar { display: none; }
 .ck-l:hover { color: var(--blue); }
 .ck-rerun { margin: 8px 4px 4px; }
 /* The changes tree: one button per folder and per file, indented by depth (cf-d0 to cf-d8: deeper paths stop getting deeper); the name is clipped, the counts and the status letter keep their place. */
-.cf-tree { display: grid; min-width: 0; --cf-step: 16px; }
+.cf-tree { display: grid; min-width: 0; }
+/* RP146: the Files tree (ft-*) shares the indent step with the Changes tree, so the two never diverge. */
+.cf-tree, .ft-tree { --cf-step: 16px; }
 .cf-item, .cf-dir { display: flex; align-items: center; gap: 6px; width: 100%; min-width: 0; text-align: left; border: 1px solid transparent; background: transparent; border-radius: 6px; padding: 3px 6px 3px calc(6px + var(--cf-d, 0) * var(--cf-step, 16px)); }
 @container col (max-width: 300px) {
-  .cf-tree { --cf-step: 8px; }
+  .cf-tree, .ft-tree { --cf-step: 8px; }
 }
 .cf-d0 { --cf-d: 0; } .cf-d1 { --cf-d: 1; } .cf-d2 { --cf-d: 2; } .cf-d3 { --cf-d: 3; } .cf-d4 { --cf-d: 4; } .cf-d5 { --cf-d: 5; } .cf-d6 { --cf-d: 6; } .cf-d7 { --cf-d: 7; } .cf-d8 { --cf-d: 8; }
 .cf-item:hover:not(:disabled), .cf-dir:hover:not(:disabled) { background: var(--panel2); border-color: transparent; }
@@ -625,9 +627,12 @@ body.tab-summary #viewbar { display: none; }
 .ft-tree { flex: none; max-height: 40vh; overflow: auto; display: flex; flex-direction: column; margin-bottom: 12px; font-size: 13px; }
 /* RP132: that cap is for the chat's own Files tab (the file is below the tree); in the column the tree takes its natural height and the column scrolls. */
 #colBody .ft-tree { flex: none; max-height: none; overflow: visible; }
-.ft-row { display: flex; align-items: center; gap: 6px; width: 100%; text-align: left; border: 1px solid transparent; background: transparent; padding: 2px 6px 2px calc(6px + var(--d, 0) * 14px); border-radius: 6px; }
+.ft-row { display: flex; align-items: center; gap: 6px; width: 100%; text-align: left; border: 1px solid transparent; background: transparent; padding: 2px 6px 2px calc(6px + var(--d, 0) * var(--cf-step, 16px)); border-radius: 6px; }
 .ft-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
+.ft-row .ft-name { font-family: inherit; font-size: 13px; }
 .ft-dir { color: var(--muted); }
+.ft-dir .cf-ic { color: var(--blue); }
+.ft-file .cf-ic { color: var(--gray); }
 .ft-chg { color: var(--yellow); }
 .ft-on { border-color: var(--blue); background: #12253d; }
 .ft-mark { font-family: ui-monospace, Consolas, monospace; font-size: 11px; color: var(--yellow); }

@@ -702,13 +702,13 @@
     const walk = (node, depth) => {
       for (const d of [...node.dirs.values()].sort(byName)) {
         const open = folded[d.path] === undefined ? d.dirty : folded[d.path] === true;
-        emit(`<button type="button" class="ft-row ft-dir${d.dirty ? ' ft-chg' : ''}" style="--d:${depth}" data-act="files-dir" data-path="${esc(d.path)}" data-open="${open}" aria-expanded="${open}"><span aria-hidden="true">${open ? '▾' : '▸'}</span> ${esc(d.name)}</button>`);
+        emit(`<button type="button" class="ft-row ft-dir${d.dirty ? ' ft-chg' : ''}" style="--d:${depth}" data-act="files-dir" data-path="${esc(d.path)}" data-open="${open}" aria-expanded="${open}"><span class="cf-ch" aria-hidden="true">${open ? '▾' : '▸'}</span><span class="cf-ic" aria-hidden="true">${ICON_DIR}</span><span class="ft-name">${esc(d.name)}</span></button>`);
         if (open) walk(d, depth + 1);
       }
       for (const f of node.files.sort(byName)) {
         const m = mark(f.path);
         const on = ctx.selected === f.path;
-        emit(`<button type="button" class="ft-row ft-file${m ? ' ft-chg' : ''}${on ? ' ft-on' : ''}" style="--d:${depth}" data-act="files-open" data-path="${esc(f.path)}" aria-pressed="${on}" title="${esc(f.path)}"><span class="ft-name">${esc(f.name)}</span>${m ? `<span class="ft-mark">${esc(m)}</span>` : ''}</button>`);
+        emit(`<button type="button" class="ft-row ft-file${m ? ' ft-chg' : ''}${on ? ' ft-on' : ''}" style="--d:${depth}" data-act="files-open" data-path="${esc(f.path)}" aria-pressed="${on}" title="${esc(f.path)}"><span class="cf-ch" aria-hidden="true"></span><span class="cf-ic" aria-hidden="true">${ICON_FILE}</span><span class="ft-name">${esc(f.name)}</span>${m ? `<span class="ft-mark">${esc(m)}</span>` : ''}</button>`);
       }
     };
     walk(root, 0);
