@@ -648,15 +648,19 @@
       // RP105c: pi is retrying a failed request on its own (live only: the history keeps no record). Only valid numbers are kept.
       else if (r.type === 'auto_retry_start') e.retry = { attempt: rpcInt(r.attempt, 1, 1000), max: rpcInt(r.maxAttempts, 1, 1000), delayMs: rpcInt(r.delayMs, 0, 3600000) };
       else if (r.type === 'auto_retry_end') e.retry = null;
+      // RP155: every message starts with an empty live text. The blocks are kept BY POSITION inside a message and were cleared only at the next agent_start, so the text of the message before stayed in the position a later one did
+      // not use (measured on the real stream: blocks [110] then [110, 1625]) and a text_delta was added to whatever its position already held. Only the text and the reasoning flag are reset: nothing else of the entry.
+      else if (r.type === 'message_start') { e.blocks = []; e.thinking = false; }
       else if (r.type === 'message_update' && Number.isInteger(a.contentIndex) && a.contentIndex >= 0 && a.contentIndex < RPC_BLOCKS) {
         for (let i = e.blocks.length; i < a.contentIndex; i++) e.blocks[i] = '';
+        if (a.type === 'text_start') e.blocks[a.contentIndex] = ''; // RP155: a text block starts empty, whatever the position held
         // RP104: the reasoning only turns a flag on and off (the server never sends its text); the first text of the run ends it.
         if (a.type === 'thinking_start' || a.type === 'thinking_delta') e.thinking = true;
         else if (a.type === 'thinking_end' || (typeof a.type === 'string' && a.type.startsWith('text_'))) e.thinking = false;
         if (a.type === 'text_delta' && typeof a.delta === 'string') e.blocks[a.contentIndex] = ((e.blocks[a.contentIndex] || '') + a.delta).slice(0, RPC_TEXT_MAX);
         else if (a.type === 'text_end' && typeof a.content === 'string') e.blocks[a.contentIndex] = a.content;
       }
-      if (r.type === 'agent_start' || r.type === 'message_update') e.text = rpcText(e.blocks);
+      if (r.type === 'agent_start' || r.type === 'message_update' || r.type === 'message_start') e.text = rpcText(e.blocks);
     }
     return { entry: e, reload, ctx };
   }
