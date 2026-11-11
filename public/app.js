@@ -160,6 +160,11 @@ setInterval(() => refreshTick(), 2000);
 setInterval(summaryTick, 20000);
 setInterval(chatTick, CHAT_MS);
 setInterval(subTick, 1000); // RP152
+// RP133: Back, Forward and a hash typed by hand apply the address (both events: idempotent, applying never writes).
+if (typeof addEventListener === 'function') {
+  addEventListener('popstate', () => addressApply(addressNow()));
+  addEventListener('hashchange', () => addressApply(addressNow()));
+}
 setInterval(quietTick, 10000);
 setInterval(() => { if (!document.hidden) loadUsage(); }, 30000);
 // RP96: Escape on the focused usage element closes its popover (the focus leaves it).
@@ -180,7 +185,7 @@ document.addEventListener('visibilitychange', () => {
   try { await loadConfig(); } catch (e) { toast(e.message, 'bad'); }
   $('#cleanAsColumn').checked = cleanAsColumn();
   draw();
-  if (location.hash === '#conformity') openConformity(); // deep link
+  addressApply(addressNow()); // RP133: the link of the page (a repo and its zone, or #conformity) opens that place
   refreshAll();
   rpcSeed();
   startEvents();

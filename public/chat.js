@@ -49,13 +49,52 @@ function openChat(id, tab) {
   flushNotes();
   S.recall = {};
   S.chatResults = Object.create(null);
-  S.chat = { id, seq: S.chat.seq + 1, ...(V && V.chatFromCache(S.chatCache[id])), ...(tab === 'tasks' && !columnOn() ? { tab } : {}) }; // RP79: cached messages at once, state unknown (no get: opening must not reorder the cache)
+  S.chat = { id, seq: S.chat.seq + 1, zone: 'chat', ...(V && V.chatFromCache(S.chatCache[id])), ...(tab === 'tasks' && !columnOn() ? { tab } : {}) }; // RP79: cached messages at once, state unknown (no get: opening must not reorder the cache)
   $('#msgBox').value = S.drafts[id] || '';
   draw();
   if (chatCtl) chatCtl.abort();
   chatCtl = new AbortController();
   loadChat(id, { user: true, signal: chatCtl.signal });
   rpcSync(id);
+  addressWrite(); // RP133
+}
+// RP133 (S26): the address of the page follows the open repo and its zone, so Back and Forward walk the screens and a link reopens the same place. It is WRITTEN with history.pushState (it fires no event: no loop) and READ
+// by addressApply, which never writes. Everything is guarded: most suites run the page with no history or no location at all.
+const addr = { applying: false };
+const addressNow = () => (typeof location === 'object' && location && typeof location.hash === 'string' ? location.hash : '');
+function addressWrite(replace = false) {
+  if (addr.applying || !V || typeof history !== 'object' || !history || typeof location !== 'object' || !location) return;
+  const act = replace ? history.replaceState : history.pushState;
+  if (typeof act !== 'function') return;
+  const id = S.chat.id;
+  const want = id ? V.addressOf(id, S.chat.zone) : '';
+  if (id && !want) return; // a chat with no address (a room): the address bar is left alone
+  const now = addressNow();
+  if (!replace && (want === now || (want === '' && (now === '#' || now === '#/')))) return;
+  act.call(history, null, '', `${location.pathname || ''}${location.search || ''}${want}`);
+}
+function setZone(zone) {
+  if (!S.chat.id || !V || !V.ADDRESS_ZONES.includes(zone) || S.chat.zone === zone) return;
+  S.chat.zone = zone;
+  draw();
+  addressWrite();
+}
+// Applies an address of the page (a link, Back, Forward, a hash typed by hand). Junk is ignored and the address bar goes back to what is open (replaceState: no new entry). Nothing happens before the list of repos is
+// known (a valid address would look like junk). Applying never writes, and it does nothing that is already so: a burst of events cannot loop.
+function addressApply(hash) {
+  if (!V || allRepos().length === 0) return;
+  const to = V.parseAddress(hash, allRepos().map((r) => r.id));
+  if (!to) { if (typeof hash === 'string') addressWrite(true); return; }
+  addr.applying = true;
+  try {
+    if (to.kind === 'conformity') openConformity();
+    else if (to.kind === 'list') { if (S.chat.id) closeChat(); }
+    else {
+      if (S.tab !== 'summary') setTab('summary');
+      if (S.chat.id !== to.id) openChat(to.id);
+      if (S.chat.id === to.id && S.chat.zone !== to.zone) { S.chat.zone = to.zone; draw(); }
+    }
+  } finally { addr.applying = false; }
 }
 function closeChat() {
   if (!S.chat.id) return;
@@ -67,6 +106,7 @@ function closeChat() {
   S.chat = { id: null, seq: S.chat.seq + 1 };
   chatShown = null;
   draw();
+  addressWrite(); // RP133
 }
 // RP152: the counter of «Subagent working» moves by itself, once a second, and only while the open chat has one on and the page is visible (nothing is repainted otherwise).
 function subTick() {
