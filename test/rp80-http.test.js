@@ -64,6 +64,7 @@ function fakeDeps() {
     state: note('state', { available: false }),
     requirements: note('requirements', { available: true, results: [], summary: { ok: 1, total: 1 } }),
     git: async () => { calls.push('git'); lanes.push(lane.getStore()); return { code: 0, stdout: '2026-10-28T10:00:00Z\nsubject\n', stderr: '' }; },
+    fetch: async () => ({ skipped: 'no-remote' }), // RP150: the fetch kind asks no git and no remote here
   };
 }
 

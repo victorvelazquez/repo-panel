@@ -51,7 +51,8 @@ function setup({ repos = ['alpha', 'beta', 'gamma'], ...opts } = {}) {
     if (hook) return hook(n);
     return kind === 'git' ? { code: 0, stdout: `${LAST.at}\n${LAST.what}\n`, stderr: '' } : GOOD[kind];
   };
-  e.deps = Object.fromEntries(KINDS.map((k) => [k, reader(k)]));
+  // RP150: the fetch kind is not under test here: its round is skipped, so it asks no git and no remote.
+  e.deps = { ...Object.fromEntries(KINDS.map((k) => [k, reader(k)])), fetch: async () => ({ skipped: 'no-remote' }) };
   e.setTimer = (fn, ms) => { const timer = { fn, ms, unrefs: 0, unref() { this.unrefs++; } }; e.timers.push(timer); return timer; };
   e.clearTimer = (timer) => { e.cleared.push(timer); };
   e.store = make({ deps: e.deps, now: () => e.t, loadCfg: () => e.cfg, setTimer: e.setTimer, clearTimer: e.clearTimer, ...opts });

@@ -7,8 +7,9 @@ const crypto = require('node:crypto');
 const lib = require('../lib.js');
 const view = require('../public/view.js');
 const { HttpError } = require('./errors.js');
-const { git, firstLine, withContext, withPriority, singleFlight, stats } = require('./exec.js');
+const { firstLine, withContext, withPriority, singleFlight, stats } = require('./exec.js');
 const { createPerf } = require('./perf.js');
+const { fetchRepo } = require('./fetcher.js');
 const { loadConfig, saveConfig, findRepo, roomIssues } = require('./config.js');
 const { resolveRuntime, handshake } = require('./piruntime.js');
 const { localState, diffText } = require('./local.js');
@@ -138,7 +139,7 @@ const routes = {
   'POST /api/notes': (q, b) => saveNotes(findRepo(b && b.id), b),
   'POST /api/fetch': async (q, b) => {
     const repo = findRepo(b.id);
-    const r = await git(repo.path, ['fetch', '--prune', '--quiet']);
+    const r = await fetchRepo(repo, { prune: true, lane: 'user' });
     if (r.code !== 0) throw new HttpError(502, firstLine(r.stderr) || 'git fetch failed');
     return { ok: true };
   },
