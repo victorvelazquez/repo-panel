@@ -260,7 +260,7 @@ test('g6: the chip "N files" of a card (action diff) with the column in opens th
 });
 
 test('g7: a chat left on the Changes tab when the layout grows to have the column shows the chat again (the card replaces the tab, as with Tasks) and the composer comes back; shrinking brings the tab back', async () => {
-  const page = boot(900);
+  const page = boot(0);
   page.run('S').local.abc = L(FILES);
   page.routes['/api/diff?id=abc'] = () => Promise.resolve(ok({ diff: DIFF, truncated: false }));
   open(page, 'abc');
@@ -275,14 +275,14 @@ test('g7: a chat left on the Changes tab when the layout grows to have the colum
   assert.equal(page.get('#composer').hidden, false);
   assert.doesNotMatch(head(page), /data-tab="changes"/);
   assert.doesNotMatch(page.get('#chatBody').html, /cv-item/, 'the Changes viewer is not drawn');
-  page.get('#sumLayout').clientWidth = 900;
+  page.get('#sumLayout').clientWidth = 0;
   page.run('draw()');
   page.flush();
   assert.match(head(page), /data-tab="changes"[^>]*aria-selected="true"/, 'without the column the tab is back');
 });
 
-test('n1: under 1100 px (no column) nothing changes: the Changes tab is there and lists every file, and touching one opens the diff tab', async () => {
-  const page = boot(900);
+test('n1: with a layout that measures nothing (no column; RP136: the column is in from 760 px) nothing changes: the Changes tab is there and lists every file, and touching one opens the diff tab', async () => {
+  const page = boot(0);
   page.run('S').local.abc = L(FILES);
   page.routes['/api/diff?id=abc'] = () => Promise.resolve(ok({ diff: `${DIFF}diff --git a/two.js b/two.js\n--- a/two.js\n+++ b/two.js\n@@ -1,1 +1,1 @@\n-a\n+b two\n`, truncated: false }));
   open(page, 'abc');

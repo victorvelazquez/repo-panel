@@ -430,8 +430,8 @@ test('p7: a folder keeps the focus after it folds (the page repaints), a click o
   assert.ok(page.get('#coltab-tasks').focused >= 1);
 });
 
-test('p8: under 1100 px there is no column: it holds no tabs and the chat keeps its own Tasks and Changes tabs as before', async () => {
-  const page = boot(900);
+test('p8: with a layout that measures nothing (RP136: the column is in from 760 px) there is no column: it holds no tabs and the chat keeps its own Tasks and Changes tabs as before', async () => {
+  const page = boot(0);
   open(page, 'abc');
   await page.tick();
   assert.doesNotMatch(col(page), /col-tabs|tk-bar/);

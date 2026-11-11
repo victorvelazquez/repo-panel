@@ -17,13 +17,13 @@ const A = 'abcdef0123';
 const B = '9c15a89663';
 
 // ---------- the cut (pure) ----------
-test('s1: the screen under 760 px is the list with no repo open and the chat with one; from 760 px up there is no screen (null)', () => {
+test('s1: the screen under 760 px is the list with no repo open and the chat with one; from 1100 px up there is no screen (null; RP136: 760 to 1099 is the duo)', () => {
   assert.equal(V.screenOf(759, null), 'list');
   assert.equal(V.screenOf(759, A), 'chat');
   assert.equal(V.screenOf(390, A), 'chat');
   assert.equal(V.screenOf(360, null), 'list');
   assert.equal(V.screenOf(1, A), 'chat');
-  for (const w of [760, 761, 800, 1099, 1100, 1500, 4000, Infinity]) { assert.equal(V.screenOf(w, null), null, String(w)); assert.equal(V.screenOf(w, A), null, String(w)); }
+  for (const w of [1100, 1500, 4000, Infinity]) { assert.equal(V.screenOf(w, null), null, String(w)); assert.equal(V.screenOf(w, A), null, String(w)); }
 });
 
 test('s2: a width that is not a real size is not «narrow»: unknown (a layout that is hidden in another tab measures 0) keeps today\'s behaviour', () => {
@@ -146,8 +146,8 @@ test('p1: under 760 px with no repo open the screen is the list; opening a repo 
   assert.equal(page.screen(), 'list');
 });
 
-test('p2: from 760 px up there is no screen, with or without a repo open: today\'s layout is untouched', async () => {
-  for (const width of [760, 800, 1099, 1100, 1500]) {
+test('p2: from 1100 px up there is no screen (RP136: 760 to 1099 is the duo), with or without a repo open: today\'s layout is untouched', async () => {
+  for (const width of [1100, 1500]) {
     const page = await boot({ width });
     assert.equal(page.screen(), undefined, String(width));
     await page.click('chat-open', { id: A });
@@ -163,6 +163,8 @@ test('p3: a resize across the cut changes the screen at once, both ways, and kee
   assert.equal(page.screen(), 'chat');
   assert.equal(page.chatId(), A);
   await page.setWidth(760);
+  assert.equal(page.screen(), 'duo', 'RP136: from 760 to 1099 px the screen is the duo');
+  await page.setWidth(1100);
   assert.equal(page.screen(), undefined);
   await page.setWidth(500);
   page.run('closeChat()');

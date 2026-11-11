@@ -252,8 +252,8 @@ test('g4: with the column in a Files tab asked of the chat reads as the chat (th
   assert.equal(chatTab(page), 'chat', 'a file tab with no file open reads as the chat');
 });
 
-test('g5: under 1100 px nothing changes: the Files tab stays in the chat and opening a file there reads it in the same tab, with no viewer tab', async () => {
-  const page = boot130(900);
+test('g5: with a layout that measures nothing nothing changes (RP136: the column is in from 760 px): the Files tab stays in the chat and opening a file there reads it in the same tab, with no viewer tab', async () => {
+  const page = boot130(0);
   open(page, 'abc');
   await page.tick();
   assert.doesNotMatch(col(page), /col-tabs/);

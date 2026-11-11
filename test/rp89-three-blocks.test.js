@@ -278,11 +278,11 @@ test('p8: without the pointer-capture APIs nothing throws', () => {
   for (const id of ['#split', '#split2']) assert.doesNotThrow(() => { fireOn(page.get(id), 'pointerdown', { pointerId: 1 }); fireOn(page.get(id), 'pointerup', { pointerId: 1 }); });
 });
 
-test('p9: under 1100 px the column is out: two blocks, the list is half by default and the column has no width; a resize recomputes', () => {
+test('p9: from 760 to 1100 px (the duo, RP136) the list takes no room and the column takes 40% by default (the chat keeps the rest); a resize recomputes', () => {
   const page = loadPage();
   open(page, 1000);
-  assert.equal(listW(page), '495px');
-  assert.equal(colW(page), '0px');
+  assert.equal(listW(page), '0px');
+  assert.equal(colW(page), '396px'); // 40% of 990: the width minus the one separator that is in
   page.get('#sumLayout').clientWidth = 1400;
   for (const fn of page.winL.resize || []) fn({ type: 'resize' });
   assert.equal(listW(page), '345px');
@@ -362,11 +362,11 @@ test('r4: the widths do not jump when a repo is chosen after, or closed again', 
   assert.equal(listW(page), '369px');
 });
 
-test('r5: in a narrow window the chat is in with no repo open too, and the column stays out as RP89 decided', () => {
+test('r5: in a mid window (900 px) the chat is in with no repo open too, and the list keeps its minimum (RP136: the column is in from 760 px)', () => {
   const page = loadPage();
   noRepo(page, 900);
   assert.equal(page.get('#chat').hidden, false);
-  assert.equal(listW(page), '445px');
+  assert.equal(listW(page), '260px');
   assert.match(page.get('#chatBody').html, /Pick a repo/);
 });
 

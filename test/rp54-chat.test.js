@@ -600,7 +600,7 @@ test('divider (RP89: the list separator): default width, the arrows move 24 px a
   assert.equal(ls(page), undefined);
 });
 
-test('divider: the minimums hold and a resize recomputes (under 1100 px the list is half)', () => {
+test('divider: the minimums hold and a resize recomputes (from 760 to 1100 px, the duo of RP136, the list takes no room)', () => {
   const page = loadPage();
   withDivider(page);
   const split = page.get('#split');
@@ -611,7 +611,7 @@ test('divider: the minimums hold and a resize recomputes (under 1100 px the list
   fireOn(split, 'dblclick');
   page.get('#sumLayout').clientWidth = 1000;
   for (const fn of page.winL.resize || []) fn({ type: 'resize' });
-  assert.equal(listWidth(page), '495px', 'under 1100 px the default is 50/50');
+  assert.equal(listWidth(page), '0px', 'RP136: in the duo (760 to 1100 px) the list is out of the screen and takes no room');
   assert.ok((page.winL.resize || []).length >= 1);
 });
 
