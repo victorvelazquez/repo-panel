@@ -24,6 +24,24 @@ async function doMerge(id, n) {
   try { await refreshRepo(id, { catchUp: true }); } finally { draw(); }
 }
 
+// RP137: the tap on ANY Merge button. Under 760 px it opens the sheet that asks first (and only when the button is on: the same rule); from 760 px up, or when the width is not known, it merges as it always did.
+function mergeTap(id, n) {
+  if (!phoneNow()) return doMerge(id, n);
+  const pr = prOfId(id, n);
+  if (!pr || !V || V.mergeButton(pr, mergeCtxOf(id, n)).enabled !== true) return;
+  S.mergeSheet = { id, n, chatId: S.chat.id || null, head: pr.head, title: pr.title }; // what the person is shown: the confirm refuses a different PR that took the same number
+  draw();
+}
+// The Merge of the sheet. The sheet closes FIRST (a second tap finds nothing), the rule is asked again with the live data, and only then the order goes out, once.
+function mergeConfirm() {
+  const sh = S.mergeSheet;
+  if (!sh) return;
+  S.mergeSheet = null;
+  const pr = prOfId(sh.id, sh.n);
+  if (!pr || !V || (S.chat.id || null) !== sh.chatId || pr.head !== sh.head || pr.title !== sh.title || V.mergeButton(pr, mergeCtxOf(sh.id, sh.n)).enabled !== true) { draw(); toast(`#${sh.n}: not ready to merge any more`, 'bad'); return; }
+  doMerge(sh.id, sh.n);
+}
+
 async function doRerun(id, n) {
   S.busy[`${id}:${n}`] = true; draw();
   try { const r = await api('/api/rerun', { id, number: n }); toast(`Re-running ${r.rerun} workflow run(s)`, 'ok'); }
@@ -384,7 +402,9 @@ const ACTIONS = {
       draw();
     }
   },
-  'merge': (el) => doMerge(el.dataset.id, Number(el.dataset.n)),
+  'merge': (el) => mergeTap(el.dataset.id, Number(el.dataset.n)), // RP137: under 760 px it asks first
+  'merge-confirm': () => mergeConfirm(),
+  'merge-cancel': () => { if (S.mergeSheet) { S.mergeSheet = null; draw(); } },
   'queue-pick': (el) => {
     if (el.dataset.close) setTab(S.backTab);
     S.q = el.dataset.name; $('#search').value = S.q; draw();

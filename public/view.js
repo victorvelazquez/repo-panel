@@ -386,6 +386,11 @@
       title: hold || hint(pr.ready ? `Merge into ${pr.base}` : pr.blockedReason || 'Not ready to merge'),
     };
   }
+  // RP137: the reason a Merge button is off, to write it where there is no tooltip (a phone). Only for a button that is off with the plain label: a merging or merged one is not "off for a reason". Total.
+  function mergeWhy(btn) {
+    const b = btn && typeof btn === 'object' && !Array.isArray(btn) ? btn : {};
+    return b.enabled === false && typeof b.label === 'string' && b.label.startsWith('Merge ·') && typeof b.title === 'string' ? b.title : '';
+  }
   // The Re-run failed button, with the same rule of flight, hold and running: shown only when the PR has failed runs.
   function rerunButton(pr, ctx = {}) {
     const runs = pr && typeof pr === 'object' && pr.checks && Array.isArray(pr.checks.failedRuns) ? pr.checks.failedRuns : [];
@@ -998,5 +1003,5 @@
     return `${dot}${meters.join('')}<div class="usage-pop" role="group" aria-label="Claude usage details">${details.join('')}${note}${foot}</div>`;
   }
 
-  return { screenOf, bandOf, NARROW_BELOW, DUO_BELOW, parseAddress, addressOf, ADDRESS_ZONES, subClock, columnTabFor, conformityTabLabel, repoModel, changeChips, prChip, idleChip, conflictChip, sizeChip, RepoCard, stateLineHidden, usageView, usageHtml, usageRemaining, boardApply, boardWait, chatCachePut, chatCacheGet, rpcWithContext, chatFromCache, API_VERSION, mergeButton, rerunButton, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, dirtyRepos, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, taskPrs, matchesUnitId, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, parseSse, rpcEvent, rpcReduce, rpcFromStatus, eventsPlan, eventsRetryMs, eventsStale };
+  return { mergeWhy, screenOf, bandOf, NARROW_BELOW, DUO_BELOW, parseAddress, addressOf, ADDRESS_ZONES, subClock, columnTabFor, conformityTabLabel, repoModel, changeChips, prChip, idleChip, conflictChip, sizeChip, RepoCard, stateLineHidden, usageView, usageHtml, usageRemaining, boardApply, boardWait, chatCachePut, chatCacheGet, rpcWithContext, chatFromCache, API_VERSION, mergeButton, rerunButton, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, dirtyRepos, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, taskPrs, matchesUnitId, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, parseSse, rpcEvent, rpcReduce, rpcFromStatus, eventsPlan, eventsRetryMs, eventsStale };
 }));

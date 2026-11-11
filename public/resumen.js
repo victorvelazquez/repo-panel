@@ -278,7 +278,7 @@
     const m = g.merge && typeof g.merge === 'object' ? g.merge : {};
     const branch = typeof g.branch === 'string' ? g.branch : '';
     const ahead = Number.isInteger(g.ahead) && g.ahead > 0 ? `<span class="chip" title="Commits ahead of the base">↑${g.ahead}</span>` : '';
-    return `<div class="col-foot" role="group" aria-label="Branch and pull request"><span class="ft-br"${branch ? ` title="${esc(branch)}"` : ''}>${ICON_BRANCH}<span class="ft-name">${branch ? esc(branch) : '—'}</span></span>${ahead}${ciMark(pr)}<button type="button" class="merge ft-merge" data-act="merge" data-id="${esc(g.id ?? '')}"${pr ? ` data-n="${pr.number}"` : ''}${m.enabled === true ? '' : ' disabled'} title="${esc(m.title || 'No open pull request for this branch')}">${esc(m.label || 'Merge · squash')}</button></div>`;
+    return `${typeof m.why === 'string' && m.why ? `<div class="ft-why" role="status">${esc(m.why)}</div>` : ''}<div class="col-foot" role="group" aria-label="Branch and pull request"><span class="ft-br"${branch ? ` title="${esc(branch)}"` : ''}>${ICON_BRANCH}<span class="ft-name">${branch ? esc(branch) : '—'}</span></span>${ahead}${ciMark(pr)}<button type="button" class="merge ft-merge" data-act="merge" data-id="${esc(g.id ?? '')}"${pr ? ` data-n="${pr.number}"` : ''}${m.enabled === true ? '' : ' disabled'} title="${esc(m.title || 'No open pull request for this branch')}">${esc(m.label || 'Merge · squash')}</button></div>`;
   };
   const statusPanel = (g) => {
     const pr = prOf(g);
@@ -404,6 +404,15 @@
     return `${head(term.shell)}<code class="term-cmd">${esc(term.command)}</code><div class="term-row"><button type="button" data-act="terminal-copy">${term.copied ? 'Copied' : 'Copy'}</button><span class="term-note">Close the session here first: two programs on the same session mix up its history.</span></div>`;
   }
 
+  // RP137: the sheet that asks before a merge under 760 px. m = { n, base, title, method, del }; anything that is not a valid model gives nothing. Every text is escaped; a method that is not one of the three reads as squash
+  // (as the Merge button does).
+  function mergeSheetHtml(m) {
+    const x = m && typeof m === 'object' && !Array.isArray(m) ? m : null;
+    if (!x || !Number.isSafeInteger(x.n) || x.n <= 0 || typeof x.base !== 'string') return '';
+    const method = ['squash', 'merge', 'rebase'].includes(x.method) ? x.method : 'squash';
+    const title = typeof x.title === 'string' && x.title ? `<p class="ms-sub">${esc(x.title)}</p>` : '';
+    return `<div class="ms-back" data-act="merge-cancel"></div><div class="ms-card" role="dialog" aria-modal="true" aria-labelledby="ms-t"><h3 id="ms-t">Merge #${x.n} into ${esc(x.base)}?</h3>${title}<p>Method: <b>${method}</b>. ${x.del === true ? 'The branch will be deleted after the merge.' : 'The branch is kept.'}</p><div class="ms-btns"><button type="button" class="ms-cancel" id="ms-cancel" data-act="merge-cancel">Cancel</button><button type="button" class="primary ms-ok" data-act="merge-confirm">Merge · ${method}</button></div></div>`;
+  }
   // RP135: what the head of the chat says about the repo under 760 px. Pure and total. `g` is what columnGit gives (branch, commits ahead, and the open PR of THAT branch, so a PR of another branch never shows here). The checks that
   // are running or failed are said, the passed ones are not; what is not a count is 0. line = the second line of the head, label = the name of the button that opens Repo, pending = the badge of the Repo button.
   const count = (v) => (Number.isSafeInteger(v) && v > 0 ? v : 0);
@@ -1276,5 +1285,5 @@ ${status}</div>`;
     return `${ctx.failed ? '<div class="rs-note" role="status">⚠ Summary unavailable: showing the last data we have.</div>' : ''}<div class="rs-list">${body}</div>`;
   }
 
-  return { repoStatus, esc, mdHtml, settingsView, memoryChipHtml, subagentChipHtml, ctxChipHtml, compactButtonHtml, legendHtml, listCount, listHeadChips, sessionChip, blockWidths, columnView, treeFolderPaths, fileView, COLUMN_TABS, composerState, askAllowed, actionMenu, actionButtonsHtml, composerNote, chatHead, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, sessionCloseHtml, sessionTerminalHtml, terminalBlockHtml, recentlyActive, chatBody, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
+  return { mergeSheetHtml, repoStatus, esc, mdHtml, settingsView, memoryChipHtml, subagentChipHtml, ctxChipHtml, compactButtonHtml, legendHtml, listCount, listHeadChips, sessionChip, blockWidths, columnView, treeFolderPaths, fileView, COLUMN_TABS, composerState, askAllowed, actionMenu, actionButtonsHtml, composerNote, chatHead, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, sessionCloseHtml, sessionTerminalHtml, terminalBlockHtml, recentlyActive, chatBody, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
 }));

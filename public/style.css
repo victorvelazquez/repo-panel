@@ -816,6 +816,19 @@ button.tc:hover { border-color: var(--muted); }
 #sumLayout[data-screen] .ch-back { display: inline-flex; min-width: 44px; min-height: 44px; }
 #sumLayout[data-screen] .ch-row .x { display: none; }
 /* RP136: from 760 to 1100 px the screen is the duo: the chat and the column side by side (with the separator between them), the list reached with the arrow of the chat. Repo is in view, so the Repo button is out. */
+/* RP137: the sheet that asks before a merge under 760 px (an overlay with a backdrop; Cancel is the first button and takes the focus), and the reason Merge is off, written above the footer of the Repo screen. */
+#mergeSheet { position: fixed; inset: 0; z-index: 100; display: flex; align-items: flex-end; justify-content: center; }
+#mergeSheet[hidden] { display: none; }
+.ms-back { position: absolute; inset: 0; background: rgba(1, 4, 9, .7); }
+.ms-card { position: relative; width: min(100%, 480px); box-sizing: border-box; padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px)); background: var(--bg); border: 1px solid var(--line); border-radius: 12px 12px 0 0; }
+.ms-card h3 { margin: 0 0 8px; font-size: 16px; }
+.ms-card p { margin: 0 0 8px; }
+.ms-sub { color: var(--muted); overflow-wrap: anywhere; }
+.ms-btns { display: flex; gap: 8px; margin-top: 12px; }
+.ms-btns button { flex: 1; min-height: 44px; }
+.ms-btns button:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.ft-why { display: none; padding: 6px 12px; color: var(--muted); font-size: 12px; border-top: 1px solid var(--line); background: var(--bg); overflow-wrap: anywhere; }
+#sumLayout[data-screen="repo"] .ft-why { display: block; }
 #sumLayout[data-screen="duo"] { flex-direction: row; }
 #sumLayout[data-screen="duo"] #listCol, #sumLayout[data-screen="duo"] #split { display: none; }
 #sumLayout[data-screen="duo"] #split2 { display: block; }

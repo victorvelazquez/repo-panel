@@ -125,6 +125,7 @@ function render() {
   drawSettings();
   drawSummary();
   drawChat();
+  drawMergeSheet(); // RP137
   if (!allRepos().length) {
     paint($('#app'), '<div class="empty">No repositories yet.<br><br><button class="primary" data-act="add-dialog">+ Add your first repo</button></div>');
     return;

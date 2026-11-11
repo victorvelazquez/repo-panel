@@ -68,6 +68,7 @@ document.addEventListener('submit', (e) => {
 // Escape closes the card menu first; with nothing else open it closes the chat. A focused repo card opens the chat with Enter or
 // Space (the buttons inside it have no chat-open act, so they are untouched).
 document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && S.mergeSheet) { S.mergeSheet = null; draw(); return; } // RP137: the sheet that asks before a merge closes first
   if (e.key === 'Escape' && (S.lh.menu || S.lh.search || S.lh.legend)) { S.lh.menu = false; S.lh.search = false; S.lh.legend = false; draw(); return; } // RP121: the bar of the repos column first
   if (e.key === 'Escape' && S.menu) { S.menu = null; draw(); return; }
   if (e.key === 'Escape') {
