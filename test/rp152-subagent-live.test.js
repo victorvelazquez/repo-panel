@@ -295,8 +295,9 @@ test('p7: the existing state label is unchanged by this row: Working…, Idle an
 });
 
 test('p8: the page code has no way to show an agent name or free text of a tool call: the server whitelist is untouched and the reducer reads only the type and the tool name', () => {
-  const view = fs.readFileSync(path.join(__dirname, '..', 'public', 'view.js'), 'utf8');
+  const lf = (text) => text.replace(/\r\n/g, '\n'); // a Windows runner checks the repo out with CRLF: the regex below looks for LF
+  const view = lf(fs.readFileSync(path.join(__dirname, '..', 'public', 'view.js'), 'utf8'));
   const reducer = /function rpcReduce\([\s\S]*?\n  \}\n/.exec(view)[0];
   assert.doesNotMatch(reducer, /\bargs\b|toolCallId|\.agent\b|\.label\b|\.task\b/, 'the reducer never reads arguments, ids or names of agents');
-  assert.match(fs.readFileSync(path.join(__dirname, 'rpc2-1-server.test.js'), 'utf8'), /tool_execution_start', toolName: 'read' \}/, 'the server test that pins the whitelist is still there');
+  assert.match(lf(fs.readFileSync(path.join(__dirname, 'rpc2-1-server.test.js'), 'utf8')), /tool_execution_start', toolName: 'read' \}/, 'the server test that pins the whitelist is still there');
 });
