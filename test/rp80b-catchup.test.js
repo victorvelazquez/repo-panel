@@ -65,7 +65,8 @@ function setup({ repos = ['alpha', 'beta'], timer = timers(), ...opts } = {}) {
     if (hook) return hook(n);
     return kind === 'git' ? { code: 0, stdout: '2026-10-28T10:00:00Z\nsubject\n', stderr: '' } : structuredClone(GOOD[kind]);
   };
-  e.deps = Object.fromEntries(KINDS.map((k) => [DEP[k], reader(k)]));
+  // RP150: the fetch kind is not under test here: its round is skipped, so it asks no git and no remote.
+  e.deps = { ...Object.fromEntries(KINDS.map((k) => [DEP[k], reader(k)])), fetch: async () => ({ skipped: 'no-remote' }) };
   e.store = createSummaryStore({ deps: e.deps, now: () => e.t, loadCfg: () => e.cfg, setTimer: timer.setTimer, clearTimer: timer.clearTimer, ...opts });
   e.hook = (kind, name, fn) => { e.hooks[`${kind}:${pathOf(name)}`] = fn; };
   e.count = (kind, name) => e.calls[kind].filter((p) => p === pathOf(name)).length;

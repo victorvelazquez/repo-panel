@@ -40,7 +40,8 @@ function singleFlight(map, key, fn) {
   return p;
 }
 
-async function run(cmd, args, { cwd, timeout = 60000 } = {}) {
+// `env` (optional) is merged over the base environment of the child.
+async function run(cmd, args, { cwd, timeout = 60000, env } = {}) {
   const st = als.getStore() || {};
   const t0 = Date.now();
   const release = await slot(st.priority === 'user');
@@ -49,7 +50,7 @@ async function run(cmd, args, { cwd, timeout = 60000 } = {}) {
     return await new Promise((resolve) => {
       execFile(cmd, args, {
         cwd, timeout, maxBuffer: 64 * 1024 * 1024, windowsHide: true,
-        env: { ...process.env, GIT_TERMINAL_PROMPT: '0', GH_PROMPT_DISABLED: '1', GH_NO_UPDATE_NOTIFIER: '1' },
+        env: { ...process.env, GIT_TERMINAL_PROMPT: '0', GH_PROMPT_DISABLED: '1', GH_NO_UPDATE_NOTIFIER: '1', ...env },
       }, (err, stdout, stderr) => {
         resolve({ code: err ? (typeof err.code === 'number' ? err.code : -1) : 0, stdout: stdout || '', stderr: stderr || '' });
       });

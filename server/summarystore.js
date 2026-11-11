@@ -4,6 +4,7 @@
 // read keeps the last good value and marks it `stale`; a repo whose facts were not all read yet is a calm `loading` row.
 // RP80: a sixth fact, `req` (requirementsFor, slow), is kept for the board only (the Summary never needs it), and every read that changes an
 // outcome bumps a revision counter, so board(since) answers from memory, reading nothing, only what moved after `since`.
+// RP150: a seventh kind, `fetch` (git fetch of the remote, never the Summary's business), runs detached from the repo cycle so a slow fetch holds none of the other reads.
 // The session state is read from `sessionOf` (the RPC host) at snapshot time. Nothing is started by creating the store.
 const path = require('node:path');
 const lib = require('../lib.js');
@@ -15,16 +16,19 @@ const { prState } = require('./github.js');
 const { roadmapState } = require('./roadmap.js');
 const { readState } = require('./state.js');
 const { requirementsFor } = require('./requirements.js');
+const { fetchRepo } = require('./fetcher.js');
 const view = require('../public/view.js');
 const { stateFrom, safeAnalyse, tally, loadingRow, lastMovementOf, pool } = require('./summary.js');
 
-const KINDS = ['local', 'prs', 'roadmap', 'state', 'last', 'req'];
-const SUMMARY_KINDS = KINDS.filter((k) => k !== 'req'); // the Summary never shows req, so it is never one of its stale marks
+const KINDS = ['local', 'prs', 'roadmap', 'state', 'last', 'req', 'fetch'];
+const SUMMARY_KINDS = KINDS.filter((k) => k !== 'req' && k !== 'fetch'); // the Summary never shows req or fetch, so they are never one of its stale marks
+const BOARD_KINDS = KINDS.filter((k) => k !== 'fetch'); // fetch is bookkeeping: the board neither carries nor marks it
 const VALUES = ['local', 'prs', 'roadmap', 'state', 'req']; // the facts board() carries as values (`last` only as a time)
 const NEEDED = ['local', 'prs', 'roadmap', 'state']; // a row is real once each of these was read, even in error
 const FAST = new Set(['local', 'state']);
 // local and state cost about eight Git calls per repo: 15 s keeps a page with 15 repos near the load of the old 20 s rebuild.
-const INTERVALS = { fast: 15000, slow: 60000, idleFast: 30000, idleSlow: 300000, hotPrs: 15000, hotLocal: 10000 };
+const INTERVALS = { fast: 15000, slow: 60000, idleFast: 30000, idleSlow: 300000, hotPrs: 15000, hotLocal: 10000, fetch: 300000, hotFetch: 60000 };
+const FETCH_MAX_MS = 15 * 60 * 1000; // the longest wait after failed fetches (the interval doubles per failure)
 const HOT_KEY = { prs: 'hotPrs', local: 'hotLocal' }; // RP80b: a hot repo (V.isHotRepo) reads these two faster while a client is active
 const CATCH_UP_DELAY_MS = 5000;
 const READ_TIMEOUT_MS = 90000; // a reader that hangs outside exec must not pin its repo for ever
@@ -41,6 +45,11 @@ const READERS = {
   state: (d, repo) => (d.state || readState)(repo),
   last: (d, repo) => lastMovementOf(repo, d.git || exec.git),
   req: (d, repo) => (d.requirements || requirementsFor)(repo),
+  // A skipped round (no remote, git locked) is no failure; anything else but a clean exit is.
+  fetch: async (d, repo) => {
+    const r = await (d.fetch || fetchRepo)(repo, { deps: { git: d.git } });
+    return r.skipped || r.code === 0 ? r : { error: exec.firstLine(r.stderr) || 'git fetch failed' };
+  },
 };
 
 // Gives up on a promise after `ms` (the timer is unref-ed and cleared); the late answer is ignored.
@@ -63,9 +72,13 @@ function createSummaryStore({
   let timer = null;
   let started = false;
   const catching = new Map(); // repo id -> the one pending delayed read of catchUp
+  const fetching = new Map(); // repo id -> the fetch round in flight
+  const roadmapAgain = new Set(); // repo ids whose roadmap is due now, because a fetch brought something
 
   const interval = (kind, idle, hot = false) => (idle ? (FAST.has(kind) ? iv.idleFast : iv.idleSlow) : hot && HOT_KEY[kind] ? iv[HOT_KEY[kind]] : (FAST.has(kind) ? iv.fast : iv.slow));
   // The rule is the page's own, looked up at call time, on the facts held now.
+  // A fetch every `fetch` ms (`hotFetch` for a hot repo, the slow interval when idle), doubled per failure in a row up to FETCH_MAX_MS.
+  const fetchEvery = (f, idle, hot) => Math.min(FETCH_MAX_MS, (idle ? iv.idleSlow : hot ? iv.hotFetch : iv.fetch) * 2 ** f.fetch.fails);
   const isHot = (f) => !!view.isHotRepo({ local: f.local.value, prs: f.prs.value });
   const isIdle = () => now() - lastTouch >= idleAfterMs;
   const touch = () => { lastTouch = now(); };
@@ -79,10 +92,11 @@ function createSummaryStore({
     const repos = cfg.groups.flatMap((g) => g.repos.map((r) => ({ ...r, id: lib.repoId(r.path), group: g.name, room: roomOf.get(lib.repoId(r.path)) || null })));
     const ids = new Set(repos.map((r) => r.id));
     for (const map of [facts, revOf]) for (const id of map.keys()) if (!ids.has(id)) map.delete(id);
+    for (const id of roadmapAgain) if (!ids.has(id)) roadmapAgain.delete(id);
     return repos;
   }
   const factsOf = (id) => {
-    if (!facts.has(id)) facts.set(id, Object.fromEntries(KINDS.map((k) => [k, { value: undefined, at: null, tried: null, failed: false, error: null }])));
+    if (!facts.has(id)) facts.set(id, Object.fromEntries(KINDS.map((k) => [k, { value: undefined, at: null, tried: null, failed: false, error: null, fails: 0 }])));
     return facts.get(id);
   };
 
@@ -104,7 +118,14 @@ const outcome = (fact) => JSON.stringify([fact.failed, fact.error, fact.value ==
     fact.error = error;
     // A git that cannot say keeps the previous movement.
     if (error === null && !(kind === 'last' && value === null && fact.value)) { fact.value = value; fact.at = t; }
-    if (outcome(fact) !== before) revOf.set(repo.id, ++rev);
+    if (kind !== 'fetch' && outcome(fact) !== before) revOf.set(repo.id, ++rev);
+  }
+
+  // One fetch round: never rejects. A failure counts toward the backoff; a fetch that really ran makes the roadmap due again.
+  async function fetchRound(repo, f) {
+    await read(repo, f.fetch, 'fetch');
+    f.fetch.fails = f.fetch.failed ? f.fetch.fails + 1 : 0;
+    if (!f.fetch.failed && !f.fetch.value.skipped) roadmapAgain.add(repo.id);
   }
 
   // One read cycle of a repo: the due facts (all when forced), all at once; a cycle already in flight is joined.
@@ -113,7 +134,13 @@ const outcome = (fact) => JSON.stringify([fact.failed, fact.error, fact.value ==
     const f = factsOf(repo.id);
     const idle = isIdle();
     const hot = !idle && isHot(f);
-    const kinds = KINDS.filter((k) => force || f[k].tried === null || now() - f[k].tried >= interval(k, idle && !f[k].failed, hot));
+    // A forced cycle never fetches (the network is not the business of a refresh); fetch is due on its own interval, or at the first look.
+    const due = (k) => (k === 'fetch' ? !force && (f.fetch.tried === null || now() - f.fetch.tried >= fetchEvery(f, idle, hot)) : force || f[k].tried === null || now() - f[k].tried >= interval(k, idle && !f[k].failed, hot));
+    if (due('fetch') && !fetching.has(repo.id)) {
+      fetching.set(repo.id, exec.withPriority('background', () => fetchRound(repo, f)).finally(() => fetching.delete(repo.id)));
+    }
+    const kinds = KINDS.filter((k) => k !== 'fetch' && (due(k) || (k === 'roadmap' && roadmapAgain.has(repo.id))));
+    if (kinds.includes('roadmap')) roadmapAgain.delete(repo.id);
     if (!kinds.length) return Promise.resolve();
     const flight = exec.withPriority('background', () => Promise.all(kinds.map((k) => read(repo, f[k], k)))).finally(() => flights.delete(repo.id));
     flights.set(repo.id, flight);
@@ -182,8 +209,8 @@ const outcome = (fact) => JSON.stringify([fact.failed, fact.error, fact.value ==
       const f = facts.get(repo.id);
       const bumped = revOf.get(repo.id) || 0;
       if (from && bumped <= from) continue;
-      const entry = { rev: bumped, at: {}, errors: {}, stale: f ? staleOf(f, t, KINDS) : [] };
-      for (const k of f ? KINDS : []) {
+      const entry = { rev: bumped, at: {}, errors: {}, stale: f ? staleOf(f, t, BOARD_KINDS) : [] };
+      for (const k of f ? BOARD_KINDS : []) {
         if (f[k].at !== null) entry.at[k] = f[k].at;
         if (f[k].failed) entry.errors[k] = f[k].error;
         if (VALUES.includes(k) && f[k].value !== undefined) entry[k] = structuredClone(f[k].value);

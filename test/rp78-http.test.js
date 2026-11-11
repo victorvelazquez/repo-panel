@@ -41,6 +41,7 @@ function fakeDeps() {
     roadmap: note('roadmap', { available: false, reason: 'missing' }),
     state: note('state', { available: false }),
     git: async () => { calls.push('git'); return { code: 0, stdout: '2026-10-28T10:00:00Z\nsubject\n', stderr: '' }; },
+    fetch: async () => ({ skipped: 'no-remote' }), // RP150: the fetch kind asks no git and no remote here
   };
 }
 

@@ -36,7 +36,8 @@ function setup(opts = {}, { repos = ['alpha', 'beta', 'gamma'], fail = () => fal
     if (how === 'async') return Promise.reject(new Error(`${kind} async`));
     return Promise.resolve(kind === 'git' ? { code: 0, stdout: '2026-10-28T10:00:00Z\nsubject\n', stderr: '' } : GOOD[kind]);
   };
-  const deps = Object.fromEntries(KINDS.map((k) => [k, reader(k)]));
+  // RP150: the fetch kind is not under test here: its round is skipped, so it asks no git and no remote.
+  const deps = { ...Object.fromEntries(KINDS.map((k) => [k, reader(k)])), fetch: async () => ({ skipped: 'no-remote' }) };
   const make = require('../server/summarystore.js').createSummaryStore;
   e.store = make({ deps, now: () => e.t, loadCfg: () => cfg, setTimer: () => ({ unref() {} }), clearTimer() {}, waitForClient: false, intervals: { fast: 5000 }, ...opts });
   return e;
