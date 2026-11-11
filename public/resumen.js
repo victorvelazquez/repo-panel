@@ -1021,6 +1021,20 @@
   // had the same flattened text when it was sent; more of them now means the history holds it.
   const flat = (t) => String(t).replace(/\s+/g, ' ').trim();
   const userCount = (items, text) => items.filter((it) => it.role === 'user' && flat(it.text) === flat(text)).length;
+  // RP155: the live bubble of the session keeps its text until the run ends, while the history already holds the message that comes before a tool (it is saved as soon as it ends): the same message was drawn twice. The live
+  // text counts as already in the history when it says the same as the LAST answer of the assistant with text that comes AFTER the last message of the person (an older run never hides a new message), spaces collapsed like the
+  // pending messages do. Total: anything that is not a list of items, or not text, says no.
+  const liveIsInHistory = (liveText, items) => {
+    const live = typeof liveText === 'string' ? flat(liveText) : '';
+    if (!live || !Array.isArray(items)) return false;
+    for (let i = items.length - 1; i >= 0; i--) {
+      const it = items[i];
+      if (!it || typeof it !== 'object') continue;
+      if (it.role === 'user') return false;
+      if (it.role === 'assistant' && typeof it.text === 'string' && it.text) return flat(it.text) === live;
+    }
+    return false;
+  };
   const PENDING_WHO = { sending: 'sending…', ok: '<span class="ok">✓</span>' };
   const pendingHtml = (pending, items) => (pending || []).filter((p) => userCount(items, p.text) <= p.base)
     .map((p) => `<div class="m me pending"><span class="who">You · ${PENDING_WHO[p.state] || PENDING_WHO.sending}</span>${mdHtml(p.text)}</div>`).join('');
@@ -1068,12 +1082,13 @@
     else controls = field + btn('Send', 'data-kind="send"', 'affirmative') + btn('Cancel', 'data-kind="cancel"', 'negative');
     return `<div class="ch-ask" role="alert"><div class="ch-ask-title">${esc(visible(d.title) || 'The session is asking')}</div>${d.message ? `<pre class="ch-ask-text">${esc(visible(d.message))}</pre>` : ''}<div class="ch-ask-btns">${controls}</div>${ok ? '' : `<div class="ch-ask-warn" role="status">${CUT_NOTE}</div>`}</div>`;
   }
-  function rpcTail(c, who) {
+  function rpcTail(c, who, items = []) {
     const r = c.rpc && typeof c.rpc === 'object' ? c.rpc : {};
     // RP105c: while pi retries a failed request the tail says so (the attempt and the wait when they are known), instead of «working…»
     const rt = r.retry && typeof r.retry === 'object' ? r.retry : null;
     const retry = rt ? `<div class="m working">⟳ Retrying${Number.isInteger(rt.attempt) ? ` · attempt ${rt.attempt}${Number.isInteger(rt.max) ? ` of ${rt.max}` : ''}` : ''}${Number.isInteger(rt.delayMs) ? ` · in ${Math.max(1, Math.round(rt.delayMs / 1000))}s` : ''}</div>` : '';
-    const streaming = (r.text ? `<div class="m streaming"><span class="who">${esc(who)}</span>${mdHtml(r.text)}</div>` : r.streaming && !retry ? `<div class="m working">${r.thinking ? 'thinking…' : 'working…'}</div>` : '') + retry;
+    const hasLive = !!r.text && !liveIsInHistory(r.text, items); // RP155: a copy of what the history already shows is not drawn; the «working…» line takes its place while the run goes on
+    const streaming = (hasLive ? `<div class="m streaming"><span class="who">${esc(who)}</span>${mdHtml(r.text)}</div>` : r.streaming && !retry ? `<div class="m working">${r.thinking ? 'thinking…' : 'working…'}</div>` : '') + retry;
     const asks = (Array.isArray(r.asks) ? r.asks : []).filter((d) => d && typeof d.requestId === 'string').map((d) => askCard(d, c.id, !!(c.askBusy && c.askBusy[d.requestId]))).join('');
     return streaming + asks;
   }
@@ -1144,10 +1159,10 @@ ${status}</div>`;
     }
     const who = info.adopted.name || info.adopted.id;
     if (!info.adoptedFound) return `${note}<div class="ch-state" role="status"><p>The session is loading. The history appears with its first message.</p></div>${pendingHtml(c.pending, [])}${rpcTail(c, who)}`;
-    const items = (c.hist && c.hist.items) || [];
+    const items = c.hist && Array.isArray(c.hist.items) ? c.hist.items : []; // RP155: a history that is not a list reads as empty
     const rx = { allow: !!c.hist && c.hist.results === true, map: c.results && typeof c.results === 'object' ? c.results : {}, id: c.id };
     const pending = pendingHtml(c.pending, items);
-    return `${note}${c.hist && c.hist.truncated ? '<div class="rs-sub ch-older">Older messages are not shown</div>' : ''}${items.map((it) => bubble(it, who, rx)).join('') || (pending ? '' : '<div class="empty">No messages yet.</div>')}${pending}${rpcTail(c, who)}`;
+    return `${note}${c.hist && c.hist.truncated ? '<div class="rs-sub ch-older">Older messages are not shown</div>' : ''}${items.map((it) => bubble(it, who, rx)).join('') || (pending ? '' : '<div class="empty">No messages yet.</div>')}${pending}${rpcTail(c, who, items)}`;
   }
 
   // Pinned room card (not clickable yet): the aggregate of its member rows (a room has no session state any more).
