@@ -386,6 +386,16 @@
       title: hold || hint(pr.ready ? `Merge into ${pr.base}` : pr.blockedReason || 'Not ready to merge'),
     };
   }
+  // RP151: should the Tasks tab of the column read the roadmap again by itself? Only when a whole minute has gone since the last try, the repo is open, the column is ON SCREEN with its Tasks tab, the page is visible,
+  // no read is on its way (that one answers) and, on a phone, the Repo screen is the one showing. `at` is the time of the last TRY (a failed one counts, so a server that fails is not hammered). Total.
+  const TASKS_REFRESH_MS = 60000;
+  function tasksPollDue(ctx) {
+    const c = ctx && typeof ctx === 'object' && !Array.isArray(ctx) ? ctx : {};
+    if (typeof c.chatId !== 'string' || !c.chatId || c.column !== true || c.colTab !== 'tasks' || c.hidden === true || c.reading === true) return false;
+    if (c.narrow === true && c.zone !== 'repo') return false;
+    if (!Number.isFinite(c.at) || c.at < 0 || !Number.isFinite(c.now)) return false;
+    return c.now - c.at >= TASKS_REFRESH_MS;
+  }
   // RP137: the reason a Merge button is off, to write it where there is no tooltip (a phone). Only for a button that is off with the plain label: a merging or merged one is not "off for a reason". Total.
   function mergeWhy(btn) {
     const b = btn && typeof btn === 'object' && !Array.isArray(btn) ? btn : {};
@@ -1003,5 +1013,5 @@
     return `${dot}${meters.join('')}<div class="usage-pop" role="group" aria-label="Claude usage details">${details.join('')}${note}${foot}</div>`;
   }
 
-  return { mergeWhy, screenOf, bandOf, NARROW_BELOW, DUO_BELOW, parseAddress, addressOf, ADDRESS_ZONES, subClock, columnTabFor, conformityTabLabel, repoModel, changeChips, prChip, idleChip, conflictChip, sizeChip, RepoCard, stateLineHidden, usageView, usageHtml, usageRemaining, boardApply, boardWait, chatCachePut, chatCacheGet, rpcWithContext, chatFromCache, API_VERSION, mergeButton, rerunButton, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, dirtyRepos, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, taskPrs, matchesUnitId, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, parseSse, rpcEvent, rpcReduce, rpcFromStatus, eventsPlan, eventsRetryMs, eventsStale };
+  return { tasksPollDue, TASKS_REFRESH_MS, mergeWhy, screenOf, bandOf, NARROW_BELOW, DUO_BELOW, parseAddress, addressOf, ADDRESS_ZONES, subClock, columnTabFor, conformityTabLabel, repoModel, changeChips, prChip, idleChip, conflictChip, sizeChip, RepoCard, stateLineHidden, usageView, usageHtml, usageRemaining, boardApply, boardWait, chatCachePut, chatCacheGet, rpcWithContext, chatFromCache, API_VERSION, mergeButton, rerunButton, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, dirtyRepos, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, taskPrs, matchesUnitId, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, parseSse, rpcEvent, rpcReduce, rpcFromStatus, eventsPlan, eventsRetryMs, eventsStale };
 }));
