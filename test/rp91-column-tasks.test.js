@@ -234,8 +234,8 @@ test('p7: choosing the Tasks tab while the column is in does nothing (it is the 
 });
 
 // ---------- where there is no column ----------
-test('n1: under 1100 px (no column) nothing changes: the Tasks tab is there, the roadmap is read only when it is chosen, and the column holds no tasks view', async () => {
-  const page = boot(1000);
+test('n1: with a layout that measures nothing (no column; RP136: the column is in from 760 px) nothing changes: the Tasks tab is there, the roadmap is read only when it is chosen, and the column holds no tasks view', async () => {
+  const page = boot(0);
   page.routes[RM('abc')] = () => Promise.resolve(ok(ROADMAP));
   open(page, 'abc');
   await page.tick();
@@ -248,8 +248,8 @@ test('n1: under 1100 px (no column) nothing changes: the Tasks tab is there, the
   assert.match(page.get('#chatBody').html, /Delivery of B1/);
 });
 
-test('n2: under 1100 px tasks-open opens the repo on the Tasks tab, as before', async () => {
-  const page = boot(1000);
+test('n2: with a layout that measures nothing tasks-open opens the repo on the Tasks tab, as before', async () => {
+  const page = boot(0);
   page.routes[RM('abc')] = () => Promise.resolve(ok(ROADMAP));
   tasksOpen(page, 'abc');
   await page.tick();
@@ -257,8 +257,8 @@ test('n2: under 1100 px tasks-open opens the repo on the Tasks tab, as before', 
   assert.equal(reads(page, 'abc'), 1);
 });
 
-test('n3: when the window grows past 1100 px the column takes the tasks (read once) and a Tasks tab that was open reads as the Chat tab', async () => {
-  const page = boot(1000);
+test('n3: when the layout is measured at 1400 px (it measured nothing before) the column takes the tasks (read once) and a Tasks tab that was open reads as the Chat tab', async () => {
+  const page = boot(0);
   page.routes[RM('abc')] = () => Promise.resolve(ok(ROADMAP));
   tasksOpen(page, 'abc');
   await page.tick();

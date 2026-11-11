@@ -16,14 +16,14 @@ const A = 'abcdef0123';
 const B = '9c15a89663';
 
 // ---------- the screen (pure) ----------
-test('s1: under 760 px the zone repo of an open repo is the screen repo; any other zone is the chat; no repo is the list; from 760 px up there is no screen', () => {
+test('s1: under 760 px the zone repo of an open repo is the screen repo; any other zone is the chat; no repo is the list; from 1100 px up there is no screen (RP136: 760 to 1099 is the duo)', () => {
   assert.equal(V.screenOf(390, A, 'repo'), 'repo');
   assert.equal(V.screenOf(759, A, 'repo'), 'repo');
   assert.equal(V.screenOf(390, A, 'chat'), 'chat');
   assert.equal(V.screenOf(390, A), 'chat');
   for (const z of ['', null, 5, 'Repo', 'repo ', {}, undefined]) assert.equal(V.screenOf(390, A, z), 'chat', String(z));
   assert.equal(V.screenOf(390, null, 'repo'), 'list');
-  for (const w of [760, 800, 1100, 1500]) assert.equal(V.screenOf(w, A, 'repo'), null, String(w));
+  for (const w of [1100, 1500]) assert.equal(V.screenOf(w, A, 'repo'), null, String(w));
   for (const w of [0, NaN, undefined, '390']) assert.equal(V.screenOf(w, A, 'repo'), null, String(w));
 });
 
@@ -196,11 +196,11 @@ test('p6: a resize across the cut keeps the zone: wide there is no screen and th
   assert.match(colBody(page), /^<div class="col-head">/);
 });
 
-test('p7: from 760 px up nothing changes: the chat keeps its Tasks, Changes and Files tabs from 760 to 1099 px, and the column replaces them from 1100 px', async () => {
+test('p7: from 760 px up the chat has no Tasks, Changes or Files tabs: the column holds them, in the duo (760 to 1099 px, RP136) and in the three columns (from 1100 px)', async () => {
   const mid = await boot({ width: 900 });
   await mid.click('chat-open', { id: A });
-  for (const t of ['tasks', 'changes', 'files']) assert.match(head(mid), new RegExp(`data-tab="${t}"`), `900 ${t}`);
-  assert.equal(colBody(mid), '');
+  for (const t of ['tasks', 'changes', 'files']) assert.doesNotMatch(head(mid), new RegExp(`data-tab="${t}"`), `900 ${t}`);
+  assert.notEqual(colBody(mid), '');
   const wide = await boot({ width: 1440 });
   await wide.click('chat-open', { id: A });
   for (const t of ['tasks', 'changes', 'files']) assert.doesNotMatch(head(wide), new RegExp(`data-tab="${t}"`), `1440 ${t}`);

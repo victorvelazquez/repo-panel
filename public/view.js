@@ -31,9 +31,18 @@
   // hidden in another tab measures 0): what is not known keeps today's behaviour. The page marks it with `data-screen` and the stylesheet follows the mark.
   const NARROW_BELOW = 760;
   // RP157: with a repo open and the zone `repo` (the address of RP133) the screen is `repo`, the column on top of the chat.
+  // RP136: from NARROW_BELOW to DUO_BELOW px (the `mid` band) the page shows TWO zones side by side, the chat and Repo (the column): `duo` with a repo open, `list` with none; the zone does not matter there. From DUO_BELOW up there is
+  // no screen (the three columns). bandOf says the band of a width, null for what is not a real size.
+  const DUO_BELOW = 1100;
+  function bandOf(width) {
+    if (typeof width !== 'number' || !Number.isFinite(width) || width <= 0) return null;
+    return width < NARROW_BELOW ? 'narrow' : width < DUO_BELOW ? 'mid' : 'wide';
+  }
   function screenOf(width, chatId, zone) {
-    if (typeof width !== 'number' || !Number.isFinite(width) || width <= 0 || width >= NARROW_BELOW) return null;
-    return chatId ? (zone === 'repo' ? 'repo' : 'chat') : 'list';
+    const band = bandOf(width);
+    if (!band || band === 'wide') return null;
+    if (!chatId) return 'list';
+    return band === 'mid' ? 'duo' : zone === 'repo' ? 'repo' : 'chat';
   }
   // RP133 (S26): the address of the page (its hash) as a CLOSED grammar. It is untrusted input (anyone can type or paste one), so only these forms count: the list (empty, `#`, `#/`), Conformity (`#conformity` exactly) and
   // `#/repo/<id>/<zone>` with the zone optional when reading (then chat) and from a closed list. An id counts only when it is IN the list of repos the page has (an array), compared as exact text after a check of its characters
@@ -989,5 +998,5 @@
     return `${dot}${meters.join('')}<div class="usage-pop" role="group" aria-label="Claude usage details">${details.join('')}${note}${foot}</div>`;
   }
 
-  return { screenOf, NARROW_BELOW, parseAddress, addressOf, ADDRESS_ZONES, subClock, columnTabFor, conformityTabLabel, repoModel, changeChips, prChip, idleChip, conflictChip, sizeChip, RepoCard, stateLineHidden, usageView, usageHtml, usageRemaining, boardApply, boardWait, chatCachePut, chatCacheGet, rpcWithContext, chatFromCache, API_VERSION, mergeButton, rerunButton, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, dirtyRepos, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, taskPrs, matchesUnitId, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, parseSse, rpcEvent, rpcReduce, rpcFromStatus, eventsPlan, eventsRetryMs, eventsStale };
+  return { screenOf, bandOf, NARROW_BELOW, DUO_BELOW, parseAddress, addressOf, ADDRESS_ZONES, subClock, columnTabFor, conformityTabLabel, repoModel, changeChips, prChip, idleChip, conflictChip, sizeChip, RepoCard, stateLineHidden, usageView, usageHtml, usageRemaining, boardApply, boardWait, chatCachePut, chatCacheGet, rpcWithContext, chatFromCache, API_VERSION, mergeButton, rerunButton, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, dirtyRepos, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, taskPrs, matchesUnitId, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, parseSse, rpcEvent, rpcReduce, rpcFromStatus, eventsPlan, eventsRetryMs, eventsStale };
 }));

@@ -815,6 +815,13 @@ button.tc:hover { border-color: var(--muted); }
 .col-head { display: flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 8px 0 4px; border-bottom: 1px solid var(--line); background: var(--bg); }
 #sumLayout[data-screen] .ch-back { display: inline-flex; min-width: 44px; min-height: 44px; }
 #sumLayout[data-screen] .ch-row .x { display: none; }
+/* RP136: from 760 to 1100 px the screen is the duo: the chat and the column side by side (with the separator between them), the list reached with the arrow of the chat. Repo is in view, so the Repo button is out. */
+#sumLayout[data-screen="duo"] { flex-direction: row; }
+#sumLayout[data-screen="duo"] #listCol, #sumLayout[data-screen="duo"] #split { display: none; }
+#sumLayout[data-screen="duo"] #split2 { display: block; }
+#sumLayout[data-screen="duo"] #chat { flex: 1 1 0; }
+#sumLayout[data-screen="duo"] #col { display: flex; flex: none; width: var(--col-w, 30%); min-width: 220px; }
+#sumLayout[data-screen="duo"] .ch-repo { display: none; }
 /* RP135: under 760 px the head says the state of the repo: the name and a second line (commits ahead, checks, branch) are ONE button that opens Repo; the Repo button carries the badge of the pending checks. */
 .ch-id { flex: 1; min-width: 0; min-height: 44px; display: grid; gap: 0; align-content: center; justify-items: start; text-align: left; padding: 0 4px; background: transparent; border: 0; border-radius: 6px; color: var(--text); }
 .ch-id:hover:not(:disabled) { background: var(--panel2); }

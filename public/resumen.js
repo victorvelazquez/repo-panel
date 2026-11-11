@@ -150,10 +150,15 @@
   // there are two blocks and the list is half by default, as before. Total: a width that is not a positive number gives zeros; a width too small for the minimums is split 25 | 50 | 25.
   const share = (v, dflt) => (typeof v === 'number' && Number.isFinite(v) && v > 0 && v < 1 ? v : dflt);
   const within = (v, lo, hi) => Math.max(lo, Math.min(v, Math.max(lo, hi)));
-  function blockWidths(total, ratios, { column = true } = {}) {
+  // RP136: with `list: false` (the duo of 760 to 1100 px, where the list is out of the screen) the list takes no room: the chat and the column share the whole width, the column with its saved share or 40%, and the chat keeps 340.
+  function blockWidths(total, ratios, { column = true, list: listIn = true } = {}) {
     if (typeof total !== 'number' || !Number.isFinite(total) || total <= 0) return { list: 0, chat: 0, col: 0 };
     const t = Math.floor(total);
     const r = ratios && typeof ratios === 'object' && !Array.isArray(ratios) ? ratios : {};
+    if (!listIn) {
+      const col = t < CHAT_MIN + COL_MIN ? Math.floor(t * 0.4) : within(Math.round(t * share(r.col, 0.4)), COL_MIN, t - CHAT_MIN);
+      return { list: 0, chat: t - col, col };
+    }
     if (!column) {
       if (t < LIST_MIN + CHAT_MIN) { const list = Math.floor(t / 2); return { list, chat: t - list, col: 0 }; }
       const list = within(Math.round(t * share(r.list, 0.5)), LIST_MIN, t - CHAT_MIN);

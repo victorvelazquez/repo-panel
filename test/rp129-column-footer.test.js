@@ -453,8 +453,8 @@ test('p10: the arrows cycle Tasks, Changes, Status, Files and back; a fresh open
   assert.equal(sel(), 'tasks');
 });
 
-test('p11: under 1100 px there is no column, so no footer and no merge button of it; and nothing is written by drawing the footer', async () => {
-  const page = boot({ width: 900 });
+test('p11: with a layout that measures nothing (RP136: the column is in from 760 px) there is no column, so no footer and no merge button of it; and nothing is written by drawing the footer', async () => {
+  const page = boot({ width: 0 });
   await open(page);
   assert.equal(col(page), '');
   const wide = boot();

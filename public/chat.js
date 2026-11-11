@@ -94,13 +94,13 @@ function applyScreen() {
   if (!V || !layout || !layout.dataset) return;
   const screen = V.screenOf(layout.clientWidth, S.chat.id, S.chat.zone);
   if (screen) layout.dataset.screen = screen; else delete layout.dataset.screen;
-  // RP157: crossing the cut (a resize) changes what the chat head and the column hold (the tabs, the arrow of Repo), so it repaints once; lastNarrow is set before, so the repaint cannot loop.
-  const narrow = !!screen;
-  const crossed = lastNarrow !== null && lastNarrow !== narrow;
-  lastNarrow = narrow;
+  // RP157, RP136: crossing a cut (a resize) changes what the chat head and the column hold (the tabs, the arrow of Repo), so it repaints once; lastBand is set before, so the repaint cannot loop.
+  const band = V.bandOf(layout.clientWidth);
+  const crossed = lastBand !== null && lastBand !== band;
+  lastBand = band;
   if (crossed && S.chat.id) draw();
 }
-let lastNarrow = null;
+let lastBand = null;
 function setZone(zone) {
   if (!S.chat.id || !V || !V.ADDRESS_ZONES.includes(zone) || S.chat.zone === zone) return;
   const from = S.chat.zone;
@@ -322,17 +322,24 @@ function changedOf(id) {
 // RP91: whether the right column is in (from COLUMN_FROM px of layout): then the tasks are its card and the chat has no Tasks tab.
 // RP157: also under 760 px, where the column's content is the Repo screen and the chat keeps only Chat and Notes.
 function narrowOn() {
-  return !!V && V.screenOf($('#sumLayout').clientWidth, 'x') !== null;
+  return !!V && V.bandOf($('#sumLayout').clientWidth) === 'narrow';
+}
+// RP136: and from 760 to 1100 px (the duo: the chat and the column side by side). Only the phone keeps what is its own: the Repo screen's arrow, the Repo button and the second line of the head.
+// RP136: the duo is on in the mid band with a repo open (the screen the stylesheet follows).
+function duoOn() {
+  return !!V && !!S.chat.id && V.bandOf($('#sumLayout').clientWidth) === 'mid';
 }
 function columnOn() {
-  return ($('#sumLayout').clientWidth || 0) >= COLUMN_FROM || narrowOn();
+  const width = $('#sumLayout').clientWidth || 0;
+  return width >= COLUMN_FROM || (!!V && V.bandOf(width) !== null);
 }
 // The widths now: the layout without its separators (the column's separator only counts while the column is in), and the three blocks from the saved shares.
 function layoutNow() {
   const width = $('#sumLayout').clientWidth || 0;
-  const column = width >= COLUMN_FROM;
-  const total = width - ($('#split').offsetWidth || 0) - (column ? ($('#split2').offsetWidth || 0) : 0);
-  return total > 0 && R ? { total, column, ...R.blockWidths(total, layoutRatios, { column }) } : null;
+  const column = columnOn();
+  const listOn = !duoOn(); // RP136: in the duo the list is out of the screen, so the chat and the column share the width
+  const total = width - (listOn ? ($('#split').offsetWidth || 0) : 0) - (column ? ($('#split2').offsetWidth || 0) : 0);
+  return total > 0 && R ? { total, column, listOn, ...R.blockWidths(total, layoutRatios, { column, list: listOn }) } : null;
 }
 // RP129: what the footer and the Status tab of the column need. The branch and the commits ahead are the board's facts; the PR is the open one of THAT branch and never another (on the base branch, on a
 // detached HEAD, or with nothing loaded there is none); and the two buttons are what view.js decides with the ONE rule of the card of the board: the same busy, held and running-command facts the card reads.
@@ -370,8 +377,8 @@ function applyLayout() {
 function setBlocks({ list, col }) {
   const w = layoutNow();
   if (!w) return;
-  const fixed = R.blockWidths(w.total, { list: (list ?? w.list) / w.total, col: (col ?? w.col) / w.total }, { column: w.column });
-  layoutRatios = { list: fixed.list / w.total, col: w.column ? fixed.col / w.total : layoutRatios.col ?? null };
+  const fixed = R.blockWidths(w.total, { list: (list ?? w.list) / w.total, col: (col ?? w.col) / w.total }, { column: w.column, list: w.listOn });
+  layoutRatios = { list: w.listOn ? fixed.list / w.total : layoutRatios.list ?? null, col: w.column ? fixed.col / w.total : layoutRatios.col ?? null };
   try { localStorage.setItem(LAYOUT_KEY, JSON.stringify(layoutRatios)); } catch { /* not persisted */ }
   applyLayout();
 }
