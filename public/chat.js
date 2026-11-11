@@ -45,6 +45,7 @@ async function loadChat(id, { user = false, signal } = {}) {
 }
 function openChat(id, tab) {
   if (!R || !id || S.chat.id === id) return;
+  const fromList = !S.chat.id; // RP134: with no repo open before, the entry the address writes comes right after the list
   saveDraft();
   flushNotes();
   S.recall = {};
@@ -56,22 +57,43 @@ function openChat(id, tab) {
   chatCtl = new AbortController();
   loadChat(id, { user: true, signal: chatCtl.signal });
   rpcSync(id);
-  addressWrite(); // RP133
+  if (addressWrite() && fromList) S.chat.fromList = true; // RP134: the page itself opened this chat from the list and wrote its entry: the arrow can use the Back of the browser
 }
 // RP133 (S26): the address of the page follows the open repo and its zone, so Back and Forward walk the screens and a link reopens the same place. It is WRITTEN with history.pushState (it fires no event: no loop) and READ
 // by addressApply, which never writes. Everything is guarded: most suites run the page with no history or no location at all.
 const addr = { applying: false };
 const addressNow = () => (typeof location === 'object' && location && typeof location.hash === 'string' ? location.hash : '');
-function addressWrite(replace = false) {
-  if (addr.applying || !V || typeof history !== 'object' || !history || typeof location !== 'object' || !location) return;
+function addressWrite(replace = false) { // true when it wrote an entry or replaced one
+  if (addr.applying || !V || typeof history !== 'object' || !history || typeof location !== 'object' || !location) return false;
   const act = replace ? history.replaceState : history.pushState;
-  if (typeof act !== 'function') return;
+  if (typeof act !== 'function') return false;
   const id = S.chat.id;
   const want = id ? V.addressOf(id, S.chat.zone) : '';
-  if (id && !want) return; // a chat with no address (a room): the address bar is left alone
+  if (id && !want) return false; // a chat with no address (a room): the address bar is left alone
   const now = addressNow();
-  if (!replace && (want === now || (want === '' && (now === '#' || now === '#/')))) return;
+  if (!replace && (want === now || (want === '' && (now === '#' || now === '#/')))) return false;
   act.call(history, null, '', `${location.pathname || ''}${location.search || ''}${want}`);
+  return true;
+}
+// RP134: the arrow of the chat head (visible under 760 px). A chat the page opened from the list has its own entry in the history, so the arrow uses the Back of the browser (the Back of the phone then does not return to the chat that
+// was just closed) and the answer of the browser, the address changing, closes the chat. Any other chat is closed as always. A second tap while the first Back is on its way does nothing; if the browser never answers it closes anyway.
+function chatBack() {
+  if (!S.chat.id || S.chat.backing) return;
+  if (S.chat.fromList && typeof history === 'object' && history && typeof history.back === 'function') {
+    const chat = S.chat;
+    chat.backing = true;
+    history.back();
+    setTimeout(() => { if (S.chat === chat) closeChat(); }, 1000);
+    return;
+  }
+  closeChat();
+}
+// RP134: which screen is on. The mark only exists under 760 px, and a layout that measures nothing (hidden in another tab) is not guessed narrow.
+function applyScreen() {
+  const layout = $('#sumLayout');
+  if (!V || !layout || !layout.dataset) return;
+  const screen = V.screenOf(layout.clientWidth, S.chat.id);
+  if (screen) layout.dataset.screen = screen; else delete layout.dataset.screen;
 }
 function setZone(zone) {
   if (!S.chat.id || !V || !V.ADDRESS_ZONES.includes(zone) || S.chat.zone === zone) return;
@@ -305,6 +327,7 @@ function columnGit(id, facts) {
   };
 }
 function applyLayout() {
+  applyScreen(); // RP134
   // RP126: how much sits above the layout (0 while it is hidden in another tab: then the last good value stays; a page without the measure sets nothing).
   const top = $('#sumLayout').offsetTop;
   if (Number.isFinite(top) && top > 0 && $('#sumLayout').style.setProperty) $('#sumLayout').style.setProperty('--sum-top', `${Math.round(top)}px`);

@@ -103,11 +103,10 @@ test('h2: the layout is a named container, the column shows only from 1100 px, t
   assert.doesNotMatch(css, /#chat\s*\{[^}]*width:\s*var\(--chat-w/);
 });
 
-test('h3: the new blocks hide with the attribute (an author display rule must not beat it) and stack under 720 px like before', () => {
+test('h3: the new blocks hide with the attribute (an author display rule must not beat it) and, under 760 px, the separators and the column are out (RP134: one screen at a time, by the mark data-screen, replaced the block of 720 px that stacked them)', () => {
   assert.match(css, /#split2\[hidden\],\s*#col\[hidden\]\s*\{\s*display:\s*none;\s*\}/);
-  const media = /@media \(max-width: 720px\)\s*\{([\s\S]*?)\n\}/.exec(css);
-  assert.ok(media, 'the 720 px rule');
-  assert.match(media[1], /#split,\s*#split2\s*\{\s*display:\s*none;/);
+  assert.doesNotMatch(css, /@media \(max-width: 720px\)\s*\{[^}]*\.chatlayout\.chat-open/, 'the old block of 720 px is gone');
+  assert.match(css, /#sumLayout\[data-screen\] #split,\s*#sumLayout\[data-screen\] #split2,\s*#sumLayout\[data-screen\] #col\s*\{\s*display:\s*none;/);
 });
 
 // ---------- the page ----------
