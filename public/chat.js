@@ -92,14 +92,38 @@ function chatBack() {
 function applyScreen() {
   const layout = $('#sumLayout');
   if (!V || !layout || !layout.dataset) return;
-  const screen = V.screenOf(layout.clientWidth, S.chat.id);
+  const screen = V.screenOf(layout.clientWidth, S.chat.id, S.chat.zone);
   if (screen) layout.dataset.screen = screen; else delete layout.dataset.screen;
+  // RP157: crossing the cut (a resize) changes what the chat head and the column hold (the tabs, the arrow of Repo), so it repaints once; lastNarrow is set before, so the repaint cannot loop.
+  const narrow = !!screen;
+  const crossed = lastNarrow !== null && lastNarrow !== narrow;
+  lastNarrow = narrow;
+  if (crossed && S.chat.id) draw();
 }
+let lastNarrow = null;
 function setZone(zone) {
   if (!S.chat.id || !V || !V.ADDRESS_ZONES.includes(zone) || S.chat.zone === zone) return;
+  const from = S.chat.zone;
   S.chat.zone = zone;
   draw();
-  addressWrite();
+  const wrote = addressWrite();
+  S.chat.zoneFromChat = wrote && from === 'chat' && zone === 'repo'; // RP157: the page itself wrote the entry that Repo sits on, so the arrow of Repo can use the Back of the browser
+}
+// RP157: the arrow of the Repo screen. Same rule as the arrow of the chat (chatBack): the Back of the browser when the page wrote the entry, else the chat zone; a second tap while it is on its way does nothing.
+function zoneBack() {
+  if (!S.chat.id || S.chat.zone !== 'repo' || S.chat.zoneBacking) return;
+  if (S.chat.zoneFromChat && typeof history === 'object' && history && typeof history.back === 'function') {
+    const chat = S.chat;
+    chat.zoneBacking = true;
+    history.back();
+    setTimeout(() => { if (S.chat === chat && chat.zone === 'repo') { chat.zoneBacking = false; setZone('chat'); } }, 1000);
+    return;
+  }
+  setZone('chat');
+}
+// RP157: under 760 px a file or a diff opens in the chat, where the viewer tab is: leave the Repo screen for it.
+function leaveRepo() {
+  if (narrowOn() && S.chat.zone === 'repo') setZone('chat');
 }
 // Applies an address of the page (a link, Back, Forward, a hash typed by hand). Junk is ignored and the address bar goes back to what is open (replaceState: no new entry). Nothing happens before the list of repos is
 // known (a valid address would look like junk). Applying never writes, and it does nothing that is already so: a burst of events cannot loop.
@@ -114,7 +138,7 @@ function addressApply(hash) {
     else {
       if (S.tab !== 'summary') setTab('summary');
       if (S.chat.id !== to.id) openChat(to.id);
-      if (S.chat.id === to.id && S.chat.zone !== to.zone) { S.chat.zone = to.zone; draw(); }
+      if (S.chat.id === to.id && S.chat.zone !== to.zone) { S.chat.zone = to.zone; S.chat.zoneBacking = false; S.chat.zoneFromChat = false; draw(); }
     }
   } finally { addr.applying = false; }
 }
@@ -296,8 +320,12 @@ function changedOf(id) {
   return changed;
 }
 // RP91: whether the right column is in (from COLUMN_FROM px of layout): then the tasks are its card and the chat has no Tasks tab.
+// RP157: also under 760 px, where the column's content is the Repo screen and the chat keeps only Chat and Notes.
+function narrowOn() {
+  return !!V && V.screenOf($('#sumLayout').clientWidth, 'x') !== null;
+}
 function columnOn() {
-  return ($('#sumLayout').clientWidth || 0) >= COLUMN_FROM;
+  return ($('#sumLayout').clientWidth || 0) >= COLUMN_FROM || narrowOn();
 }
 // The widths now: the layout without its separators (the column's separator only counts while the column is in), and the three blocks from the saved shares.
 function layoutNow() {
@@ -383,7 +411,7 @@ function drawChat() {
   }
   // RP128: the column is tabs (Changes, Tasks). The open one belongs to the opening (S.chat.colTab, Changes by default), the closed folders too (S.chat.colFold); with no column nothing is painted.
   const colTab = ['tasks', 'status', 'files'].includes(S.chat.colTab) ? S.chat.colTab : 'changes';
-  paint($('#colBody'), !column ? '' : R.columnView({ name: nameOf(S.chat.id), tab: colTab, fold: S.chat.colFold, git: columnGit(S.chat.id, facts), files: facts && !facts.error && Array.isArray(facts.files) ? facts.files : null, failed: !!(facts && facts.error), selected: S.chat.dfile || '', tree: colTab === 'files' ? S.files[S.chat.id] || null : null, changed: colTab === 'files' ? changedOf(S.chat.id) : null, fselected: S.chat.ffile || '', fopen: S.filesOpen[S.chat.id] || {}, filesFailed: !!S.chat.filesFailed, tasksHtml: colTab === 'tasks' ? R.tasksView(S.tasks[S.chat.id] || null, { compact: true, open: S.tasksFold, more: S.tasksMore, readAt: S.chat.tasksAt, now: Date.now(), refreshing: !!S.chat.tasksRefreshing, refreshFailed: !!S.chat.tasksRefreshFailed, loading: !!S.chat.tasksLoading, failed: !!S.chat.tasksFailed }) : '' }));
+  paint($('#colBody'), !column ? '' : R.columnView({ back: narrowOn(), name: nameOf(S.chat.id), tab: colTab, fold: S.chat.colFold, git: columnGit(S.chat.id, facts), files: facts && !facts.error && Array.isArray(facts.files) ? facts.files : null, failed: !!(facts && facts.error), selected: S.chat.dfile || '', tree: colTab === 'files' ? S.files[S.chat.id] || null : null, changed: colTab === 'files' ? changedOf(S.chat.id) : null, fselected: S.chat.ffile || '', fopen: S.filesOpen[S.chat.id] || {}, filesFailed: !!S.chat.filesFailed, tasksHtml: colTab === 'tasks' ? R.tasksView(S.tasks[S.chat.id] || null, { compact: true, open: S.tasksFold, more: S.tasksMore, readAt: S.chat.tasksAt, now: Date.now(), refreshing: !!S.chat.tasksRefreshing, refreshFailed: !!S.chat.tasksRefreshFailed, loading: !!S.chat.tasksLoading, failed: !!S.chat.tasksFailed }) : '' }));
   // What the person touched in the column keeps the focus across the repaint: a tab by its id, a folder or a fold by its button.
   const want = S.chat.colFocus;
   if (want) {

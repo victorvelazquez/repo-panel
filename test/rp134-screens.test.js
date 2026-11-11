@@ -58,7 +58,8 @@ const rule = (sel) => { const r = rules.filter((x) => x.sel === sel); assert.ok(
 test('c1: the stylesheet follows the mark: one screen at a time, the other zones out, the separators and the column out, and the zone that stays takes the whole width', () => {
   assert.match(rule('#sumLayout[data-screen="list"] #chat'), /display:\s*none/);
   assert.match(rule('#sumLayout[data-screen="chat"] #listCol'), /display:\s*none/);
-  for (const sel of ['#sumLayout[data-screen] #split', '#sumLayout[data-screen] #split2', '#sumLayout[data-screen] #col']) assert.match(rule(sel), /display:\s*none/, sel);
+  // RP157: the column is the third screen, so it is out on the list and on the chat screens (before it was out on both)
+  for (const sel of ['#sumLayout[data-screen] #split', '#sumLayout[data-screen] #split2', '#sumLayout[data-screen="list"] #col', '#sumLayout[data-screen="chat"] #col']) assert.match(rule(sel), /display:\s*none/, sel);
   const wide = rule('#sumLayout[data-screen] #listCol');
   assert.match(wide, /min-width:\s*0/);
   assert.match(wide, /width:\s*auto|width:\s*100%/);
@@ -182,15 +183,16 @@ test('p5: the screen follows an address: a link to a repo opens the chat screen,
   await page.go('');
   assert.equal(page.screen(), 'list');
   await page.go(`#/repo/${A}/repo`);
-  assert.equal(page.screen(), 'chat', 'the zone repo reads as chat until RP157');
+  assert.equal(page.screen(), 'repo', 'RP157: the zone repo is the screen repo (until then it read as chat)');
 });
 
-test('p6: the chat head under 760 px has the arrow and the tabs of always (Files, Changes and Tasks are still in the chat)', async () => {
+test('p6: the chat head under 760 px has the arrow and only the tabs Chat and Notes (RP157 moved Tasks, Changes and Files to the Repo screen)', async () => {
   const page = await boot({ width: 390 });
   await page.click('chat-open', { id: A });
   const head = page.get('#chatHead').html;
   assert.match(head, /data-act="chat-back"/);
-  for (const t of ['chat', 'tasks', 'changes', 'files', 'notes']) assert.match(head, new RegExp(`data-tab="${t}"`), t);
+  for (const t of ['chat', 'notes']) assert.match(head, new RegExp(`data-tab="${t}"`), t);
+  for (const t of ['tasks', 'changes', 'files']) assert.doesNotMatch(head, new RegExp(`data-tab="${t}"`), t);
 });
 
 // ---------- the arrow and the Back of the phone ----------

@@ -30,9 +30,10 @@
   // RP134 (S26): under NARROW_BELOW px of width of the layout the page shows ONE zone at a time: the list of repos, or the chat of the open repo. null from that width up, and for a width that is not a real size (a layout that is
   // hidden in another tab measures 0): what is not known keeps today's behaviour. The page marks it with `data-screen` and the stylesheet follows the mark.
   const NARROW_BELOW = 760;
-  function screenOf(width, chatId) {
+  // RP157: with a repo open and the zone `repo` (the address of RP133) the screen is `repo`, the column on top of the chat.
+  function screenOf(width, chatId, zone) {
     if (typeof width !== 'number' || !Number.isFinite(width) || width <= 0 || width >= NARROW_BELOW) return null;
-    return chatId ? 'chat' : 'list';
+    return chatId ? (zone === 'repo' ? 'repo' : 'chat') : 'list';
   }
   // RP133 (S26): the address of the page (its hash) as a CLOSED grammar. It is untrusted input (anyone can type or paste one), so only these forms count: the list (empty, `#`, `#/`), Conformity (`#conformity` exactly) and
   // `#/repo/<id>/<zone>` with the zone optional when reading (then chat) and from a closed list. An id counts only when it is IN the list of repos the page has (an array), compared as exact text after a check of its characters
