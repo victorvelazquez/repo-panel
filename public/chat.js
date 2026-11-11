@@ -422,7 +422,7 @@ function drawChat() {
   // RP149: the summary row of the Tasks list sticks right under the tab bar, whatever the height of the bar is: the page measures it (the CSS has a default until then).
   const tabsBar = column ? $('#colBody .col-tabs') : null;
   if (tabsBar && tabsBar.offsetHeight > 0 && $('#col').style.setProperty) $('#col').style.setProperty('--col-tabs-h', `${tabsBar.offsetHeight}px`);
-  paint($('#chatHead'), R.chatHead(S.chat, { name: nameOf(S.chat.id), column }));
+  paint($('#chatHead'), R.chatHead(S.chat, { name: nameOf(S.chat.id), column, narrow: narrowOn(), git: columnGit(S.chat.id, facts) }));
   const tasksTab = S.chat.tab === 'tasks' && !column;
   const changesTab = S.chat.tab === 'changes' && !column; // RP92: with the column in, the files card replaces the tab
   const filesTab = S.chat.tab === 'files' && !column; // RP130: the explorer is the column's; only without it the chat keeps its Files tab

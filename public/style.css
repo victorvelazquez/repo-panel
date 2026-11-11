@@ -815,6 +815,14 @@ button.tc:hover { border-color: var(--muted); }
 .col-head { display: flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 8px 0 4px; border-bottom: 1px solid var(--line); background: var(--bg); }
 #sumLayout[data-screen] .ch-back { display: inline-flex; min-width: 44px; min-height: 44px; }
 #sumLayout[data-screen] .ch-row .x { display: none; }
+/* RP135: under 760 px the head says the state of the repo: the name and a second line (commits ahead, checks, branch) are ONE button that opens Repo; the Repo button carries the badge of the pending checks. */
+.ch-id { flex: 1; min-width: 0; min-height: 44px; display: grid; gap: 0; align-content: center; justify-items: start; text-align: left; padding: 0 4px; background: transparent; border: 0; border-radius: 6px; color: var(--text); }
+.ch-id:hover:not(:disabled) { background: var(--panel2); }
+.ch-id:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.ch-id .ch-name { max-width: 100%; }
+.ch-sub { max-width: 100%; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ch-repo { position: relative; }
+.ch-dot { position: absolute; top: 4px; right: 2px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--yellow); color: #06101c; font-style: normal; font-size: 11px; font-weight: 700; line-height: 16px; text-align: center; box-sizing: border-box; }
 
 /* RP68: the composer at the bottom of the chat and its "/ Actions" menu (opens upwards, anchored to the bar). */
 #chat .ch-body { flex: 1 1 0; }

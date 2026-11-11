@@ -399,7 +399,24 @@
     return `${head(term.shell)}<code class="term-cmd">${esc(term.command)}</code><div class="term-row"><button type="button" data-act="terminal-copy">${term.copied ? 'Copied' : 'Copy'}</button><span class="term-note">Close the session here first: two programs on the same session mix up its history.</span></div>`;
   }
 
-  // The header: the repo name (the session id is only its tooltip) and the close button.
+  // RP135: what the head of the chat says about the repo under 760 px. Pure and total. `g` is what columnGit gives (branch, commits ahead, and the open PR of THAT branch, so a PR of another branch never shows here). The checks that
+  // are running or failed are said, the passed ones are not; what is not a count is 0. line = the second line of the head, label = the name of the button that opens Repo, pending = the badge of the Repo button.
+  const count = (v) => (Number.isSafeInteger(v) && v > 0 ? v : 0);
+  function repoStatus(g) {
+    const x = g && typeof g === 'object' && !Array.isArray(g) ? g : {};
+    const pr = prOf(x);
+    const k = pr ? checksOf(pr) : null;
+    const ahead = count(x.ahead);
+    const pending = k ? count(k.pending) : 0;
+    const failed = k ? count(k.failed) : 0;
+    const branch = typeof x.branch === 'string' ? x.branch : '';
+    const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+    const line = [ahead && `↑${ahead}`, pending && plural(pending, 'check', 'checks'), failed && `${failed} failed`, branch].filter(Boolean).join(' · ');
+    const said = [branch && `branch ${branch}`, ahead && plural(ahead, 'commit ahead', 'commits ahead'), pending && `${plural(pending, 'check', 'checks')} running`, failed && `${plural(failed, 'check', 'checks')} failed`].filter(Boolean);
+    return { ahead, pending, failed, branch, line, label: said.length ? `Open the repo: ${said.join(', ')}` : 'Open the repo' };
+  }
+  // The header: the repo name (the session id is only its tooltip) and the close button. RP135: under 760 px (`ctx.narrow === true`) the name and the state of the repo are ONE button that opens Repo, and the Repo button carries
+  // the badge of the checks that are pending (`ctx.git` is what columnGit gives).
   function chatHead(c, ctx = {}) {
     const adopted = c.info && c.info.adopted;
     const tip = adopted ? `${ctx.name} · ${adopted.id}` : ctx.name;
@@ -416,7 +433,11 @@
     const dtab = kind ? `<span class="ch-dtab"><button type="button" role="tab" class="ch-tab" data-act="chat-tab" data-tab="${kind}" title="${esc(vfile)}" aria-selected="${cur === kind}">${esc(dname)}</button><button type="button" class="ch-dclose" data-act="diff-close" aria-label="Close the ${kind === 'file' ? 'file' : 'diff of'} ${esc(vfile)}" title="Close the ${kind}">✕</button></span>` : '';
     const tabs = [['chat', 'Chat'], ['tasks', 'Tasks'], ['changes', 'Changes'], ['files', 'Files'], ['notes', 'Notes']].filter(([t]) => !hidden(t)).map(([t, label]) => `<button type="button" role="tab" class="ch-tab" data-act="chat-tab" data-tab="${t}" aria-selected="${cur === t}">${label}</button>`).join('');
     // RP134: the arrow that goes back to the list (a button with a name; the stylesheet shows it only under 760 px, where the close button goes out)
-    return `<div class="ch-row"><button type="button" class="ch-back" data-act="chat-back" aria-label="Back to the list of repos" title="Back to the list">${svgIcon('<path d="M10 3L5 8l5 5"/>', 20)}</button><b class="ch-name" title="${esc(tip)}">${esc(ctx.name)}</b><button type="button" class="ch-repo" data-act="zone-set" data-zone="repo" aria-label="Open the repo: tasks, changes, status and files" title="Open the repo">${svgIcon('<path d="M3 4.5h10M3 8h10M3 11.5h6"/>', 20)}</button><button type="button" class="x" data-act="chat-close" aria-label="Close the chat" title="Close the chat (Esc)">✕</button></div><div class="ch-tabs" role="tablist" aria-label="Panel">${tabs}${dtab}</div>`;
+    const narrow = ctx.narrow === true;
+    const st = repoStatus(ctx.git);
+    const nameB = `<b class="ch-name" title="${esc(tip)}">${esc(ctx.name)}</b>`;
+    const nameHtml = narrow ? `<button type="button" class="ch-id" data-act="zone-set" data-zone="repo" aria-label="${esc(st.label)}" title="Open the repo">${nameB}${st.line ? `<span class="ch-sub mono">${esc(st.line)}</span>` : ''}</button>` : nameB;
+    return `<div class="ch-row"><button type="button" class="ch-back" data-act="chat-back" aria-label="Back to the list of repos" title="Back to the list">${svgIcon('<path d="M10 3L5 8l5 5"/>', 20)}</button>${nameHtml}<button type="button" class="ch-repo" data-act="zone-set" data-zone="repo" aria-label="${esc(st.pending ? `Repo: ${st.pending} ${st.pending === 1 ? 'check' : 'checks'} pending` : 'Open the repo: tasks, changes, status and files')}" title="Open the repo">${svgIcon('<path d="M3 4.5h10M3 8h10M3 11.5h6"/>', 20)}${narrow && st.pending ? `<i class="ch-dot" aria-hidden="true">${st.pending > 99 ? '99+' : st.pending}</i>` : ''}</button><button type="button" class="x" data-act="chat-close" aria-label="Close the chat" title="Close the chat (Esc)">✕</button></div><div class="ch-tabs" role="tablist" aria-label="Panel">${tabs}${dtab}</div>`;
   }
 
   // The Notes tab (RP93b, S8): the notepad of a repo (`.panel/notas.md`), one textarea and a status line apart so the page can repaint the status without touching the text.
@@ -1250,5 +1271,5 @@ ${status}</div>`;
     return `${ctx.failed ? '<div class="rs-note" role="status">⚠ Summary unavailable: showing the last data we have.</div>' : ''}<div class="rs-list">${body}</div>`;
   }
 
-  return { esc, mdHtml, settingsView, memoryChipHtml, subagentChipHtml, ctxChipHtml, compactButtonHtml, legendHtml, listCount, listHeadChips, sessionChip, blockWidths, columnView, treeFolderPaths, fileView, COLUMN_TABS, composerState, askAllowed, actionMenu, actionButtonsHtml, composerNote, chatHead, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, sessionCloseHtml, sessionTerminalHtml, terminalBlockHtml, recentlyActive, chatBody, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
+  return { repoStatus, esc, mdHtml, settingsView, memoryChipHtml, subagentChipHtml, ctxChipHtml, compactButtonHtml, legendHtml, listCount, listHeadChips, sessionChip, blockWidths, columnView, treeFolderPaths, fileView, COLUMN_TABS, composerState, askAllowed, actionMenu, actionButtonsHtml, composerNote, chatHead, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, sessionCloseHtml, sessionTerminalHtml, terminalBlockHtml, recentlyActive, chatBody, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
 }));
