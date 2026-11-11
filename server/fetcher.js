@@ -50,12 +50,15 @@ async function skipReason(repo, git) {
 // Same comparison as config.js normPath: slashes, trailing slashes and case do not matter.
 const normPath = (p) => String(p).replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
 
-// The key of a repo: its git common dir (resolved against the repo path), or the repo path when git cannot say. Asked once per path.
+// The real path of a folder: a junction, a link or an 8.3 short name (a Windows runner's temp folder is `RUNNER~1`, while git answers from a worktree with the long name) all give the same one. The folder itself when it cannot be resolved.
+const realOf = (p) => { try { return fs.realpathSync.native(p); } catch { return p; } };
+
+// The key of a repo: its git common dir (resolved against the repo path, then to its real path), or the repo path when git cannot say. Asked once per path.
 function keyOf(repo, git) {
   if (!keys.has(repo.path)) {
     keys.set(repo.path, git(repo.path, ['rev-parse', '--git-common-dir']).then(
-      (r) => normPath(r.code === 0 && r.stdout.trim() ? path.resolve(repo.path, r.stdout.trim()) : repo.path),
-      () => normPath(repo.path),
+      (r) => normPath(realOf(r.code === 0 && r.stdout.trim() ? path.resolve(repo.path, r.stdout.trim()) : repo.path)),
+      () => normPath(realOf(repo.path)),
     ));
   }
   return keys.get(repo.path);

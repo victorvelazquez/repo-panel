@@ -476,8 +476,10 @@ test('D1. the automatic fetch never prunes, even with fetch.prune or remote.orig
 function gated() {
   const g = { started: [], running: new Map(), perRepoMax: 0, gates: new Map() };
   g.gate = (cwd, kind) => { const k = `${cwd}|${kind}`; if (!g.gates.has(k)) g.gates.set(k, gate()); return g.gates.get(k); };
+  g.done = []; // the probes (every git call that is not a fetch) that have ANSWERED, as `<repo>|<first two words>`: what tells that a call reached the queue for a place
+  g.probed = (r) => g.done.includes(`${path.basename(path.dirname(r.path))}|rev-parse --git-path`);
   g.git = async (cwd, args, opts) => {
-    if (!args.includes('fetch')) return exec.git(cwd, args, opts);
+    if (!args.includes('fetch')) { const answer = await exec.git(cwd, args, opts); g.done.push(`${path.basename(path.dirname(cwd))}|${args.slice(0, 2).join(' ')}`); return answer; }
     const kind = args.includes('--prune') ? 'manual' : 'auto';
     g.started.push(`${path.basename(path.dirname(cwd))}|${kind}`);
     const here = (g.running.get(cwd) || 0) + 1;
@@ -537,15 +539,15 @@ test('D2b. an automatic call that joins a manual fetch gives its place back at o
   const d = { git: g.git };
   const name = (r) => path.basename(path.dirname(r.path));
   try {
-    // Staggered, so the queue order is a, b | t, c.
+    // Staggered by WAITING FOR EACH STEP (never by a fixed pause: a slow runner needs more than 100 ms per git call), so the queue order is a, b | t, c.
     const calls = [fetchRepo(a, { deps: d })];
-    await sleep(100);
+    await until(() => g.started.length === 1); // a holds a place
     calls.push(fetchRepo(b, { deps: d }));
-    await sleep(100);
+    await until(() => g.started.length === 2); // b holds the other: the semaphore is full
     calls.push(fetchRepo(t, { deps: d }));
-    await sleep(100);
+    await until(() => g.probed(t)); // t finished its probes: it is queued for a place
     calls.push(fetchRepo(c, { deps: d }));
-    await sleep(100);
+    await until(() => g.probed(c));
     assert.deepEqual(g.started, [`${name(a)}|auto`, `${name(b)}|auto`]);
     calls.push(fetchRepo(t, { prune: true, lane: 'user', deps: d }));
     await until(() => g.started.length === 3);
@@ -595,6 +597,23 @@ test('D4. a main clone and its linked worktree share refs: fetched together they
       fetchRepo(wt, { prune: wtPrune, lane: wtPrune ? 'user' : 'background', deps: deps(rec) }),
     ]);
     assert.equal(rec.max, 1, `prune ${mainPrune}/${wtPrune}: two fetch processes of one repository at once`);
+    assert.ok(results.every((r) => r.code === 0), JSON.stringify(results));
+  }
+});
+
+test('D4b. the same repository reached through two spellings of its path (a junction or a link here, an 8.3 short name on a Windows runner) is ONE key: never two fetch processes at once', async () => {
+  const { fetchRepo } = fetcher();
+  const main = origin().clone();
+  const link = path.join(path.dirname(main.path), 'via-link');
+  fs.symlinkSync(main.path, link, 'junction'); // a junction on Windows (no administrator needed), a plain directory link elsewhere
+  for (const [firstPrune, secondPrune] of [[false, false], [false, true], [true, true]]) {
+    const rec = recorder();
+    rec.delay = 250;
+    const results = await Promise.all([
+      fetchRepo(main, { prune: firstPrune, lane: firstPrune ? 'user' : 'background', deps: deps(rec) }),
+      fetchRepo({ id: 'link', path: link }, { prune: secondPrune, lane: secondPrune ? 'user' : 'background', deps: deps(rec) }),
+    ]);
+    assert.equal(rec.max, 1, `prune ${firstPrune}/${secondPrune}: two fetch processes of one repository at once`);
     assert.ok(results.every((r) => r.code === 0), JSON.stringify(results));
   }
 });
