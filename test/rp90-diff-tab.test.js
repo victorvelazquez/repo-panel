@@ -32,7 +32,7 @@ test('t1: with a file open the bar gets ONE more tab, the last one, named after 
 test('t2: the diff tab has its own close button, labelled with the path, next to it (not inside the tab button)', () => {
   const h = R.chatHead({ id: 'abc', dfile: 'src/one.txt', tab: 'diff' }, { name: 'demo' });
   assert.match(h, /<span class="ch-dtab">[^]*data-tab="diff"[^]*<button type="button" class="ch-dclose" data-act="diff-close" aria-label="Close the diff of src\/one\.txt" title="Close the diff">✕<\/button><\/span>/);
-  assert.equal((h.match(/<button/g) || []).length, 5 + 1 + 1 + 1 + 1, 'five standard tabs, the diff tab, its close button, the close of the chat and (RP134) the back arrow');
+  assert.equal((h.match(/<button/g) || []).length, 5 + 1 + 1 + 1 + 1 + 1, 'five standard tabs, the diff tab, its close button, the close of the chat, (RP134) the back arrow and (RP157) the Repo button');
 });
 
 test('t3: without a file there is no diff tab, and a "diff" tab without a file reads as the chat', () => {

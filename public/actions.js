@@ -78,11 +78,11 @@ const ACTIONS = {
   // RP64: the chip opens the single viewer, the Changes tab of the right panel; from the Work tab the page goes to the Summary first.
   'diff': (el) => { const id = el.dataset.id; if (S.tab !== 'summary') setTab('summary'); if (S.chat.id !== id) openChat(id); setChatTab('changes'); },
   // RP90: touching a file of the Changes list opens it in the ONE diff tab of the centre (reused for every file); RP92 will open it from the files card.
-  'changes-file': (el) => { const p = el.dataset.path || ''; if (p) { S.chat.dfile = p; S.chat.ffile = ''; setChatTab('diff'); } else draw(); }, // RP130: the viewer tab is ONE, a diff or a file
+  'changes-file': (el) => { const p = el.dataset.path || ''; if (p) { leaveRepo(); S.chat.dfile = p; S.chat.ffile = ''; setChatTab('diff'); } else draw(); }, // RP130: the viewer tab is ONE, a diff or a file
   'diff-split': () => setPref('split', !S.prefs.split), // RP66c: the side-by-side diff on or off, kept with the other preferences
   'diff-close': () => { S.chat.dfile = ''; S.chat.ffile = ''; if (S.chat.tab === 'diff' || S.chat.tab === 'file') S.chat.tab = 'chat'; draw(); },
   // RP130: with the column in, a file of its explorer opens in the viewer tab of the centre; without it the chat's own Files tab reads it as before.
-  'files-open': (el) => { const p = el.dataset.path || ''; if (!p) return; if (columnOn()) { S.chat.ffile = p; S.chat.dfile = ''; setChatTab('file'); } loadFile(p); },
+  'files-open': (el) => { const p = el.dataset.path || ''; if (!p) return; if (columnOn()) { leaveRepo(); S.chat.ffile = p; S.chat.dfile = ''; setChatTab('file'); } loadFile(p); },
   // The button says what the person SEES (data-open): the default is open only when a changed file is inside, so toggling flips that.
   'files-dir': (el) => { (S.filesOpen[S.chat.id] ||= {})[el.dataset.path || ''] = el.dataset.open !== 'true'; if (columnOn()) S.chat.colFocus = { act: 'files-dir', key: 'path', val: el.dataset.path || '' }; draw(); },
   'tab': (el) => { if (['summary', 'work', 'conformity', 'settings'].includes(el.dataset.tab)) setTab(el.dataset.tab); },
@@ -123,7 +123,7 @@ const ACTIONS = {
   'focus-repo': (el) => { S.q = nameOf(el.dataset.id); $('#search').value = S.q; setTab('work'); },
   'chat-open': (el) => openChat(el.dataset.id),
   // RP91: with the column in, setChatTab turns the Tasks tab into the Chat one (the tasks card is already there); without it the chat opens on its Tasks tab as before.
-  'tasks-open': (el) => { openChat(el.dataset.id, 'tasks'); if (S.chat.id === el.dataset.id) { if (columnOn()) S.chat.colTab = 'tasks'; setChatTab('tasks'); } }, // RP128: with the column in, the tasks are ITS tab
+  'tasks-open': (el) => { openChat(el.dataset.id, 'tasks'); if (S.chat.id === el.dataset.id) { if (columnOn()) S.chat.colTab = 'tasks'; setChatTab('tasks'); if (narrowOn()) setZone('repo'); } }, // RP128: with the column in, the tasks are ITS tab
   'chat-tab': (el) => setChatTab(el.dataset.tab),
   'notes-retry': () => flushNotes(),
   'notes-disk': () => { const p = S.pad[S.chat.id]; if (p && p.status === 'conflict' && p.disk) { Object.assign(p, { text: p.disk.text, savedText: p.disk.text, base: p.disk.rev, status: 'saved', error: '', gen: p.gen + 1 }); p.req++; draw(); } },
@@ -155,6 +155,7 @@ const ACTIONS = {
     chat.tasksRefreshing = false;
     if (S.chat === chat) draw();
   },
+  'zone-back': () => zoneBack(), // RP157: the arrow of the Repo screen
   'chat-back': () => chatBack(), // RP134: the arrow of the chat head, under 760 px
   'zone-set': (el) => setZone(el && el.dataset && el.dataset.zone), // RP133: the zone of the open repo (chat or repo); the buttons that use it come with RP134
   'tasks-fold': (el) => {

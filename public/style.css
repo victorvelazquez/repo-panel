@@ -149,6 +149,7 @@ main { max-width: none; padding: 8px; }
 .idle-caret { display: inline-block; width: 12px; color: var(--muted); }
 .idle-column { font-size: 12px; padding: 0 8px; color: var(--muted); }
 .idle-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 2px 8px; padding: 0 8px 8px; }
+.col-head b { margin: 0 auto 0 0; }
 .col-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; }
 .col-head h2 { margin: 0; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; }
 .col-head .n { background: var(--line); border-radius: 10px; padding: 0 8px; font-size: 12px; }
@@ -799,10 +800,19 @@ button.tc:hover { border-color: var(--muted); }
 .ch-back:hover:not(:disabled) { color: var(--text); background: var(--panel2); }
 .ch-back:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 #sumLayout[data-screen] { flex-direction: column; height: calc(100vh - var(--sum-top, 98px)); height: calc(100dvh - var(--sum-top, 98px)); min-height: 0; }
-#sumLayout[data-screen] #split, #sumLayout[data-screen] #split2, #sumLayout[data-screen] #col { display: none; }
-#sumLayout[data-screen="list"] #chat { display: none; }
-#sumLayout[data-screen="chat"] #listCol { display: none; }
+#sumLayout[data-screen] #split, #sumLayout[data-screen] #split2 { display: none; }
+#sumLayout[data-screen="list"] #chat, #sumLayout[data-screen="list"] #col { display: none; }
+#sumLayout[data-screen="chat"] #listCol, #sumLayout[data-screen="chat"] #col { display: none; }
+#sumLayout[data-screen="repo"] #listCol, #sumLayout[data-screen="repo"] #chat { display: none; }
+#sumLayout[data-screen="repo"] #col { display: flex; flex: 1 1 0; width: auto; min-width: 0; }
 #sumLayout[data-screen] #listCol, #sumLayout[data-screen] #chat { flex: 1 1 0; width: auto; min-width: 0; max-height: none; }
+/* RP157: the Repo screen (the column on top of the chat). Its head is the arrow and the title; the button of the chat head that opens it is only here. */
+.ch-repo { display: none; align-items: center; justify-content: center; flex: none; padding: 0; background: transparent; border: 0; border-radius: 6px; color: var(--muted); }
+.ch-repo:hover:not(:disabled) { color: var(--text); background: var(--panel2); }
+.ch-repo:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+#sumLayout[data-screen] .ch-repo { display: inline-flex; min-width: 44px; min-height: 44px; }
+.col-head b { margin: 0 auto 0 0; }
+.col-head { display: flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 8px 0 4px; border-bottom: 1px solid var(--line); background: var(--bg); }
 #sumLayout[data-screen] .ch-back { display: inline-flex; min-width: 44px; min-height: 44px; }
 #sumLayout[data-screen] .ch-row .x { display: none; }
 
