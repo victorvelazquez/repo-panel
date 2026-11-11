@@ -347,6 +347,17 @@
     return `<span class="mem ${cls}" title="${esc(title)}">${word}</span>`;
   };
 
+  // RP152: «Subagent working · mm:ss» next to the state, from the two numbers the reducer keeps (c.rpc.subs and c.rpc.subSince) and the clock `now`; nothing else of the entry is read, so no text of a tool call or
+  // name of an agent can reach it. It says nothing unless the session is busy or asking and both numbers are valid (what is not known is not «working»), it never says slow (that needs activity data) and it is
+  // not a live region: a counter that changes every second must not be announced.
+  const subagentChipHtml = (c, now) => {
+    const r = c && typeof c === 'object' && c.rpc && typeof c.rpc === 'object' && !Array.isArray(c.rpc) ? c.rpc : null;
+    if (!r || (r.state !== 'busy' && r.state !== 'asking') || !Number.isInteger(r.subs) || r.subs < 1 || !Number.isFinite(r.subSince) || r.subSince <= 0 || !Number.isFinite(now)) return '';
+    const v = typeof module === 'object' && module.exports ? require('./view.js') : root.RepoPanelView;
+    const words = r.subs > 1 ? `${r.subs} subagents working` : 'Subagent working';
+    return `<span class="sub-chip" title="A subagent is running in this session. The time counts from when it started."><i class="sub-dot" aria-hidden="true">↳</i> ${words} <b class="sub-time">${v.subClock(now - r.subSince)}</b></span>`;
+  };
+
   // RP139: the share of the context window the session uses, as a chip next to the memory one. c.rpc.ctx holds three validated numbers (V.rpcWithContext); unknown (null) reads `ctx —`, never 0.
   // Quiet below 70%, warning from 70%, strong warning from 90%: icon + number + words in the help, never colour alone. Nothing is drawn while the session is closed or starting, or before the first reading.
   const kTokens = (n) => (n >= 1000 ? `${Math.round(n / 1000)}k` : String(n));
@@ -1221,5 +1232,5 @@ ${status}</div>`;
     return `${ctx.failed ? '<div class="rs-note" role="status">⚠ Summary unavailable: showing the last data we have.</div>' : ''}<div class="rs-list">${body}</div>`;
   }
 
-  return { esc, mdHtml, settingsView, memoryChipHtml, ctxChipHtml, compactButtonHtml, legendHtml, listCount, listHeadChips, sessionChip, blockWidths, columnView, treeFolderPaths, fileView, COLUMN_TABS, composerState, askAllowed, actionMenu, actionButtonsHtml, composerNote, chatHead, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, sessionCloseHtml, sessionTerminalHtml, terminalBlockHtml, recentlyActive, chatBody, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
+  return { esc, mdHtml, settingsView, memoryChipHtml, subagentChipHtml, ctxChipHtml, compactButtonHtml, legendHtml, listCount, listHeadChips, sessionChip, blockWidths, columnView, treeFolderPaths, fileView, COLUMN_TABS, composerState, askAllowed, actionMenu, actionButtonsHtml, composerNote, chatHead, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, sessionCloseHtml, sessionTerminalHtml, terminalBlockHtml, recentlyActive, chatBody, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
 }));

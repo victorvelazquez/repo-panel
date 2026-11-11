@@ -761,6 +761,9 @@ button.tk-gh:hover:not(:disabled) { background: var(--panel2); color: var(--text
 .m .who { display: block; margin-bottom: 2px; font-size: 11px; color: var(--muted); }
 .tools.thought { font-style: italic; }
 /* RP110b: the memory chip, next to the state of the session. */
+/* RP152: «Subagent working · mm:ss» next to the state: blue (normal activity, not a warning), words and a counter that does not jump when its digits change. */
+.sub-chip { display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; padding: 0 8px; border: 1px solid var(--line); border-radius: 10px; font-size: 12px; color: var(--blue); white-space: nowrap; }
+.sub-time { font-weight: 600; font-variant-numeric: tabular-nums; }
 .mem { font-size: 12px; padding: 0 8px; border-radius: 10px; border: 1px solid var(--line); margin-left: 6px; white-space: nowrap; color: var(--muted); }
 .mem-warn { color: var(--yellow); border-color: #53410f; background: #251d08; }
 .mem-bad { color: var(--red); border-color: #5a1f1c; background: #2a1213; }

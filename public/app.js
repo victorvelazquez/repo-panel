@@ -159,6 +159,7 @@ setInterval(() => {
 setInterval(() => refreshTick(), 2000);
 setInterval(summaryTick, 20000);
 setInterval(chatTick, CHAT_MS);
+setInterval(subTick, 1000); // RP152
 setInterval(quietTick, 10000);
 setInterval(() => { if (!document.hidden) loadUsage(); }, 30000);
 // RP96: Escape on the focused usage element closes its popover (the focus leaves it).

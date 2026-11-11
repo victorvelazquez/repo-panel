@@ -594,7 +594,15 @@
   // the blocks in order (the index is the `contentIndex` of pi; thinking and tool blocks leave theirs empty), capped.
   const RPC_BLOCKS = 64;
   const RPC_TEXT_MAX = 200000;
-  const rpcBlank = () => ({ state: 'closed', text: '', blocks: [], error: '', startedAt: 0, streaming: false, thinking: false, retry: null, memory: null, ctx: null, compacting: false, asks: [] });
+  // RP152: `subs` is how many `subagent_run` calls started and have not ended, `subSince` the moment the first one of them started (0 = none): only the tool name of the live events is read, never an argument.
+  const rpcBlank = () => ({ state: 'closed', text: '', blocks: [], error: '', startedAt: 0, streaming: false, thinking: false, retry: null, memory: null, ctx: null, compacting: false, asks: [], subs: 0, subSince: 0 });
+  const SUB_TOOL = 'subagent_run';
+  const SUB_MAX = 20;
+  // RP152: the counter of a subagent that is working, as mm:ss (the minutes keep growing past 59). Anything that is not a duration in milliseconds reads 00:00.
+  function subClock(ms) {
+    const s = typeof ms === 'number' && Number.isFinite(ms) && ms > 0 ? Math.floor(ms / 1000) : 0;
+    return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+  }
   const rpcInt = (v, min, max) => (Number.isInteger(v) && v >= min && v <= max ? v : null);
   const rpcText = (blocks) => blocks.filter(Boolean).join('\n\n').slice(0, RPC_TEXT_MAX);
   // One pending dialog as the card needs it (RPC2-3), or null when it is not well formed. The server already caps what it sends; what is still
@@ -620,17 +628,20 @@
     let reload = false;
     let ctx = false; // RP139: the context of the session must be read again (a run or a compaction ended)
     if (!isObject(p)) return { entry: e, reload, ctx };
-    if (p.kind === 'state' && RPC_STATES.includes(p.state)) { e.state = p.state; if (p.state === 'busy') e.streaming = true; }
-    else if (p.kind === 'exit') Object.assign(e, { state: 'closed', blocks: [], text: '', streaming: false, thinking: false, retry: null, memory: null, ctx: null, compacting: false, asks: [] });
+    if (p.kind === 'state' && RPC_STATES.includes(p.state)) { e.state = p.state; if (p.state === 'busy') e.streaming = true; if (p.state !== 'busy' && p.state !== 'asking') Object.assign(e, { subs: 0, subSince: 0 }); }
+    else if (p.kind === 'exit') Object.assign(e, { state: 'closed', blocks: [], text: '', streaming: false, thinking: false, retry: null, memory: null, ctx: null, compacting: false, asks: [], subs: 0, subSince: 0 });
     else if (p.kind === 'memory') { if (MEMORY_CATS.includes(p.memory)) e.memory = p.memory; }
     else if (p.kind === 'dialog') e.asks = rpcAsks(e.asks, rpcAskOf(p));
     else if (p.kind === 'dialog-closed' && typeof p.requestId === 'string') e.asks = rpcAsks(e.asks, null, p.requestId);
     else if (p.kind === 'event' && isObject(p.record)) {
       const r = p.record;
       const a = isObject(r.assistantMessageEvent) ? r.assistantMessageEvent : {};
-      if (r.type === 'agent_start') Object.assign(e, { blocks: [], streaming: true, thinking: false, retry: null, error: '', startedAt: now });
-      else if (r.type === 'agent_settled') { e.streaming = false; e.thinking = false; e.retry = null; reload = true; ctx = true; }
-      else if (r.type === 'agent_end') ctx = true;
+      if (r.type === 'agent_start') Object.assign(e, { blocks: [], streaming: true, thinking: false, retry: null, error: '', startedAt: now, subs: 0, subSince: 0 });
+      else if (r.type === 'agent_settled') { e.streaming = false; e.thinking = false; e.retry = null; e.subs = 0; e.subSince = 0; reload = true; ctx = true; }
+      else if (r.type === 'agent_end') { ctx = true; e.subs = 0; e.subSince = 0; }
+      // RP152: a subagent_run that starts is counted (the clock keeps the first start) and one that ends is taken out; never below zero, never above SUB_MAX.
+      else if (r.type === 'tool_execution_start' && r.toolName === SUB_TOOL) { e.subs = Math.min(SUB_MAX, (Number.isInteger(e.subs) && e.subs > 0 ? e.subs : 0) + 1); if (!(e.subSince > 0)) e.subSince = now; }
+      else if (r.type === 'tool_execution_end' && r.toolName === SUB_TOOL) { e.subs = Math.max(0, (Number.isInteger(e.subs) ? e.subs : 0) - 1); if (e.subs === 0) e.subSince = 0; }
       // RP140: a compaction (the person's, or one pi starts by itself) is on from its start to its end; the end also asks for the context (RP139).
       else if (r.type === 'compaction_start') e.compacting = true;
       else if (r.type === 'compaction_end') { e.compacting = false; ctx = true; }
@@ -659,7 +670,7 @@
   }
   // GET /api/rpc/status: the state and the pending dialogs (by `requestId`). A run that is not on any more leaves no streaming text.
   function rpcFromStatus(prev, st) {
-    const e = { ...rpcBlank(), ...(isObject(prev) ? prev : {}) };
+    const e = { ...rpcBlank(), ...(isObject(prev) ? prev : {}), subs: 0, subSince: 0 }; // RP152: after an open or a (re)connect nothing is known of a subagent: not «working»
     if (!isObject(st) || !RPC_STATES.includes(st.state)) return e;
     e.state = st.state;
     e.memory = MEMORY_CATS.includes(st.memory) ? st.memory : st.state === 'closed' ? null : e.memory; // RP110b: a closed session has no memory to report
@@ -943,5 +954,5 @@
     return `${dot}${meters.join('')}<div class="usage-pop" role="group" aria-label="Claude usage details">${details.join('')}${note}${foot}</div>`;
   }
 
-  return { columnTabFor, conformityTabLabel, repoModel, changeChips, prChip, idleChip, conflictChip, sizeChip, RepoCard, stateLineHidden, usageView, usageHtml, usageRemaining, boardApply, boardWait, chatCachePut, chatCacheGet, rpcWithContext, chatFromCache, API_VERSION, mergeButton, rerunButton, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, dirtyRepos, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, taskPrs, matchesUnitId, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, parseSse, rpcEvent, rpcReduce, rpcFromStatus, eventsPlan, eventsRetryMs, eventsStale };
+  return { subClock, columnTabFor, conformityTabLabel, repoModel, changeChips, prChip, idleChip, conflictChip, sizeChip, RepoCard, stateLineHidden, usageView, usageHtml, usageRemaining, boardApply, boardWait, chatCachePut, chatCacheGet, rpcWithContext, chatFromCache, API_VERSION, mergeButton, rerunButton, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, dirtyRepos, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, taskPrs, matchesUnitId, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, parseSse, rpcEvent, rpcReduce, rpcFromStatus, eventsPlan, eventsRetryMs, eventsStale };
 }));
