@@ -24,6 +24,8 @@ async function doMerge(id, n) {
   try { await refreshRepo(id, { catchUp: true }); } finally { draw(); }
 }
 
+function persistLive() { try { localStorage.setItem('repo-panel.live', JSON.stringify(S.slive === true)); } catch { /* not persisted */ } } // RP158
+
 // RP137: the tap on ANY Merge button. Under 760 px it opens the sheet that asks first (and only when the button is on: the same rule); from 760 px up, or when the width is not known, it merges as it always did.
 function mergeTap(id, n) {
   if (!phoneNow()) return doMerge(id, n);
@@ -133,7 +135,9 @@ const ACTIONS = {
   'lh-legend': () => { S.lh.legend = !S.lh.legend; S.lh.menu = false; draw(); }, // RP121: the legend of the bars; it and the filter menu never show together
   'lh-clear-q': () => { S.q = ''; draw(); },
   'lh-clear-group': () => { S.group = ''; draw(); },
-  'lh-clear': () => { S.q = ''; S.group = ''; S.scope = { kind: 'all' }; S.sfilter = 'all'; draw(); },
+  'lh-clear': () => { S.q = ''; S.group = ''; S.scope = { kind: 'all' }; S.sfilter = 'all'; S.slive = false; persistLive(); draw(); },
+  // RP158: the filter «Working now»: the button says the value it sets (on or off, anything else is off) and the page remembers it.
+  'slive': (el) => { S.slive = !!el && !!el.dataset && el.dataset.live === 'on'; persistLive(); draw(); },
   'sfilter': (el) => { S.sfilter = el.dataset.filter === 'attention' ? 'attention' : 'all'; draw(); },
   'toggle-group': (el) => { S.collapsed[el.dataset.group] = !S.collapsed[el.dataset.group]; draw(); },
   'scope': (el) => { S.scope = el.dataset.kind === 'room' ? { kind: 'room', name: el.dataset.name } : { kind: el.dataset.kind === 'none' ? 'none' : 'all' }; draw(); },

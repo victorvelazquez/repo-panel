@@ -448,6 +448,8 @@ body.tab-summary #viewbar { display: none; }
 .lh-ic small { font-size: 12px; font-weight: 600; }
 .lh-att.on { color: var(--red); }
 .lh-att[aria-pressed="true"] { border-color: var(--red); background: #2a1213; }
+.lh-live.on { color: var(--green); } /* RP158: the icon of «Working now» next to the flag: green with cards, a green frame when pressed */
+.lh-live[aria-pressed="true"] { border-color: var(--green); background: #12261a; }
 .lh-dot { position: absolute; top: 4px; right: 4px; width: 7px; height: 7px; border-radius: 50%; background: var(--blue); }
 .lh-search { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; padding: 0 6px 0 8px; color: var(--muted); }
 .lh-search input { flex: 1; min-width: 0; border: 0; background: transparent; padding: 5px 0; }

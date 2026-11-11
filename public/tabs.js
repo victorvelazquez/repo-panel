@@ -340,7 +340,7 @@ function drawListHead(ctx, kept) {
   paint($('#lhActive'), chips);
   $('#lhActive').hidden = !chips;
   $('#lhDot').hidden = !chips;
-  if (paint($('#lhAttention'), R.summaryTools(S.summary, { ...ctx, compact: true })) && kept && kept.act === 'sfilter') { const on = $('#lhAttention [data-act="sfilter"]'); if (on && on.focus) on.focus(); }
+  if (paint($('#lhAttention'), R.summaryTools(S.summary, { ...ctx, compact: true })) && kept && (kept.act === 'sfilter' || kept.act === 'slive')) { const on = $(`#lhAttention [data-act="${kept.act}"]`); if (on && on.focus) on.focus(); }
   paint($('#lhGroup'), `<option value="">All groups</option>${S.groups.map((g) => `<option ${S.group === g.name ? 'selected' : ''}>${esc(g.name)}</option>`).join('')}`);
   const scopeHad = !!(document.activeElement && document.activeElement.dataset && document.activeElement.dataset.act === 'scope' && lh.menu);
   if (paint($('#lhScope'), R.scopeBar(S.rooms, allRepos().length, ctx.scope)) && scopeHad) { const on = $('#lhScope [aria-pressed="true"]'); if (on && on.focus) on.focus(); }
@@ -357,10 +357,10 @@ function drawSummary() {
   if (paint($('#scope'), R.scopeBar(S.rooms, allRepos().length, scope)) && hadFocus) { const on = $('#scope [aria-pressed="true"]'); if (on && on.focus) on.focus(); }
   // The group buttons live inside #summary and the Needs attention toggle in the view bar: keep the focus on the pressed one.
   const ae = document.activeElement;
-  const kept = ae && ae.dataset && (ae.dataset.act === 'sfilter' || ae.dataset.act === 'toggle-group') ? { act: ae.dataset.act, filter: ae.dataset.filter, group: ae.dataset.group } : null;
+  const kept = ae && ae.dataset && (ae.dataset.act === 'sfilter' || ae.dataset.act === 'slive' || ae.dataset.act === 'toggle-group') ? { act: ae.dataset.act, filter: ae.dataset.filter, group: ae.dataset.group } : null;
   const box = $('#summary');
   const ctx = {
-    now: Date.now(), scope, rooms: S.rooms, q: S.q, group: S.group, roomData: S.roomData.data, filter: S.sfilter, collapsed: S.collapsed, failed: S.summaryFailed,
+    now: Date.now(), scope, rooms: S.rooms, q: S.q, group: S.group, roomData: S.roomData.data, filter: S.sfilter, live: S.slive, collapsed: S.collapsed, failed: S.summaryFailed,
     flowFor: summaryFlow, changesFor: summaryChanges, prsFor: summaryPrs, idleFor: summaryIdle, sending: S.sending, busy: busyView(), chatId: S.chat.id,
   };
   drawListHead(ctx, kept);

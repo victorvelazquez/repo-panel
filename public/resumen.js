@@ -23,10 +23,13 @@
   };
   const filterRows = (rows, scope) => rows.filter((r) => (scope.kind === 'room' ? r.room === scope.name : scope.kind === 'none' ? !r.room : true));
   // The rows the Summary shows: the scope, then the shared text and group filters (empty or "all" is no filter).
+  // RP158: with `ctx.live === true` (only the boolean) the repos whose session is NOT started or was closed (`none`) go out; what is not known (unknown, loading, no session, any other value) stays: a session that finished its
+  // cycle is `free`, still open, and it must not disappear.
+  const isLive = (r) => !r.session || r.session.state !== 'none';
   const visibleRows = (rows, ctx) => {
     const q = String(ctx.q || '').toLowerCase();
     const group = ctx.group && ctx.group !== 'all' ? ctx.group : '';
-    return filterRows(rows, normalizeScope(ctx.scope, ctx.rooms)).filter((r) => (!group || r.group === group) && (!q || String(r.name).toLowerCase().includes(q)));
+    return filterRows(rows, normalizeScope(ctx.scope, ctx.rooms)).filter((r) => (!group || r.group === group) && (!q || String(r.name).toLowerCase().includes(q)) && (ctx.live !== true || isLive(r)));
   };
 
   function relativeTime(iso, now = Date.now()) {
@@ -1231,7 +1234,11 @@ ${status}</div>`;
     const n = visibleRows(payload.rows, ctx).filter((r) => r.needs).length;
     if (ctx.compact) {
       const flag = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 14V2M3.5 2.5h8l-1.8 3 1.8 3h-8"/></svg>';
-      return `<button type="button" class="lh-ic lh-att${n ? ' on' : ''}" data-act="sfilter" data-filter="${attention ? 'all' : 'attention'}" aria-pressed="${attention}" aria-label="Needs attention · ${n}" title="Needs attention · ${n}">${flag}<small>${n}</small></button>`;
+      // RP158: next to the flag, the icon of «Working now»: how many repos of the scope, group and text have a live session; the button sets the value it is NOT in.
+      const live = ctx.live === true;
+      const nLive = visibleRows(payload.rows, { ...ctx, live: false }).filter(isLive).length;
+      const dot = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="5.5"/><circle cx="8" cy="8" r="1.8" fill="currentColor"/></svg>';
+      return `<button type="button" class="lh-ic lh-att${n ? ' on' : ''}" data-act="sfilter" data-filter="${attention ? 'all' : 'attention'}" aria-pressed="${attention}" aria-label="Needs attention · ${n}" title="Needs attention · ${n}">${flag}<small>${n}</small></button><button type="button" class="lh-ic lh-live${nLive ? ' on' : ''}" data-act="slive" data-live="${live ? 'off' : 'on'}" aria-pressed="${live}" aria-label="Working now · ${nLive}" title="Working now · ${nLive}">${dot}<small>${nLive}</small></button>`;
     }
     return `<button type="button" data-act="sfilter" data-filter="${attention ? 'all' : 'attention'}" aria-pressed="${attention}">Needs attention · ${n}</button>`;
   }
@@ -1253,6 +1260,7 @@ ${status}</div>`;
     else if (scope.kind === 'none') out.push(chip('data-act="scope" data-kind="all"', 'No room'));
     if (group) out.push(chip('data-act="lh-clear-group"', group));
     if (q) out.push(chip('data-act="lh-clear-q"', q));
+    if (ctx.live === true) out.push(chip('data-act="slive" data-live="off"', 'Working now')); // RP158
     if (ctx.filter === 'attention') out.push(chip('data-act="sfilter" data-filter="all"', 'Needs attention'));
     return out.length ? `${out.join('')}<button type="button" class="lh-clr" data-act="lh-clear">Clear</button>` : '';
   }
@@ -1271,7 +1279,7 @@ ${status}</div>`;
       // Most urgent first; Array#sort is stable, so ties keep the payload order.
       body = needing.length ? needing.slice().sort((x, y) => num(x.rank) - num(y.rank)).map((r) => cardHtml(r, ctx)).join('') : '<div class="empty">Nothing needs your attention right now.</div>';
     } else {
-      const rooms = ctx.roomData && Array.isArray(ctx.roomData.rooms) && scope.kind !== 'none' && !ctx.q && !(ctx.group && ctx.group !== 'all') ? ctx.roomData.rooms.filter((m) => scope.kind === 'all' || m.name === scope.name) : [];
+      const rooms = ctx.roomData && Array.isArray(ctx.roomData.rooms) && scope.kind !== 'none' && !ctx.q && !(ctx.group && ctx.group !== 'all') && ctx.live !== true ? ctx.roomData.rooms.filter((m) => scope.kind === 'all' || m.name === scope.name) : [];
       const groups = new Map();
       for (const r of rows) groups.set(r.group ?? '', (groups.get(r.group ?? '') || []).concat(r));
       const parts = rooms.map((m) => roomCard(m, payload.rows, ctx));
@@ -1280,7 +1288,8 @@ ${status}</div>`;
         if (groups.size > 1) parts.push(`<button type="button" class="rs-group" data-act="toggle-group" data-group="${esc(g)}" aria-expanded="${!shut}"><span aria-hidden="true">${shut ? '▸' : '▾'}</span> ${esc(g)} <span class="mono">${list.length}</span></button>`);
         if (!shut) for (const r of list) parts.push(cardHtml(r, ctx));
       }
-      body = rows.length ? parts.join('') : '<div class="empty">No repositories in this scope.</div>';
+      const noLive = ctx.live === true && visibleRows(payload.rows, { ...ctx, live: false }).length > 0; // RP158: there are repos, none has a session
+      body = rows.length ? parts.join('') : noLive ? '<div class="empty">No repository has a session open right now.</div>' : '<div class="empty">No repositories in this scope.</div>';
     }
     return `${ctx.failed ? '<div class="rs-note" role="status">⚠ Summary unavailable: showing the last data we have.</div>' : ''}<div class="rs-list">${body}</div>`;
   }
