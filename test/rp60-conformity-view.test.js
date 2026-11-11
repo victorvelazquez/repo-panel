@@ -82,8 +82,9 @@ test('a4: the first Conformity visit from Summary returns to Summary even when W
   assert.equal(page.run('S.tab'), 'summary');
 });
 
-test('a5: the deep link #conformity opens the tab', () => {
-  assert.match(appSource(), /location\.hash === '#conformity'\) openConformity\(\)/);
+test('a5: the deep link #conformity opens the tab (RP133: the start applies the address of the page, whose grammar keeps `#conformity`; test/rp133-address.test.js runs the page with it)', () => {
+  assert.match(appSource(), /addressApply\(addressNow\(\)\)/);
+  assert.match(appSource(), /if \(to\.kind === 'conformity'\) openConformity\(\)/);
   assert.match(appSource(), /function openConformity\(\) \{\s*setTab\('conformity'\)/);
 });
 

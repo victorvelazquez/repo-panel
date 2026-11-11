@@ -27,6 +27,29 @@
     if (s.hasPr === true) return 'status';
     return Number.isInteger(s.ahead) && s.ahead === 0 ? 'tasks' : 'changes';
   }
+  // RP133 (S26): the address of the page (its hash) as a CLOSED grammar. It is untrusted input (anyone can type or paste one), so only these forms count: the list (empty, `#`, `#/`), Conformity (`#conformity` exactly) and
+  // `#/repo/<id>/<zone>` with the zone optional when reading (then chat) and from a closed list. An id counts only when it is IN the list of repos the page has (an array), compared as exact text after a check of its characters
+  // (letters, digits, `_` and `-`, up to 64) and never one of the names of the machinery of the language. Nothing is decoded (a `%` is out), evaluated or drawn as markup. Pure and total: anything else answers null.
+  const ADDRESS_ZONES = ['chat', 'repo'];
+  const ADDRESS_MAX = 200;
+  const ADDRESS_ID = /^[A-Za-z0-9_-]{1,64}$/;
+  const ADDRESS_REPO = /^#\/repo\/([A-Za-z0-9_-]{1,64})(?:\/(chat|repo))?$/;
+  const ADDRESS_BANNED = new Set([...Object.getOwnPropertyNames(Object.prototype), 'prototype']);
+  function parseAddress(hash, ids) {
+    if (typeof hash !== 'string') return null;
+    if (hash === '' || hash === '#' || hash === '#/') return { kind: 'list' };
+    if (hash === '#conformity') return { kind: 'conformity' };
+    if (hash.length > ADDRESS_MAX) return null;
+    const m = ADDRESS_REPO.exec(hash);
+    if (!m || ADDRESS_BANNED.has(m[1]) || !Array.isArray(ids)) return null;
+    const id = ids.find((x) => x === m[1]); // the text of the LIST comes back, never the text of the address
+    return id === undefined ? null : { kind: 'repo', id, zone: m[2] || 'chat' };
+  }
+  // The address of a repo and a zone (always written), or '' when the id is not plain text that the grammar can carry (a room has `:` in its id, so it has none).
+  function addressOf(id, zone) {
+    if (typeof id !== 'string' || !ADDRESS_ID.test(id) || ADDRESS_BANNED.has(id)) return '';
+    return `#/repo/${id}/${ADDRESS_ZONES.includes(zone) ? zone : 'chat'}`;
+  }
   // RP143: the Conformity tab is an icon with an aria-label, so the count has to be in the label to be read.
   function conformityTabLabel(n) { return Number.isInteger(n) && n > 0 ? `Conformity: ${n} to review` : 'Conformity'; }
   // Single place that decides what the conformity drawer says.
@@ -958,5 +981,5 @@
     return `${dot}${meters.join('')}<div class="usage-pop" role="group" aria-label="Claude usage details">${details.join('')}${note}${foot}</div>`;
   }
 
-  return { subClock, columnTabFor, conformityTabLabel, repoModel, changeChips, prChip, idleChip, conflictChip, sizeChip, RepoCard, stateLineHidden, usageView, usageHtml, usageRemaining, boardApply, boardWait, chatCachePut, chatCacheGet, rpcWithContext, chatFromCache, API_VERSION, mergeButton, rerunButton, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, dirtyRepos, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, taskPrs, matchesUnitId, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, parseSse, rpcEvent, rpcReduce, rpcFromStatus, eventsPlan, eventsRetryMs, eventsStale };
+  return { parseAddress, addressOf, ADDRESS_ZONES, subClock, columnTabFor, conformityTabLabel, repoModel, changeChips, prChip, idleChip, conflictChip, sizeChip, RepoCard, stateLineHidden, usageView, usageHtml, usageRemaining, boardApply, boardWait, chatCachePut, chatCacheGet, rpcWithContext, chatFromCache, API_VERSION, mergeButton, rerunButton, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, dirtyRepos, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, taskPrs, matchesUnitId, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, parseSse, rpcEvent, rpcReduce, rpcFromStatus, eventsPlan, eventsRetryMs, eventsStale };
 }));
