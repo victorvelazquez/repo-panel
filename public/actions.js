@@ -155,6 +155,7 @@ const ACTIONS = {
     chat.tasksRefreshing = false;
     if (S.chat === chat) draw();
   },
+  'chat-back': () => chatBack(), // RP134: the arrow of the chat head, under 760 px
   'zone-set': (el) => setZone(el && el.dataset && el.dataset.zone), // RP133: the zone of the open repo (chat or repo); the buttons that use it come with RP134
   'tasks-fold': (el) => {
     const k = el && el.dataset && el.dataset.fold;

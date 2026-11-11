@@ -792,12 +792,19 @@ button.tc:hover { border-color: var(--muted); }
 .ch-busy { flex: 1 1 auto; min-width: 0; color: var(--yellow); font-size: 12px; }
 .ch-sname { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ch-last { margin-top: 4px; overflow-wrap: anywhere; }
-@media (max-width: 720px) {
-  .chatlayout.chat-open { flex-direction: column; height: auto; }
-  .chatlayout.chat-open #listCol { min-width: 0; max-height: 50vh; width: auto; }
-  #split, #split2 { display: none; }
-  #chat { width: auto; min-width: 0; height: 60vh; border-top: 1px solid var(--line); }
-}
+/* RP134 (S26), design F of design/panel-movil/06: under 760 px ONE zone at a time. The page marks the layout with `data-screen` (list or chat) and ONLY under 760 px (page code: applyScreen), and these rules follow the mark: the other
+   zone, the separators and the column are out, and the zone that stays takes the whole width and the viewport (the dynamic one, so the bars of a phone browser do not cut it). It replaces the old block that stacked the list over the chat
+   under 720 px. The tabs of the chat stay as they are (they move to Repo in RP157). The arrow of the chat head goes back to the list; it is the way out, so the close button is out here. Targets of 44 px. */
+.ch-back { display: none; align-items: center; justify-content: center; flex: none; padding: 0; background: transparent; border: 0; border-radius: 6px; color: var(--muted); }
+.ch-back:hover:not(:disabled) { color: var(--text); background: var(--panel2); }
+.ch-back:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+#sumLayout[data-screen] { flex-direction: column; height: calc(100vh - var(--sum-top, 98px)); height: calc(100dvh - var(--sum-top, 98px)); min-height: 0; }
+#sumLayout[data-screen] #split, #sumLayout[data-screen] #split2, #sumLayout[data-screen] #col { display: none; }
+#sumLayout[data-screen="list"] #chat { display: none; }
+#sumLayout[data-screen="chat"] #listCol { display: none; }
+#sumLayout[data-screen] #listCol, #sumLayout[data-screen] #chat { flex: 1 1 0; width: auto; min-width: 0; max-height: none; }
+#sumLayout[data-screen] .ch-back { display: inline-flex; min-width: 44px; min-height: 44px; }
+#sumLayout[data-screen] .ch-row .x { display: none; }
 
 /* RP68: the composer at the bottom of the chat and its "/ Actions" menu (opens upwards, anchored to the bar). */
 #chat .ch-body { flex: 1 1 0; }
