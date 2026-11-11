@@ -173,6 +173,7 @@ function loadTasks(opts = {}) {
   if (!id || (chat.tasksAsked && !opts.force)) return undefined;
   if (chat.tasksReading) return chat.tasksReading;
   chat.tasksAsked = true;
+  chat.tasksTriedAt = Date.now(); // RP151: a failed try counts too
   chat.tasksLoading = true;
   chat.tasksFailed = false;
   chat.tasksReading = (async () => {
@@ -186,6 +187,13 @@ function loadTasks(opts = {}) {
     if (S.chat === chat) { chat.tasksLoading = false; draw(); }
   })();
   return chat.tasksReading;
+}
+// RP151: the clock of the Tasks tab of the column: it only READS (the force read of RP149), once a minute from the last try, and V.tasksPollDue says when. A read on its way is the one that answers, a failed one keeps the last
+// good list on screen, and what is read for a repo the person left is stored for that repo and never painted (loadTasks).
+function tasksTick() {
+  const chat = S.chat;
+  if (!V || !chat.id || !V.tasksPollDue({ chatId: chat.id, column: columnOn(), colTab: chat.colTab, hidden: document.hidden, narrow: narrowOn(), zone: chat.zone, reading: !!chat.tasksReading, at: chat.tasksTriedAt, now: Date.now() })) return;
+  loadTasks({ force: true });
 }
 // RP64 (S62): the Changes tab reads /api/diff each time the person SWITCHES to it (the files change), keeps the last good answer of a repo,
 // and only the latest read of a chat opening counts. A read of a repo the person left is stored for that repo and never paints another.

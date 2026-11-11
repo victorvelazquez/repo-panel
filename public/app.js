@@ -161,6 +161,7 @@ setInterval(() => refreshTick(), 2000);
 setInterval(summaryTick, 20000);
 setInterval(chatTick, CHAT_MS);
 setInterval(subTick, 1000); // RP152
+setInterval(tasksTick, 10000); // RP151: the Tasks tab of the column reads again once a minute (the tick only asks the rule)
 // RP133: Back, Forward and a hash typed by hand apply the address (both events: idempotent, applying never writes).
 if (typeof addEventListener === 'function') {
   addEventListener('popstate', () => addressApply(addressNow()));
