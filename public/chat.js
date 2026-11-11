@@ -350,16 +350,47 @@ function columnGit(id, facts) {
   const known = !prs ? 'loading' : prs.error ? 'failed' : prs.noRemote ? 'noRemote' : 'ok';
   const pr = known === 'ok' && branch && Array.isArray(prs.prs) ? prs.prs.find((p) => p && p.head === branch) || null : null;
   const noPr = { loading: 'Loading pull requests…', failed: 'Pull requests unavailable', noRemote: 'This repository has no GitHub remote', ok: 'No open pull request for this branch' }[known];
-  const busy = pr ? S.busy[`${id}:${pr.number}`] : undefined;
-  const held = !!pr && !busy && mergeHeld(id, pr.number);
-  const verdict = verdictOf({ id });
-  const hold = verdict && verdict.state === 'running' && V ? V.runningReason({ cmd: verdict.cmd, label: verdict.label }) : '';
-  const ctx = { method: S.prefs.method, busy, held, hold, noPr };
+  const ctx = { ...mergeCtxOf(id, pr ? pr.number : 0), noPr }; // RP137: the facts of the ONE rule, asked the same way by the sheet that confirms a merge
   return {
     id, branch, ahead: facts && Number.isInteger(facts.ahead) ? facts.ahead : 0, pr, noPr,
-    merge: V ? V.mergeButton(pr, ctx) : { enabled: false, label: `Merge · ${S.prefs.method}`, title: 'view.js did not load' },
+    merge: V ? (() => { const b = V.mergeButton(pr, ctx); return { ...b, why: V.mergeWhy(b) }; })() : { enabled: false, label: `Merge · ${S.prefs.method}`, title: 'view.js did not load' },
     rerun: V ? V.rerunButton(pr, ctx) : { show: false, enabled: false, title: '' },
   };
+}
+// RP137: the facts the ONE rule of the Merge button (V.mergeButton) reads for a PR: the method, a merge in flight, a merge already held, and a command running in the session. The column's footer and the sheet that confirms a merge
+// ask the rule with the same facts.
+function mergeCtxOf(id, n) {
+  const busy = S.busy[`${id}:${n}`];
+  const held = !busy && mergeHeld(id, n);
+  const verdict = verdictOf({ id });
+  const hold = verdict && verdict.state === 'running' && V ? V.runningReason({ cmd: verdict.cmd, label: verdict.label }) : '';
+  return { method: S.prefs.method, busy, held, hold };
+}
+const prOfId = (id, n) => ((S.prs[id] && Array.isArray(S.prs[id].prs) ? S.prs[id].prs : []).find((p) => p && p.number === n)) || null;
+// RP137: is this a phone? The width of the layout when it is measured; the Work tab hides the layout (it measures 0), so then the width of the window. A width that is not known is not a phone (today's behaviour).
+function phoneNow() {
+  const layout = $('#sumLayout').clientWidth || 0;
+  const width = layout > 0 ? layout : typeof window === 'object' && window && typeof window.innerWidth === 'number' ? window.innerWidth : 0;
+  return !!V && V.bandOf(width) === 'narrow';
+}
+// RP137: the sheet that asks before a merge. It is drawn from S.mergeSheet = { id, n, chatId } and the live data, and it closes by itself when the PR is not there, is not ready any more, or the open repo is not the one it was opened in.
+let sheetShown = false;
+function mergeSheetModel() {
+  const sh = S.mergeSheet;
+  if (!sh || !V || !R) return null;
+  const pr = prOfId(sh.id, sh.n);
+  if (!pr || (S.chat.id || null) !== sh.chatId || pr.head !== sh.head || pr.title !== sh.title || V.mergeButton(pr, mergeCtxOf(sh.id, sh.n)).enabled !== true) return null;
+  return { n: pr.number, base: pr.base, title: pr.title, method: S.prefs.method, del: S.prefs.del === true };
+}
+function drawMergeSheet() {
+  const model = mergeSheetModel();
+  if (!model) S.mergeSheet = null;
+  const el = $('#mergeSheet');
+  if (!el) return;
+  el.hidden = !model;
+  paint(el, model ? R.mergeSheetHtml(model) : '');
+  if (model && !sheetShown) { const b = $('#ms-cancel'); if (b && b.focus) b.focus(); }
+  sheetShown = !!model;
 }
 function applyLayout() {
   applyScreen(); // RP134
