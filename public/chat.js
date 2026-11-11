@@ -68,6 +68,12 @@ function closeChat() {
   chatShown = null;
   draw();
 }
+// RP152: the counter of «Subagent working» moves by itself, once a second, and only while the open chat has one on and the page is visible (nothing is repainted otherwise).
+function subTick() {
+  if (document.hidden || !S.chat.id) return;
+  const e = S.rpc[S.chat.id];
+  if (e && Number.isInteger(e.subs) && e.subs > 0) draw();
+}
 const chatTick = () => { if (S.chat.id && (!S.chat.tab || S.chat.tab === 'chat') && S.tab === 'summary' && !document.hidden && !(V && pollSkipped('chat'))) loadChat(S.chat.id); };
 
 // RP63 (S60): the Tasks tab reads /api/roadmap once per chat opening, when the tab is first shown. The last good answer of a repo
@@ -373,7 +379,7 @@ function drawChat() {
   prunePending(S.chat.id);
   const shown = chatView();
   const hasSession = !!(S.chat.info && S.chat.info.adopted) || !!(S.rpc[S.chat.id] && S.rpc[S.chat.id].state !== 'closed'); // RP98: a session to close
-  paint($('#sessState'), R.sessionLabelHtml(shown) + R.memoryChipHtml(shown) + R.ctxChipHtml(shown) + R.compactButtonHtml(shown) + R.sessionTerminalHtml(hasSession, S.chat.terminal) + R.sessionCloseHtml(hasSession, S.chat.closing));
+  paint($('#sessState'), R.sessionLabelHtml(shown) + R.subagentChipHtml(shown, Date.now()) + R.memoryChipHtml(shown) + R.ctxChipHtml(shown) + R.compactButtonHtml(shown) + R.sessionTerminalHtml(hasSession, S.chat.terminal) + R.sessionCloseHtml(hasSession, S.chat.closing));
   paint($('#termBlock'), R.terminalBlockHtml(hasSession ? S.chat.terminal : null)); // RP118: the line for a normal terminal, only while the button is open
   const body = $('#chatBody');
   const atBottom = chatShown !== S.chat.id || !(body.scrollHeight > 0) || body.scrollHeight - body.scrollTop - body.clientHeight < 24;
