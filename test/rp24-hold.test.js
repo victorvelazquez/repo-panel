@@ -95,14 +95,19 @@ test('B: the override lifts the session gating and the menu offers the override 
   assert.equal(commitOverrideItem(null, { now: NOW, session: 'busy', stale: true }), null);
 });
 
-test('B: it only touches the commit pair: a clean card, a stale card and the PR and base buttons are unaffected', () => {
+test('B: a busy session holds EVERY delivery button of a card (RP159: it used to touch only the commit pair, and /flow-pr and /flow-base came back while the session worked); the shape of the cards is unchanged', () => {
   const clean = { ...dirty(), files: [], ahead: 1 };
-  assert.deepEqual(flowButtons(clean, prs(), null, ctx({ session: 'busy' })), [{ cmd: 'flow-pr', label: '/flow-pr' }]);
+  assert.deepEqual(flowButtons(clean, prs(), null, ctx({ session: 'busy' })), [{ cmd: 'flow-pr', label: '/flow-pr', disabled: true, reason: 'the session is still working' }]);
+  assert.deepEqual(flowButtons(clean, prs(), null, ctx({ session: 'idle' })), [{ cmd: 'flow-pr', label: '/flow-pr' }]);
   const merged = { via: 'merged', pr: 7, reason: 'Merged: run /flow-base' };
-  assert.deepEqual(cmds(flowButtons({ ...clean, ahead: 0 }, prs({ stale: merged }), null, ctx({ session: 'busy' }))), ['flow-base']);
+  const base = flowButtons({ ...clean, ahead: 0 }, prs({ stale: merged }), null, ctx({ session: 'busy' }));
+  assert.deepEqual(cmds(base), ['flow-base']);
+  assert.equal(base[0].disabled, true);
+  assert.equal(base[0].reason, 'the session is still working');
   const stash = flowButtons(dirty(), prs({ stale: merged }), null, ctx({ session: 'busy' }));
   assert.deepEqual(cmds(stash), ['flow-base-stash']);
-  assert.equal(stash[0].disabled, undefined);
+  assert.equal(stash[0].disabled, true);
+  assert.equal(flowButtons(dirty(), prs({ stale: merged }), null, ctx({ session: 'idle' }))[0].disabled, undefined);
   assert.deepEqual(flowButtons(dirty({ inProgress: 'rebase' }), prs(), null, ctx({ session: 'busy' })), []);
   assert.deepEqual(flowButtons({ error: 'x' }, prs(), null, ctx({ session: 'busy' })), []);
 });

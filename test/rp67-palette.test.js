@@ -110,7 +110,7 @@ test('css: the mapping is documented in a comment block', () => {
 // ---------- rename ----------
 test('the Fix CI label replaces "Fix with pi" and keeps the data attributes', () => {
   const app = appSource();
-  assert.match(app, /piBtn\(r, 'fix-pr', 'Fix CI', \{ pr: pr\.number, title: hold \|\| FIX_PR_HINT, disabled: !!hold \}\)/);
+  assert.match(app, /piBtn\(r, 'fix-pr', 'Fix CI', \{ pr: pr\.number, title: fixHold \|\| FIX_PR_HINT, disabled: !!fixHold \}\)/); // RP159: fixHold is the running command OR the live session
   for (const f of [...APP_FILES, 'view.js']) assert.doesNotMatch(read(f), /Fix with pi/, f);
   assert.match(read('../README.md'), /Fix CI/);
   assert.equal(read('../README.md').split('Fix with pi').length - 1, 1, 'only the "formerly" mention is left');

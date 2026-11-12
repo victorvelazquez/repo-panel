@@ -98,15 +98,19 @@
     // The visible label is short; the full text stays in title and aria-label.
     const open = (title, cls = '', kind = '') => `<button${cls ? ` class="${cls}"` : ''} data-act="focus-repo" data-id="${id}"${kind ? ` data-kind="${kind}"` : ''} title="${esc(title)}" aria-label="${esc(title)}">Open</button>`;
     const sending = ctx.sending && ctx.sending[r.id] ? ' disabled' : '';
+    // RP159: the buttons that talk to the session are held while it works, not only while the order is on its way. The page says it (`ctx.holdFor`, from the live session); a page that does not have it asks the row of the server.
+    const rowWorking = r.session && r.session.state === 'working' ? 'The session is working: wait for it to finish' : '';
+    const held = (ctx.holdFor ? String(ctx.holdFor(r.id) || '') : rowWorking) || (sending ? 'Sending the order to the session' : '');
+    const heldAttr = held ? ' disabled' : '';
     if (r.error) return open('Open');
     if (!a) return '';
     if (a.kind === 'merge') return `<button class="merge" data-act="merge" data-id="${id}" data-n="${esc(a.pr)}" title="Merge #${esc(a.pr)}" aria-label="Merge #${esc(a.pr)}"${ctx.busy && ctx.busy[`${r.id}:${a.pr}`] ? ' disabled' : ''}>${esc(clip(`Merge #${a.pr}`, LABEL_MAX))}</button>`;
-    if (a.kind === 'branch') return `<button class="primary" data-act="pi" data-id="${id}" data-cmd="flow-base" title="Send /flow-base to the open session of this repo"${sending}>/flow-base</button>`;
-    if (a.kind === 'start') return `<button class="primary" data-act="pi" data-id="${id}" data-cmd="flow-next" title="Send /flow-next to the open session of this repo (starts ${esc(r.next ? r.next.id : '')})"${sending}>/flow-next</button>`;
+    if (a.kind === 'branch') return `<button class="primary" data-act="pi" data-id="${id}" data-cmd="flow-base" title="${esc(held || 'Send /flow-base to the open session of this repo')}"${heldAttr}>/flow-base</button>`;
+    if (a.kind === 'start') return `<button class="primary" data-act="pi" data-id="${id}" data-cmd="flow-next" title="${esc(held || `Send /flow-next to the open session of this repo (starts ${r.next ? r.next.id : ''})`)}"${heldAttr}>/flow-next</button>`;
     if (a.kind === 'deliver') {
       const f = ctx.flowFor ? ctx.flowFor(r.id) : null;
       return f
-        ? `<button class="primary" data-act="pi" data-id="${id}" data-cmd="${esc(f.cmd)}" title="${esc(f.reason || `Send /${f.cmd} to the open session of this repo`)}"${f.disabled || sending ? ' disabled' : ''}>${esc(f.label)}</button>`
+        ? `<button class="primary" data-act="pi" data-id="${id}" data-cmd="${esc(f.cmd)}" title="${esc(held || f.reason || `Send /${f.cmd} to the open session of this repo`)}"${f.disabled || held ? ' disabled' : ''}>${esc(f.label)}</button>`
         : '<button class="primary" disabled title="This repo\'s local state is not loaded yet">Deliver</button>';
     }
     // answer and waiting get data-kind so the stylesheet can colour them amber; manual stays neutral.
