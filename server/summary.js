@@ -3,6 +3,7 @@
 // the one main action). It only reuses what the other routes already read; the session comes from the RPC host. A repo whose git or gh read fails gets an error row and the others are unaffected.
 const path = require('node:path');
 const lib = require('../lib.js');
+const { MAX_JOBS } = require('./jobs.js');
 const V = require('../public/view.js');
 const { git } = require('./exec.js');
 const { loadConfig } = require('./config.js');
@@ -23,7 +24,18 @@ const WORKING = QUEUE_BASE + Math.max(...Object.values(lib.QUEUE_RANK)) + 1;
 
 const caches = new WeakMap();
 
-const sessionOf = (s) => ({ state: SESSION_OF[s] || 'unknown' });
+// RP161: next to the state, how many background jobs the session still waits for: only for a live session and only a positive integer (at most MAX_JOBS); absent otherwise, so a row with none is the row of always.
+const LIVE_STATES = ['free', 'working', 'waiting'];
+const LIVE_RAW = ['idle', 'busy', 'starting', 'asking'];
+const sessionOf = (s, jobs) => {
+  const state = SESSION_OF[s] || 'unknown';
+  const n = LIVE_STATES.includes(state) && Number.isSafeInteger(jobs) && jobs > 0 ? Math.min(jobs, MAX_JOBS) : 0;
+  return n ? { state, jobs: n } : { state };
+};
+// The number a getter gives for one repo; a getter that throws is no jobs.
+function jobsFrom(getter, id) {
+  try { return getter(id); } catch { return 0; }
+}
 const noProgress = { total: null, completada: null, enRevision: null, bloqueada: null, pendiente: null, enCurso: null };
 
 // Every row counts once: Completada and Bloqueada as written, then the derived En revisión, then En curso (derived or
@@ -92,7 +104,7 @@ function rankOf(session, failingCi, action, blocking) {
 // The row of one repo and why it needs attention (a list of reasons, empty when it does not).
 function analyse(f) {
   const { id, name, group, room } = f.repo;
-  const session = sessionOf(f.session);
+  const session = sessionOf(f.session, f.jobs);
   const error = f.error || (f.local && f.local.error) || (f.prs && f.prs.error) || null;
   const last = f.last && f.last.at ? { at: f.last.at, what: f.last.what ?? null } : { at: null, what: null };
   if (error || !f.local || !f.prs) {
@@ -145,7 +157,8 @@ async function gather(repo, ctx) {
       (deps.local || localState)(repo), (deps.prs || prState)(repo), (deps.roadmap || roadmapState)(repo),
       (deps.state || readState)(repo), sessionIn(), lastMovementOf(repo, deps.git || git),
     ]);
-    return { ...f, local, prs, roadmap, state, session, last };
+    const jobs = deps.jobsOf && LIVE_RAW.includes(session) ? jobsFrom(deps.jobsOf, repo.id) : 0; // RP161: only a live session can wait for a job
+    return { ...f, local, prs, roadmap, state, session, jobs, last };
   } catch (e) {
     return { ...f, error: e.message || 'Read failed', session: 'unknown' };
   }
@@ -208,4 +221,4 @@ function summaryFor(deps = {}, query = {}) {
   return p;
 }
 
-module.exports = { stateFrom, summarize, summaryFor, safeAnalyse, tally, loadingRow, lastMovementOf, pool };
+module.exports = { jobsFrom, LIVE_RAW, stateFrom, summarize, summaryFor, safeAnalyse, tally, loadingRow, lastMovementOf, pool };

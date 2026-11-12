@@ -319,4 +319,4 @@ function adoptIfNone(key, sid) {
   return true;
 }
 
-module.exports = { baseDir, sessionsDirFor, listSessions, readChat, chatState, chatResult, sessionKeyFor, sessionsState, adoptSession, releaseSession, adoptIfNone, SESSION_ID };
+module.exports = { linesOf, readChunk, CHAT_WINDOW, isSessionFile, baseDir, sessionsDirFor, listSessions, readChat, chatState, chatResult, sessionKeyFor, sessionsState, adoptSession, releaseSession, adoptIfNone, SESSION_ID };
