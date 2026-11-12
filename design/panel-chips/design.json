@@ -1,0 +1,35 @@
+{
+  "title": "Repo Panel — Chips del chat",
+  "brief": "«el icono del chip de contexto (ctx) no se ve bien, propone agregar uno al chip de memoria («memory ready») y mejorar los iconos de todos los chips del chat» (RP156). Hoy son caracteres de texto que cada sistema dibuja distinto. Las tres direcciones dibujan el estado de la sesión, la memoria, el contexto y el subagente con los textos y estados reales de public/resumen.js, a 880 y a 360 px. Colores tomados de public/style.css.",
+  "feature": "odd/tasks/panel-layout.md",
+  "artboards": [
+    {
+      "file": "01-hoy.html",
+      "title": "Hoy · the chips as they are now",
+      "tradeoff": "Not a direction: the reference, drawn from the code. Text characters that each system draws with another shape and size; two different states share the same glyph; the memory chip has no icon",
+      "width": 960,
+      "height": 760
+    },
+    {
+      "file": "02-linea.html",
+      "title": "A · Outline icons, the family of the page",
+      "tradeoff": "Same drawn icons as the tabs, trees and CI (16 grid, stroke 1.5): consistent and easy to extend. Every state has its own shape (Idle is a check, Not started a dashed ring), the context chip changes shape with the level (arc, triangle, cross). Costs width: icon plus word in every chip",
+      "width": 960,
+      "height": 1500
+    },
+    {
+      "file": "03-formas-y-barra.html",
+      "title": "B · Small solid shapes and a bar for the context",
+      "tradeoff": "Compact 12 px shapes (ring, disc, half disc, diamond) and the context as a bar whose length says how full it is, with a hatch for the warning and a solid fill for the strong warning. Reads at a glance and is smaller, but the shapes are less common in the rest of the page and the bar needs a legend",
+      "width": 960,
+      "height": 1500
+    },
+    {
+      "file": "04-solo-icono-angosto.html",
+      "title": "C · Icon and word when wide, icon only when narrow",
+      "tradeoff": "Uses the icons of A but collapses the row under about 480 px: the state and the memory become icon-only chips (the word stays in the accessible name and the tooltip) and Terminal and Close session shorten, so the row fits on one line at 360 px. One more rule to maintain and the words disappear on a phone",
+      "width": 960,
+      "height": 1300
+    }
+  ]
+}
