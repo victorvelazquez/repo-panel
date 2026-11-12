@@ -25,6 +25,7 @@ const { roomsState, createRoom, removeRoom, assignRoom } = require('./rooms.js')
 const { queueFor, conformityFor } = require('./queue.js');
 const { summaryFor } = require('./summary.js');
 const { jobsOf } = require('./jobs.js');
+const { subagentsOf } = require('./presence.js');
 const { createSummaryStore } = require('./summarystore.js');
 const { createEventHub } = require('./events.js');
 const { createRpcHost, rpcApi } = require('./rpchost.js');
@@ -235,8 +236,10 @@ function createServer(port, deps = {}) {
   if (!deps.sessionOf && typeof deps.rpcHost.stateOf === 'function') deps.sessionOf = (id) => deps.rpcHost.stateOf(id);
   // RP161: the background jobs a session waits for, counted from its session file; only for a session the panel started (`startedAtOf`); an injected host with none leaves them out.
   if (!deps.jobsOf && typeof deps.rpcHost.startedAtOf === 'function') deps.jobsOf = (id) => jobsOf(id, deps.rpcHost.startedAtOf(id), deps.sessionsDir);
+  // RP164: what the subagents of that session do, read from the presence folder next to the sessions one (shown only, never a hold); only for a session the panel started, like the jobs.
+  if (!deps.subagentsOf && typeof deps.rpcHost.startedAtOf === 'function') deps.subagentsOf = (id) => (typeof deps.rpcHost.startedAtOf(id) === 'number' ? subagentsOf(id, { base: deps.sessionsDir }) : null);
   // RP78: the Summary comes from a store kept in memory (server.js starts it); injected by tests, or off with noSummaryStore. Built AFTER the host: it reads its state.
-  if (!deps.summaryStore && !deps.noSummaryStore) deps.summaryStore = createSummaryStore({ deps, now: deps.now, sessionOf: deps.sessionOf, jobsOf: deps.jobsOf });
+  if (!deps.summaryStore && !deps.noSummaryStore) deps.summaryStore = createSummaryStore({ deps, now: deps.now, sessionOf: deps.sessionOf, jobsOf: deps.jobsOf, subagentsOf: deps.subagentsOf });
   const server = http.createServer((req, res) => {
     if (req.method === 'GET' && req.url.split('?')[0] === '/api/events') return openStream(req, res);
     const t0 = Date.now();

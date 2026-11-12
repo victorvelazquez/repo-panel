@@ -18,7 +18,7 @@ const { readState } = require('./state.js');
 const { requirementsFor } = require('./requirements.js');
 const { fetchRepo } = require('./fetcher.js');
 const view = require('../public/view.js');
-const { stateFrom, jobsFrom, LIVE_RAW, safeAnalyse, tally, loadingRow, lastMovementOf, pool } = require('./summary.js');
+const { stateFrom, jobsFrom, subagentsFrom, LIVE_RAW, safeAnalyse, tally, loadingRow, lastMovementOf, pool } = require('./summary.js');
 
 const KINDS = ['local', 'prs', 'roadmap', 'state', 'last', 'req', 'fetch'];
 const SUMMARY_KINDS = KINDS.filter((k) => k !== 'req' && k !== 'fetch'); // the Summary never shows req or fetch, so they are never one of its stale marks
@@ -60,7 +60,7 @@ function withTimeout(promise, ms) {
 }
 
 function createSummaryStore({
-  deps = {}, now = Date.now, loadCfg = loadConfig, setTimer = setTimeout, clearTimer = clearTimeout, intervals, idleAfterMs = IDLE_AFTER_MS, pool: poolSize = POOL, waitForClient = true, timeout = withTimeout, catchUpDelayMs = CATCH_UP_DELAY_MS, sessionOf, jobsOf,
+  deps = {}, now = Date.now, loadCfg = loadConfig, setTimer = setTimeout, clearTimer = clearTimeout, intervals, idleAfterMs = IDLE_AFTER_MS, pool: poolSize = POOL, waitForClient = true, timeout = withTimeout, catchUpDelayMs = CATCH_UP_DELAY_MS, sessionOf, jobsOf, subagentsOf,
 } = {}) {
   const iv = { ...INTERVALS, ...intervals };
   const facts = new Map(); // repo id -> { [kind]: { value, at (last success), tried (last attempt), failed, error } }
@@ -233,9 +233,11 @@ const outcome = (fact) => JSON.stringify([fact.failed, fact.error, fact.value ==
       const session = sessionOf ? stateFrom(sessionOf, repo.id) : 'unknown';
       // RP161: how many background jobs that session waits for, read now like its state (only a live session can wait for one).
       const jobs = jobsOf && LIVE_RAW.includes(session) ? jobsFrom(jobsOf, repo.id) : 0;
+      // RP164: what its subagents do, read now like the jobs (shown only, never a hold).
+      const subagents = subagentsOf && LIVE_RAW.includes(session) ? subagentsFrom(subagentsOf, repo.id) : null;
       const broken = NEEDED.find((k) => f[k].value === undefined);
-      if (broken) return safeAnalyse({ repo: info, last, session, jobs, error: f[broken].error });
-      const out = safeAnalyse({ repo: info, snoozed: cfg.snoozed, now: t, local: f.local.value, prs: f.prs.value, roadmap: f.roadmap.value, state: f.state.value, session, jobs, last });
+      if (broken) return safeAnalyse({ repo: info, last, session, jobs, subagents, error: f[broken].error });
+      const out = safeAnalyse({ repo: info, snoozed: cfg.snoozed, now: t, local: f.local.value, prs: f.prs.value, roadmap: f.roadmap.value, state: f.state.value, session, jobs, subagents, last });
       const stale = staleOf(f, t);
       return stale.length && !out.row.error ? { ...out, row: { ...out.row, stale: { facts: stale } } } : out;
     });
