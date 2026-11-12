@@ -147,7 +147,7 @@ test('r6: after a close the repo starts a NEW session, which is adopted again (t
 
 // ---------- the page ----------
 test('p0: Close session is next to the session state (RP72 keeps the chat head to the repo name and the ✕): the helper draws it only when there is a session, disabled while closing', () => {
-  assert.match(R.sessionCloseHtml(true, false), /^<button type="button" class="ss-close" data-act="session-close" title="[^"]+">Close session<\/button>$/);
+  assert.match(R.sessionCloseHtml(true, false), /^<button type="button" class="ss-close" data-act="session-close" title="[^"]+">Close<span class="ss-long"> session<\/span><\/button>$/); // RP156: a narrow chat shows «Close» (the words stay for the accessible name)
   assert.match(R.sessionCloseHtml(true, true), /data-act="session-close" disabled /);
   assert.equal(R.sessionCloseHtml(false, false), '');
   const adopted = { id: 'abc', info: { adopted: { id: 's1' } } };

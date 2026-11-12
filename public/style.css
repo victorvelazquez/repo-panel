@@ -712,7 +712,7 @@ button.tk-gh:hover:not(:disabled) { background: var(--panel2); color: var(--text
 /* RP99/RP100: the list of sessions of a repo uses the width of the chat and the height it leaves (the box shrinks and scrolls inside it); a row never squashes. */
 .ch-picks { align-self: stretch; flex: 0 1 auto; min-height: 0; max-height: 100%; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; margin: 0; }
 /* RP98: the Close session button sits at the right of the session state, inside the composer frame. */
-.sess-state { display: flex; align-items: center; gap: 8px; }
+.sess-state { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; row-gap: 4px; } /* RP156: with the icons every chip on can pass the width; wrap, never cut a button */
 .ss-close { margin-left: auto; flex: none; font-size: 12px; padding: 1px 8px; }
 .ss-close:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 /* RP118: the Terminal button sits before Close session; the block with the command opens under the state row. */
@@ -768,7 +768,7 @@ button.tk-gh:hover:not(:disabled) { background: var(--panel2); color: var(--text
 /* RP152: «Subagent working · mm:ss» next to the state: blue (normal activity, not a warning), words and a counter that does not jump when its digits change. */
 .sub-chip { display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; padding: 0 8px; border: 1px solid var(--line); border-radius: 10px; font-size: 12px; color: var(--blue); white-space: nowrap; }
 .sub-time { font-weight: 600; font-variant-numeric: tabular-nums; }
-.mem { font-size: 12px; padding: 0 8px; border-radius: 10px; border: 1px solid var(--line); margin-left: 6px; white-space: nowrap; color: var(--muted); }
+.mem { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; padding: 0 8px; border-radius: 10px; border: 1px solid var(--line); margin-left: 6px; white-space: nowrap; color: var(--muted); }
 .mem-warn { color: var(--yellow); border-color: #53410f; background: #251d08; }
 .mem-bad { color: var(--red); border-color: #5a1f1c; background: #2a1213; }
 .tools.tcs { display: flex; flex-wrap: wrap; gap: 4px; max-width: 90%; padding: 0; border: 0; }
@@ -849,7 +849,7 @@ button.tc:hover { border-color: var(--muted); }
 
 /* RP68: the composer at the bottom of the chat and its "/ Actions" menu (opens upwards, anchored to the bar). */
 #chat .ch-body { flex: 1 1 0; }
-.composer { flex: none; margin: 0 12px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); padding: 8px 8px 6px; display: grid; gap: 6px; }
+.composer { container-type: inline-size; container-name: cmp; flex: none; margin: 0 12px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); padding: 8px 8px 6px; display: grid; gap: 6px; }
 .sess-state { min-height: 18px; padding: 0 6px; font-size: 12px; color: var(--muted); }
 .ss { display: inline-flex; align-items: center; gap: 5px; }
 .ss-dot { font-style: normal; display: inline-block; }
@@ -859,6 +859,13 @@ button.tc:hover { border-color: var(--muted); }
 .ss-anim .ss-dot { animation: pulse-dot 1.2s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) {
   .ss-anim .ss-dot { animation: none; }
+}
+/* RP156 (design/panel-chips/, direction C): the icons of the chips are drawn in the line with their text; in a narrow chat (the composer is 24 px narrower than the chat: 456 px is 480 px of chat) a chip keeps only its icon, the number of
+   the context and the time of the subagent. The words are hidden the clip way, NEVER with display:none: they stay in the accessible name, and the titles do not change. */
+.ss-dot svg, .mem-ic svg, .sub-dot svg { display: block; }
+.mem-ic, .sub-dot { font-style: normal; display: inline-flex; }
+@container cmp (max-width: 456px) {
+  .ss-word, .mem-word, .sub-word, .ss-long { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 }
 .composer:focus-within { border-color: var(--blue); }
 .composer textarea { width: 100%; min-height: 42px; max-height: 150px; resize: none; border: 0; background: transparent; color: var(--text); font: inherit; padding: 4px 6px; }

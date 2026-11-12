@@ -203,10 +203,10 @@ test('page: the status of the session sets or keeps the category, and a closed s
 
 test('page: the chip says the category in words, with a tone; nothing is drawn without a known category or when the session is closed', () => {
   const chip = (memory, state = 'idle') => R.memoryChipHtml({ rpc: { state, memory } });
-  assert.match(chip('ready'), /^<span class="mem mem-ready" title="[^"]+">memory ready<\/span>$/);
-  assert.match(chip('offline'), /class="mem mem-bad" title="[^"]+">memory offline</);
-  assert.match(chip('error'), /class="mem mem-bad" title="[^"]+">memory error</);
-  assert.match(chip('disabled'), /class="mem mem-warn" title="[^"]+">memory disabled</);
+  assert.match(chip('ready'), /^<span class="mem mem-ready" title="[^"]+"><i class="mem-ic" aria-hidden="true"><svg [\s\S]*<\/svg><\/i> <span class="mem-word">memory ready<\/span><\/span>$/); // RP156: the chip has a drawn icon and the word in its own span
+  assert.match(chip('offline'), /class="mem mem-bad" title="[^"]+"><i [\s\S]*<span class="mem-word">memory offline<\/span>/);
+  assert.match(chip('error'), /class="mem mem-bad" title="[^"]+"><i [\s\S]*<span class="mem-word">memory error<\/span>/);
+  assert.match(chip('disabled'), /class="mem mem-warn" title="[^"]+"><i [\s\S]*<span class="mem-word">memory disabled<\/span>/);
   for (const c of [{}, { rpc: null }, { rpc: {} }, { rpc: { memory: 'SECRET' } }, { rpc: { memory: '<img src=x>' } }, { rpc: { state: 'closed', memory: 'ready' } }, null, undefined]) {
     assert.equal(R.memoryChipHtml(c), '', JSON.stringify(c));
   }
@@ -261,7 +261,7 @@ async function chatPage(rpcStatus) {
 
 test('page (real): opening a chat whose status says offline draws the chip next to the state of the session; with no memory in the status there is no chip', async () => {
   const bad = await chatPage({ state: 'idle', pendingDialogs: [], sessionId: 's1', memory: 'offline' });
-  assert.match(bad.get('#sessState').html, /class="mem mem-bad"[^>]*>memory offline</);
+  assert.match(bad.get('#sessState').html, /class="mem mem-bad"[^>]*><i [\s\S]*<span class="mem-word">memory offline<\/span>/); // RP156
   assert.match(bad.get('#sessState').html, /class="ss /);
   const none = await chatPage({ state: 'idle', pendingDialogs: [], sessionId: 's1' });
   assert.doesNotMatch(none.get('#sessState').html, /class="mem /);
