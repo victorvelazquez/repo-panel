@@ -15,7 +15,8 @@ const CHUNK = 64 * 1024;
 const CHAT_WINDOW = 512 * 1024;
 const LIMIT = 20;
 const TEXT_MAX = 200;
-const CHAT_TEXT = 4000;
+// RP162: the history keeps this many characters of each text (it used to be 4000 and a long answer ended in «corr…»). The read of the history is bounded by CHAT_WINDOW anyway, so the answer of one read stays bounded.
+const CHAT_TEXT = 50000;
 const CHAT_DEFAULT = 30;
 const BLOCK_GAP = '\n\n';
 const CHAT_MAX = 100;
@@ -116,7 +117,8 @@ const isoOf = (t) => {
   const d = new Date(typeof t === 'string' && /^\d+$/.test(t) ? Number(t) : t);
   return typeof t === 'number' || typeof t === 'string' ? (Number.isNaN(d.getTime()) ? null : d.toISOString()) : null;
 };
-const capped = (s) => { const t = cleanText(s).trim(); return t.length > CHAT_TEXT ? `${t.slice(0, CHAT_TEXT)}…` : t; };
+// RP162: { text, cut }: the text up to CHAT_TEXT characters (nothing glued to it) and `cut`, how many characters were left out (0 when none): the page says it instead of showing a «…» with no explanation.
+const capped = (s) => { const t = cleanText(s).trim(); return t.length > CHAT_TEXT ? { text: t.slice(0, CHAT_TEXT), cut: t.length - CHAT_TEXT } : { text: t, cut: 0 }; };
 // RP106: NUMBERS about a tool result, never its text: the characters of its text blocks, and for an edit the lines its unified diff adds and removes (counted only after the
 // first hunk header, so a changed line that starts with "--" or "++" is not taken for a file header).
 const textSize = (c) => (typeof c === 'string' ? c.length : Array.isArray(c) ? c.reduce((n, b) => n + (b && b.type === 'text' && typeof b.text === 'string' ? b.text.length : 0), 0) : 0);
@@ -162,7 +164,7 @@ function readChat(folder, sessionId, { base = baseDir(), limit = CHAT_DEFAULT, k
       const m = entry && entry.type === 'message' && entry.message;
       if (!m || typeof m !== 'object') continue;
       const at = isoOf(m.timestamp ?? entry.timestamp);
-      const body = capped(blocksOf(m, 'text').filter((c) => typeof c.text === 'string').map((c) => c.text).join(BLOCK_GAP));
+      const { text: body, cut } = capped(blocksOf(m, 'text').filter((c) => typeof c.text === 'string').map((c) => c.text).join(BLOCK_GAP));
       if (m.role === 'toolResult') {
         const chip = typeof m.toolCallId === 'string' ? infoById.get(m.toolCallId) : undefined;
         if (chip) {
@@ -171,7 +173,7 @@ function readChat(folder, sessionId, { base = baseDir(), limit = CHAT_DEFAULT, k
         }
         continue;
       }
-      if (m.role === 'user') { pending = []; pendingInfo = []; thought = false; if (body) items.push({ role: 'user', text: body, at, tools: [] }); continue; }
+      if (m.role === 'user') { pending = []; pendingInfo = []; thought = false; if (body) items.push({ role: 'user', text: body, at, tools: [], ...(cut ? { cut } : {}) }); continue; }
       if (m.role !== 'assistant') continue;
       if (blocksOf(m, 'thinking').length) thought = true; // only THAT it reasoned: the reasoning text never leaves the server
       for (const c of blocksOf(m, 'toolCall').filter((b) => typeof b.name === 'string')) {
@@ -183,7 +185,7 @@ function readChat(folder, sessionId, { base = baseDir(), limit = CHAT_DEFAULT, k
       // RP105b: only the CATEGORY of a stopped or failed turn travels; the `errorMessage` (it can hold the raw body of an API answer) is never read. A turn that stopped with
       // no text is an item too (it was invisible before).
       const stop = m.stopReason === 'aborted' || m.stopReason === 'error' ? m.stopReason : null;
-      if (body || stop) { items.push({ role: 'assistant', text: body, at, tools: pending, ...(pendingInfo.length ? { toolInfo: pendingInfo } : {}), ...(thought ? { thinking: true } : {}), ...(stop ? { stop } : {}) }); pending = []; pendingInfo = []; thought = false; }
+      if (body || stop) { items.push({ role: 'assistant', text: body, at, tools: pending, ...(cut ? { cut } : {}), ...(pendingInfo.length ? { toolInfo: pendingInfo } : {}), ...(thought ? { thinking: true } : {}), ...(stop ? { stop } : {}) }); pending = []; pendingInfo = []; thought = false; }
     }
     if (pending.length || thought) items.push({ role: 'assistant', text: '', at: null, tools: pending, ...(pendingInfo.length ? { toolInfo: pendingInfo } : {}), ...(thought ? { thinking: true } : {}) });
     return { key, sessionId, found: true, items: items.slice(-max), truncated: start > 0 || items.length > max, updatedAt: new Date(mtimeMs).toISOString() };

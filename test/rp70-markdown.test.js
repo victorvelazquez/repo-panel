@@ -64,13 +64,14 @@ test('readChat: the text is still trimmed (whole message, not each line)', () =>
   assert.equal(oneUser('a5', [text('\n\n  hello\n  world  \n\n')]), 'hello\n  world');
 });
 
-test('readChat: the cap is still 4000 characters plus the ellipsis, and a capped multi-line text keeps its newlines', () => {
-  const flat = oneUser('a6', [text('x'.repeat(5000))]);
-  assert.equal(flat.length, 4001);
-  assert.equal(flat, `${'x'.repeat(4000)}…`);
-  const multi = oneUser('a6b', [text('ab\n'.repeat(2000))]);
-  assert.equal(multi.length, 4001);
-  assert.equal(multi, `${'ab\n'.repeat(2000).slice(0, 4000)}…`);
+test('readChat: the cap is 50 000 characters with nothing glued to the text (RP162: it was 4000 plus an ellipsis; `cut` says how many were left out), and a capped multi-line text keeps its newlines', () => {
+  const flat = oneUser('a6', [text('x'.repeat(50005))]);
+  assert.equal(flat.length, 50000);
+  assert.equal(flat, 'x'.repeat(50000));
+  const multi = oneUser('a6b', [text('ab\n'.repeat(20000))]);
+  assert.equal(multi.length, 50000);
+  assert.equal(multi, 'ab\n'.repeat(20000).trim().slice(0, 50000));
+  assert.ok(multi.includes('\n'), 'the newlines stay');
 });
 
 test('readChat: a tool NAME is still flattened (no newline or tab in it) and thinking, arguments and results stay out', () => {

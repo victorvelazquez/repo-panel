@@ -1054,12 +1054,14 @@
   const thoughtLine = (it) => (it.thinking === true ? '<div class="tools thought">▸ thinking…</div>' : '');
   // RP105b: a note after a turn that stopped or failed (only the two known categories draw), and a quiet line where the context was compacted.
   const STOP_NOTES = { aborted: '⏹ Turn stopped', error: '⚠ Turn failed' };
+  // RP162: a text the history cut says so under its words (`cut` is how many characters were left out; only a positive safe integer counts).
+  const cutNote = (it) => (Number.isSafeInteger(it.cut) && it.cut > 0 ? `<div class="m-cut" role="note">Message cut: ${it.cut} more characters, see the rest in the terminal</div>` : '');
   const stopNote = (it) => (Object.hasOwn(STOP_NOTES, it.stop) ? `<div class="m stopnote ${it.stop}">${STOP_NOTES[it.stop]}</div>` : '');
   const bubble = (it, who, rx) => {
     const time = hhmm(it.at);
     if (it.role === 'system') return it.kind === 'compaction' ? `<div class="sysnote">↻ Context compacted${time ? ` · ${time}` : ''}</div>` : '';
     if (it.role === 'assistant' && !it.text) return `${thoughtLine(it)}${toolsLine(it.tools, it.toolInfo, rx)}${stopNote(it) || '<div class="m working">working…</div>'}`;
-    return `${thoughtLine(it)}${toolsLine(it.tools || [], it.toolInfo, rx)}<div class="m${it.role === 'user' ? ' me' : ''}"><span class="who">${esc(it.role === 'user' ? 'You' : who)}${time ? ` · ${time}` : ''}</span>${mdHtml(it.text)}</div>${stopNote(it)}`;
+    return `${thoughtLine(it)}${toolsLine(it.tools || [], it.toolInfo, rx)}<div class="m${it.role === 'user' ? ' me' : ''}"><span class="who">${esc(it.role === 'user' ? 'You' : who)}${time ? ` · ${time}` : ''}</span>${mdHtml(it.text)}${cutNote(it)}</div>${stopNote(it)}`;
   };
 
   // Pending messages of the composer (RP75): shown after the real ones until the history has them. `base` is how many user items
@@ -1076,7 +1078,8 @@
       const it = items[i];
       if (!it || typeof it !== 'object') continue;
       if (it.role === 'user') return false;
-      if (it.role === 'assistant' && typeof it.text === 'string' && it.text) return flat(it.text) === live;
+      // RP162: an item the history CUT is compared by its beginning (the live text is the whole answer)
+      if (it.role === 'assistant' && typeof it.text === 'string' && it.text) return Number.isSafeInteger(it.cut) && it.cut > 0 ? live.startsWith(flat(it.text)) : flat(it.text) === live;
     }
     return false;
   };
