@@ -43,7 +43,7 @@ Las citas son textuales de la persona (ver `- [x] **RP96** · S12, S13 · inline
 - [x] **RP151** · S41 · inline · la página relee la lista cada minuto mientras la pestaña Tasks está abierta; depende de RP150.
 - [x] **RP152** · S42 · inline · el indicador en vivo «Subagente trabajando» con contador, desde los eventos que el panel ya recibe; empezar por reproducir por qué hoy no se ve.
 - [x] **RP153** · S54 · inline · SOLO EL ESTUDIO del formato de la presencia de los subagentes en la 4.7.0 (`docs/ESTUDIO-presencia.md`, de solo lectura y sin código); la implementación va en RP164 después de la decisión de la persona.
-- [ ] **RP154** · S42 · inline · la insignia en la tarjeta del repo y la lista de sus subagentes; depende de RP153.
+- [x] **RP154** · S42, S55 · inline · la insignia en la tarjeta del repo y la lista de sus subagentes vivos; `test/rp154-subagent-badge.test.js`; depende de RP164.
 - [x] **RP155** · S44 · inline · el chat no muestra dos veces el mismo mensaje del asistente mientras corre una herramienta: comparar al dibujar (la opción A); medir antes si el texto del historial es idéntico al de la burbuja en vivo.
 - [x] **RP156** · S45, S57 · inline · un mismo juego de iconos dibujados para los chips del chat (estado, memoria, contexto, subagente), con la dirección A + C de `design/panel-chips/`; `test/rp156-chip-icons.test.js`; depende de RP152.
 - [x] **RP144** · S32 · inline · `fix(header): colour the usage bars by consumption (RP144)` (lo crea `/flow-commit`). Pruebas primero (RED 4 de 8) con el marcado real y el CSS real; medido en el panel real con el consumo verdadero y con datos inventados en la memoria de la página; verificación liviana.
