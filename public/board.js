@@ -314,7 +314,7 @@ function flowFor(r, l, p, verdict) {
   const commitVerdict = verdict && COMMIT_CMDS.includes(verdict.cmd) ? verdict.state : null;
   const running = verdict && verdict.state === 'running' ? { cmd: verdict.cmd, label: verdict.label } : null;
   const retry = commitVerdict === 'attention';
-  return V ? V.flowButtons(l, p, S.state[r.id], { override, verdict: commitVerdict, running, retry, session: sessionOf(r.id) }) : (l.files || []).length > 0 ? [{ cmd: 'flow-commit', label: '/flow-commit' }] : [];
+  return V ? V.flowButtons(l, p, S.state[r.id], { override, verdict: commitVerdict, running, retry, session: sessionOf(r.id), jobs: jobsOfRepo(r.id) }) : (l.files || []).length > 0 ? [{ cmd: 'flow-commit', label: '/flow-commit' }] : [];
 }
 
 function repoCard(r, attn = false, verdict = null) {
@@ -322,7 +322,7 @@ function repoCard(r, attn = false, verdict = null) {
   const manual = V ? V.manualAction(l, l.base) : null;
   const override = S.showCommit.has(r.id);
   const flow = flowFor(r, l, p, verdict);
-  const overrideItem = !manual && dirty && V ? V.commitOverrideItem(S.state[r.id], { override, stale: !!p.stale, session: sessionOf(r.id) }) : null;
+  const overrideItem = !manual && dirty && V ? V.commitOverrideItem(S.state[r.id], { override, stale: !!p.stale, session: sessionOf(r.id), jobs: jobsOfRepo(r.id) }) : null;
   const chips = [];
   const shared = V ? V.changeChips(modelOf(r.id).changes, r.id) : ''; // RP87: the same chips as the Summary card
   if (shared) chips.push(shared);
@@ -364,7 +364,7 @@ function prCard(r, pr, meta, running = null) {
   const busy = S.busy[`${r.id}:${pr.number}`];
   const held = !busy && mergeHeld(r.id, pr.number);
   const hold = running && V ? V.runningReason({ cmd: running.cmd, label: running.label }) : '';
-  const fixHold = hold || (V ? V.deliveryHold({ session: sessionOf(r.id) }) : ''); // RP159: Fix CI talks to the session, so it waits for it; Merge and Re-run do not
+  const fixHold = hold || (V ? V.deliveryHold({ session: sessionOf(r.id), jobs: jobsOfRepo(r.id) }) : ''); // RP159: Fix CI talks to the session, so it waits for it; Merge and Re-run do not
   const showReason = !pr.ready && pr.blockedReason && pr.checks.state !== 'pending' && pr.checks.state !== 'failed';
   const n = `data-id="${r.id}" data-n="${pr.number}"`;
   // RP129: the Merge and Re-run buttons follow the ONE rule of view.js (the footer of the right column asks it too); without view.js neither is ever offered.

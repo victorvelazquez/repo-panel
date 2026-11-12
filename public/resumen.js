@@ -99,7 +99,8 @@
     const open = (title, cls = '', kind = '') => `<button${cls ? ` class="${cls}"` : ''} data-act="focus-repo" data-id="${id}"${kind ? ` data-kind="${kind}"` : ''} title="${esc(title)}" aria-label="${esc(title)}">Open</button>`;
     const sending = ctx.sending && ctx.sending[r.id] ? ' disabled' : '';
     // RP159: the buttons that talk to the session are held while it works, not only while the order is on its way. The page says it (`ctx.holdFor`, from the live session); a page that does not have it asks the row of the server.
-    const rowWorking = r.session && r.session.state === 'working' ? 'The session is working: wait for it to finish' : '';
+    const rowJobs = r.session && Number.isSafeInteger(r.session.jobs) && r.session.jobs > 0 ? `${Math.min(r.session.jobs, 99)} background job${r.session.jobs === 1 ? ' is' : 's are'} running` : ''; // RP163: the number the server left in the row
+    const rowWorking = r.session && r.session.state === 'working' ? 'The session is working: wait for it to finish' : rowJobs;
     const held = (ctx.holdFor ? String(ctx.holdFor(r.id) || '') : rowWorking) || (sending ? 'Sending the order to the session' : '');
     const heldAttr = held ? ' disabled' : '';
     if (r.error) return open('Open');

@@ -200,6 +200,11 @@
   function sessionHold(session) {
     return session === 'busy' ? SESSION_BUSY : session === 'asking' ? SESSION_ASKING : null;
   }
+  // RP163: the reason the delivery buttons are held while the session waits for background jobs (the server counts them, RP161, and leaves the number in the row of the Summary): only a positive safe integer holds, and at
+  // most 99 are said. Total.
+  function jobsHold(n) {
+    return Number.isSafeInteger(n) && n > 0 ? `${Math.min(n, 99)} background job${n === 1 ? ' is' : 's are'} running` : '';
+  }
   // RP159: the ONE rule that holds a delivery button (/flow-commit, /flow-pr, /flow-base, /flow-next, Fix CI): the reason it is held, or ''. In this order: the order is on its way (`sending`, a command name), a command sent
   // from this page is judged running (`running`, { cmd, label }), the session asks you or works (`session`, the LIVE state: busy | asking). What is not exactly one of those holds nothing. Total.
   function deliveryHold(ctx) {
@@ -209,7 +214,7 @@
     if (run && typeof run === 'object' && typeof run.cmd === 'string' && typeof run.label === 'string') return runningReason(run);
     if (c.session === 'asking') return 'The session is waiting for your answer';
     if (c.session === 'busy') return 'The session is working: wait for it to finish';
-    return '';
+    return jobsHold(c.jobs); // RP163: free, but it waits for background jobs
   }
 
   // Whether the newest changed file is younger than QUIET_MS. A missing or non-finite value never blocks.
@@ -275,8 +280,8 @@
   // The "⋯" menu item that lifts the state gating, only while the gating hides the button and it is not lifted yet.
   // Never on a stale repo with changes: that card offers /flow-base --stash, so /flow-commit would not appear anyway.
   // `session` is the live pi session state: a busy or asking one also gates the button, and the item lifts that too.
-  function commitOverrideItem(data, { now = Date.now(), override = false, stale = false, session } = {}) {
-    return !override && !stale && (!commitAllowed(data, { now }) || sessionHold(session)) ? { act: 'show-commit', label: 'Show /flow-commit anyway' } : null;
+  function commitOverrideItem(data, { now = Date.now(), override = false, stale = false, session, jobs } = {}) {
+    return !override && !stale && (!commitAllowed(data, { now }) || sessionHold(session) || jobsHold(jobs)) ? { act: 'show-commit', label: 'Show /flow-commit anyway' } : null;
   }
 
   // The card's "what to do now" line: { kind: 'current', dot, text, title } for a usable state, { kind: 'outdated',
@@ -441,13 +446,13 @@
     if (!hasLocal(local) || manualAction(local, local.base)) return [];
     const { override = false, verdict = null, retry = false, now = Date.now() } = ctx;
     // RP159: the other delivery buttons follow the live session too (only /flow-commit did): held while it works or asks, with the reason of the session. The override of the person is for /flow-commit only.
-    const live = sessionHold(ctx.session);
+    const live = sessionHold(ctx.session) || jobsHold(ctx.jobs); // RP163
     const held = live ? { disabled: true, reason: live } : {};
     if (local.files.length > 0 && prInfo && prInfo.stale) return verdict === 'running' ? [] : [{ cmd: 'flow-base-stash', label: '/flow-base --stash', reason: FLOW_STASH_HINT, ...held }];
     if (local.files.length > 0) {
       if (!commitAllowed(stateData, { now, override })) return [];
       const again = retry ? 'Retry ' : '';
-      const hold = override ? null : sessionHold(ctx.session) || (quietPeriod(local.lastChangeMs, now) ? QUIET_REASON : null);
+      const hold = override ? null : sessionHold(ctx.session) || jobsHold(ctx.jobs) || (quietPeriod(local.lastChangeMs, now) ? QUIET_REASON : null);
       if (local.stagedCount > 0) return [{ cmd: 'flow-commit-unstage', label: `${again}/flow-commit --unstage`, reason: hold || UNSTAGE_HINT, ...(hold ? { disabled: true } : {}) }];
       return [{ cmd: 'flow-commit', label: `${again}/flow-commit`, ...(hold ? { disabled: true, reason: hold } : {}) }];
     }
@@ -1027,5 +1032,5 @@
     return `${dot}${meters.join('')}<div class="usage-pop" role="group" aria-label="Claude usage details">${details.join('')}${note}${foot}</div>`;
   }
 
-  return { deliveryHold, tasksPollDue, TASKS_REFRESH_MS, mergeWhy, screenOf, bandOf, NARROW_BELOW, DUO_BELOW, parseAddress, addressOf, ADDRESS_ZONES, subClock, columnTabFor, conformityTabLabel, repoModel, changeChips, prChip, idleChip, conflictChip, sizeChip, RepoCard, stateLineHidden, usageView, usageHtml, usageRemaining, boardApply, boardWait, chatCachePut, chatCacheGet, rpcWithContext, chatFromCache, API_VERSION, mergeButton, rerunButton, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, dirtyRepos, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, taskPrs, matchesUnitId, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, parseSse, rpcEvent, rpcReduce, rpcFromStatus, eventsPlan, eventsRetryMs, eventsStale };
+  return { jobsHold, deliveryHold, tasksPollDue, TASKS_REFRESH_MS, mergeWhy, screenOf, bandOf, NARROW_BELOW, DUO_BELOW, parseAddress, addressOf, ADDRESS_ZONES, subClock, columnTabFor, conformityTabLabel, repoModel, changeChips, prChip, idleChip, conflictChip, sizeChip, RepoCard, stateLineHidden, usageView, usageHtml, usageRemaining, boardApply, boardWait, chatCachePut, chatCacheGet, rpcWithContext, chatFromCache, API_VERSION, mergeButton, rerunButton, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, dirtyRepos, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, taskPrs, matchesUnitId, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, parseSse, rpcEvent, rpcReduce, rpcFromStatus, eventsPlan, eventsRetryMs, eventsStale };
 }));

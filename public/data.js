@@ -104,6 +104,14 @@ const loadLocal = (id) => track(id, pooled(() => api(`/api/local?id=${id}`)).the
 // The session state the buttons of a repo see (S.sent has its own verdict). RPC2b-1: only the live session (S.rpc) says: idle, busy (a session that is
 // starting works), asking or closed (a closed one is not a hold: the click starts it). rpcSeed gives every repo a state, so it is not undefined for long.
 const rpcSession = (id) => { const r = S.rpc[id]; return r && r.state ? (r.state === 'starting' ? 'busy' : r.state) : undefined; };
+// RP163: the background jobs the server counted for the session of a repo (RP161: `session.jobs` of its row in the Summary): a positive safe integer (at most 99) or 0. A session the page knows is closed has none left, even if
+// the row (up to 20 s old) still says so.
+function jobsOfRepo(id) {
+  if (rpcSession(id) === 'closed') return 0;
+  const row = S.summary && Array.isArray(S.summary.rows) ? S.summary.rows.find((x) => x && x.id === id) : null;
+  const n = row && row.session && typeof row.session === 'object' ? row.session.jobs : 0;
+  return Number.isSafeInteger(n) && n > 0 ? Math.min(n, 99) : 0;
+}
 // RP159: always the LIVE state of the session. It used to be undefined while a command of this page was being judged (S.sent), which let the delivery buttons come back while the session still worked.
 function sessionOf(id) {
   return rpcSession(id);
