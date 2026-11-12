@@ -56,6 +56,42 @@
   const pct = (n, total) => Math.floor((n * 1000) / total) / 10; // rounded down: the four never add up to more than 100
   const num = (v) => Math.max(0, Math.floor(Number(v)) || 0);
   const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+  // RP154: the subagents of a repo (what the server of RP164 puts in `row.session.subagents`), drawn on its card: a badge in the words and colours of the chat head and, when opened, the list. The page trusts nothing: only a live
+  // session, a closed list of states, whole numbers from 0 to 9999, at most 5 entries; a name is text (escaped). It only SHOWS: nothing here reads or holds a delivery button.
+  const SUBS_MAX = 5;
+  const SUB_WORD = { working: 'working', slow: 'slow', stuck: 'possible block' };
+  const SUB_RANK = { working: 0, slow: 1, stuck: 2 };
+  const wholeMinutes = (n) => Number.isSafeInteger(n) && n >= 0 && n <= 9999;
+  function subsOf(session) {
+    if (!session || typeof session !== 'object' || !['working', 'waiting', 'free'].includes(session.state)) return null;
+    const sa = session.subagents;
+    if (!sa || typeof sa !== 'object' || Array.isArray(sa) || typeof sa.signal !== 'boolean' || !Array.isArray(sa.list)) return null;
+    if (!sa.signal) return { signal: false, list: [] };
+    const list = [];
+    for (const e of sa.list) {
+      if (list.length >= SUBS_MAX) break;
+      if (!e || typeof e !== 'object' || Array.isArray(e) || !Object.prototype.hasOwnProperty.call(SUB_WORD, e.state) || !wholeMinutes(e.minutes) || !wholeMinutes(e.idle)) continue;
+      list.push({ name: typeof e.name === 'string' && e.name ? e.name : null, state: e.state, minutes: e.minutes, idle: e.idle });
+    }
+    return list.length ? { signal: true, list } : null;
+  }
+  const subsOpenFor = (ctx, id) => !!ctx && !!ctx.subsOpen && typeof ctx.subsOpen === 'object' && !Array.isArray(ctx.subsOpen) && Object.prototype.hasOwnProperty.call(ctx.subsOpen, id) && ctx.subsOpen[id] === true;
+  function subsBadgeHtml(r, ctx) {
+    const s = r.error ? null : subsOf(r.session);
+    if (!s) return '';
+    const n = s.list.length;
+    const worst = s.signal ? s.list.reduce((w, e) => (SUB_RANK[e.state] > SUB_RANK[w] ? e.state : w), 'working') : null;
+    const text = !s.signal ? 'No signal' : n === 1 ? (worst === 'working' ? 'Subagent working' : worst === 'slow' ? 'Slow' : 'Possible block') : `${n} subagents${worst === 'working' ? ' working' : worst === 'slow' ? ' · slow' : ' · possible block'}`;
+    const title = !s.signal ? 'The subagents of this session gave no sign of life for more than 15 seconds. Click to see.' : `${n === 1 ? 'A subagent runs' : `${n} subagents run`} in this session${worst === 'slow' ? ' (one is slow: 2 minutes without activity)' : worst === 'stuck' ? ' (one may be blocked: 5 minutes without activity)' : ''}. Click to see the list.`;
+    return `<button type="button" class="chip sub-badge sb-${s.signal ? worst : 'nosignal'}" data-act="subs-toggle" data-id="${esc(r.id)}" aria-expanded="${subsOpenFor(ctx, r.id)}" title="${esc(title)}"><i aria-hidden="true">${SUB_ICON}</i>${text}</button>`;
+  }
+  function subsListHtml(r, ctx) {
+    const s = r.error ? null : subsOf(r.session);
+    if (!s || !subsOpenFor(ctx, r.id)) return '';
+    if (!s.signal) return '<p class="rs-subs rs-subs-none">No signal from the subagents of this session: the last sign of life is more than 15 seconds old.</p>';
+    const items = s.list.map((e) => `<li class="rs-sub-item sbi-${e.state}"><b>${esc(e.name || 'subagent')}</b> <span>${SUB_WORD[e.state]}</span> <span>${e.minutes} min${e.idle >= 1 ? ` · idle ${e.idle} min` : ''}</span></li>`).join('');
+    return `<ul class="rs-subs" aria-label="Subagents of this repo">${items}</ul>`;
+  }
   const sessionChip = (state) => { const [color, text] = SESSION[state] || SESSION.unknown; return `<span class="chip ${color}">${text}</span>`; };
 
   // Segmented bar plus a SHORT count; the full breakdown is the title and the aria-label. `p` is a row's progress or a sum of them.
@@ -143,8 +179,8 @@
       branch: { text: r.branch ?? '', title: r.branch ?? '' }, chips,
       // RP94c: the subject of the last commit (the row already had it as the tooltip of the time), on its own small line.
       commit: !r.error && typeof lm.what === 'string' && lm.what.trim() ? `<span class="rs-sub rs-commit" title="${esc(lm.what.trim())}">${esc(lm.what.trim())}</span>` : '',
-      meta: `<span class="rs-sub rs-when" title="${esc(lm.what ?? '')}">${esc(relativeTime(lm.at, ctx.now))}</span>${r.error ? '<span class="chip red">▲ error</span>' : sessionChip(r.session && r.session.state)}`,
-      body: `${r.error ? noData : progressHtml(r.progress, r.id)}${nextHtml(r)}${actionButton(r, ctx)}`,
+      meta: `<span class="rs-sub rs-when" title="${esc(lm.what ?? '')}">${esc(relativeTime(lm.at, ctx.now))}</span>${r.error ? '<span class="chip red">▲ error</span>' : sessionChip(r.session && r.session.state)}${subsBadgeHtml(r, ctx)}`,
+      body: `${subsListHtml(r, ctx)}${r.error ? noData : progressHtml(r.progress, r.id)}${nextHtml(r)}${actionButton(r, ctx)}`,
     }, 'summary');
   }
 

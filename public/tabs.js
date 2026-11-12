@@ -371,7 +371,7 @@ function drawSummary() {
   const kept = ae && ae.dataset && (ae.dataset.act === 'sfilter' || ae.dataset.act === 'slive' || ae.dataset.act === 'toggle-group') ? { act: ae.dataset.act, filter: ae.dataset.filter, group: ae.dataset.group } : null;
   const box = $('#summary');
   const ctx = {
-    now: Date.now(), scope, rooms: S.rooms, q: S.q, group: S.group, roomData: S.roomData.data, filter: S.sfilter, live: S.slive, collapsed: S.collapsed, failed: S.summaryFailed,
+    now: Date.now(), scope, rooms: S.rooms, q: S.q, group: S.group, roomData: S.roomData.data, filter: S.sfilter, live: S.slive, subsOpen: S.subsOpen, collapsed: S.collapsed, failed: S.summaryFailed,
     flowFor: summaryFlow, holdFor: summaryHold, changesFor: summaryChanges, prsFor: summaryPrs, idleFor: summaryIdle, sending: S.sending, busy: busyView(), chatId: S.chat.id,
   };
   drawListHead(ctx, kept);
