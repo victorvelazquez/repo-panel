@@ -247,11 +247,11 @@ test('chat header: only the repo name (the session id is its tooltip) and the cl
   assert.match(head({ info: null }), /title="alpha">alpha<\/b>/);
   const label = (i, state) => R.sessionLabelHtml({ id: 'r1', info: i, rpc: state ? { state } : undefined });
   const loaded = info({ adopted, adoptedFound: true });
-  assert.match(label(loaded, 'busy'), /ss-working[\s\S]*●<\/i> Working…/);
-  assert.match(label(loaded, 'asking'), /ss-waiting[\s\S]*◐<\/i> Asking you something/);
-  assert.match(label(loaded, 'idle'), /○<\/i> Idle/);
+  assert.match(label(loaded, 'busy'), /ss-working[\s\S]*<span class="ss-word">Working…<\/span>/); // RP156: drawn icons, the word in its own span
+  assert.match(label(loaded, 'asking'), /ss-waiting[\s\S]*<span class="ss-word">Asking you something<\/span>/);
+  assert.match(label(loaded, 'idle'), /ss-free[\s\S]*<span class="ss-word">Idle<\/span>/);
   assert.match(label(loaded, 'starting'), /ss-starting[\s\S]*Starting…/);
-  assert.match(label(info(), 'closed'), /○<\/i> Not started/);
+  assert.match(label(info(), 'closed'), /ss-none[\s\S]*<span class="ss-word">Not started<\/span>/);
   assert.match(label(null), /Loading…/);
 });
 

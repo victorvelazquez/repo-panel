@@ -108,23 +108,26 @@ const classes = (html) => new Set((/^<span[^>]*\sclass="([^"]*)"/.exec(html) || 
 // ---------- sessionState ----------
 const ss = (c) => R.sessionState({ id: 'r1', ...c }, { name: 'alpha' });
 const STATES = [
-  ['info missing (not loaded)', { info: null }, { key: 'loading', tone: 'gray', icon: '○', word: 'Loading…', animate: false }],
-  ['not adopted, no rpc entry', { info: info() }, { key: 'unknown', tone: 'gray', icon: '?', word: 'Unknown', animate: false }],
-  ['adopted, no rpc entry', { info: adoptedInfo() }, { key: 'unknown', tone: 'gray', icon: '?', word: 'Unknown', animate: false }],
-  ['adopted, closed', { info: adoptedInfo(), rpc: { state: 'closed' } }, { key: 'none', tone: 'gray', icon: '○', word: 'Not started', animate: false }],
-  ['starting', { info: adoptedInfo(), rpc: { state: 'starting' } }, { key: 'starting', tone: 'yellow', icon: '◌', word: 'Starting…', animate: true }],
-  ['idle', { info: adoptedInfo(), rpc: { state: 'idle' } }, { key: 'free', tone: 'gray', icon: '○', word: 'Idle', animate: false }],
-  ['busy', { info: adoptedInfo(), rpc: { state: 'busy' } }, { key: 'working', tone: 'green', icon: '●', word: 'Working…', animate: true }],
-  ['asking', { info: adoptedInfo(), rpc: { state: 'asking' } }, { key: 'waiting', tone: 'yellow', icon: '◐', word: 'Asking you something', animate: false }],
-  ['an unknown rpc state', { info: adoptedInfo(), rpc: { state: 'bogus' } }, { key: 'unknown', tone: 'gray', icon: '?', word: 'Unknown', animate: false }],
-  ['the polled live state is ignored', { info: adoptedInfo('working'), rpc: { state: 'idle' } }, { key: 'free', tone: 'gray', icon: '○', word: 'Idle', animate: false }],
+  ['info missing (not loaded)', { info: null }, { key: 'loading', tone: 'gray', icon: 'svg', word: 'Loading…', animate: false }],
+  ['not adopted, no rpc entry', { info: info() }, { key: 'unknown', tone: 'gray', icon: 'svg', word: 'Unknown', animate: false }],
+  ['adopted, no rpc entry', { info: adoptedInfo() }, { key: 'unknown', tone: 'gray', icon: 'svg', word: 'Unknown', animate: false }],
+  ['adopted, closed', { info: adoptedInfo(), rpc: { state: 'closed' } }, { key: 'none', tone: 'gray', icon: 'svg', word: 'Not started', animate: false }],
+  ['starting', { info: adoptedInfo(), rpc: { state: 'starting' } }, { key: 'starting', tone: 'yellow', icon: 'svg', word: 'Starting…', animate: true }],
+  ['idle', { info: adoptedInfo(), rpc: { state: 'idle' } }, { key: 'free', tone: 'gray', icon: 'svg', word: 'Idle', animate: false }],
+  ['busy', { info: adoptedInfo(), rpc: { state: 'busy' } }, { key: 'working', tone: 'green', icon: 'svg', word: 'Working…', animate: true }],
+  ['asking', { info: adoptedInfo(), rpc: { state: 'asking' } }, { key: 'waiting', tone: 'yellow', icon: 'svg', word: 'Asking you something', animate: false }],
+  ['an unknown rpc state', { info: adoptedInfo(), rpc: { state: 'bogus' } }, { key: 'unknown', tone: 'gray', icon: 'svg', word: 'Unknown', animate: false }],
+  ['the polled live state is ignored', { info: adoptedInfo('working'), rpc: { state: 'idle' } }, { key: 'free', tone: 'gray', icon: 'svg', word: 'Idle', animate: false }],
 ];
 
 test('sessionState: key, tone, icon, word and animate for every case', () => {
   assert.equal(typeof R.sessionState, 'function');
   for (const [name, c, want] of STATES) {
     const got = ss(c);
-    for (const k of Object.keys(want)) assert.strictEqual(got[k], want[k], `${name}: ${k}`);
+    for (const k of Object.keys(want)) {
+      if (k === 'icon') { assert.match(got.icon, /^<svg [^>]*aria-hidden="true"/, `${name}: the icon is drawn (RP156)`); continue; } // RP156: the icons are SVG now (test/rp156-chip-icons.test.js checks that the eight are different)
+      assert.strictEqual(got[k], want[k], `${name}: ${k}`);
+    }
   }
 });
 
@@ -148,14 +151,14 @@ test('sessionLabelHtml: ONE span with role=status, the tone and key classes, the
     const title = ss(c).title;
     assert.match(html, /^<span /, name);
     assert.match(html, /<\/span>$/, name);
-    assert.equal((html.match(/<span/g) || []).length, 1, `${name}: exactly one span`);
+    assert.equal((html.match(/<span/g) || []).length, 2, `${name}: the label span and the span of its word (RP156)`);
     assert.match(html, /\srole="status"/, name);
     const cl = classes(html);
     for (const k of ['ss', `ss-${want.tone}`, `ss-${want.key}`]) assert.ok(cl.has(k), `${name}: class ${k} in ${[...cl]}`);
     assert.ok(html.includes(`title="${R.esc(title)}"`), `${name}: title`);
-    assert.ok(html.includes(`<i class="ss-dot" aria-hidden="true">${want.icon}</i>`), `${name}: icon in i.ss-dot`);
+    assert.ok(html.includes(`<i class="ss-dot" aria-hidden="true">${ss(c).icon}</i>`), `${name}: icon in i.ss-dot`);
     assert.ok(text(html).includes(want.word), `${name}: word`);
-    assert.ok([`${want.icon} ${want.word}`, `${want.icon}${want.word}`].includes(text(html).trim()), `${name}: visible text is the icon and the word, got ${text(html)}`);
+    assert.equal(text(html).trim(), want.word, `${name}: the visible text is the word (the icon is drawn), got ${text(html)}`);
   }
 });
 

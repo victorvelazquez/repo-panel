@@ -108,9 +108,9 @@ const live = (over = {}) => ({ info: { found: true }, rpc: { ...busy(), subs: 1,
 
 test('c1: one subagent: «Subagent working» and the counter from its start; two: «2 subagents working» and the counter of the first', () => {
   const one = R.subagentChipHtml(live(), T0 + 135000);
-  assert.match(one, /^<span class="sub-chip" title="[^"]+"><i class="sub-dot" aria-hidden="true">[^<]+<\/i> Subagent working <b class="sub-time">02:15<\/b><\/span>$/);
+  assert.match(one, /^<span class="sub-chip" title="[^"]+"><i class="sub-dot" aria-hidden="true"><svg [\s\S]*<\/svg><\/i> <span class="sub-word">Subagent working<\/span> <b class="sub-time">02:15<\/b><\/span>$/); // RP156: the arrow is drawn and the words are in their own span
   const two = R.subagentChipHtml(live({ subs: 2 }), T0 + 135000);
-  assert.match(two, /2 subagents working <b class="sub-time">02:15<\/b>/);
+  assert.match(two, /2 subagents working<\/span> <b class="sub-time">02:15<\/b>/); // RP156
 });
 
 test('c2: it says nothing when nobody knows of a subagent: no count, a session that is not busy or asking, a bad clock, no entry', () => {
@@ -215,7 +215,7 @@ test('p1: a subagent_run that starts shows the chip next to the state of the ses
   await page.open();
   assert.doesNotMatch(page.state(), /Subagent/);
   await page.rpc(ID, start());
-  assert.match(page.state(), /Subagent working <b class="sub-time">00:0\d<\/b>/);
+  assert.match(page.state(), /Subagent working<\/span> <b class="sub-time">00:0\d<\/b>/); // RP156
   assert.match(page.state(), /<\/span><span class="sub-chip"/, 'right after the label of the state');
   await page.rpc(ID, end());
   assert.doesNotMatch(page.state(), /Subagent/);
@@ -247,7 +247,7 @@ test('p4: the clock runs by itself every second while one is on: the counter mov
   page.run(`S.rpc['${ID}'].subSince = Date.now() - 125000`);
   page.run('subTick()');
   await page.tick();
-  assert.match(page.state(), /Subagent working <b class="sub-time">02:0\d<\/b>/);
+  assert.match(page.state(), /Subagent working<\/span> <b class="sub-time">02:0\d<\/b>/); // RP156
   const ticker = page.timers.find((t) => t.ms === 1000);
   assert.ok(ticker, 'a timer of 1000 ms is registered');
   assert.match(appSource(), /setInterval\(subTick, 1000\)/);

@@ -327,13 +327,38 @@
     return `${head}<div class="col-tabs" role="tablist" aria-label="Column views">${list.map(tabBtn).join('')}</div><div class="col-pane" id="colpane" role="tabpanel" aria-labelledby="coltab-${tab}">${body}</div>${g ? footHtml(g) : ''}`;
   };
   // The state of the session (RPC2-1), shown inside the composer frame. Icon + word, never colour alone. c = { info, rpc } (rpc: what V.rpcReduce keeps).
+  // RP156 (design/panel-chips/, direction A): the icons of the chips of the chat are drawn (the family of the icons of the page: 16 grid, stroke 1.5, currentColor), not text characters that each system draws with another shape. Every state
+  // has its own shape, so colour is never the only thing that tells them apart. `svgIcon` marks them aria-hidden: the word is still in the chip.
+  const SI = {
+    loading: svgIcon('<circle cx="3.5" cy="8" r="1.2" fill="currentColor" stroke="none"/><circle cx="8" cy="8" r="1.2" fill="currentColor" stroke="none"/><circle cx="12.5" cy="8" r="1.2" fill="currentColor" stroke="none"/>'),
+    none: svgIcon('<circle cx="8" cy="8" r="5.5" stroke-dasharray="2 2.2"/>'),
+    starting: svgIcon('<path d="M8 2.5a5.5 5.5 0 1 1-5.5 5.5"/>'),
+    free: svgIcon('<circle cx="8" cy="8" r="5.5"/><path d="M5.6 8.2l1.8 1.8 3-3.4"/>'),
+    working: svgIcon('<circle cx="8" cy="8" r="2.6" fill="currentColor"/><circle cx="8" cy="8" r="5.5"/>'),
+    compacting: svgIcon('<path d="M3 3l3.6 3.6M6.8 3.6v3.2H3.6M13 13l-3.6-3.6M9.2 12.4V9.2h3.2"/>'),
+    waiting: svgIcon('<path d="M3 3.5h10v7H8.6L5.6 13v-2.5H3z"/><path d="M8 5.4v2.2"/><circle cx="8" cy="9" r=".5" fill="currentColor" stroke="none"/>'),
+    unknown: svgIcon('<circle cx="8" cy="8" r="5.5"/><path d="M6.4 6.4a1.7 1.7 0 1 1 2.5 1.5c-.6.4-.9.7-.9 1.3"/><circle cx="8" cy="11.2" r=".5" fill="currentColor" stroke="none"/>'),
+  };
+  const MEMORY_BASE = '<ellipse cx="8" cy="4.2" rx="4.5" ry="1.8"/><path d="M3.5 4.2v7.6c0 1 2 1.8 4.5 1.8s4.5-.8 4.5-1.8V4.2"/><path d="M3.5 8c0 1 2 1.8 4.5 1.8S12.5 9 12.5 8"/>';
+  const MEMORY_ICON = {
+    ready: svgIcon(MEMORY_BASE),
+    offline: svgIcon(`${MEMORY_BASE}<path d="M2 14L14 2" stroke-width="1.6"/>`),
+    error: svgIcon(`${MEMORY_BASE}<circle cx="12" cy="12" r="3.2" fill="#2a1213"/><path d="M12 10.6v1.5"/><circle cx="12" cy="13.2" r=".4" fill="currentColor" stroke="none"/>`),
+    disabled: svgIcon(`${MEMORY_BASE}<path d="M2.5 8h11" stroke-width="2.2" stroke="#251d08"/><path d="M3 8h10"/>`),
+  };
+  // The context: an arc as long as the percent under 70, a triangle from 70, a cross from 90, a dashed ring when it is not known. `n` is the rounded percent (a number, never text).
+  const ctxIcon = (kind, n) => (kind === 'bad' ? svgIcon('<circle cx="8" cy="8" r="5.5"/><path d="M5.9 5.9l4.2 4.2M10.1 5.9l-4.2 4.2"/>')
+    : kind === 'warn' ? svgIcon('<path d="M8 2.6l5.6 10H2.4z"/><path d="M8 6.8v2.6"/><circle cx="8" cy="11.2" r=".5" fill="currentColor" stroke="none"/>')
+      : kind === 'unknown' ? svgIcon('<circle cx="8" cy="8" r="5.5" stroke-dasharray="2 2.2"/>')
+        : svgIcon(`<circle cx="8" cy="8" r="5.5" opacity=".3"/><circle cx="8" cy="8" r="5.5" pathLength="100" stroke-dasharray="${n} 100" transform="rotate(-90 8 8)"/>`));
+  const SUB_ICON = svgIcon('<path d="M4 2.5v6.5a2 2 0 0 0 2 2h6"/><path d="M9.6 8.2l2.6 2.8-2.6 2.8"/>');
   const SESS_TITLE = {
     loading: 'Loading the session', unknown: 'The session state is unknown', none: 'The session is not started: sending a message starts it', starting: 'The session is starting; this can take half a minute',
     free: 'The session is idle: you can write to it', working: 'The session is working', compacting: 'The session is compacting its context: wait a moment', waiting: 'pi is asking something: answer it in the card of the chat',
   };
   const SESS_VIEW = {
-    loading: ['gray', '○', 'Loading…'], unknown: ['gray', '?', 'Unknown'], none: ['gray', '○', 'Not started'], starting: ['yellow', '◌', 'Starting…'], free: ['gray', '○', 'Idle'],
-    working: ['green', '●', 'Working…'], compacting: ['yellow', '◍', 'Compacting…'], waiting: ['yellow', '◐', 'Asking you something'],
+    loading: ['gray', SI.loading, 'Loading…'], unknown: ['gray', SI.unknown, 'Unknown'], none: ['gray', SI.none, 'Not started'], starting: ['yellow', SI.starting, 'Starting…'], free: ['gray', SI.free, 'Idle'],
+    working: ['green', SI.working, 'Working…'], compacting: ['yellow', SI.compacting, 'Compacting…'], waiting: ['yellow', SI.waiting, 'Asking you something'],
   };
   const SESS_OF = { closed: 'none', starting: 'starting', idle: 'free', busy: 'working', asking: 'waiting' };
   function sessionState(c) {
@@ -344,7 +369,7 @@
   }
   const sessionLabelHtml = (c) => {
     const s = sessionState(c);
-    return `<span class="ss ss-${s.tone} ss-${s.key}${s.animate ? ' ss-anim' : ''}" role="status" title="${esc(s.title)}"><i class="ss-dot" aria-hidden="true">${s.icon}</i> ${s.word}</span>`;
+    return `<span class="ss ss-${s.tone} ss-${s.key}${s.animate ? ' ss-anim' : ''}" role="status" title="${esc(s.title)}"><i class="ss-dot" aria-hidden="true">${s.icon}</i> <span class="ss-word">${s.word}</span></span>`; // RP156: the word can be hidden in a narrow chat, but stays for the accessible name
   };
 
   // RP110b: the memory (Engram) of the session, as one chip next to its state. The server sends ONE category of a closed list, never the text of the plugin; the chip says it in words
@@ -359,7 +384,7 @@
     const r = c && c.rpc && typeof c.rpc === 'object' ? c.rpc : null;
     if (!r || r.state === 'closed' || typeof r.memory !== 'string' || !Object.hasOwn(MEMORY_CHIP, r.memory)) return '';
     const [cls, word, title] = MEMORY_CHIP[r.memory];
-    return `<span class="mem ${cls}" title="${esc(title)}">${word}</span>`;
+    return `<span class="mem ${cls}" title="${esc(title)}"><i class="mem-ic" aria-hidden="true">${MEMORY_ICON[r.memory]}</i> <span class="mem-word">${word}</span></span>`; // RP156: the memory chip gets an icon too
   };
 
   // RP152: «Subagent working · mm:ss» next to the state, from the two numbers the reducer keeps (c.rpc.subs and c.rpc.subSince) and the clock `now`; nothing else of the entry is read, so no text of a tool call or
@@ -370,7 +395,7 @@
     if (!r || (r.state !== 'busy' && r.state !== 'asking') || !Number.isInteger(r.subs) || r.subs < 1 || !Number.isFinite(r.subSince) || r.subSince <= 0 || !Number.isFinite(now)) return '';
     const v = typeof module === 'object' && module.exports ? require('./view.js') : root.RepoPanelView;
     const words = r.subs > 1 ? `${r.subs} subagents working` : 'Subagent working';
-    return `<span class="sub-chip" title="A subagent is running in this session. The time counts from when it started."><i class="sub-dot" aria-hidden="true">↳</i> ${words} <b class="sub-time">${v.subClock(now - r.subSince)}</b></span>`;
+    return `<span class="sub-chip" title="A subagent is running in this session. The time counts from when it started."><i class="sub-dot" aria-hidden="true">${SUB_ICON}</i> <span class="sub-word">${words}</span> <b class="sub-time">${v.subClock(now - r.subSince)}</b></span>`;
   };
 
   // RP139: the share of the context window the session uses, as a chip next to the memory one. c.rpc.ctx holds three validated numbers (V.rpcWithContext); unknown (null) reads `ctx —`, never 0.
@@ -381,11 +406,11 @@
     const x = r && r.ctx && typeof r.ctx === 'object' ? r.ctx : null;
     if (!x || r.state === 'closed' || r.state === 'starting') return '';
     const ok = (v) => typeof v === 'number' && Number.isFinite(v) && v >= 0;
-    if (!ok(x.percent) || !Number.isSafeInteger(x.window) || x.window <= 0) return '<span class="mem ctx" title="Context usage is unknown until the next answer"><i aria-hidden="true">◌</i> ctx —</span>';
+    if (!ok(x.percent) || !Number.isSafeInteger(x.window) || x.window <= 0) return '<span class="mem ctx" title="Context usage is unknown until the next answer"><i class="mem-ic" aria-hidden="true">' + ctxIcon('unknown', 0) + '</i> <span class="mem-word">ctx </span>—</span>';
     const p = Math.min(100, x.percent);
-    const [cls, icon, more] = p >= 90 ? ['mem-bad', '✖', ' (almost full)'] : p >= 70 ? ['mem-warn', '▲', ' (getting full)'] : ['', '◔', ''];
+    const [cls, kind, more] = p >= 90 ? ['mem-bad', 'bad', ' (almost full)'] : p >= 70 ? ['mem-warn', 'warn', ' (getting full)'] : ['', 'ok', '']; // RP156: the shape says the level, not only the colour
     const used = ok(x.tokens) ? kTokens(x.tokens) : `${Math.round(p)}%`;
-    return `<span class="mem ctx${cls ? ` ${cls}` : ''}" title="${esc(`Context used by this session: ${used} of ${kTokens(x.window)} tokens${more}`)}"><i aria-hidden="true">${icon}</i> ctx ${Math.round(p)}%</span>`;
+    return `<span class="mem ctx${cls ? ` ${cls}` : ''}" title="${esc(`Context used by this session: ${used} of ${kTokens(x.window)} tokens${more}`)}"><i class="mem-ic" aria-hidden="true">${ctxIcon(kind, Math.round(p))}</i> <span class="mem-word">ctx </span>${Math.round(p)}%</span>`;
   };
 
   // RP140: "Compact" next to the ctx chip. Only a live session (idle or answering) that is not compacting already has it; the title says that an answer in progress is stopped first. The server decides anyway.
@@ -397,7 +422,7 @@
 
   // RP98: "Close session" stops the pi process of the repo and releases its adoption (the chat goes back to the list of sessions). It lives next to the session state in the composer frame (RP72 keeps the
   // chat header to the repo name and the ✕, which only hides the chat) and is there while the repo has a session: adopted or live.
-  const sessionCloseHtml = (show, closing) => (show ? `<button type="button" class="ss-close" data-act="session-close"${closing ? ' disabled' : ''} title="Stop this session and go back to the list of sessions">Close session</button>` : '');
+  const sessionCloseHtml = (show, closing) => (show ? `<button type="button" class="ss-close" data-act="session-close"${closing ? ' disabled' : ''} title="Stop this session and go back to the list of sessions">Close<span class="ss-long"> session</span></button>` : ''); // RP156: a narrow chat shows «Close»; the words stay for the accessible name and the title
 
   // RP118: "Terminal" next to "Close session" shows the line to open this session in a normal terminal. The server writes the line (GET /api/terminal); the page only shows it, escaped, and copies it from its
   // own state: the command is never put in an attribute. `term` is { open, loading | failed | available + command + reason, copied }.
