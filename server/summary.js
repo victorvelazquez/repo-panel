@@ -4,6 +4,7 @@
 const path = require('node:path');
 const lib = require('../lib.js');
 const { MAX_JOBS } = require('./jobs.js');
+const { sanitize: subagentsClean } = require('./presence.js');
 const V = require('../public/view.js');
 const { git } = require('./exec.js');
 const { loadConfig } = require('./config.js');
@@ -27,14 +28,21 @@ const caches = new WeakMap();
 // RP161: next to the state, how many background jobs the session still waits for: only for a live session and only a positive integer (at most MAX_JOBS); absent otherwise, so a row with none is the row of always.
 const LIVE_STATES = ['free', 'working', 'waiting'];
 const LIVE_RAW = ['idle', 'busy', 'starting', 'asking'];
-const sessionOf = (s, jobs) => {
+// RP164: and, for a live session too, what its subagents do (`subagents`, the closed shape of server/presence.js, only when it passes that gate); absent otherwise, so a row with none is the row of always.
+const sessionOf = (s, jobs, subagents) => {
   const state = SESSION_OF[s] || 'unknown';
-  const n = LIVE_STATES.includes(state) && Number.isSafeInteger(jobs) && jobs > 0 ? Math.min(jobs, MAX_JOBS) : 0;
-  return n ? { state, jobs: n } : { state };
+  const live = LIVE_STATES.includes(state);
+  const n = live && Number.isSafeInteger(jobs) && jobs > 0 ? Math.min(jobs, MAX_JOBS) : 0;
+  const subs = live ? subagentsClean(subagents) : null;
+  return { state, ...(n ? { jobs: n } : {}), ...(subs ? { subagents: subs } : {}) };
 };
 // The number a getter gives for one repo; a getter that throws is no jobs.
 function jobsFrom(getter, id) {
   try { return getter(id); } catch { return 0; }
+}
+// The presence summary a getter gives for one repo; a getter that throws is none (the gate in sessionOf decides what is worth showing).
+function subagentsFrom(getter, id) {
+  try { return getter(id); } catch { return null; }
 }
 const noProgress = { total: null, completada: null, enRevision: null, bloqueada: null, pendiente: null, enCurso: null };
 
@@ -104,7 +112,7 @@ function rankOf(session, failingCi, action, blocking) {
 // The row of one repo and why it needs attention (a list of reasons, empty when it does not).
 function analyse(f) {
   const { id, name, group, room } = f.repo;
-  const session = sessionOf(f.session, f.jobs);
+  const session = sessionOf(f.session, f.jobs, f.subagents);
   const error = f.error || (f.local && f.local.error) || (f.prs && f.prs.error) || null;
   const last = f.last && f.last.at ? { at: f.last.at, what: f.last.what ?? null } : { at: null, what: null };
   if (error || !f.local || !f.prs) {
@@ -158,7 +166,8 @@ async function gather(repo, ctx) {
       (deps.state || readState)(repo), sessionIn(), lastMovementOf(repo, deps.git || git),
     ]);
     const jobs = deps.jobsOf && LIVE_RAW.includes(session) ? jobsFrom(deps.jobsOf, repo.id) : 0; // RP161: only a live session can wait for a job
-    return { ...f, local, prs, roadmap, state, session, jobs, last };
+    const subagents = deps.subagentsOf && LIVE_RAW.includes(session) ? subagentsFrom(deps.subagentsOf, repo.id) : null; // RP164: shown, never a hold
+    return { ...f, local, prs, roadmap, state, session, jobs, subagents, last };
   } catch (e) {
     return { ...f, error: e.message || 'Read failed', session: 'unknown' };
   }
@@ -221,4 +230,4 @@ function summaryFor(deps = {}, query = {}) {
   return p;
 }
 
-module.exports = { jobsFrom, LIVE_RAW, stateFrom, summarize, summaryFor, safeAnalyse, tally, loadingRow, lastMovementOf, pool };
+module.exports = { jobsFrom, subagentsFrom, LIVE_RAW, stateFrom, summarize, summaryFor, safeAnalyse, tally, loadingRow, lastMovementOf, pool };
