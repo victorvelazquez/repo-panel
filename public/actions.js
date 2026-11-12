@@ -137,6 +137,8 @@ const ACTIONS = {
   'lh-clear-group': () => { S.group = ''; draw(); },
   'lh-clear': () => { S.q = ''; S.group = ''; S.scope = { kind: 'all' }; S.sfilter = 'all'; S.slive = false; persistLive(); draw(); },
   // RP158: the filter «Working now»: the button says the value it sets (on or off, anything else is off) and the page remembers it.
+  // RP154: opens or closes the list of the subagents of ONE card (the id is checked: a hostile id never becomes a key of the object).
+  'subs-toggle': (el) => { const id = el && el.dataset ? el.dataset.id : null; if (typeof id !== 'string' || !/^[A-Za-z0-9._-]{1,64}$/.test(id) || id === '__proto__') return; if (S.subsOpen[id]) delete S.subsOpen[id]; else S.subsOpen[id] = true; draw(); },
   'slive': (el) => { S.slive = !!el && !!el.dataset && el.dataset.live === 'on'; persistLive(); draw(); },
   'sfilter': (el) => { S.sfilter = el.dataset.filter === 'attention' ? 'attention' : 'all'; draw(); },
   'toggle-group': (el) => { S.collapsed[el.dataset.group] = !S.collapsed[el.dataset.group]; draw(); },

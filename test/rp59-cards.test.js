@@ -452,7 +452,7 @@ test('the filter and group buttons update the state, redraw once and do not loop
 test('the Needs attention filter and the collapsed groups are kept in memory only, never persisted (RP158: the filter Working now is the one the page remembers, saved by hand under its own key)', () => {
   const src = appSource();
   assert.doesNotMatch(src, /setPref\('(sfilter|collapsed|slive)/);
-  assert.match(src, /sfilter: 'all', slive: store\('repo-panel\.live', false\) === true, collapsed: \{\}/);
+  assert.match(src, /sfilter: 'all', slive: store\('repo-panel\.live', false\) === true, subsOpen: \{\}, collapsed: \{\}/); // RP154: the open lists of subagents are memory only too (`subsOpen`), between the two
 });
 
 test('the page keeps the keyboard focus on a group button (inside #summary) after the redraw', () => {
