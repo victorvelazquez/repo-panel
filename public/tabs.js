@@ -292,7 +292,7 @@ function summaryHold(id) {
   const row = S.summary && Array.isArray(S.summary.rows) ? S.summary.rows.find((x) => x && x.id === id) : null;
   const state = row && row.session ? row.session.state : null;
   const session = live !== undefined ? live : state === 'working' ? 'busy' : state === 'waiting' ? 'asking' : undefined;
-  return V.deliveryHold({ sending: S.sending[id], running: v && v.state === 'running' ? { cmd: v.cmd, label: v.label } : null, session });
+  return V.deliveryHold({ sending: S.sending[id], running: v && v.state === 'running' ? { cmd: v.cmd, label: v.label } : null, session, jobs: jobsOfRepo(id) }); // RP163: and the jobs the session waits for
 }
 function summaryFlow(id) {
   const r = allRepos().find((x) => x.id === id);
