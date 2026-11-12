@@ -733,6 +733,7 @@ button.tk-gh:hover:not(:disabled) { background: var(--panel2); color: var(--text
 .term-note { margin: 0; color: var(--muted); }
 .ch-body { flex: 1; min-height: 0; overflow: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
 .ch-body .empty { padding: 30px 0; }
+.m-cut { margin-top: 6px; font-size: 12px; color: var(--muted); } /* RP162: the note under a text the history cut */
 .ch-older { text-align: center; }
 .m { max-width: 90%; padding: 8px 11px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel2); overflow-wrap: anywhere; }
 .m.me { align-self: flex-end; background: #12253d; border-color: #1d3a5f; border-radius: 12px 12px 3px 12px; }

@@ -112,17 +112,18 @@ test('limit: 30 by default, at most 100, oldest first; older items than the limi
   assert.equal(chatOf('c3', { limit: 'x' }).items.length, 30);
 });
 
-test('text is capped at 4000 chars with an ellipsis, control characters become spaces, timestamps are normalised to ISO or null', () => {
+test('text is capped at 50 000 chars (RP162: it was 4000 with an ellipsis glued to it; now the text has nothing glued and `cut` says how many were left out), control characters become spaces, timestamps are normalised to ISO or null', () => {
   resetDisk();
   const file = putSession(repoDir, 'c4', [
     header('c4', repoDir),
-    msg('user', [text('a'.repeat(5000))]),
+    msg('user', [text('a'.repeat(50005))]),
     msg('assistant', [text('x\u0007y\u0000z')], Date.parse('2026-10-28T15:00:00Z')),
     JSON.stringify({ type: 'message', timestamp: '2026-10-28T16:00:00.000Z', message: { role: 'user', content: [text('iso')] } }),
     JSON.stringify({ type: 'message', message: { role: 'user', content: [text('none')], timestamp: 'garbage' } }),
   ]);
   const r = chatOf('c4');
-  assert.equal(r.items[0].text, `${'a'.repeat(4000)}…`);
+  assert.equal(r.items[0].text, 'a'.repeat(50000));
+  assert.equal(r.items[0].cut, 5);
   assert.equal(r.items[1].text, 'x y z');
   assert.equal(r.items[2].at, '2026-10-28T16:00:00.000Z');
   assert.equal(r.items[3].at, null);
@@ -152,7 +153,7 @@ test('only the last 512 KB (RP104; it was 64 KB) of a ~5 MB file is read: a garb
   let r;
   try { r = chatOf('big'); } finally { fs.readSync = realRead; }
   assert.ok(bytes <= 530 * 1024, `read ${bytes} bytes`);
-  assert.deepEqual(r.items.map((i) => i.text.length), [6, 4001]);
+  assert.deepEqual(r.items.map((i) => i.text.length), [6, 30000], 'RP162: a 30 000 character answer arrives whole (it was cut at 4000)');
   assert.equal(r.truncated, true);
   assert.doesNotMatch(JSON.stringify(r), /FIRST/);
   fs.appendFileSync(file, `\n${msg('assistant', [text('H'.repeat(600000))])}\n`);
