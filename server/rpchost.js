@@ -189,7 +189,7 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
       // RP98: the exit of an OLD client (closed, replaced by a new start) is not the new session's: it is published only while this entry is the live one or none is.
       onExit: () => { const cur = live.get(id); if (cur === entry) live.delete(id); if (cur === entry || !cur) publish(id, { kind: 'exit' }); },
     });
-    try { await entry.client.start(); entry.up = true; } catch (e) {
+    try { await entry.client.start(); entry.up = true; entry.upAt = Date.now(); } catch (e) { // RP161: when the panel started this session (the jobs of an older process are gone)
       if (entry.closed) throw new HttpError(409, SESSION_CLOSED); // closed while starting: not a failure to launch
       // Fixed messages only: a start that ran out of time is not a failure to launch, and the raw error never reaches the page.
       throw e && e.message === 'The session did not start in time' ? new HttpError(504, 'The session did not start in time') : new HttpError(502, 'The session could not be started');
@@ -242,10 +242,19 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
     } catch { return 'closed'; }
   }
 
+  // RP161: when (ms) the panel finished starting the live session of a repo, or null (no live session, still starting, closed). Memory only, total.
+  function startedAtOf(id) {
+    try {
+      const entry = live.get(id);
+      return entry && entry.up === true && !entry.closed && Number.isFinite(entry.upAt) ? entry.upAt : null;
+    } catch { return null; }
+  }
+
   return {
     start,
     close,
     stateOf,
+    startedAtOf,
     async prompt(id, value, { behavior } = {}) {
       repoOf(id);
       if (behavior !== undefined && !BEHAVIORS.includes(behavior)) throw new HttpError(400, 'behavior must be steer or followUp');
