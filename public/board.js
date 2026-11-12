@@ -364,6 +364,7 @@ function prCard(r, pr, meta, running = null) {
   const busy = S.busy[`${r.id}:${pr.number}`];
   const held = !busy && mergeHeld(r.id, pr.number);
   const hold = running && V ? V.runningReason({ cmd: running.cmd, label: running.label }) : '';
+  const fixHold = hold || (V ? V.deliveryHold({ session: sessionOf(r.id) }) : ''); // RP159: Fix CI talks to the session, so it waits for it; Merge and Re-run do not
   const showReason = !pr.ready && pr.blockedReason && pr.checks.state !== 'pending' && pr.checks.state !== 'failed';
   const n = `data-id="${r.id}" data-n="${pr.number}"`;
   // RP129: the Merge and Re-run buttons follow the ONE rule of view.js (the footer of the right column asks it too); without view.js neither is ever offered.
@@ -387,6 +388,6 @@ function prCard(r, pr, meta, running = null) {
       <button data-act="snooze" ${n} title="Park this PR at the bottom of the column until it is ready to merge (stays parked if it is already ready)">💤</button>
     </div>
     ${rr.show ? `<button data-act="rerun" ${n} ${rr.enabled ? '' : 'disabled'}${rr.title ? ` title="${esc(rr.title)}"` : ''}>Re-run failed</button>` : ''}
-    ${V && V.fixPrAction(pr).show ? piBtn(r, 'fix-pr', 'Fix CI', { pr: pr.number, title: hold || FIX_PR_HINT, disabled: !!hold }) : ''}
+    ${V && V.fixPrAction(pr).show ? piBtn(r, 'fix-pr', 'Fix CI', { pr: pr.number, title: fixHold || FIX_PR_HINT, disabled: !!fixHold }) : ''}
   </div>`;
 }

@@ -200,6 +200,17 @@
   function sessionHold(session) {
     return session === 'busy' ? SESSION_BUSY : session === 'asking' ? SESSION_ASKING : null;
   }
+  // RP159: the ONE rule that holds a delivery button (/flow-commit, /flow-pr, /flow-base, /flow-next, Fix CI): the reason it is held, or ''. In this order: the order is on its way (`sending`, a command name), a command sent
+  // from this page is judged running (`running`, { cmd, label }), the session asks you or works (`session`, the LIVE state: busy | asking). What is not exactly one of those holds nothing. Total.
+  function deliveryHold(ctx) {
+    const c = ctx && typeof ctx === 'object' && !Array.isArray(ctx) ? ctx : {};
+    if (typeof c.sending === 'string' && c.sending) return 'Sending the order to the session';
+    const run = c.running;
+    if (run && typeof run === 'object' && typeof run.cmd === 'string' && typeof run.label === 'string') return runningReason(run);
+    if (c.session === 'asking') return 'The session is waiting for your answer';
+    if (c.session === 'busy') return 'The session is working: wait for it to finish';
+    return '';
+  }
 
   // Whether the newest changed file is younger than QUIET_MS. A missing or non-finite value never blocks.
   function quietPeriod(lastChangeMs, now = Date.now()) {
@@ -429,7 +440,10 @@
     }
     if (!hasLocal(local) || manualAction(local, local.base)) return [];
     const { override = false, verdict = null, retry = false, now = Date.now() } = ctx;
-    if (local.files.length > 0 && prInfo && prInfo.stale) return verdict === 'running' ? [] : [{ cmd: 'flow-base-stash', label: '/flow-base --stash', reason: FLOW_STASH_HINT }];
+    // RP159: the other delivery buttons follow the live session too (only /flow-commit did): held while it works or asks, with the reason of the session. The override of the person is for /flow-commit only.
+    const live = sessionHold(ctx.session);
+    const held = live ? { disabled: true, reason: live } : {};
+    if (local.files.length > 0 && prInfo && prInfo.stale) return verdict === 'running' ? [] : [{ cmd: 'flow-base-stash', label: '/flow-base --stash', reason: FLOW_STASH_HINT, ...held }];
     if (local.files.length > 0) {
       if (!commitAllowed(stateData, { now, override })) return [];
       const again = retry ? 'Retry ' : '';
@@ -438,8 +452,8 @@
       return [{ cmd: 'flow-commit', label: `${again}/flow-commit`, ...(hold ? { disabled: true, reason: hold } : {}) }];
     }
     const pa = local.ahead > 0 ? prAction(local, prInfo, verdict) : null;
-    if (pa && pa.show) return [{ cmd: 'flow-pr', label: pa.update ? '/flow-pr (update PR)' : '/flow-pr' }];
-    if (prInfo && prInfo.stale && verdict !== 'running') return [{ cmd: 'flow-base', label: '/flow-base', reason: FLOW_BASE_HINT }];
+    if (pa && pa.show) return [{ cmd: 'flow-pr', label: pa.update ? '/flow-pr (update PR)' : '/flow-pr', ...held }];
+    if (prInfo && prInfo.stale && verdict !== 'running') return [{ cmd: 'flow-base', label: '/flow-base', reason: FLOW_BASE_HINT, ...held }];
     return [];
   }
 
@@ -1013,5 +1027,5 @@
     return `${dot}${meters.join('')}<div class="usage-pop" role="group" aria-label="Claude usage details">${details.join('')}${note}${foot}</div>`;
   }
 
-  return { tasksPollDue, TASKS_REFRESH_MS, mergeWhy, screenOf, bandOf, NARROW_BELOW, DUO_BELOW, parseAddress, addressOf, ADDRESS_ZONES, subClock, columnTabFor, conformityTabLabel, repoModel, changeChips, prChip, idleChip, conflictChip, sizeChip, RepoCard, stateLineHidden, usageView, usageHtml, usageRemaining, boardApply, boardWait, chatCachePut, chatCacheGet, rpcWithContext, chatFromCache, API_VERSION, mergeButton, rerunButton, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, dirtyRepos, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, taskPrs, matchesUnitId, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, parseSse, rpcEvent, rpcReduce, rpcFromStatus, eventsPlan, eventsRetryMs, eventsStale };
+  return { deliveryHold, tasksPollDue, TASKS_REFRESH_MS, mergeWhy, screenOf, bandOf, NARROW_BELOW, DUO_BELOW, parseAddress, addressOf, ADDRESS_ZONES, subClock, columnTabFor, conformityTabLabel, repoModel, changeChips, prChip, idleChip, conflictChip, sizeChip, RepoCard, stateLineHidden, usageView, usageHtml, usageRemaining, boardApply, boardWait, chatCachePut, chatCacheGet, rpcWithContext, chatFromCache, API_VERSION, mergeButton, rerunButton, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, dirtyRepos, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, taskPrs, matchesUnitId, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, parseSse, rpcEvent, rpcReduce, rpcFromStatus, eventsPlan, eventsRetryMs, eventsStale };
 }));

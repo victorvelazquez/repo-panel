@@ -283,6 +283,17 @@ function setTab(tab) {
 }
 
 // The "deliver" button of a Summary row is the first button the board's own card would show for that repo.
+// RP159: why the delivery buttons of the card of a repo are held, or ''. The live state of the session wins; when the page does not have it yet (no stream) the row of the server is the witness (working, waiting).
+function summaryHold(id) {
+  const r = allRepos().find((x) => x.id === id);
+  if (!r || !V) return '';
+  const v = verdictOf(r);
+  const live = sessionOf(id);
+  const row = S.summary && Array.isArray(S.summary.rows) ? S.summary.rows.find((x) => x && x.id === id) : null;
+  const state = row && row.session ? row.session.state : null;
+  const session = live !== undefined ? live : state === 'working' ? 'busy' : state === 'waiting' ? 'asking' : undefined;
+  return V.deliveryHold({ sending: S.sending[id], running: v && v.state === 'running' ? { cmd: v.cmd, label: v.label } : null, session });
+}
 function summaryFlow(id) {
   const r = allRepos().find((x) => x.id === id);
   const m = modelOf(id);
@@ -361,7 +372,7 @@ function drawSummary() {
   const box = $('#summary');
   const ctx = {
     now: Date.now(), scope, rooms: S.rooms, q: S.q, group: S.group, roomData: S.roomData.data, filter: S.sfilter, live: S.slive, collapsed: S.collapsed, failed: S.summaryFailed,
-    flowFor: summaryFlow, changesFor: summaryChanges, prsFor: summaryPrs, idleFor: summaryIdle, sending: S.sending, busy: busyView(), chatId: S.chat.id,
+    flowFor: summaryFlow, holdFor: summaryHold, changesFor: summaryChanges, prsFor: summaryPrs, idleFor: summaryIdle, sending: S.sending, busy: busyView(), chatId: S.chat.id,
   };
   drawListHead(ctx, kept);
   const changed = paint(box, R.summaryView(summaryShown(), ctx));
