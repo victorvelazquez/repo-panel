@@ -904,17 +904,3 @@ button.tc:hover { border-color: var(--muted); }
 .notes-box:focus-visible, .btn-sm:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 .notes-status { flex: none; font-size: 12px; color: var(--muted); }
 .btn-sm { font-size: 12px; padding: 2px 8px; }
-/* RP154: the badge of the subagents on the card of a repo (the words and colours of the chat head) and its list. */
-.sub-badge { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; background: transparent; font-family: inherit; }
-.sub-badge svg { display: block; }
-.sub-badge i { font-style: normal; display: inline-flex; }
-.sub-badge:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
-.sb-working { color: var(--blue); }
-.sb-slow { color: var(--yellow); border-color: #53410f; background: #251d08; }
-.sb-stuck { color: var(--red); border-color: #5a1f1c; background: #2a1213; }
-.sb-nosignal { color: var(--muted); }
-.rs-subs { margin: 0 0 6px; padding: 0; list-style: none; font-size: 12px; color: var(--muted); display: grid; gap: 2px; }
-.rs-sub-item { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
-.rs-sub-item b { color: var(--text); font-weight: 600; }
-.sbi-slow span:first-of-type { color: var(--yellow); }
-.sbi-stuck span:first-of-type { color: var(--red); }

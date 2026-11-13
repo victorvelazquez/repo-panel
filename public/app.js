@@ -31,7 +31,7 @@ const S = {
   prefs: store('prefs', { method: 'squash', del: true }),
   lastRefresh: 0, lastAt: {}, scan: [],
   boardRev: 0, boardRefreshing: [], factAt: {},
-  tab: 'summary', scope: { kind: 'all' }, summary: null, summaryKey: '', summaryFailed: false, sfilter: 'all', slive: store('repo-panel.live', false) === true, subsOpen: {}, collapsed: {},
+  tab: 'summary', scope: { kind: 'all' }, summary: null, summaryKey: '', summaryFailed: false, sfilter: 'all', slive: store('repo-panel.live', false) === true, collapsed: {},
   timeouts: { get: 25000, post: 70000 },
   tasks: {}, tasksOpenDone: false, tasksMore: false, tasksFold: {}, changes: {}, files: {}, filesOpen: {}, fileData: {}, pad: {},
   lh: { search: false, menu: false, legend: false, focus: false }, // RP121: the header of the repos column (search box open, filter menu open, focus the box on the next draw)
