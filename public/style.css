@@ -857,8 +857,10 @@ button.tc:hover { border-color: var(--muted); }
 .ss-yellow { color: var(--yellow); }
 .ss-gray { color: var(--muted); }
 .ss-anim .ss-dot { animation: pulse-dot 1.2s ease-in-out infinite; }
+.ss-starting.ss-anim .ss-dot { animation: ck-spin 1.4s linear infinite; } /* RP174: the open arc of «Starting…» turns like the spinner of the CI instead of pulsing */
 @media (prefers-reduced-motion: reduce) {
   .ss-anim .ss-dot { animation: none; }
+  .ss-starting.ss-anim .ss-dot { animation: none; }
 }
 /* RP156 (design/panel-chips/, direction C): the icons of the chips are drawn in the line with their text; in a narrow chat (the composer is 24 px narrower than the chat: 456 px is 480 px of chat) a chip keeps only its icon, the number of
    the context and the time of the subagent. The words are hidden the clip way, NEVER with display:none: they stay in the accessible name, and the titles do not change. */
