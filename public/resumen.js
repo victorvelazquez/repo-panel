@@ -392,17 +392,6 @@
     return `<span class="mem ${cls}" title="${esc(title)}"><i class="mem-ic" aria-hidden="true">${MEMORY_ICON[r.memory]}</i> <span class="mem-word">${word}</span></span>`; // RP156: the memory chip gets an icon too
   };
 
-  // RP152: «Subagent working · mm:ss» next to the state, from the two numbers the reducer keeps (c.rpc.subs and c.rpc.subSince) and the clock `now`; nothing else of the entry is read, so no text of a tool call or
-  // name of an agent can reach it. It says nothing unless the session is busy or asking and both numbers are valid (what is not known is not «working»), it never says slow (that needs activity data) and it is
-  // not a live region: a counter that changes every second must not be announced.
-  const subagentChipHtml = (c, now) => {
-    const r = c && typeof c === 'object' && c.rpc && typeof c.rpc === 'object' && !Array.isArray(c.rpc) ? c.rpc : null;
-    if (!r || (r.state !== 'busy' && r.state !== 'asking') || !Number.isInteger(r.subs) || r.subs < 1 || !Number.isFinite(r.subSince) || r.subSince <= 0 || !Number.isFinite(now)) return '';
-    const v = typeof module === 'object' && module.exports ? require('./view.js') : root.RepoPanelView;
-    const words = r.subs > 1 ? `${r.subs} subagents working` : 'Subagent working';
-    return `<span class="sub-chip" title="A subagent is running in this session. The time counts from when it started."><i class="sub-dot" aria-hidden="true">${SUB_ICON}</i> <span class="sub-word">${words}</span> <b class="sub-time">${v.subClock(now - r.subSince)}</b></span>`;
-  };
-
   // RP139: the share of the context window the session uses, as a chip next to the memory one. c.rpc.ctx holds three validated numbers (V.rpcWithContext); unknown (null) reads `ctx —`, never 0.
   // Quiet below 70%, warning from 70%, strong warning from 90%: icon + number + words in the help, never colour alone. Nothing is drawn while the session is closed or starting, or before the first reading.
   const kTokens = (n) => (n >= 1000 ? `${Math.round(n / 1000)}k` : String(n));
@@ -962,10 +951,19 @@
     const inner = `${mark} <b>${esc(c.name)}</b>${arg}${time}${more}`;
     return canAsk(c, rx) ? `<button type="button" class="tc ${cls} res" data-act="chat-result" data-id="${esc(rx.id)}" data-call="${esc(c.id)}" title="Show the start of the result">${inner}</button>` : `<span class="tc ${cls}">${inner}</span>`;
   };
+  // RP171: a subagent is NOT a chip: while it runs the bubble at the end of the thread says it, and once it ends one result line stays where the chip was (it survives a reload of the history). The name comes from
+  // the `arg` of the item of the history (the page already receives it), validated; nothing else of the entry is read. What is not a name is left out: «Subagent working», «Subagent finished».
+  const SUB_TOOL = 'subagent_run';
+  const SUB_NAME = /^[A-Za-z0-9._-]{1,40}$/;
+  const subNameOf = (c) => (c && typeof c.arg === 'string' && SUB_NAME.test(c.arg) ? c.arg : '');
+  const subTime = (ms) => { const s = nat(ms) === null ? null : Math.round(ms / 1000); return s === null ? '' : ` · ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+  const subDoneHtml = (c) => `<div class="m subrun done${c.ok ? '' : ' bad'}" role="status"><i class="sub-dot" aria-hidden="true">${SUB_ICON}</i> <span class="sub-text">Subagent${subNameOf(c) ? ` ${subNameOf(c)}` : ''} ${c.ok ? 'finished' : 'failed'}${subTime(c.ms)}</span></div>`;
   const toolsLine = (t, info, rx) => {
-    const chips = (Array.isArray(info) ? info : []).filter((c) => c && typeof c === 'object' && typeof c.name === 'string');
-    if (chips.length) return `<div class="tools tcs">${chips.slice(0, TOOL_CHIPS).map((c) => chipHtml(c, rx)).join('')}${chips.length > TOOL_CHIPS ? `<span class="tcmore">+${chips.length - TOOL_CHIPS}</span>` : ''}</div>${chips.slice(0, TOOL_CHIPS).map((c) => resultPanel(c, rx)).join('')}`;
-    return toolsLineOld(t);
+    const all = (Array.isArray(info) ? info : []).filter((c) => c && typeof c === 'object' && typeof c.name === 'string');
+    if (!all.length) return toolsLineOld(t);
+    const chips = all.filter((c) => c.name !== SUB_TOOL);
+    const done = all.filter((c) => c.name === SUB_TOOL && typeof c.ok === 'boolean').map(subDoneHtml).join('');
+    return (chips.length ? `<div class="tools tcs">${chips.slice(0, TOOL_CHIPS).map((c) => chipHtml(c, rx)).join('')}${chips.length > TOOL_CHIPS ? `<span class="tcmore">+${chips.length - TOOL_CHIPS}</span>` : ''}</div>${chips.slice(0, TOOL_CHIPS).map((c) => resultPanel(c, rx)).join('')}` : '') + done;
   };
   const toolsLineOld = (t) => (t.length ? `<div class="tools">▸ ${plural(t.length, 'tool')} · ${esc(t.slice(0, 3).join(', '))}${t.length > 3 ? ` (+${t.length - 3})` : ''}</div>` : '');
   // One chat message as safe HTML: escape first, then a small Markdown subset. Only the tags built here reach the output,
@@ -1101,7 +1099,7 @@
   const bubble = (it, who, rx) => {
     const time = hhmm(it.at);
     if (it.role === 'system') return it.kind === 'compaction' ? `<div class="sysnote">↻ Context compacted${time ? ` · ${time}` : ''}</div>` : '';
-    if (it.role === 'assistant' && !it.text) return `${thoughtLine(it)}${toolsLine(it.tools, it.toolInfo, rx)}${stopNote(it) || '<div class="m working">working…</div>'}`;
+    if (it.role === 'assistant' && !it.text) return `${thoughtLine(it)}${toolsLine(it.tools, it.toolInfo, rx)}${stopNote(it)}`; // RP171: no «working…» here: the tail of the thread is the one place that says the session works
     return `${thoughtLine(it)}${toolsLine(it.tools || [], it.toolInfo, rx)}<div class="m${it.role === 'user' ? ' me' : ''}"><span class="who">${esc(it.role === 'user' ? 'You' : who)}${time ? ` · ${time}` : ''}</span>${mdHtml(it.text)}${cutNote(it)}</div>${stopNote(it)}`;
   };
 
@@ -1224,13 +1222,24 @@
     else controls = field + btn('Send', 'data-kind="send"', 'affirmative') + btn('Cancel', 'data-kind="cancel"', 'negative');
     return `<div class="ch-ask" role="alert"><div class="ch-ask-title">${esc(visible(d.title) || 'The session is asking')}</div>${d.message ? `<pre class="ch-ask-text">${esc(visible(d.message))}</pre>` : ''}<div class="ch-ask-btns">${controls}</div>${ok ? '' : `<div class="ch-ask-warn" role="status">${CUT_NOTE}</div>`}</div>`;
   }
-  function rpcTail(c, who, items = []) {
+  // RP171: «Subagent working · NAME» + the clock, from the live count and start (c.rpc.subs, c.rpc.subSince) and the clock `now`. It says nothing unless the session is busy or asking and both numbers are valid. The
+  // name is the one of the pending `subagent_run` item of the history, only when exactly one runs. The icon and the clock are hidden from screen readers: the bubble announces only that it appears and that it ends.
+  const subBubbleHtml = (r, items, now) => {
+    if ((r.state !== 'busy' && r.state !== 'asking') || !Number.isInteger(r.subs) || r.subs < 1 || !Number.isFinite(r.subSince) || r.subSince <= 0 || !Number.isFinite(now)) return '';
+    const v = typeof module === 'object' && module.exports ? require('./view.js') : root.RepoPanelView;
+    const open = items.flatMap((it) => (it && Array.isArray(it.toolInfo) ? it.toolInfo : [])).filter((c) => c && c.name === SUB_TOOL && c.ok == null);
+    const name = r.subs === 1 && open.length ? subNameOf(open[open.length - 1]) : '';
+    const words = r.subs > 1 ? `${r.subs} subagents working` : `Subagent working${name ? ` · ${name}` : ''}`;
+    return `<div class="m subrun" role="status"><i class="sub-dot" aria-hidden="true">${SUB_ICON}</i> <span class="sub-text">${words}</span> <b class="sub-time" aria-hidden="true">${v.subClock(now - r.subSince)}</b></div>`;
+  };
+  function rpcTail(c, who, items = [], now) {
     const r = c.rpc && typeof c.rpc === 'object' ? c.rpc : {};
     // RP105c: while pi retries a failed request the tail says so (the attempt and the wait when they are known), instead of «working…»
     const rt = r.retry && typeof r.retry === 'object' ? r.retry : null;
     const retry = rt ? `<div class="m working">⟳ Retrying${Number.isInteger(rt.attempt) ? ` · attempt ${rt.attempt}${Number.isInteger(rt.max) ? ` of ${rt.max}` : ''}` : ''}${Number.isInteger(rt.delayMs) ? ` · in ${Math.max(1, Math.round(rt.delayMs / 1000))}s` : ''}</div>` : '';
     const hasLive = !!r.text && !liveIsInHistory(r.text, items); // RP155: a copy of what the history already shows is not drawn; the «working…» line takes its place while the run goes on
-    const streaming = (hasLive ? `<div class="m streaming"><span class="who">${esc(who)}</span>${mdHtml(r.text)}</div>` : r.streaming && !retry ? `<div class="m working">${r.thinking ? 'thinking…' : 'working…'}</div>` : '') + retry;
+    const sub = subBubbleHtml(r, items, now); // RP171: while a subagent runs its bubble replaces the generic «working…» (never both)
+    const streaming = (hasLive ? `<div class="m streaming"><span class="who">${esc(who)}</span>${mdHtml(r.text)}</div>` : '') + (sub || (!hasLive && r.streaming && !retry ? `<div class="m working">${r.thinking ? 'thinking…' : 'working…'}</div>` : '')) + retry;
     const asks = (Array.isArray(r.asks) ? r.asks : []).filter((d) => d && typeof d.requestId === 'string').map((d) => askCard(d, c.id, !!(c.askBusy && c.askBusy[d.requestId]))).join('');
     return streaming + asks;
   }
@@ -1300,11 +1309,11 @@ ${status}</div>`;
       return `${note}<div class="ch-state"><p>No session is adopted for this folder.${rows ? ' Open one, or start a new one.' : ''}</p>${rows ? `<div class="ch-picks">${rows}</div>` : ''}<button type="button" data-act="chat-start" data-id="${id}"${c.starting ? ' disabled' : ''}>New session</button></div>`;
     }
     const who = info.adopted.name || info.adopted.id;
-    if (!info.adoptedFound) return `${note}<div class="ch-state" role="status"><p>The session is loading. The history appears with its first message.</p></div>${pendingHtml(c.pending, [])}${rpcTail(c, who)}`;
+    if (!info.adoptedFound) return `${note}<div class="ch-state" role="status"><p>The session is loading. The history appears with its first message.</p></div>${pendingHtml(c.pending, [])}${rpcTail(c, who, [], ctx.now)}`;
     const items = c.hist && Array.isArray(c.hist.items) ? c.hist.items : []; // RP155: a history that is not a list reads as empty
     const rx = { allow: !!c.hist && c.hist.results === true, map: c.results && typeof c.results === 'object' ? c.results : {}, id: c.id };
     const pending = pendingHtml(c.pending, items);
-    return `${note}${c.hist && c.hist.truncated ? '<div class="rs-sub ch-older">Older messages are not shown</div>' : ''}${items.map((it) => bubble(it, who, rx)).join('') || (pending ? '' : '<div class="empty">No messages yet.</div>')}${quickRow(quickOf(c))}${pending}${rpcTail(c, who, items)}`;
+    return `${note}${c.hist && c.hist.truncated ? '<div class="rs-sub ch-older">Older messages are not shown</div>' : ''}${items.map((it) => bubble(it, who, rx)).join('') || (pending ? '' : '<div class="empty">No messages yet.</div>')}${quickRow(quickOf(c))}${pending}${rpcTail(c, who, items, ctx.now)}`;
   }
 
   // Pinned room card (not clickable yet): the aggregate of its member rows (a room has no session state any more).
@@ -1395,5 +1404,5 @@ ${status}</div>`;
     return `${ctx.failed ? '<div class="rs-note" role="status">⚠ Summary unavailable: showing the last data we have.</div>' : ''}<div class="rs-list">${body}</div>`;
   }
 
-  return { mergeSheetHtml, repoStatus, esc, mdHtml, settingsView, memoryChipHtml, subagentChipHtml, ctxChipHtml, compactButtonHtml, legendHtml, listCount, listHeadChips, blockWidths, columnView, treeFolderPaths, fileView, COLUMN_TABS, composerState, askAllowed, actionMenu, actionButtonsHtml, composerMergeHtml, composerNote, chatHead, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, sessionCloseHtml, sessionTerminalHtml, terminalBlockHtml, recentlyActive, chatBody, quickReplies, quickOf, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
+  return { mergeSheetHtml, repoStatus, esc, mdHtml, settingsView, memoryChipHtml, ctxChipHtml, compactButtonHtml, legendHtml, listCount, listHeadChips, blockWidths, columnView, treeFolderPaths, fileView, COLUMN_TABS, composerState, askAllowed, actionMenu, actionButtonsHtml, composerMergeHtml, composerNote, chatHead, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, sessionCloseHtml, sessionTerminalHtml, terminalBlockHtml, recentlyActive, chatBody, quickReplies, quickOf, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
 }));

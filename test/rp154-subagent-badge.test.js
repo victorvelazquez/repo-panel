@@ -52,12 +52,11 @@ test('a3: the rest of the card is untouched: the state chip of RP169 (words, ico
 });
 
 // ---------- what must stay ----------
-test('k1: the chip of the chat (RP152) keeps drawing the live subagent next to the state of the session, with its clock', () => {
-  const html = R.subagentChipHtml({ rpc: { state: 'busy', subs: 1, subSince: 1000 } }, 1000 + 135000);
-  assert.match(html, /^<span class="sub-chip"/);
-  assert.match(html, /Subagent working<\/span> <b class="sub-time">02:15<\/b>/);
-  assert.match(R.subagentChipHtml({ rpc: { state: 'busy', subs: 3, subSince: 1000 } }, 5000), /3 subagents working/);
-  assert.equal(R.subagentChipHtml({ rpc: { state: 'idle', subs: 1, subSince: 1000 } }, 5000), '');
+test('k1: the chat (RP152, now a bubble of the thread: RP171) keeps drawing the live subagent with its clock', () => {
+  const chat = (rpc, now) => R.chatBody({ id: 'abcdef0123', info: { adopted: { id: 's', name: 'demo' }, adoptedFound: true, sessions: [] }, hist: { items: [], truncated: false }, rpc }, { now });
+  assert.match(chat({ state: 'busy', subs: 1, subSince: 1000 }, 1000 + 135000), /Subagent working<\/span> <b class="sub-time" aria-hidden="true">02:15<\/b>/);
+  assert.match(chat({ state: 'busy', subs: 3, subSince: 1000 }, 5000), /3 subagents working/);
+  assert.doesNotMatch(chat({ state: 'idle', subs: 1, subSince: 1000 }, 5000), /Subagent/);
 });
 
 test('k2: the server that reads the presence (RP164) is still there and still hands the page a closed shape: only the card stopped drawing it', () => {
@@ -76,9 +75,10 @@ test('g1: the code of the badge and its list is gone from the page: the helpers,
   assert.doesNotMatch(read('README.md'), /Subagents on the card/);
 });
 
-test('g2: and what belongs to the chat chip is still in the page (the class names and the helper of RP152), so nothing was removed by mistake', () => {
+test('g2: and what belongs to the chat bubble is still in the page (RP171: the helper of the chip is gone, the classes of the bubble stay), so nothing was removed by mistake', () => {
   const js = read('public/resumen.js');
   const css = read('public/style.css');
-  assert.match(js, /const subagentChipHtml = \(c, now\) =>/);
-  for (const c of ['sub-chip', 'sub-dot', 'sub-time']) assert.ok(css.includes(`.${c}`), c);
+  assert.match(js, /const subBubbleHtml = \(r, items, now\) =>/);
+  assert.doesNotMatch(js, /subagentChipHtml/);
+  for (const c of ['m.subrun', 'sub-dot', 'sub-time']) assert.ok(css.includes('.' + c), c);
 });

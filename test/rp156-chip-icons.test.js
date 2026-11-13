@@ -108,14 +108,15 @@ test('c3: the word «ctx» is in span.mem-word and the number stays outside it (
 });
 
 // ---------- the subagent ----------
-test('u1: the subagent chip draws the arrow as an SVG (the same elbow arrow as the text one, now drawn), the words in span.sub-word, the time outside it; the rules of when it shows are the ones of RP152', () => {
-  const html = R.subagentChipHtml({ rpc: { state: 'busy', subs: 1, subSince: 1000 } }, 1000 + 134000);
-  assert.match(html, /^<span class="sub-chip" title="[^"]+"><i class="sub-dot" aria-hidden="true"><svg /);
-  assert.ok(html.includes('<span class="sub-word">Subagent working</span>'));
-  assert.match(html, /<b class="sub-time">02:14<\/b><\/span>$/);
-  assert.doesNotMatch(html, GLYPHS);
-  assert.ok(R.subagentChipHtml({ rpc: { state: 'busy', subs: 3, subSince: 1000 } }, 5000).includes('<span class="sub-word">3 subagents working</span>'));
-  for (const c of [null, undefined, {}, { rpc: { state: 'idle', subs: 1, subSince: 1000 } }, { rpc: { state: 'busy', subs: 0, subSince: 1000 } }, { rpc: { state: 'busy', subs: 1, subSince: 0 } }]) assert.equal(R.subagentChipHtml(c, 5000), '', JSON.stringify(c));
+test('u1: the subagent (RP171: a bubble of the thread, no longer a chip) draws the arrow as an SVG, the words in span.sub-text, the time outside it and hidden from screen readers; the rules of when it shows are the ones of RP152', () => {
+  const chat = (rpc, now) => R.chatBody({ id: 'abcdef0123', info: { adopted: { id: 's', name: 'demo' }, adoptedFound: true, sessions: [] }, hist: { items: [], truncated: false }, rpc }, { now });
+  const html = chat({ state: 'busy', subs: 1, subSince: 1000 }, 1000 + 134000);
+  assert.match(html, /<div class="m subrun" role="status"><i class="sub-dot" aria-hidden="true"><svg /);
+  assert.ok(html.includes('<span class="sub-text">Subagent working</span>'));
+  assert.match(html, /<b class="sub-time" aria-hidden="true">02:14<\/b><\/div>$/);
+  assert.doesNotMatch(/<div class="m subrun"[\s\S]*?<\/div>/.exec(html)[0], GLYPHS);
+  assert.ok(chat({ state: 'busy', subs: 3, subSince: 1000 }, 5000).includes('<span class="sub-text">3 subagents working</span>'));
+  for (const rpc of [null, undefined, {}, { state: 'idle', subs: 1, subSince: 1000 }, { state: 'busy', subs: 0, subSince: 1000 }, { state: 'busy', subs: 1, subSince: 0 }]) assert.doesNotMatch(chat(rpc, 5000), /Subagent/, JSON.stringify(rpc));
 });
 
 // ---------- the buttons ----------
@@ -138,7 +139,7 @@ test('t1: the composer is the container of the row and a narrow chat hides ONLY 
   assert.match(rule('.composer'), /container-name:\s*cmp/);
   const q = /@container cmp \(max-width:\s*456px\)\s*\{\s*([\s\S]*?)\n\}/.exec(css);
   assert.ok(q, 'the container query of the composer');
-  assert.match(q[1], /\.ss-word,\s*\.mem-word,\s*\.sub-word,\s*\.ss-long\s*\{[^}]*clip-path:\s*inset\(50%\)/);
+  assert.match(q[1], /\.ss-word,\s*\.mem-word,\s*\.ss-long\s*\{[^}]*clip-path:\s*inset\(50%\)/);
   assert.doesNotMatch(q[1], /display:\s*none/);
   assert.match(q[1], /position:\s*absolute/);
   assert.match(q[1], /width:\s*1px/);

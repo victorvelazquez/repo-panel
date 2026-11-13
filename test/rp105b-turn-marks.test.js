@@ -85,8 +85,8 @@ test('page: a stopped or failed turn gets a note after its message; with no text
   assert.doesNotMatch(noText, /working…/);
 });
 
-test('page: a trailing run with no stop is still «working…», and an unknown stop value draws nothing', () => {
-  assert.match(body([{ role: 'assistant', text: '', at: null, tools: ['bash'] }]), /working…/);
+test('page: a trailing run with no stop draws no stop note (RP171: no «working…» of its own, the tail says it), and an unknown stop value draws nothing', () => {
+  assert.doesNotMatch(body([{ role: 'assistant', text: '', at: null, tools: ['bash'] }]), /working…|stopnote/); // RP171
   const odd = body([{ role: 'assistant', text: 'x', at: null, tools: [], stop: '<img onerror=1>' }]);
   assert.doesNotMatch(odd, /stopnote|<img/);
 });
