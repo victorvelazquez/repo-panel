@@ -33,6 +33,7 @@ const { terminalAnswer } = require('./terminal.js');
 const { readUsage, usageFile } = require('./usage.js');
 const { sessionsState, chatState, chatResult, adoptSession, releaseSession, adoptIfNone } = require('./sessions.js');
 const { readSettings, writeSetting } = require('./settings.js');
+const remote = require('./remote.js');
 
 const ROOT = path.join(__dirname, '..');
 const TOKEN = crypto.randomBytes(24).toString('hex');
@@ -227,6 +228,25 @@ function createServer(port, deps = {}) {
   // One duplicate-send guard per server (tests inject theirs with a fake clock).
   deps = { guard: sendGuard(), ...deps };
   const hostOk = new Set([`127.0.0.1:${port}`, `localhost:${port}`]);
+  // RP177: the remote host of config.json (read per request, so editing it needs no restart) and its login; 127.0.0.1 never goes through them.
+  const clock = deps.now || Date.now;
+  const limiter = remote.createLoginLimiter({ now: clock });
+  const remoteCfg = () => remote.remoteOf(loadConfig());
+  const hostKind = (req, rem) => remote.classify(req.headers.host, hostOk, rem, port);
+  // null when the request may go on, else the refusal. A remote host with no valid cookie gets nothing but the login.
+  const refusal = (req, rem) => {
+    const kind = hostKind(req, rem);
+    if (!kind) return { status: 403, error: 'Forbidden host' };
+    if (kind === 'remote' && !remote.isAuthed(req, rem.secret, clock())) return { status: 401, error: 'Login required' };
+    return null;
+  };
+  async function login(req, res, rem) {
+    if (limiter.locked()) return send(res, 429, { error: 'Too many attempts' });
+    const body = await readBody(req);
+    if (!remote.secretOk(body && body.secret, rem.secret)) { limiter.fail(); return send(res, 401, { error: 'Wrong secret' }); }
+    limiter.success();
+    return send(res, 200, { ok: true }, undefined, { 'set-cookie': remote.sessionCookie(remote.signSession(rem.secret, clock()), req.headers['x-forwarded-proto'] === 'https') });
+  }
   const perf = createPerf();
   const flights = new Map();
   const hub = deps.hub || createEventHub();
@@ -262,9 +282,18 @@ function createServer(port, deps = {}) {
     };
     return withContext(ctx, () => withPriority(priority, async () => {
       try {
-        // Blocks DNS-rebinding: only our own host names are served.
-        if (!hostOk.has(req.headers.host)) throw new HttpError(403, 'Forbidden host');
+        // Blocks DNS-rebinding: only our own host names (and the configured remote one, behind its login) are served.
+        const rem = remoteCfg();
+        if (!hostKind(req, rem)) throw new HttpError(403, 'Forbidden host');
+        // RP177: a POST that names another origin is a cross-site one.
+        if (req.method === 'POST' && !remote.originOk(req)) throw new HttpError(403, 'Forbidden origin');
         if (badUrl) throw new HttpError(400, 'Bad request');
+        if (hostKind(req, rem) === 'remote' && req.method === 'POST' && pathname === '/login') return await login(req, res, rem);
+        const denied = pathname === '/health' ? null : refusal(req, rem);
+        if (denied) {
+          if (req.method === 'GET' && (pathname === '/' || pathname === '/index.html')) return reply(denied.status, remote.LOGIN_PAGE, 'text/html; charset=utf-8');
+          throw new HttpError(denied.status, denied.error);
+        }
         if (req.method === 'GET' && (pathname === '/' || pathname === '/index.html')) {
           const html = fs.readFileSync(path.join(ROOT, 'public', 'index.html'), 'utf8').replace('__TOKEN__', TOKEN);
           return reply(200, html, 'text/html; charset=utf-8');
@@ -296,7 +325,8 @@ function createServer(port, deps = {}) {
   });
   // RP77b: GET /api/events is long-lived, so it skips perf and singleFlight; the token is read ONLY from the x-token header (never the URL).
   function openStream(req, res) {
-    if (!hostOk.has(req.headers.host)) return send(res, 403, { error: 'Forbidden host' });
+    const denied = refusal(req, remoteCfg());
+    if (denied) return send(res, denied.status, { error: denied.error });
     if (req.headers['x-token'] !== TOKEN) return send(res, 401, { error: 'Invalid token' });
     for (const [k, v] of Object.entries({ 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' })) res.setHeader(k, v);
     if (hub.add(res)) return undefined;

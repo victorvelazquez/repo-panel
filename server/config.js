@@ -104,6 +104,15 @@ function cleanPi(v) {
   return out;
 }
 
+// Remote access (RP177): kept as typed (host trimmed and lowercased) so a typo is never erased by a save; server/remote.js decides if it is usable.
+function cleanRemote(v) {
+  const out = {};
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return out;
+  if (typeof v.host === 'string') out.host = v.host.trim().toLowerCase();
+  if (typeof v.secret === 'string') out.secret = v.secret;
+  return out;
+}
+
 function loadConfig() {
   let cfg = {};
   try { cfg = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8')); } catch { /* first run */ }
@@ -126,6 +135,8 @@ function loadConfig() {
     ...(cfg.pi !== undefined ? { pi: cleanPi(cfg.pi) } : {}),
     // Chat options; written back only when present.
     ...(cfg.chat !== undefined ? { chat: cleanChat(cfg.chat) } : {}),
+    // Remote access (host and login secret); written back only when present.
+    ...(cfg.remote !== undefined ? { remote: cleanRemote(cfg.remote) } : {}),
     // Optional manual order of the "Go work on" strip; written back only when present.
     ...(Array.isArray(cfg.priority) ? { priority: cleanPriority(cfg.priority) } : {}),
   };
