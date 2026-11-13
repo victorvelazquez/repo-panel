@@ -1,4 +1,5 @@
 'use strict';
+// RP176: the /flow-commit button is now /flow-ship everywhere it is offered; each assertion here keeps holding, now for /flow-ship.
 // RP52 (S46): the Summary tab. public/resumen.js is pure (payload of /api/summary in, HTML out); the page tests load the
 // real public/app.js in a vm with a recording DOM (same approach as rp47) and check the tabs, the scope and the painting.
 const test = require('node:test');
@@ -44,10 +45,10 @@ test('deliver uses the flow button the board would show; without local state it 
   const action = { kind: 'deliver', label: 'Deliver', pr: null };
   const pr = view([row({ action })], { flowFor: () => ({ cmd: 'flow-pr', label: '/flow-pr' }) });
   assert.match(pr, /<button[^>]*data-act="pi" data-id="r1" data-cmd="flow-pr"[^>]*>\/flow-pr</);
-  const commit = view([row({ action })], { flowFor: () => ({ cmd: 'flow-commit', label: '/flow-commit' }) });
-  assert.match(commit, /data-cmd="flow-commit"/);
-  const held = view([row({ action })], { flowFor: () => ({ cmd: 'flow-commit', label: '/flow-commit', disabled: true, reason: 'busy' }) });
-  assert.match(held, /data-cmd="flow-commit"[^>]*disabled/);
+  const commit = view([row({ action })], { flowFor: () => ({ cmd: 'flow-ship', label: '/flow-ship' }) });
+  assert.match(commit, /data-cmd="flow-ship"/);
+  const held = view([row({ action })], { flowFor: () => ({ cmd: 'flow-ship', label: '/flow-ship', disabled: true, reason: 'busy' }) });
+  assert.match(held, /data-cmd="flow-ship"[^>]*disabled/);
   const unknown = view([row({ action })], { flowFor: () => null });
   assert.doesNotMatch(unknown, /data-act="pi"/);
   assert.match(unknown, /<button[^>]*disabled[^>]*>Deliver</);
@@ -418,7 +419,7 @@ test('the deliver button on the page is disabled until the repo local state is l
   S.local.abc = { branch: 'feat', detached: false, upstream: 'origin/feat', noUpstream: false, ahead: 0, behind: 0, files: [{ path: 'a.txt', status: 'M', untracked: false }], added: 1, deleted: 0, head: 'h', inProgress: null, base: 'main', stagedCount: 0 };
   S.state.abc = { state: 'ready-to-commit', next: 'x', at: new Date().toISOString() };
   page.run('render()');
-  assert.match(page.get('#summary').html, /data-act="pi" data-id="abc" data-cmd="flow-commit"/);
+  assert.match(page.get('#summary').html, /data-act="pi" data-id="abc" data-cmd="flow-ship"/);
 });
 
 // ---------- index.html and server ----------

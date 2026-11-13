@@ -205,7 +205,7 @@
   function jobsHold(n) {
     return Number.isSafeInteger(n) && n > 0 ? `${Math.min(n, 99)} background job${n === 1 ? ' is' : 's are'} running` : '';
   }
-  // RP159: the ONE rule that holds a delivery button (/flow-commit, /flow-pr, /flow-base, /flow-next, Fix CI): the reason it is held, or ''. In this order: the order is on its way (`sending`, a command name), a command sent
+  // RP159: the ONE rule that holds a delivery button (/flow-ship, /flow-pr, /flow-base, /flow-next, Fix CI): the reason it is held, or ''. In this order: the order is on its way (`sending`, a command name), a command sent
   // from this page is judged running (`running`, { cmd, label }), the session asks you or works (`session`, the LIVE state: busy | asking). What is not exactly one of those holds nothing. Total.
   function deliveryHold(ctx) {
     const c = ctx && typeof ctx === 'object' && !Array.isArray(ctx) ? ctx : {};
@@ -270,7 +270,7 @@
   }
 
   // The commit button stays unless a usable state says the work is not ready to commit. No state never blocks.
-  // `override` is the page's "Show /flow-commit anyway" choice for this repo.
+  // `override` is the page's "Show /flow-ship anyway" choice for this repo.
   function commitAllowed(data, { now = Date.now(), override = false } = {}) {
     if (override) return true;
     const s = usableState(data, now);
@@ -278,10 +278,10 @@
   }
 
   // The "⋯" menu item that lifts the state gating, only while the gating hides the button and it is not lifted yet.
-  // Never on a stale repo with changes: that card offers /flow-base --stash, so /flow-commit would not appear anyway.
+  // Never on a stale repo with changes: that card offers /flow-base --stash, so /flow-ship would not appear anyway.
   // `session` is the live pi session state: a busy or asking one also gates the button, and the item lifts that too.
   function commitOverrideItem(data, { now = Date.now(), override = false, stale = false, session, jobs } = {}) {
-    return !override && !stale && (!commitAllowed(data, { now }) || sessionHold(session) || jobsHold(jobs)) ? { act: 'show-commit', label: 'Show /flow-commit anyway' } : null;
+    return !override && !stale && (!commitAllowed(data, { now }) || sessionHold(session) || jobsHold(jobs)) ? { act: 'show-commit', label: 'Show /flow-ship anyway' } : null;
   }
 
   // The card's "what to do now" line: { kind: 'current', dot, text, title } for a usable state, { kind: 'outdated',
@@ -307,7 +307,7 @@
   const hasLocal = (l) => !!l && typeof l === 'object' && !l.error && Array.isArray(l.files);
 
   // A reason the repo needs a person's hands, or null. Commits on the base branch are forbidden outside
-  // /flow-commit, and anything done by hand that the panel cannot drive is flagged. A clean branch that is only
+  // /flow-ship, and anything done by hand that the panel cannot drive is flagged. A clean branch that is only
   // behind, a base with nothing ahead and a task branch with commits ahead are all normal.
   function manualAction(local, baseName) {
     if (!hasLocal(local)) return null;
@@ -364,10 +364,10 @@
     if (!hasLocal(local)) return no('Local state not loaded');
     const manual = manualAction(local, local.base);
     if (manual) return no(manual);
-    if (local.files.length > 0) return no('Uncommitted changes: run /flow-commit first');
+    if (local.files.length > 0) return no('Uncommitted changes: run /flow-ship first');
     if (!(local.ahead > 0)) return no('No commits to deliver');
     if (prInfo && prInfo.stale) return no('Branch already merged: run /flow-base');
-    if (verdict === 'attention') return no('Needs attention after /flow-commit');
+    if (verdict === 'attention') return no('Needs attention after /flow-ship');
     if (verdict === 'running') return no('Committing…');
     const open = prInfo && Array.isArray(prInfo.prs) ? prInfo.prs : [];
     return { show: true, update: open.some((p) => p && p.head === local.branch), reason: null };
@@ -376,7 +376,7 @@
   const FLOW_BASE_HINT = 'Start from a fresh, updated base branch: this branch was already merged';
   const FLOW_STASH_HINT = 'This branch was already merged but has uncommitted changes. /flow-base --stash carries them to the fresh base branch (stash, switch, update, restore). It refuses and changes nothing when the work of this branch is not yet merged or its remote branch not yet deleted.';
 
-  const UNSTAGE_HINT = '/flow-commit needs an empty index. This clears the index (git reset: your changes stay in the working tree) and continues with the normal commit.';
+  const UNSTAGE_HINT = '/flow-ship needs an empty index. This clears the index (git reset: your changes stay in the working tree) and continues with the normal commit.';
 
   // What a running command is called in a tooltip.
   const RUNNING_NAME = { 'fix-pr': 'the fix order', 'put-in-conditions': 'the put-in-conditions order' };
@@ -428,16 +428,16 @@
     return { show: true, enabled: !c.busy && !c.held && !hold, title: hold };
   }
 
-  // The flow buttons of a repo's LOCAL card, in order: [{ cmd, label, reason?, disabled? }] with cmd flow-commit |
-  // flow-commit-unstage | flow-pr | flow-base | flow-base-stash, or []. The one source of truth for the page and the
-  // tests. `ctx` is { override (the person lifted the declared-state gating of /flow-commit), verdict ('running' |
-  // 'ok' | 'attention' | null, the last /flow-commit), running ({ cmd, label } of a command sent from this page that is
+  // The flow buttons of a repo's LOCAL card, in order: [{ cmd, label, reason?, disabled? }] with cmd flow-ship |
+  // flow-ship-unstage | flow-pr | flow-base | flow-base-stash, or []. The one source of truth for the page and the
+  // tests. `ctx` is { override (the person lifted the declared-state gating of /flow-ship), verdict ('running' |
+  // 'ok' | 'attention' | null, the last /flow-ship), running ({ cmd, label } of a command sent from this page that is
   // still running: the same buttons come back disabled with a reason), retry (label the commit button "Retry …"), session
   // (live pi session state of a repo with changes: busy or asking disables the commit pair with a reason; so does a
   // `local.lastChangeMs` younger than QUIET_MS; `override` lifts both), now }.
-  // A stale repo with changed or untracked files offers /flow-base --stash instead of /flow-commit (the skill carries
+  // A stale repo with changed or untracked files offers /flow-base --stash instead of /flow-ship (the skill carries
   // the changes aside, updates the base branch and brings them back). A dirty repo with staged files offers
-  // /flow-commit --unstage instead of /flow-commit (the index must be empty). Neither branch button shows while a
+  // /flow-ship --unstage instead of /flow-ship (the index must be empty). Neither branch button shows while a
   // bare `verdict: 'running'` is passed or when the repo needs manual action.
   function flowButtons(local, prInfo, stateData, ctx = {}) {
     if (ctx.running) {
@@ -447,7 +447,7 @@
     }
     if (!hasLocal(local) || manualAction(local, local.base)) return [];
     const { override = false, verdict = null, retry = false, now = Date.now() } = ctx;
-    // RP159: the other delivery buttons follow the live session too (only /flow-commit did): held while it works or asks, with the reason of the session. The override of the person is for /flow-commit only.
+    // RP159: the other delivery buttons follow the live session too (only /flow-ship did): held while it works or asks, with the reason of the session. The override of the person is for /flow-ship only.
     const live = sessionHold(ctx.session) || jobsHold(ctx.jobs); // RP163
     const held = live ? { disabled: true, reason: live } : {};
     if (local.files.length > 0 && prInfo && prInfo.stale) return verdict === 'running' ? [] : [{ cmd: 'flow-base-stash', label: '/flow-base --stash', reason: FLOW_STASH_HINT, ...held }];
@@ -455,8 +455,8 @@
       if (!commitAllowed(stateData, { now, override })) return [];
       const again = retry ? 'Retry ' : '';
       const hold = override ? null : sessionHold(ctx.session) || jobsHold(ctx.jobs) || (quietPeriod(local.lastChangeMs, now) ? QUIET_REASON : null);
-      if (local.stagedCount > 0) return [{ cmd: 'flow-commit-unstage', label: `${again}/flow-commit --unstage`, reason: hold || UNSTAGE_HINT, ...(hold ? { disabled: true } : {}) }];
-      return [{ cmd: 'flow-commit', label: `${again}/flow-commit`, ...(hold ? { disabled: true, reason: hold } : {}) }];
+      if (local.stagedCount > 0) return [{ cmd: 'flow-ship-unstage', label: `${again}/flow-ship --unstage`, reason: hold || UNSTAGE_HINT, ...(hold ? { disabled: true } : {}) }];
+      return [{ cmd: 'flow-ship', label: `${again}/flow-ship`, ...(hold ? { disabled: true, reason: hold } : {}) }];
     }
     const pa = local.ahead > 0 ? prAction(local, prInfo, verdict) : null;
     if (pa && pa.show) return [{ cmd: 'flow-pr', label: pa.update ? '/flow-pr (update PR)' : '/flow-pr', ...held }];
@@ -480,8 +480,8 @@
 
   // Where a repo's LOCAL card goes, by Git state alone: { column, attn, row }. `column` is changes | committed | clean, or
   // null when the repo has no local card (clean, nothing stale, only its PR cards); `row` is the compact clean row;
-  // `attn` marks a card that needs a person (error, stale branch, manual action, failed /flow-commit). `verdict` is
-  // the state of the last /flow-commit and `prCount` the number of open PRs of the repo.
+  // `attn` marks a card that needs a person (error, stale branch, manual action, failed /flow-ship). `verdict` is
+  // the state of the last /flow-ship and `prCount` the number of open PRs of the repo.
   function localPlacement(local, prInfo, prCount, verdict) {
     const l = local || {};
     if (l.error) return { column: 'changes', attn: true, row: false };
@@ -526,46 +526,57 @@
   const sortPrCards = (items, get = (x) => x) => items.map((item, i) => ({ item, i, rank: prRank(get(item)) }))
     .sort((a, b) => a.rank - b.rank || a.i - b.i).map((x) => x.item);
 
-  // Verdict after /flow-commit: { state: 'running' | 'ok' | 'attention', reason }, or null without a record.
-  // `sent` is { at (epoch ms), head, files } recorded when the command was sent; `session` is the state of
+  // Verdict after /flow-ship (or the old /flow-commit, still judged when its record has `cmd`): { state: 'running' | 'ok' | 'attention', reason }, or null without a record.
+  // `sent` is { at (epoch ms), head, files, cmd? } recorded when the command was sent; `session` is the state of
   // GET /api/pi-status (busy | idle | closed | ambiguous | unknown, or undefined before the first answer).
   // ok/attention is judged from Git (clean tree including untracked files, HEAD changed, commits ahead) and from
   // the session state, never from terminal text. The panel does not judge the quality of the commits.
+  // /flow-ship also publishes the pull request: it is ok only when nothing is left to deliver (clean tree, HEAD changed, nothing ahead of the
+  // upstream), and a commit that is still ahead means the PR stage did not finish (the /flow-pr button stays on the card for that).
   const SETTLE_MS = 30 * 1000; // an idle prompt right after sending may just not have started yet
   const UNKNOWN_MS = 15 * 60 * 1000; // how long an unknown session may be given the benefit of the doubt
+  // RP176: a commit plus a pull request (the agents run tests and Git checks in between) takes longer than a commit: twice the wait, for /flow-ship only.
+  const SHIP_UNKNOWN_MS = 30 * 60 * 1000;
+  const SHIP_CMDS = ['flow-ship', 'flow-ship-unstage'];
+  const DELIVER_CMDS = [...SHIP_CMDS, 'flow-commit', 'flow-commit-unstage'];
 
   function commitVerdict(sent, local, session, now = Date.now()) {
     if (!sent) return null;
+    const ship = SHIP_CMDS.includes(sent.cmd);
+    const name = ship ? '/flow-ship' : '/flow-commit';
+    const unknownMs = ship ? SHIP_UNKNOWN_MS : UNKNOWN_MS;
     const running = (reason) => ({ state: 'running', reason });
     const attention = (reason) => ({ state: 'attention', reason });
     if (!hasLocal(local)) return running('Waiting for the repo state');
     if (session === 'busy') return running('The session is working');
     const n = local.files.length;
     const changed = !!local.head && local.head !== sent.head;
-    if (n === 0 && changed && local.ahead > 0) return { state: 'ok', reason: 'Committed: clean tree and commits ready to deliver' };
+    if (ship && n === 0 && changed && local.ahead === 0 && !local.noUpstream) return { state: 'ok', reason: 'Committed and published: clean tree and nothing left to deliver' };
+    if (!ship && n === 0 && changed && local.ahead > 0) return { state: 'ok', reason: 'Committed: clean tree and commits ready to deliver' };
     const elapsed = now - sent.at;
-    const filesLeft = `${n} file${n === 1 ? '' : 's'} still uncommitted after /flow-commit`;
+    const filesLeft = `${n} file${n === 1 ? '' : 's'} still uncommitted after ${name}`;
+    const notDelivered = ship ? 'Committed, but the pull request was not published: run /flow-pr' : 'HEAD changed but no commits are left to deliver';
     if (session === 'idle' || session === 'closed') {
       if (elapsed < SETTLE_MS) return running('Waiting for the session to start');
       if (n > 0) return attention(filesLeft);
-      if (!changed) return attention(session === 'closed' ? 'The session closed before /flow-commit made a commit' : 'No new commit after /flow-commit (HEAD did not change)');
-      return attention('HEAD changed but no commits are left to deliver');
+      if (!changed) return attention(session === 'closed' ? `The session closed before ${name} made a commit` : `No new commit after ${name} (HEAD did not change)`);
+      return attention(notDelivered);
     }
-    if (elapsed < UNKNOWN_MS) return running('Waiting for the session');
+    if (elapsed < unknownMs) return running('Waiting for the session');
     if (n > 0) return attention(filesLeft);
-    return attention(changed ? 'HEAD changed but no commits are left to deliver' : 'No change 15 minutes after /flow-commit and the session state is unknown');
+    return attention(changed ? notDelivered : `No change ${unknownMs / 60000} minutes after ${name} and the session state is unknown`);
   }
 
   // What the status line says while each command a button can send is running.
   const RUNNING_LABEL = {
-    'flow-commit': 'committing…', 'flow-commit-unstage': 'committing…', 'flow-pr': 'creating pull request…',
+    'flow-ship': 'shipping…', 'flow-ship-unstage': 'shipping…', 'flow-commit': 'committing…', 'flow-commit-unstage': 'committing…', 'flow-pr': 'creating pull request…',
     'flow-base': 'updating base branch…', 'flow-base-stash': 'updating base branch…',
     'fix-pr': 'fixing pull request…', 'put-in-conditions': 'putting repo in conditions…', 'flow-next': 'starting the next task…',
   };
   // The GitHub-like color of the progress line of each command (the pending CI chip is always yellow).
-  const RUN_COLOR = { 'flow-commit': 'blue', 'flow-commit-unstage': 'blue', 'flow-pr': 'green', 'flow-base': 'purple', 'flow-base-stash': 'purple', 'fix-pr': 'orange' };
+  const RUN_COLOR = { 'flow-ship': 'blue', 'flow-ship-unstage': 'blue', 'flow-commit': 'blue', 'flow-commit-unstage': 'blue', 'flow-pr': 'green', 'flow-base': 'purple', 'flow-base-stash': 'purple', 'fix-pr': 'orange' };
   const runColor = (cmd) => RUN_COLOR[cmd] || 'gray';
-  const CMD_TEXT = { 'flow-commit': '/flow-commit', 'flow-commit-unstage': '/flow-commit --unstage', 'flow-pr': '/flow-pr', 'flow-base': '/flow-base', 'flow-base-stash': '/flow-base --stash' };
+  const CMD_TEXT = { 'flow-ship': '/flow-ship', 'flow-ship-unstage': '/flow-ship --unstage', 'flow-commit': '/flow-commit', 'flow-commit-unstage': '/flow-commit --unstage', 'flow-pr': '/flow-pr', 'flow-base': '/flow-base', 'flow-base-stash': '/flow-base --stash' };
   // The pseudo-verdict of a command whose order is still being sent to the session: it behaves as a running one, with
   // the label the real running verdict shows for that command.
   const sendingVerdict = (cmd) => ({ state: 'running', cmd, label: RUNNING_LABEL[cmd] || '', reason: 'Sending the order to the session' });
@@ -582,18 +593,18 @@
   // there is no record or the command has no verdict (fix-pr and put-in-conditions are dropped once the session is
   // idle: a failure answer from the session is a legitimate outcome). `sent` is { cmd, at, head, branch, files, ahead,
   // busySeen? } recorded when the command was confirmed; `session` is the state of GET /api/pi-status; `prInfo` is the
-  // answer of /api/prs. Judged from Git and the session state, never from terminal text. /flow-commit and
-  // /flow-commit --unstage are judged by commitVerdict (the latter must also leave an empty index).
+  // answer of /api/prs. Judged from Git and the session state, never from terminal text. /flow-ship and
+  // /flow-ship --unstage (and the old /flow-commit pair) are judged by commitVerdict (the unstage ones must also leave an empty index).
   function flowVerdict(sent, local, session, prInfo, now = Date.now()) {
     if (!sent) return null;
     // A session showing a selection dialog is waiting for the person, who is the blocker: stay running, never expire.
     if (session === 'asking') return { state: 'running', reason: ASKING, label: ASKING, cmd: sent.cmd, asking: true };
     const label = RUNNING_LABEL[sent.cmd] || '';
     const done = (v) => (v ? { ...v, label, cmd: sent.cmd } : null);
-    if (sent.cmd === 'flow-commit' || sent.cmd === 'flow-commit-unstage') {
+    if (DELIVER_CMDS.includes(sent.cmd)) {
       const v = commitVerdict(sent, local, session, now);
-      if (v && v.state === 'ok' && sent.cmd === 'flow-commit-unstage' && local.stagedCount > 0) {
-        return done({ state: 'attention', reason: `${local.stagedCount} file${local.stagedCount === 1 ? ' is' : 's are'} still staged after /flow-commit --unstage` });
+      if (v && v.state === 'ok' && sent.cmd.endsWith('-unstage') && local.stagedCount > 0) {
+        return done({ state: 'attention', reason: `${local.stagedCount} file${local.stagedCount === 1 ? ' is' : 's are'} still staged after ${CMD_TEXT[sent.cmd]}` });
       }
       return done(v);
     }

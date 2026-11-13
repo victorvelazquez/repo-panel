@@ -70,7 +70,8 @@ async function withServer(fn, { state = 'idle', started = true } = {}) {
 }
 const pre = (post, command, extra = {}) => post('/api/pi', { id: ID, command, ...extra });
 
-const TEXTS = { 'flow-commit': '/flow-commit', 'flow-commit-unstage': '/flow-commit --unstage', 'flow-pr': '/flow-pr', 'flow-base': '/flow-base', 'flow-base-stash': '/flow-base --stash', 'flow-next': '/flow-next' };
+// RP176: the ship keys go out like the others; the old commit keys keep going out unchanged.
+const TEXTS = { 'flow-ship': '/flow-ship', 'flow-ship-unstage': '/flow-ship --unstage', 'flow-commit': '/flow-commit', 'flow-commit-unstage': '/flow-commit --unstage', 'flow-pr': '/flow-pr', 'flow-base': '/flow-base', 'flow-base-stash': '/flow-base --stash', 'flow-next': '/flow-next' };
 
 test('s1: each fixed key goes to the session as the exact text of its command, through rpcHost.prompt, with the answer the page reads', async () => {
   for (const [key, text] of Object.entries(TEXTS)) {

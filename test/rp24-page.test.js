@@ -1,4 +1,5 @@
 'use strict';
+// RP176: the /flow-commit button is now /flow-ship everywhere it is offered; each assertion here keeps holding, now for /flow-ship.
 // RP24 (S21) in the real public/app.js (vm with a stubbed DOM): the commit button is disabled while the RPC session
 // of the repo is busy or asking, and the quiet tick only redraws.
 const test = require('node:test');
@@ -54,10 +55,10 @@ function setup(page, l) {
   return S;
 }
 const card = (page) => page.get('repoCard')(R, false, null);
-const commitBtn = (html) => /<button data-act="pi" data-id="abc" data-cmd="flow-commit"[^>]*>/.exec(html)[0];
+const commitBtn = (html) => /<button data-act="pi" data-id="abc" data-cmd="flow-ship"[^>]*>/.exec(html)[0];
 
 // RPC2b-1: the buttons follow S.rpc (the live session of the host); nothing else holds it.
-test('page: a dirty repo with a busy session shows /flow-commit disabled with the reason, and enables it when the session is idle', async () => {
+test('page: a dirty repo with a busy session shows /flow-ship disabled with the reason, and enables it when the session is idle', async () => {
   const page = await loadPage();
   const S = setup(page, local());
   S.rpc[R.id] = { state: 'busy' };
@@ -87,7 +88,7 @@ test('page: the quiet tick requests nothing, whatever the repo (clean, hidden ta
   dirty.get('quietTick')();
   const sent = await loadPage();
   const S = setup(sent, local());
-  S.sent[R.id] = { cmd: 'flow-commit', at: Date.now(), head: 'h1', branch: 'task', files: 1, ahead: 0 };
+  S.sent[R.id] = { cmd: 'flow-ship', at: Date.now(), head: 'h1', branch: 'task', files: 1, ahead: 0 };
   sent.get('quietTick')();
   await flush();
   assert.deepEqual([clean.calls, hiddenTab.calls, dirty.calls, sent.calls], [[], [], [], []]);

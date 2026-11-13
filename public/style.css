@@ -360,19 +360,19 @@ details.pop > summary:focus-visible { outline: 2px solid var(--blue); outline-of
 
 /* ---------- RP67: soft action palette (calm look) ----------
    One hue per EFFECT of the action, through --h; the look is identical for all of them (13% tint at rest, 24% on hover):
-   blue = start (/flow-next, + Repo), amber = hand over your work or answer (/flow-commit, Summary Open on answer/waiting),
+   blue = start (/flow-next, + Repo), amber = hand over your work or answer (/flow-ship, Summary Open on answer/waiting),
    green = publish (/flow-pr, Merge), violet = new cycle (/flow-base), orange = fix (Fix CI). Urgent ones (answer, waiting,
    Fix CI) are one step stronger. Gray stays for secondary buttons. Urgency is shown by the card, never by a solid button;
    a disabled button loses its hue. */
 button:is([data-cmd="flow-next"], header .primary, .empty .primary) { --h: var(--blue); }
-button:is([data-cmd="flow-commit"], [data-cmd="flow-commit-unstage"], [data-kind="answer"], [data-kind="waiting"]) { --h: var(--yellow); }
+button:is([data-cmd="flow-ship"], [data-cmd="flow-ship-unstage"], [data-kind="answer"], [data-kind="waiting"]) { --h: var(--yellow); }
 button:is([data-cmd="flow-pr"], .merge) { --h: var(--green); }
 button:is([data-cmd="flow-base"], [data-cmd="flow-base-stash"]) { --h: var(--purple); }
 button[data-cmd="fix-pr"] { --h: var(--orange); }
-button:is([data-cmd="flow-next"], [data-cmd="flow-commit"], [data-cmd="flow-commit-unstage"], [data-cmd="flow-pr"], [data-cmd="flow-base"], [data-cmd="flow-base-stash"], [data-cmd="fix-pr"], [data-kind="answer"], [data-kind="waiting"], header .primary, .empty .primary, .merge) {
+button:is([data-cmd="flow-next"], [data-cmd="flow-ship"], [data-cmd="flow-ship-unstage"], [data-cmd="flow-pr"], [data-cmd="flow-base"], [data-cmd="flow-base-stash"], [data-cmd="fix-pr"], [data-kind="answer"], [data-kind="waiting"], header .primary, .empty .primary, .merge) {
   background: color-mix(in srgb, var(--h) 13%, var(--panel)); border-color: color-mix(in srgb, var(--h) 42%, var(--panel)); color: color-mix(in srgb, var(--h) 68%, #fff); font-weight: 500; padding: 2px 11px;
 }
-button:is([data-cmd="flow-next"], [data-cmd="flow-commit"], [data-cmd="flow-commit-unstage"], [data-cmd="flow-pr"], [data-cmd="flow-base"], [data-cmd="flow-base-stash"], [data-cmd="fix-pr"], [data-kind="answer"], [data-kind="waiting"], header .primary, .empty .primary, .merge):hover:not(:disabled) {
+button:is([data-cmd="flow-next"], [data-cmd="flow-ship"], [data-cmd="flow-ship-unstage"], [data-cmd="flow-pr"], [data-cmd="flow-base"], [data-cmd="flow-base-stash"], [data-cmd="fix-pr"], [data-kind="answer"], [data-kind="waiting"], header .primary, .empty .primary, .merge):hover:not(:disabled) {
   background: color-mix(in srgb, var(--h) 24%, var(--panel)); border-color: color-mix(in srgb, var(--h) 68%, var(--panel));
 }
 button:is([data-kind="answer"], [data-kind="waiting"], [data-cmd="fix-pr"]) { background: color-mix(in srgb, var(--h) 20%, var(--panel)); border-color: color-mix(in srgb, var(--h) 62%, var(--panel)); color: color-mix(in srgb, var(--h) 62%, #fff); font-weight: 600; }

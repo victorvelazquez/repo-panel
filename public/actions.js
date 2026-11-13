@@ -91,7 +91,7 @@ async function createRoom() {
 }
 
 // The commands whose result is judged from Git: the page reads a fresh baseline of the repo before sending them.
-const JUDGED_CMDS = ['flow-commit', 'flow-commit-unstage', 'flow-pr', 'flow-base', 'flow-base-stash'];
+const JUDGED_CMDS = ['flow-ship', 'flow-ship-unstage', 'flow-commit', 'flow-commit-unstage', 'flow-pr', 'flow-base', 'flow-base-stash'];
 
 // RP140: how long the page waits for a compaction (it calls the model): a little more than the server's ten minutes.
 const COMPACT_WAIT_MS = 605000;
@@ -355,7 +355,7 @@ const ACTIONS = {
         setFact('local', id, before);
         startSent(id, { cmd, at: Date.now(), head: before.head ?? null, branch: before.branch ?? null, files: before.files.length, ahead: before.ahead || 0 });
       } else if (!judged && d.sent) startSent(id, { cmd, at: Date.now() });
-      const what = cmd === 'fix-pr' ? `the fix order for #${pr}` : cmd === 'flow-base-stash' ? '/flow-base --stash' : `/${cmd}`;
+      const what = cmd === 'fix-pr' ? `the fix order for #${pr}` : cmd === 'flow-base-stash' ? '/flow-base --stash' : cmd === 'flow-ship-unstage' ? '/flow-ship --unstage' : `/${cmd}`;
       toast(d.confirmed ? `Sent ${what} to the session` : `Sent ${what}, not confirmed: check the session`, d.confirmed ? 'ok' : '');
     } catch (e) { toast(e.message, 'bad'); } finally {
       delete S.sending[id];
@@ -388,7 +388,7 @@ const ACTIONS = {
       await reloadRooms();
     } catch (e) { toast(e.message, 'bad'); }
   },
-  // Page session only (never persisted): lifts the declared-state gating of the /flow-commit button for this repo.
+  // Page session only (never persisted): lifts the declared-state gating of the /flow-ship button for this repo.
   'show-commit': (el) => { S.menu = null; S.showCommit.add(el.dataset.id); draw(); },
   'dismiss-sent': (el) => { clearSent(el.dataset.id); draw(); },
   'toggle-menu': (el) => { S.menu = S.menu === el.dataset.menu ? null : el.dataset.menu; draw(); },

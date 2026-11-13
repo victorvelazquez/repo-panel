@@ -1,4 +1,5 @@
 'use strict';
+// RP176: the /flow-commit button is now /flow-ship everywhere it is offered; each assertion here keeps holding, now for /flow-ship.
 // RP86 (S9): ONE read model per repo. V.repoModel (pure, public/view.js) joins what the page knows of a repo (its local state, its PRs, the roadmap, the
 // declared state, the requirements and the Summary row with the session lifted to "working" while a command runs) so that the board cards, the Summary
 // cards, the "go work on" strip and the Files tab all read the same object instead of each reading S.* its own way. It also closes the gap between the two
@@ -138,7 +139,7 @@ test('p1: modelOf(id) is what info(), the Summary chips and the Summary button r
 test('p2: the Summary rows the page shows come from the model: a running command lifts a free session to working, S.summary is never changed', async () => {
   const page = loadPage();
   seed(page);
-  page.run("S.sending.abc = 'flow-commit'");
+  page.run("S.sending.abc = 'flow-ship'");
   assert.equal(page.run('summaryShown().rows[0].session.state'), 'working');
   assert.equal(page.run('S.summary.rows[0].session.state'), 'free', 'the server answer is untouched');
   page.run('delete S.sending.abc');
@@ -169,11 +170,11 @@ test('p4: the gap closes for the card too: after the facts change and the answer
   seed(page);
   page.run('draw()');
   await page.tick();
-  assert.match(page.get('#summary').html, /data-cmd="flow-commit"/, 'before: the dirty repo offers /flow-commit');
+  assert.match(page.get('#summary').html, /data-cmd="flow-ship"/, 'before: the dirty repo offers /flow-ship');
   page.run('setFact("local", "abc", ' + JSON.stringify(local({ files: [], ahead: 0 })) + ')');
   summaryTimers(page)[0].fn();
   await page.tick();
-  assert.doesNotMatch(page.get('#summary').html, /data-cmd="flow-commit"/, 'after: the clean repo no longer offers it');
+  assert.doesNotMatch(page.get('#summary').html, /data-cmd="flow-ship"/, 'after: the clean repo no longer offers it');
   assert.match(page.get('#summary').html, /data-cmd="flow-base"/);
 });
 
@@ -249,7 +250,7 @@ test('p10: each of the four kinds arms the timer on its own once it had a value'
 test('p11: modelOf gives the Summary row of the repo it is handed, lifted while a command runs; without a row it gives none', () => {
   const page = loadPage();
   seed(page);
-  page.run("S.sending.abc = 'flow-commit'");
+  page.run("S.sending.abc = 'flow-ship'");
   assert.equal(page.run('modelOf("abc", S.summary.rows[0]).row.session.state'), 'working');
   assert.equal(page.run('modelOf("abc").row'), null, 'info() and the others ask for no row');
   assert.equal(page.run('S.summary.rows[0].session.state'), 'free');

@@ -1,4 +1,5 @@
 'use strict';
+// RP176: the /flow-commit button is now /flow-ship everywhere it is offered; each assertion here keeps holding, now for /flow-ship.
 // RP18 in the real public/app.js (vm with a stubbed DOM): the in-progress state of every command, the disabled
 // buttons, the staging bar, the retry label, and the refresh when a session finishes.
 const test = require('node:test');
@@ -69,13 +70,13 @@ test('page: while /flow-pr runs the COMMITTED card says "creating pull request�
 });
 
 test('page: the status line names each running command and the buttons of a dirty card are disabled', () => {
-  const lines = { 'flow-commit': 'committing…', 'flow-base-stash': 'updating base branch…', 'fix-pr': 'fixing pull request…', 'put-in-conditions': 'putting repo in conditions…' };
+  const lines = { 'flow-ship': 'shipping…', 'flow-base-stash': 'updating base branch…', 'fix-pr': 'fixing pull request…', 'put-in-conditions': 'putting repo in conditions…' };
   for (const [cmd, text] of Object.entries(lines)) {
     const page = loadPage();
     setup(page, local({ files: [file] }), { sent: { cmd }, session: 'busy' });
     const html = cardOf(page);
     assert.ok(html.replace(/<span class="(?:pulse-dot|ell)"[^>]*>(…)?<\/span>/g, '$1').includes(`>${text}</div>`), `${cmd}: ${html}`);
-    assert.match(html, /data-cmd="flow-commit"[^>]* disabled>/, cmd);
+    assert.match(html, /data-cmd="flow-ship"[^>]* disabled>/, cmd);
   }
 });
 
@@ -97,22 +98,22 @@ test('page: nothing running keeps the PR card and the enabled buttons exactly as
   assert.ok(html.includes('<button data-act="pi" data-id="abc" data-cmd="fix-pr" data-pr="7" title="Ask the open session to find out why the checks failed and fix it (it will not commit or push)">Fix CI</button>'));
   const page2 = loadPage();
   setup(page2, local({ files: [file] }));
-  assert.ok(cardOf(page2).includes(btn('flow-commit', '/flow-commit', 'Send /flow-commit to the open session of this repo')));
+  assert.ok(cardOf(page2).includes(btn('flow-ship', '/flow-ship', 'Send /flow-ship to the open session of this repo')));
 });
 
 // ---------- staged files ----------
-test('page: staged files on a dirty card show the bar and /flow-commit --unstage instead of /flow-commit', () => {
+test('page: staged files on a dirty card show the bar and /flow-ship --unstage instead of /flow-ship', () => {
   const page = loadPage();
   setup(page, local({ files: [file, file, file], stagedCount: 3, stagedPaths: ['a.txt', 'b.txt', 'c.txt'] }));
   const html = cardOf(page);
-  assert.ok(html.includes('3 files are staged: /flow-commit needs an empty index. The button clears the index (git reset, your changes stay in the working tree) and then continues with the normal commit in the same run.'), html);
-  assert.ok(!html.includes('then you run /flow-commit'), 'the button does not ask for a second /flow-commit run');
+  assert.ok(html.includes('3 files are staged: /flow-ship needs an empty index. The button clears the index (git reset, your changes stay in the working tree) and then continues with the normal commit in the same run.'), html);
+  assert.ok(!html.includes('then you run /flow-ship'), 'the button does not ask for a second /flow-ship run');
   assert.match(html, /<div class="staged-bar" title="a\.txt\nb\.txt\nc\.txt">/);
-  assert.match(html, /data-cmd="flow-commit-unstage" title="[^"]*">\/flow-commit --unstage<\/button>/);
-  assert.equal(html.includes('data-cmd="flow-commit"'), false);
+  assert.match(html, /data-cmd="flow-ship-unstage" title="[^"]*">\/flow-ship --unstage<\/button>/);
+  assert.equal(html.includes('data-cmd="flow-ship"'), false);
   const one = loadPage();
   setup(one, local({ files: [file], stagedCount: 1, stagedPaths: ['a.txt'] }));
-  assert.ok(cardOf(one).includes('1 file is staged: /flow-commit needs an empty index.'));
+  assert.ok(cardOf(one).includes('1 file is staged: /flow-ship needs an empty index.'));
 });
 
 test('page: no staging bar for an empty index, a clean card or a card that needs manual action', () => {
@@ -124,14 +125,14 @@ test('page: no staging bar for an empty index, a clean card or a card that needs
 });
 
 // ---------- attention: retry and why ----------
-test('page: a failed /flow-commit labels the button "Retry /flow-commit" and shows the reason; staged files give "Retry … --unstage"', () => {
+test('page: a failed /flow-ship labels the button "Retry /flow-ship" and shows the reason; staged files give "Retry … --unstage"', () => {
   const page = loadPage();
-  const S = setup(page, local({ files: [file, file] }), { sent: { cmd: 'flow-commit', files: 2 }, session: 'idle' });
+  const S = setup(page, local({ files: [file, file] }), { sent: { cmd: 'flow-ship', files: 2 }, session: 'idle' });
   const html = cardOf(page);
-  assert.match(html, /Needs attention: 2 files still uncommitted after \/flow-commit/);
-  assert.ok(html.includes('>Retry /flow-commit</button>'), html);
+  assert.match(html, /Needs attention: 2 files still uncommitted after \/flow-ship/);
+  assert.ok(html.includes('>Retry /flow-ship</button>'), html);
   S.local[R.id] = local({ files: [file, file], stagedCount: 2, stagedPaths: ['a', 'b'] });
-  assert.ok(cardOf(page).includes('>Retry /flow-commit --unstage</button>'));
+  assert.ok(cardOf(page).includes('>Retry /flow-ship --unstage</button>'));
 });
 
 test('page: a failed /flow-pr or /flow-base shows its reason and keeps its normal button (no Retry label)', () => {
@@ -147,7 +148,7 @@ const ok = { sent: true, confirmed: true };
 const el = (dataset) => ({ dataset, disabled: false });
 
 test('page: every flow command records { cmd, at, head, branch, files, ahead } from a fresh /api/local read', async () => {
-  for (const cmd of ['flow-commit', 'flow-commit-unstage', 'flow-pr', 'flow-base', 'flow-base-stash']) {
+  for (const cmd of ['flow-ship', 'flow-ship-unstage', 'flow-pr', 'flow-base', 'flow-base-stash']) {
     const page = loadPage();
     page.answers['/api/pi'] = ok;
     page.answers['/api/local?id=abc'] = local({ files: [file, file], ahead: 3, head: 'h9' });
@@ -181,7 +182,7 @@ test('page: fix-pr and put-in-conditions record only { cmd, at } and read no bas
 
 test('page: dismissing an attention bar clears the record and the session state', () => {
   const page = loadPage();
-  const S = setup(page, local({ files: [file] }), { sent: { cmd: 'flow-commit' }, session: 'idle' });
+  const S = setup(page, local({ files: [file] }), { sent: { cmd: 'flow-ship' }, session: 'idle' });
   page.get('ACTIONS')['dismiss-sent']({ dataset: { id: 'abc' } });
   assert.deepEqual([S.sent.abc, S.pistatus.abc], [undefined, undefined]);
 });

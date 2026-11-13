@@ -1,4 +1,5 @@
 'use strict';
+// RP176: the order texts of Fix CI and put-in-conditions name /flow-ship (the button the person now has); the old key still works on the server.
 // The fix-pr order of POST /api/pi: built on the server from the PR's own data, never from browser text.
 const fs = require('node:fs');
 const os = require('node:os');
@@ -36,7 +37,7 @@ const NEVER = async () => { throw new Error('the PRs must not be read'); };
 // ---------- the builder ----------
 test('fix-pr order: one line, not a slash command, with the PR, its failing checks and its branch', () => {
   const text = fixPrOrder(prOf());
-  assert.equal(text, 'Pull request #7 "Fix the thing" of this repo has failing checks (test, lint). Find out why with gh (gh pr checks 7, gh run view --log-failed) and be on its branch "task" (switch only if the tree is clean; if not, stop and ask). Fix whatever is needed, in production code, test code or configuration, as long as it serves the original objective of this pull request (its title, description and commits). If the failure is unrelated to that objective or looks transient (infrastructure, a flaky run, a runner problem), do not edit any code: say so and recommend the "Re-run failed" button. If the right fix would change the scope of the pull request or needs a product decision, stop and ask. Run this repo\'s tests; do not commit, push or open pull requests: the user will run /flow-commit and /flow-pr. Never use git mv or git add; keep the git index empty (/flow-commit refuses to start with staged files). Finish with one line: what you fixed and the next step.');
+  assert.equal(text, 'Pull request #7 "Fix the thing" of this repo has failing checks (test, lint). Find out why with gh (gh pr checks 7, gh run view --log-failed) and be on its branch "task" (switch only if the tree is clean; if not, stop and ask). Fix whatever is needed, in production code, test code or configuration, as long as it serves the original objective of this pull request (its title, description and commits). If the failure is unrelated to that objective or looks transient (infrastructure, a flaky run, a runner problem), do not edit any code: say so and recommend the "Re-run failed" button. If the right fix would change the scope of the pull request or needs a product decision, stop and ask. Run this repo\'s tests; do not commit, push or open pull requests: the user will run /flow-ship. Never use git mv or git add; keep the git index empty (/flow-ship refuses to start with staged files). Finish with one line: what you fixed and the next step.');
   assert.equal(/[\x00-\x1f\x7f]/.test(text), false);
   assert.equal(text.startsWith('/'), false);
 });

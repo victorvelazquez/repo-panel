@@ -674,7 +674,8 @@ test('put-in-conditions: the order is one line, not a slash command, with the qu
   assert.equal(text.startsWith('/'), false);
   assert.ok(text.includes(`"${INSTALL}"`), text);
   assert.match(text, /user authorizes reading that one file outside this repo/);
-  assert.match(text, /ids: agents-file, roadmap-header, registro-block, ciclo-block\. Never use git mv or git add; keep the git index empty \(\/flow-commit refuses to start with staged files\)\.$/);
+  // RP176: the index rule of the put-in-conditions order names /flow-ship.
+  assert.match(text, /ids: agents-file, roadmap-header, registro-block, ciclo-block\. Never use git mv or git add; keep the git index empty \(\/flow-ship refuses to start with staged files\)\.$/);
   for (const id of ['base-branch', 'adoption-record']) assert.equal(text.includes(id), false, id);
 });
 
