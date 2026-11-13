@@ -63,6 +63,39 @@ async function rpcSeed() {
   draw();
 }
 
+// RP178: one notice from the server. N.plan decides what to show (nothing while this panel is in view); this only does it.
+let audio = null;
+function beep(kind) {
+  try {
+    audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+    if (audio.state === 'suspended') audio.resume();
+    const notes = kind === 'answer' || kind === 'ci' ? [880, 660] : [660, 880]; // a falling pair asks for you, a rising one says something is ready
+    notes.forEach((hz, i) => {
+      const o = audio.createOscillator();
+      const g = audio.createGain();
+      const t = audio.currentTime + i * 0.16;
+      o.frequency.value = hz;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.2, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
+      o.connect(g); g.connect(audio.destination);
+      o.start(t); o.stop(t + 0.15);
+    });
+  } catch { /* no audio (a browser that has not been touched yet): the notice still shows */ }
+}
+function applyNotice(n, force = false) {
+  const permission = typeof Notification === 'undefined' ? 'unsupported' : Notification.permission;
+  const p = N.plan(n, { visible: document.visibilityState === 'visible', focused: document.hasFocus(), permission, prefs: S.prefs }, force);
+  if (!p) return;
+  if (p.toast) toast(`${n.title}: ${n.body}`, 'ok');
+  if (p.sound) beep(n.kind);
+  if (!p.system) return;
+  try {
+    const x = new Notification(n.title, { body: n.body, tag: `rp-${n.id}-${n.kind}`, icon: '/icon.svg' });
+    x.onclick = () => { window.focus(); location.hash = V.addressOf(n.id, 'chat'); x.close(); };
+  } catch { /* a browser that refuses to build one (a phone) keeps the notice and the sound */ }
+}
+
 async function readEvents(ctl) {
   const res = await fetch('/api/events', { headers: { 'x-token': TOKEN }, signal: ctl.signal });
   if (!res.ok || !res.body) throw new Error('No event stream');
@@ -83,6 +116,8 @@ async function readEvents(ctl) {
     for (const frame of parsed.events) {
       const rpc = V.rpcEvent(frame);
       if (rpc) applyRpc(rpc);
+      const note = N ? N.parse(frame) : null;
+      if (note) applyNotice(note);
     }
   }
 }

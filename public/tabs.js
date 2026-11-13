@@ -225,9 +225,15 @@ function drawConformity() {
 function openConformity() { setTab('conformity'); }
 
 // RP111b: the Settings tab (artboard A). The view is a pure function of this model (R.settingsView); the preferences of the browser are the ones that already exist.
+// RP178: the notice switches of this browser (a missing one is on) and what the browser lets us do.
+function notifyPrefs() {
+  if (!N) return null;
+  const on = (k) => S.prefs[k] !== false;
+  return { answer: on(N.PREF.answer), ci: on(N.PREF.ci), deliver: on(N.PREF.deliver), merge: on(N.PREF.merge), start: on(N.PREF.start), sound: on('notifySound'), system: on('notifySystem'), permission: typeof Notification === 'undefined' ? 'unsupported' : Notification.permission };
+}
 function drawSettings() {
   if (S.tab !== 'settings') return;
-  const prefs = { method: S.prefs.method, del: S.prefs.del, clean: cleanAsColumn(), split: !!S.prefs.split };
+  const prefs = { method: S.prefs.method, del: S.prefs.del, clean: cleanAsColumn(), split: !!S.prefs.split, notify: notifyPrefs() };
   paint($('#settingsView'), R.settingsView({ ...S.settings, prefs, pi: S.prereq.pi }));
 }
 

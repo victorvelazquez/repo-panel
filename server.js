@@ -25,6 +25,7 @@ if (require.main === module) {
     const url = `http://127.0.0.1:${port}/`;
     console.log(`repo-panel running at ${url}`);
     server.summaryStore.start(); // only once the port is ours: a second launch must not read anything
+    if (server.notifier) server.notifier.start(); // RP178: idle while no page is connected (it asks the store only for a connected page)
     if (process.argv.includes('--open')) spawn('cmd', ['/c', 'start', '', url], { detached: true, stdio: 'ignore', windowsHide: true }).unref();
   });
 }

@@ -17,7 +17,7 @@ Rama base: main. Una tarea = un PR. Orden: RP177 → RP178 → RP179.
 
 - [x] T1 · S1-S4 · inline · RP177 acceso remoto · commit: pendiente (lo entrega la persona con /flow-commit)
 - [x] T0 · S7 · inline · RP180 pantalla estable en el teléfono · commit: pendiente
-- [ ] T2 · S5 · inline · RP178 detector de eventos y avisos con la página abierta · commit: pendiente
+- [x] T2 · S5 · inline · RP178 detector de eventos y avisos con la página abierta · commit: pendiente
 - [ ] T3 · S6 · inline · RP179 Web Push · commit: pendiente
 
 ## Log

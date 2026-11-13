@@ -123,12 +123,19 @@ const ACTIONS = {
   'pref-set': (el) => {
     const { pref, value } = (el && el.dataset) || {};
     const v = value === 'true' ? true : value === 'false' ? false : value;
-    const ok = (pref === 'method' && ['squash', 'merge', 'rebase'].includes(v)) || (['del', 'cleanAsColumn', 'split'].includes(pref) && typeof v === 'boolean');
+    const ok = (pref === 'method' && ['squash', 'merge', 'rebase'].includes(v)) || ([ 'del', 'cleanAsColumn', 'split', ...(N ? N.PREF_KEYS : [])].includes(pref) && typeof v === 'boolean');
     if (!ok) return;
     Object.assign(S.settings, { saved: 'Saved in this browser', error: '' });
     setPref(pref, v);
     syncPrefControls();
   },
+  // RP178: the system notification needs a click of the person to ask for the permission; the test button shows what a notice does, whatever the view and the switches say.
+  'notify-allow': async () => {
+    if (typeof Notification === 'undefined') { toast('This browser has no system notifications', 'bad'); return; }
+    try { await Notification.requestPermission(); } catch { /* denied or closed: the settings show the state */ }
+    drawSettings();
+  },
+  'notify-test': () => { if (N) applyNotice({ id: '0000000000', kind: 'deliver', title: 'Test', body: 'This is how a notice looks and sounds' }, true); },
   // RP121: the header of the repos column. Search and menu are page-only state (S.lh); the clears undo the shared filters.
   'lh-search-open': () => { S.lh.search = true; S.lh.legend = false; S.lh.focus = true; draw(); },
   'lh-search-close': () => { S.lh.search = false; draw(); },
