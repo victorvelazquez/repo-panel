@@ -359,6 +359,19 @@ The page is plain scripts with no build step. `index.html` loads them one after 
 
 A new page script goes into `index.html`, into the closed list of static files in `server/http.js` and into `test/pagesrc.js`, in that order of loading.
 
+## Remote access (phone)
+
+The server still listens on `127.0.0.1` only. To use the panel from a phone, put [Tailscale](https://tailscale.com) on the PC and on the phone (same account), run `tailscale serve --bg 4310` on the PC (it gives you an HTTPS address such as `https://my-pc.tail1234.ts.net`) and add this to `config.json`:
+
+```json
+"remote": { "host": "my-pc.tail1234.ts.net", "secret": "a-long-random-text-of-at-least-16-characters" }
+```
+
+- **Host.** `remote.host` is accepted as the `Host` in addition to `127.0.0.1` and `localhost` (compared exactly, case aside). It is read on every request, so editing it needs no restart. Without `remote`, or with a host and no usable `secret` (shorter than 16 characters), that host is refused (403), exactly as any unknown host.
+- **Login once.** On the remote host the page asks for the `secret` one time (`POST /login`, JSON `{ "secret": "..." }`). It answers a cookie (`HttpOnly`, `SameSite=Strict`, `Secure` when the request came through HTTPS, 180 days) signed with it and kept by no one on the server: it survives a restart and **changing `remote.secret` ends every session**. After five wrong attempts in a row the login is closed for 15 minutes (429). Everything else on the remote host (page, assets, API, `/api/events`) answers 401 without the cookie, except `/health`. The API still needs the per-run token, which the page gets together with the cookie; after a restart, reload the page. Opening the panel through `127.0.0.1` never asks for a login.
+- **Origin.** Every `POST` that carries an `Origin` header naming another host (or `null`) is refused with 403, on both hosts. Requests with no `Origin` (scripts, tests) are unchanged.
+- **On the iPhone.** Open the HTTPS address in Safari, log in and use *Share → Add to Home Screen*; log in again inside that installed app (iOS keeps its cookies apart from Safari's). There are no extra confirmations for irreversible actions: the phone does what the PC does.
+
 ## Security
 
-The server binds to `127.0.0.1` only, rejects unknown `Host` headers (DNS rebinding), requires a random per-run token on every API call, and only operates on repositories listed in `config.json`. The one place where the panel writes inside a repo is the notes file (`POST /api/notes`, RP93): a fixed path, never one sent by the page, refused through links, and out of Git.
+The server binds to `127.0.0.1` only, rejects unknown `Host` headers (DNS rebinding; the only one added is the `remote.host` of the section above, behind its login), refuses cross-site POSTs by `Origin`, requires a random per-run token on every API call, and only operates on repositories listed in `config.json`. The one place where the panel writes inside a repo is the notes file (`POST /api/notes`, RP93): a fixed path, never one sent by the page, refused through links, and out of Git.
