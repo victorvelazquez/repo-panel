@@ -55,9 +55,10 @@ test('v3: the manual-action chip is inside the wrapper too', () => {
   assert.match(html, /<span class="rs-chips"><span class="chip red">▲ manual action<\/span><\/span>/);
 });
 
+// RP169: the session part is the chip of the chat (ss-free, Idle) instead of the old «○ free».
 test('v4: nothing is lost: name, branch, time, session, chips, progress, next unit and the action are all still on the card', () => {
   const html = cardOf(view([row({ action: { kind: 'deliver' } })], { changesFor: () => C({ files: 1, added: 2, deleted: 0 }), flowFor: () => ({ cmd: 'flow-commit', label: '/flow-commit' }) }));
-  for (const part of [/<b class="rs-name" title="alpha">alpha<\/b>/, /class="mono rs-branch" title="feat\/x">feat\/x</, /12 min ago/, /○ free/, /chip yellow chip-btn/, /class="rs-prog"/, /class="rs-bar"/, /class="rs-next"/, /Validate the ownerId/, /data-cmd="flow-commit"/]) assert.match(html, part, String(part));
+  for (const part of [/<b class="rs-name" title="alpha">alpha<\/b>/, /class="mono rs-branch" title="feat\/x">feat\/x</, /12 min ago/, /ss-gray ss-free[^]*Idle/, /chip yellow chip-btn/, /class="rs-prog"/, /class="rs-bar"/, /class="rs-next"/, /Validate the ownerId/, /data-cmd="flow-commit"/]) assert.match(html, part, String(part));
 });
 
 test('v5: the hooks that other code relies on survive: data-id, the chat opening, focus, aria-current, aria-label and the ask and block classes', () => {

@@ -319,6 +319,7 @@ details.pop > summary:focus-visible { outline: 2px solid var(--blue); outline-of
 .rs-l1 { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; }
 .rs-name { font-size: 14px; flex: 1 1 55%; min-width: 0; order: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rs-l1 > .chip { order: 2; }
+.rs-l1 > .ss { order: 2; font-size: 12px; white-space: nowrap; } /* RP169: the state chip of the card is the chat chip (.ss): it keeps the place and the size the old chip had */
 .rs-branch { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1 1 55%; order: 3; }
 .rs-when { white-space: nowrap; }
 .rs-when { order: 4; }
@@ -344,7 +345,7 @@ details.pop > summary:focus-visible { outline: 2px solid var(--blue); outline-of
 }
 @container cards (min-width: 640px) {
   .rs-l1 { flex-wrap: nowrap; }
-  .rs-name, .rs-branch, .rs-commit, .rs-chips, .rs-when, .rs-l1 > .chip { order: 0; }
+  .rs-name, .rs-branch, .rs-commit, .rs-chips, .rs-when, .rs-l1 > .chip, .rs-l1 > .ss { order: 0; }
   .rs-commit { flex: 0 1 auto; max-width: 28ch; }
   .rs-name { flex: 0 0 auto; }
   .rs-branch { flex: 0 1 auto; max-width: 26ch; }
