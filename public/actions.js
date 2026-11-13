@@ -194,6 +194,18 @@ const ACTIONS = {
   },
   'chat-close': () => closeChat(),
   'chat-send': () => sendChatMessage(),
+  // RP166: a quick-reply button sends the option held in S.quick (the index is a digit, the text is never read from the element) through the message box path. It only acts while the message it was drawn for is still the
+  // last one and the conditions still hold (a fresh read gives the same signature): a double click finds the pending message and does nothing.
+  'quick-reply': (el) => {
+    const q = S.quick;
+    const raw = el && el.dataset ? el.dataset.i : undefined;
+    const i = typeof raw === 'string' && /^[0-9]$/.test(raw) ? Number(raw) : -1;
+    const now = R && S.chat.id ? R.quickOf(chatView()) : null;
+    if (!q || !now || q.id !== S.chat.id || q.sig !== now.sig || i < 0 || i >= q.options.length) return;
+    sendChatText(q.options[i]);
+  },
+  // RP166: the Reply button only moves the cursor to the message box; it sends nothing.
+  'quick-focus': () => { const box = $('#msgBox'); if (box) { box.focus(); if (box.scrollIntoView) box.scrollIntoView({ block: 'nearest' }); } },
   // RP106b: the start of the text of one tool result, on request. The chip names the call; a second click folds it. An answer that arrives after the chat changed is dropped (the bag is replaced when a chat opens or closes).
   'chat-result': async (el) => {
     const { call } = el.dataset;

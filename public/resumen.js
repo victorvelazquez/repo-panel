@@ -1149,6 +1149,59 @@
   const pendingHtml = (pending, items) => (pending || []).filter((p) => userCount(items, p.text) <= p.base)
     .map((p) => `<div class="m me pending"><span class="who">You · ${PENDING_WHO[p.state] || PENDING_WHO.sending}</span>${mdHtml(p.text)}</div>`).join('');
 
+  // RP166: options the assistant wrote as TEXT on the last line of its message (its selection tool is not available here, so it asks the person to type one). Deliberately strict: ONLY the last non-empty
+  // line, which must be exactly [Siguiente:|Next:] verb [filler] 2 to 6 `options` joined by , / o or y and, with nothing else; each option is `[A-Za-z0-9_.:-]{1,40}` and distinct, and ONE bad option rejects
+  // the whole line. Not inside a fence (or after an unclosed one), a quote, a list or indented code. Pure and total: anything odd gives [] (never a partial list). Work is capped: a text over 200000 characters, or a last
+  // line cut by the 2000-character window, is never read.
+  const QR_HEAD = /^(?:(?:siguiente|next):\s*)?(?:respond[eé](?: con)?|contest[aá](?: con)?|eleg[ií](?: una)?|(?:respond|answer|reply) with|choose|pick)(?:\s+(?:una de estas(?: (?:dos|tres|cuatro|cinco|seis))?|one of these|one of))?:?\s*(?=`)/i;
+  const QR_SEP = /^(?:\s*\/\s*|\s*,\s*(?:(?:o|or|y|and)\s+)?|\s+(?:o|or|y|and)\s+)/i;
+  const QR_OPTION = /^[A-Za-z0-9_.:-]{1,40}$/;
+  const QR_HIDDEN = /[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/;
+  function qrLine(text) {
+    if (typeof text !== 'string' || text.length > 200000) return '';
+    const t = text.replace(/\r\n?/g, '\n').trimEnd();
+    if ((t.match(/^ {0,3}(?:`{3,}|~{3,})/gm) || []).length % 2) return ''; // an unclosed fence: the last line may be code
+    const lines = t.slice(-2000).split('\n');
+    const last = lines[lines.length - 1];
+    if (lines.length === 1 && t.length > 2000 && t[t.length - 2001] !== '\n') return ''; // the window cut this line
+    if (!last.trim() || QR_HIDDEN.test(last) || /^ {4}/.test(last) || /^\s*>/.test(last) || /^\s*(?:[-*+]|\d{1,9}[.)])\s/.test(last)) return '';
+    return last.replace(/^[\s*_~]+|[\s*_~]+$/g, '');
+  }
+  function quickReplies(text) {
+    const l = qrLine(text);
+    const head = l ? QR_HEAD.exec(l) : null;
+    if (!head) return [];
+    let rest = l.slice(head[0].length).replace(/[.:?!]$/, '');
+    const out = [];
+    for (;;) {
+      const m = /^`([^`]*)`/.exec(rest);
+      if (!m || !QR_OPTION.test(m[1]) || m[1] === '__proto__' || out.includes(m[1]) || out.length >= 6) return [];
+      out.push(m[1]);
+      rest = rest.slice(m[0].length);
+      if (!rest) return out.length >= 2 ? out : [];
+      const sep = QR_SEP.exec(rest);
+      if (!sep) return [];
+      rest = rest.slice(sep[0].length);
+    }
+  }
+  // What sits under the LAST message of the chat: { sig, options, reply } or null. Only when that message is the assistant's, whole (never cut), the last item of the chat, and the session is idle with no real dialog and
+  // no message of this page pending. `sig` identifies THAT message (its place and a hash of its end): the click compares it with a fresh read, so a message that changed since the draw gets no send.
+  function quickOf(c) {
+    const items = c && c.hist && Array.isArray(c.hist.items) ? c.hist.items : [];
+    const it = items[items.length - 1];
+    const r = c && c.rpc && typeof c.rpc === 'object' ? c.rpc : null;
+    if (!it || it.role !== 'assistant' || typeof it.text !== 'string' || !it.text || (it.cut !== undefined && it.cut !== null)) return null;
+    if (!c.info || !c.info.adoptedFound || !r || r.state !== 'idle' || r.compacting === true || (Array.isArray(r.asks) ? r.asks.length : r.asks) || (Array.isArray(c.pending) ? c.pending.length : c.pending)) return null;
+    if (!composerState(c).canSend) return null;
+    const options = quickReplies(it.text);
+    const reply = !options.length && /\?$/.test(qrLine(it.text));
+    if (!options.length && !reply) return null;
+    let h = 5381;
+    for (const ch of it.text.slice(-2000)) h = ((h * 33) ^ ch.codePointAt(0)) >>> 0;
+    return { sig: `${items.length - 1}:${it.text.length}:${h}`, options, reply };
+  }
+  const quickRow = (q) => (!q ? '' : `<div class="qr-row" role="group" aria-label="Quick replies">${q.reply ? '<button type="button" class="qr qr-reply" data-act="quick-focus">Reply</button>' : q.options.map((o, i) => `<button type="button" class="qr" data-act="quick-reply" data-i="${i}">${esc(o)}</button>`).join('')}</div>`);
+
   // What the live session adds under the history: the answer being written (escaped like every message) and one card per dialog pi waits for (RPC2-3).
   // The card is how the person answers a PERMISSION, so: everything is escaped, the message (the FULL command) is shown whole, Deny comes first, and
   // the Allow of a confirm (or an option of an «Allow…» select) is NOT offered when the text may be cut or is not shown (RP81): then only the
@@ -1272,7 +1325,7 @@ ${status}</div>`;
     const items = c.hist && Array.isArray(c.hist.items) ? c.hist.items : []; // RP155: a history that is not a list reads as empty
     const rx = { allow: !!c.hist && c.hist.results === true, map: c.results && typeof c.results === 'object' ? c.results : {}, id: c.id };
     const pending = pendingHtml(c.pending, items);
-    return `${note}${c.hist && c.hist.truncated ? '<div class="rs-sub ch-older">Older messages are not shown</div>' : ''}${items.map((it) => bubble(it, who, rx)).join('') || (pending ? '' : '<div class="empty">No messages yet.</div>')}${pending}${rpcTail(c, who, items)}`;
+    return `${note}${c.hist && c.hist.truncated ? '<div class="rs-sub ch-older">Older messages are not shown</div>' : ''}${items.map((it) => bubble(it, who, rx)).join('') || (pending ? '' : '<div class="empty">No messages yet.</div>')}${quickRow(quickOf(c))}${pending}${rpcTail(c, who, items)}`;
   }
 
   // Pinned room card (not clickable yet): the aggregate of its member rows (a room has no session state any more).
@@ -1363,5 +1416,5 @@ ${status}</div>`;
     return `${ctx.failed ? '<div class="rs-note" role="status">⚠ Summary unavailable: showing the last data we have.</div>' : ''}<div class="rs-list">${body}</div>`;
   }
 
-  return { mergeSheetHtml, repoStatus, esc, mdHtml, settingsView, memoryChipHtml, subagentChipHtml, ctxChipHtml, compactButtonHtml, legendHtml, listCount, listHeadChips, blockWidths, columnView, treeFolderPaths, fileView, COLUMN_TABS, composerState, askAllowed, actionMenu, actionButtonsHtml, composerMergeHtml, composerNote, chatHead, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, sessionCloseHtml, sessionTerminalHtml, terminalBlockHtml, recentlyActive, chatBody, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
+  return { mergeSheetHtml, repoStatus, esc, mdHtml, settingsView, memoryChipHtml, subagentChipHtml, ctxChipHtml, compactButtonHtml, legendHtml, listCount, listHeadChips, blockWidths, columnView, treeFolderPaths, fileView, COLUMN_TABS, composerState, askAllowed, actionMenu, actionButtonsHtml, composerMergeHtml, composerNote, chatHead, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, sessionCloseHtml, sessionTerminalHtml, terminalBlockHtml, recentlyActive, chatBody, quickReplies, quickOf, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
 }));

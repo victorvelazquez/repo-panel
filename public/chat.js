@@ -515,6 +515,8 @@ function drawChat() {
   }
   prunePending(S.chat.id);
   const shown = chatView();
+  const qk = R.quickOf(shown); // RP166: what the buttons under the last message hold; the click reads THIS, never the DOM
+  S.quick = qk ? { id: S.chat.id, ...qk } : null;
   const hasSession = !!(S.chat.info && S.chat.info.adopted) || !!(S.rpc[S.chat.id] && S.rpc[S.chat.id].state !== 'closed'); // RP98: a session to close
   paint($('#sessState'), R.sessionLabelHtml(shown) + R.subagentChipHtml(shown, Date.now()) + R.memoryChipHtml(shown) + R.ctxChipHtml(shown) + R.compactButtonHtml(shown) + R.sessionTerminalHtml(hasSession, S.chat.terminal) + R.sessionCloseHtml(hasSession, S.chat.closing));
   paint($('#termBlock'), R.terminalBlockHtml(hasSession ? S.chat.terminal : null)); // RP118: the line for a normal terminal, only while the button is open
@@ -594,13 +596,21 @@ async function sendChatMessage() {
   if (!R || !id) return;
   const text = $('#msgBox').value;
   if (!text.trim()) return;
+  return sendChatText(text, true);
+}
+// RP166: the one path every message of the page takes (the box and the quick-reply buttons): canSend, the pending message, the session start and the error handling. `fromBox` clears the box and its draft.
+async function sendChatText(text, fromBox) {
+  const id = S.chat.id;
+  if (!R || !id) return;
   const cs = composerOf(id);
   if (!cs.canSend) { sayNote(id, cs.reason); draw(); return; }
   const entry = { text, state: 'sending', base: R.userCount((S.chat.hist && S.chat.hist.items) || [], text) };
   delete S.notes[id];
   delete S.recall[id];
-  $('#msgBox').value = '';
-  delete S.drafts[id];
+  if (fromBox) {
+    $('#msgBox').value = '';
+    delete S.drafts[id];
+  }
   (S.pending[id] || (S.pending[id] = [])).push(entry);
   setRpc(id, { error: '' });
   draw();

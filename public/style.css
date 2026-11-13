@@ -883,6 +883,11 @@ button.tc:hover { border-color: var(--muted); }
 .ch-ask-title { font-size: 12px; font-weight: 600; color: var(--yellow); }
 .ch-ask-text { margin: 6px 0; font-family: ui-monospace, Consolas, monospace; font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text); }
 .ch-ask-text mark.ask-sel { background: rgba(210, 153, 34, .28); color: inherit; border-radius: 3px; padding: 0 2px; }
+.qr-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; min-width: 0; }
+.qr { font-size: 12px; font-weight: 600; padding: 3px 10px; border: 1px solid var(--line); border-radius: 12px; background: transparent; color: var(--blue); overflow-wrap: anywhere; text-align: left; cursor: pointer; }
+.qr:hover { background: rgba(88, 166, 255, .12); border-color: var(--blue); }
+.qr:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.qr-reply { color: var(--muted); }
 .ch-ask-btns { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
 .ask-btn { font-size: 12px; font-weight: 600; text-align: left; overflow-wrap: anywhere; }
 .ask-btn.ask-affirmative { background: rgba(210, 153, 34, .14); border-color: #53410f; color: var(--yellow); }
