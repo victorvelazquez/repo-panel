@@ -303,7 +303,7 @@ test('s3: the reason wraps and never cuts, the row wraps in a narrow chat, and t
   assert.match(a, /flex-wrap:\s*wrap/);
   assert.match(a, /min-width:\s*0/);
   const q = /@container cmp \(max-width: 456px\) \{([\s\S]*?)\n\}/.exec(css)[1];
-  assert.match(q, /\.ss-word, \.mem-word, \.sub-word, \.ss-long/);
+  assert.match(q, /\.ss-word, \.mem-word, \.ss-long/); // RP171: the subagent chip is gone, so its words are not in the list any more
   assert.doesNotMatch(q, /c-why|c-act|merge/);
 });
 

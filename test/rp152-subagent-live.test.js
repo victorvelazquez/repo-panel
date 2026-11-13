@@ -1,4 +1,5 @@
 'use strict';
+// RP171: the chip below became a bubble at the end of the thread (and takes the agent name from the history, never from these events); the reducer and clock tests are unchanged.
 // RP152 (S42, S43): the page shows, live, that a subagent is working: «Subagent working · mm:ss» next to the state of the session, made ONLY of data the machine gives (the `tool_execution_start` and
 // `tool_execution_end` events of the tool `subagent_run`, which the server already lets through with the tool name alone: test/rpc2-1-server.test.js pins that the arguments and the id are cut).
 // It counts the starts without an end, clears with the end of the run, an abort, a closed session or a (re)connect (what is not known is NOT «working»), and it NEVER says «Slow» (that needs activity data: RP153).
@@ -103,54 +104,56 @@ test('k1: the counter reads mm:ss (minutes keep growing past 59), and anything t
   for (const bad of [-1, -99999, NaN, Infinity, -Infinity, '5', null, undefined, {}, []]) assert.equal(V.subClock(bad), '00:00', String(bad));
 });
 
-// ---------- the chip ----------
-const live = (over = {}) => ({ info: { found: true }, rpc: { ...busy(), subs: 1, subSince: T0, ...over } });
+// ---------- the bubble (RP171: it was the chip of the composer; the same guarantees now hold for the bubble at the end of the thread) ----------
+const live = (over = {}) => ({ id: 'abcdef0123', info: { adopted: { id: 's1', name: 'demo' }, adoptedFound: true, sessions: [] }, hist: { items: [], truncated: false }, rpc: { ...busy(), subs: 1, subSince: T0, ...over } });
+const bubble = (c, now) => (/<div class="m subrun" role="status">[\s\S]*?<\/div>/.exec(R.chatBody(c, { now })) || [''])[0];
 
 test('c1: one subagent: «Subagent working» and the counter from its start; two: «2 subagents working» and the counter of the first', () => {
-  const one = R.subagentChipHtml(live(), T0 + 135000);
-  assert.match(one, /^<span class="sub-chip" title="[^"]+"><i class="sub-dot" aria-hidden="true"><svg [\s\S]*<\/svg><\/i> <span class="sub-word">Subagent working<\/span> <b class="sub-time">02:15<\/b><\/span>$/); // RP156: the arrow is drawn and the words are in their own span
-  const two = R.subagentChipHtml(live({ subs: 2 }), T0 + 135000);
-  assert.match(two, /2 subagents working<\/span> <b class="sub-time">02:15<\/b>/); // RP156
+  const one = bubble(live(), T0 + 135000);
+  assert.match(one, /^<div class="m subrun" role="status"><i class="sub-dot" aria-hidden="true"><svg [\s\S]*<\/svg><\/i> <span class="sub-text">Subagent working<\/span> <b class="sub-time" aria-hidden="true">02:15<\/b><\/div>$/); // RP171: was the chip
+  const two = bubble(live({ subs: 2 }), T0 + 135000);
+  assert.match(two, /2 subagents working<\/span> <b class="sub-time" aria-hidden="true">02:15<\/b>/);
 });
 
 test('c2: it says nothing when nobody knows of a subagent: no count, a session that is not busy or asking, a bad clock, no entry', () => {
-  assert.equal(R.subagentChipHtml(live({ subs: 0 }), T0 + 5000), '');
-  for (const state of ['closed', 'idle', 'starting']) assert.equal(R.subagentChipHtml(live({ state }), T0 + 5000), '', state);
-  assert.match(R.subagentChipHtml(live({ state: 'asking' }), T0 + 5000), /Subagent working/);
-  for (const subSince of [0, -5, NaN, Infinity, '1', null, undefined]) assert.equal(R.subagentChipHtml(live({ subSince }), T0 + 5000), '', String(subSince));
-  for (const subs of [-1, 1.5, NaN, '1', null, undefined, Infinity]) assert.equal(R.subagentChipHtml(live({ subs }), T0 + 5000), '', String(subs));
-  for (const c of [null, undefined, {}, { info: null }, { rpc: null }, { rpc: 'x' }, { rpc: [] }, 7, 'x']) assert.equal(R.subagentChipHtml(c, T0), '', JSON.stringify(c));
-  assert.equal(R.subagentChipHtml(live(), undefined), '', 'without a clock there is no counter to show');
+  assert.equal(bubble(live({ subs: 0 }), T0 + 5000), '');
+  for (const state of ['closed', 'idle', 'starting']) assert.equal(bubble(live({ state }), T0 + 5000), '', state);
+  assert.match(bubble(live({ state: 'asking' }), T0 + 5000), /Subagent working/);
+  for (const subSince of [0, -5, NaN, Infinity, '1', null, undefined]) assert.equal(bubble(live({ subSince }), T0 + 5000), '', String(subSince));
+  for (const subs of [-1, 1.5, NaN, '1', null, undefined, Infinity]) assert.equal(bubble(live({ subs }), T0 + 5000), '', String(subs));
+  for (const rpc of [null, undefined, 'x', [], 7]) assert.equal(bubble({ ...live(), rpc }, T0), '', JSON.stringify(rpc));
+  assert.equal(bubble(live(), undefined), '', 'without a clock there is no counter to show');
 });
 
 test('c3: it NEVER says slow or stuck, however long it has been on (only the counter grows): that needs activity data (RP153)', () => {
   for (const hours of [0, 1, 3, 30]) {
-    const h = R.subagentChipHtml(live(), T0 + hours * 3600000 + 5000);
-    assert.doesNotMatch(h, /slow|stuck|block|no signal|lento|bloque|sin se/i, `${hours} h`);
+    const h = bubble(live(), T0 + hours * 3600000 + 5000);
+    assert.doesNotMatch(h, /slow|stuck|block|no signal|lento|bloque|sin se/i, String(hours) + ' h');
     assert.match(h, /Subagent working/);
   }
 });
 
-test('c4: nothing that is not ours reaches the markup: no free text of the entry, no name of an agent, no prompt (hostile fields are ignored)', () => {
+test('c4: nothing that is not ours reaches the markup: no free text of the entry, no prompt (hostile fields are ignored); the name is only the validated one of the history', () => {
   const evil = '<img src=x onerror=1>';
-  const h = R.subagentChipHtml(live({ text: evil, error: evil, agent: evil, label: evil, task: evil, blocks: [evil], name: evil }), T0 + 5000);
+  const h = bubble(live({ text: evil, error: evil, agent: evil, label: evil, task: evil, blocks: [evil], name: evil }), T0 + 5000);
   assert.ok(!h.includes('<img') && !h.includes(evil) && !h.includes('onerror'), h);
 });
 
-test('c5: it is not a live region (a counter that changes every second must not be announced), it has a help text, and it never depends on colour alone', () => {
-  const h = R.subagentChipHtml(live(), T0 + 5000);
-  assert.doesNotMatch(h, /role=|aria-live|aria-atomic/);
-  assert.match(h, /title="[^"]*subagent[^"]*"/i);
+test('c5: only the start and the end are announced: the bubble is a status and the counter that changes every second is aria-hidden (RP171; it was «not a live region» as a chip)', () => {
+  const h = bubble(live(), T0 + 5000);
+  assert.match(h, /^<div class="m subrun" role="status">/);
+  assert.match(h, /<b class="sub-time" aria-hidden="true">/);
+  assert.doesNotMatch(h, /aria-live|aria-atomic/);
   assert.match(h, /Subagent working/, 'the words are there');
 });
 
 // ---------- the stylesheet ----------
 const rules = [...css.matchAll(/(?:^|\n)([^{}\n@/ ][^{}\n]*)\{([^}]*)\}/g)].flatMap((m) => m[1].split(',').map((s) => ({ sel: s.trim().replace(/\s+/g, ' '), body: m[2] })));
-const rule = (sel) => { const r = rules.filter((x) => x.sel === sel); assert.ok(r.length, `a rule for ${sel}`); return r.map((x) => x.body).join(';'); };
+const rule = (sel) => { const r = rules.filter((x) => x.sel === sel); assert.ok(r.length, 'a rule for ' + sel); return r.map((x) => x.body).join(';'); };
 
-test('s1: the chip is blue (normal activity, not a warning), rounded like its neighbours, with a counter that does not jump when its digits change', () => {
-  assert.match(rule('.sub-chip'), /color:\s*var\(--blue\)/);
-  assert.match(rule('.sub-chip'), /border-radius:/);
+test('s1: the bubble is blue (normal activity, not a warning), rounded like its neighbours, with a counter that does not jump when its digits change', () => {
+  assert.match(rule('.m.subrun'), /color:\s*var\(--blue\)/); // RP171: was .sub-chip
+  assert.match(rule('.m'), /border-radius:/);
   assert.match(rule('.sub-time'), /font-variant-numeric:\s*tabular-nums/);
 });
 
@@ -207,18 +210,19 @@ async function chatPage({ state = 'busy' } = {}) {
   page.open = async (id = ID) => { page.run(`ACTIONS['chat-open']({ dataset: { id: '${id}' } })`); await page.tick(); };
   page.rpc = async (id, p) => { page.run(`applyRpc(${JSON.stringify({ id, ...p })})`); await page.tick(); };
   page.state = () => page.get('#sessState').html;
+  page.thread = () => page.get('#chatBody').html; // RP171: the subagent lives in the thread
   return page;
 }
 
-test('p1: a subagent_run that starts shows the chip next to the state of the session, right after its label; its end takes it away', async () => {
+test('p1: a subagent_run that starts shows the bubble at the end of the thread (never in the composer row); its end takes it away', async () => {
   const page = await chatPage();
   await page.open();
-  assert.doesNotMatch(page.state(), /Subagent/);
+  assert.doesNotMatch(page.thread() + page.state(), /Subagent/);
   await page.rpc(ID, start());
-  assert.match(page.state(), /Subagent working<\/span> <b class="sub-time">00:0\d<\/b>/); // RP156
-  assert.match(page.state(), /<\/span><span class="sub-chip"/, 'right after the label of the state');
+  assert.match(page.thread(), /Subagent working<\/span> <b class="sub-time" aria-hidden="true">00:0\d<\/b>/); // RP171: the thread, not the state row
+  assert.doesNotMatch(page.state(), /Subagent|sub-chip/, 'the composer row says nothing of it');
   await page.rpc(ID, end());
-  assert.doesNotMatch(page.state(), /Subagent/);
+  assert.doesNotMatch(page.thread() + page.state(), /Subagent working/);
 });
 
 test('p2: the end of the run, an exit and a state that goes idle also take it away', async () => {
@@ -226,9 +230,9 @@ test('p2: the end of the run, an exit and a state that goes idle also take it aw
     const page = await chatPage();
     await page.open();
     await page.rpc(ID, start());
-    assert.match(page.state(), /Subagent working/, JSON.stringify(p));
+    assert.match(page.thread(), /Subagent working/, JSON.stringify(p)); // RP171: the thread
     await page.rpc(ID, p);
-    assert.doesNotMatch(page.state(), /Subagent/, JSON.stringify(p));
+    assert.doesNotMatch(page.thread() + page.state(), /Subagent/, JSON.stringify(p));
   }
 });
 
@@ -247,7 +251,7 @@ test('p4: the clock runs by itself every second while one is on: the counter mov
   page.run(`S.rpc['${ID}'].subSince = Date.now() - 125000`);
   page.run('subTick()');
   await page.tick();
-  assert.match(page.state(), /Subagent working<\/span> <b class="sub-time">02:0\d<\/b>/); // RP156
+  assert.match(page.thread(), /Subagent working<\/span> <b class="sub-time" aria-hidden="true">02:0\d<\/b>/); // RP171: the thread
   const ticker = page.timers.find((t) => t.ms === 1000);
   assert.ok(ticker, 'a timer of 1000 ms is registered');
   assert.match(appSource(), /setInterval\(subTick, 1000\)/);
@@ -279,10 +283,10 @@ test('p6: reading the status again (open, reconnect) clears it: after a missed e
   const page = await chatPage();
   await page.open();
   await page.rpc(ID, start());
-  assert.match(page.state(), /Subagent working/);
+  assert.match(page.thread(), /Subagent working/); // RP171: the thread
   page.run(`S.rpc['${ID}'] = V.rpcFromStatus(S.rpc['${ID}'], { state: 'busy', pendingDialogs: [], sessionId: 's1' }); draw();`);
   await page.tick();
-  assert.doesNotMatch(page.state(), /Subagent/);
+  assert.doesNotMatch(page.thread() + page.state(), /Subagent/);
 });
 
 test('p7: the existing state label is unchanged by this row: Working…, Idle and the chips of memory, context and compaction are drawn as before', async () => {

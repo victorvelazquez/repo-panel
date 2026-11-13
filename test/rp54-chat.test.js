@@ -290,7 +290,8 @@ test('bubbles: user right, assistant left, small time, the folded tools line, wo
   assert.doesNotMatch(html, /<b>hi/);
   assert.match(html, /<div class="tools">▸ 5 tools · read, grep, bash \(\+2\)<\/div>\s*<div class="m">[\s\S]*Taking it\./);
   assert.match(html, /▸ 1 tool · bash</);
-  assert.match(html, /▸ 2 tools · edit, bash<\/div>\s*<div class="m working">working…/);
+  assert.match(html, /▸ 2 tools · edit, bash<\/div>$/); // RP171: the item has no «working…» of its own; the tail of the thread (live state) is the only one
+  assert.doesNotMatch(html, /working…/);
   assert.doesNotMatch(body({ info: info({ adopted, adoptedFound: true }), hist: { found: true, items: [], truncated: false } }), /Older messages/);
 });
 

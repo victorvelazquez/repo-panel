@@ -394,7 +394,8 @@ test('chatBody: the who label, the time, the tools line and the working bubble a
   assert.match(html, /<span class="who">You · \d\d:\d\d<\/span>/);
   assert.match(html, /<span class="who">panel:alpha<\/span>/);
   assert.match(html, /<div class="tools">▸ 5 tools · read, grep, bash \(\+2\)<\/div>\s*<div class="m">/);
-  assert.match(html, /▸ 2 tools · edit, bash<\/div>\s*<div class="m working">working…<\/div>/);
+  assert.match(html, /▸ 2 tools · edit, bash<\/div>$/); // RP171: the item has no «working…» of its own any more (the tail says it while the session works)
+  assert.doesNotMatch(html, /working…/);
 });
 
 test('chatBody: raw HTML in a message is escaped and the markup stays balanced', () => {

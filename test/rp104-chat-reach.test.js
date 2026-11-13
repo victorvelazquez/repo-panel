@@ -74,7 +74,10 @@ test('S2: a thinking item is drawn with a «thinking…» line, a plain one is d
   const withIt = html([{ role: 'assistant', text: 'Done.', at: null, tools: [], thinking: true }]);
   assert.match(withIt, /<div class="tools thought">▸ thinking…<\/div>\s*<div class="m">/);
   assert.doesNotMatch(html([{ role: 'assistant', text: 'Done.', at: null, tools: [] }]), /thinking/);
-  assert.match(html([{ role: 'assistant', text: '', at: null, tools: ['bash'], thinking: true }]), /thinking…<\/div>\s*<div class="tools">▸ 1 tool · bash<\/div>\s*<div class="m working">working…/);
+  // RP171: an item with no text no longer draws its own «working…» (the tail of the thread is the only one, see rp171)
+  const bare = html([{ role: 'assistant', text: '', at: null, tools: ['bash'], thinking: true }]);
+  assert.match(bare, /thinking…<\/div>\s*<div class="tools">▸ 1 tool · bash<\/div>$/);
+  assert.doesNotMatch(bare, /working…/);
 });
 
 const rec = (r) => ({ kind: 'event', id: '0123456789', record: r });

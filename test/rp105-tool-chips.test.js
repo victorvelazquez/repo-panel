@@ -193,9 +193,10 @@ test('S3: an item without toolInfo (an older server, a cached chat) keeps the li
   assert.match(body([{ role: 'assistant', text: 'Taking it.', at: null, tools: ['read', 'grep', 'bash', 'write', 'edit'] }]), /<div class="tools">▸ 5 tools · read, grep, bash \(\+2\)<\/div>\s*<div class="m">/);
 });
 
-test('S3: a trailing run with no text still shows its chips before «working…»', () => {
+test('S3: a trailing run with no text still shows its chips (RP171: its own «working…» is gone, the tail of the thread says it)', () => {
   const html = body([{ role: 'assistant', text: '', at: null, tools: ['bash'], toolInfo: [info({ name: 'bash', ok: null, ms: null, arg: 'npm test' })] }]);
-  assert.match(html, /class="tc run">… <b>bash<\/b> <i>npm test<\/i><\/span>[\s\S]*<div class="m working">working…/);
+  assert.match(html, /class="tc run">… <b>bash<\/b> <i>npm test<\/i><\/span>/);
+  assert.doesNotMatch(html, /working…/); // RP171
 });
 
 test('S3 abuse: a huge argument is cheap to summarise and a secret at the edge of what is looked at never shows', () => {
