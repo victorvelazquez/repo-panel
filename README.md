@@ -355,6 +355,7 @@ The page is plain scripts with no build step. `index.html` loads them one after 
 - `public/chat.js`: the chat, its composer, the notes pad and the three-block layout.
 - `public/board.js`: the Work board and its cards.
 - `public/actions.js`: the click handlers (`data-act`): merge, re-run, rooms and the usage bar.
+- `public/viewport.js`: on a touch screen it sets `--vvh` to the visible height (`visualViewport`), so the one-zone layout does not move when the keyboard opens (RP180); it also keeps the page at the top and leaves a pinch-zoomed page alone. Fields are 16 px on touch screens so iOS does not zoom into them.
 - `public/app.js`: only the boot (the state, the document listeners, the timers and the first load). It loads last because it is the one that runs at load.
 
 A new page script goes into `index.html`, into the closed list of static files in `server/http.js` and into `test/pagesrc.js`, in that order of loading.
