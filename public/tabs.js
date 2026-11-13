@@ -231,9 +231,23 @@ function notifyPrefs() {
   const on = (k) => S.prefs[k] !== false;
   return { answer: on(N.PREF.answer), ci: on(N.PREF.ci), deliver: on(N.PREF.deliver), merge: on(N.PREF.merge), start: on(N.PREF.start), sound: on('notifySound'), system: on('notifySystem'), permission: typeof Notification === 'undefined' ? 'unsupported' : Notification.permission };
 }
+// RP179: what this device can do with a push. Whether it is subscribed is asked of the browser once (S.pushSub), then kept by the actions.
+function pushPrefs() {
+  const supported = typeof navigator !== 'undefined' && 'serviceWorker' in navigator && typeof PushManager !== 'undefined' && typeof Notification !== 'undefined';
+  if (supported && S.pushSub === undefined) readPushSub();
+  return { supported, subscribed: S.pushSub === true, permission: typeof Notification === 'undefined' ? 'unsupported' : Notification.permission };
+}
+async function readPushSub() {
+  S.pushSub = false;
+  try {
+    const reg = await navigator.serviceWorker.getRegistration('/sw.js');
+    S.pushSub = !!(reg && await reg.pushManager.getSubscription());
+  } catch { /* stays off */ }
+  drawSettings();
+}
 function drawSettings() {
   if (S.tab !== 'settings') return;
-  const prefs = { method: S.prefs.method, del: S.prefs.del, clean: cleanAsColumn(), split: !!S.prefs.split, notify: notifyPrefs() };
+  const prefs = { method: S.prefs.method, del: S.prefs.del, clean: cleanAsColumn(), split: !!S.prefs.split, notify: notifyPrefs(), push: pushPrefs() };
   paint($('#settingsView'), R.settingsView({ ...S.settings, prefs, pi: S.prereq.pi }));
 }
 

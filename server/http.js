@@ -35,6 +35,7 @@ const { readUsage, usageFile } = require('./usage.js');
 const { sessionsState, chatState, chatResult, adoptSession, releaseSession, adoptIfNone } = require('./sessions.js');
 const { readSettings, writeSetting } = require('./settings.js');
 const remote = require('./remote.js');
+const push = require('./push.js');
 
 const ROOT = path.join(__dirname, '..');
 const TOKEN = crypto.randomBytes(24).toString('hex');
@@ -180,6 +181,11 @@ const routes = {
   'POST /api/rooms/create': (q, b) => createRoom(b.name, b.path),
   'POST /api/rooms/remove': (q, b) => removeRoom(b.name),
   'POST /api/rooms/assign': (q, b) => assignRoom(b.id, b.room),
+  // RP179: Web Push. The key is the PUBLIC one; the private key stays in push.json. A device is only a push-service endpoint (see server/push.js).
+  'GET /api/push/key': (q, b, d) => ({ key: d.pusher.store.vapid().publicKey }),
+  'POST /api/push/subscribe': (q, b, d) => { if (!d.pusher.store.add(b)) throw new HttpError(400, 'Not a push service endpoint, or too many devices'); return { ok: true }; },
+  'POST /api/push/unsubscribe': (q, b, d) => ({ ok: d.pusher.store.remove(b && b.endpoint) }),
+  'POST /api/push/test': async (q, b, d) => ({ sent: await d.pusher.test() }),
   'GET /api/scan': (q) => ({ repos: scanFolder(q.dir) }),
 };
 
@@ -199,7 +205,11 @@ const STATIC = {
   '/style.css': ['style.css', 'text/css; charset=utf-8'],
   '/kletus-dev.svg': ['kletus-dev.svg', 'image/svg+xml'], // RP102: the logo of the header
   '/icon.svg': ['icon.svg', 'image/svg+xml'], // RP102: the K of the logo, the icon of the tab
+  '/sw.js': ['sw.js', 'text/javascript; charset=utf-8'], // RP179: the service worker of the push
+  '/manifest.webmanifest': ['manifest.webmanifest', 'application/manifest+json; charset=utf-8'],
 };
+// RP179: these carry no data, so the remote host serves them without the login (an installed app fetches them before it has a cookie).
+const OPEN_STATIC = new Set(['/sw.js', '/manifest.webmanifest', '/icon.svg']);
 
 function readBody(req) {
   return new Promise((resolve, reject) => {
@@ -264,7 +274,11 @@ function createServer(port, deps = {}) {
   // RP78: the Summary comes from a store kept in memory (server.js starts it); injected by tests, or off with noSummaryStore. Built AFTER the host: it reads its state.
   if (!deps.summaryStore && !deps.noSummaryStore) deps.summaryStore = createSummaryStore({ deps, now: deps.now, sessionOf: deps.sessionOf, jobsOf: deps.jobsOf, subagentsOf: deps.subagentsOf });
   // RP178: tells the connected pages when a repo starts to need the person; started with the store by server.js, so a test server runs no timer.
-  const notifier = deps.summaryStore ? createNotifier({ store: deps.summaryStore, hub }) : null;
+  // RP179: push.json lives next to config.json; while a device is subscribed the notifier keeps reading with no page open.
+  const pushFile = path.join(process.env.REPO_PANEL_CONFIG ? path.dirname(process.env.REPO_PANEL_CONFIG) : ROOT, 'push.json');
+  const pusher = push.createPusher({ store: push.createPushStore({ file: pushFile, now: deps.now }), post: deps.pushPost || push.post, now: deps.now, sub: () => { const r = remoteCfg(); return r ? `https://${r.host}` : undefined; } });
+  deps.pusher = pusher;
+  const notifier = deps.summaryStore ? createNotifier({ store: deps.summaryStore, hub, hasSubscribers: () => pusher.store.count() > 0, onNotice: (id, n) => { pusher.notify(id, n); } }) : null;
   const server = http.createServer((req, res) => {
     if (req.method === 'GET' && req.url.split('?')[0] === '/api/events') return openStream(req, res);
     const t0 = Date.now();
@@ -294,7 +308,7 @@ function createServer(port, deps = {}) {
         if (req.method === 'POST' && !remote.originOk(req)) throw new HttpError(403, 'Forbidden origin');
         if (badUrl) throw new HttpError(400, 'Bad request');
         if (hostKind(req, rem) === 'remote' && req.method === 'POST' && pathname === '/login') return await login(req, res, rem);
-        const denied = pathname === '/health' ? null : refusal(req, rem);
+        const denied = pathname === '/health' || (req.method === 'GET' && OPEN_STATIC.has(pathname)) ? null : refusal(req, rem);
         if (denied) {
           if (req.method === 'GET' && (pathname === '/' || pathname === '/index.html')) return reply(denied.status, remote.LOGIN_PAGE, 'text/html; charset=utf-8');
           throw new HttpError(denied.status, denied.error);
@@ -309,6 +323,8 @@ function createServer(port, deps = {}) {
         }
         // Lets a second launch tell "my own panel is already here" from "another project owns the port".
         if (req.method === 'GET' && pathname === '/health') return reply(200, { app: 'repo-panel', api: view.API_VERSION });
+        // RP179: the service worker has no token; it is behind the Host and login gate above and only gets what was queued for its own endpoint.
+        if (key === 'POST /push/pending') { const b = await readBody(req); return reply(200, { notices: pusher.store.take(b && b.endpoint) }); }
         const handler = routes[key];
         if (!handler && key !== 'GET /api/perf') throw new HttpError(404, 'Not found');
         if (req.headers['x-token'] !== TOKEN) throw new HttpError(401, 'Invalid token');
@@ -344,6 +360,7 @@ function createServer(port, deps = {}) {
   server.rpcHost = deps.rpcHost;
   server.summaryStore = deps.summaryStore;
   server.notifier = notifier;
+  server.pusher = pusher;
   return server;
 }
 

@@ -1287,6 +1287,11 @@
     const NOTE_ROWS = [['answer', 'The agent asks you a question'], ['ci', 'CI fails'], ['deliver', 'Work is done (ready for /flow-ship)'], ['merge', 'A PR is ready to merge'], ['start', 'A repo is clean (ready for /flow-next)'], ['sound', 'Sound'], ['system', 'System notification']];
     const noteKey = (k) => (nf.PREF[k] || (k === 'sound' ? 'notifySound' : 'notifySystem'));
     const noteHint = { granted: '', default: '<button type="button" data-act="notify-allow">Allow system notifications</button>', denied: '<span class="rs-sub">Blocked: allow notifications for this site in the browser settings.</span>', unsupported: '<span class="rs-sub">This browser has no system notifications.</span>' };
+    // RP179: the push of THIS device (the page builds the model: supported, subscribed, permission); a phone must install the app first.
+    const pv = p.push && typeof p.push === 'object' ? p.push : null;
+    const pushCtl = !pv ? '' : !pv.supported ? '<span class="rs-sub">Not available here. On an iPhone: Share, Add to Home Screen, then open the installed app.</span>' : pv.permission === 'denied' ? '<span class="rs-sub">Blocked: allow notifications for this site in the browser settings.</span>' : pv.subscribed ? '<button type="button" data-act="push-test">Send a test push</button> <button type="button" data-act="push-disable">Disable</button>' : '<button type="button" data-act="push-enable">Enable</button>';
+    const pushHtml = pv ? `<h3 class="st-h">Push notifications <span class="chip">This device</span></h3><div class="st-rows">${stRow('<label>Notices with the panel closed</label><p class="rs-sub">Reaches this device even with no page open, through the push service of Apple, Google, Microsoft or Mozilla. On an iPhone it needs the app added with Add to Home Screen.</p>', pushCtl)}</div>
+` : '';
     const notifyHtml = nf && nv
       ? `<h3 class="st-h">Notifications <span class="chip">This browser</span></h3><div class="st-rows">${NOTE_ROWS.map(([k, label]) => stRow(`<label id="st-l-n-${k}">${label}</label>${stBrowser('on')}`, stSwitch(`st-l-n-${k}`, nv[k] === true, `data-act="pref-set" data-pref="${noteKey(k)}" data-value="${nv[k] === true ? 'false' : 'true'}"`, false))).join('')}${stRow(`<label>Test</label><p class="rs-sub">Nothing is shown while this panel is in view. A phone only hears it while the page is open.</p>${noteHint[nv.permission] || ''}`, '<button type="button" data-act="notify-test">Send a test notice</button>')}</div>
 `
@@ -1303,6 +1308,7 @@
       + `${stRow(`<label id="st-l-del">Delete the branch after merging</label>${stBrowser('on')}`, stSwitch('st-l-del', p.del === true, 'data-act="pref-set" data-pref="del" data-value="' + (p.del === true ? 'false' : 'true') + '"', false))}</div>
 `
       + notifyHtml
+      + pushHtml
       + `<h3 class="st-h">Visual <span class="chip">This browser</span></h3><div class="st-rows">${stRow(`<label id="st-l-diff">Diff view</label><p class="rs-sub">How the Changes tab draws a file.</p>${stBrowser('unified')}`, stSeg('st-l-diff', 'split', p.split === true, [['false', 'unified'], ['true', 'side by side']]))}`
       + `${stRow(`<label id="st-l-clean">Show clean repos as a column</label>${stBrowser('on')}`, stSwitch('st-l-clean', p.clean === true, 'data-act="pref-set" data-pref="cleanAsColumn" data-value="' + (p.clean === true ? 'false' : 'true') + '"', false))}</div>
 `

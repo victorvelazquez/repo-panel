@@ -356,6 +356,7 @@ The page is plain scripts with no build step. `index.html` loads them one after 
 - `public/chat.js`: the chat, its composer, the notes pad and the three-block layout.
 - `public/board.js`: the Work board and its cards.
 - `public/actions.js`: the click handlers (`data-act`): merge, re-run, rooms and the usage bar.
+- `public/sw.js` and `public/manifest.webmanifest`: not page scripts; the browser fetches them (the service worker of the push, RP179, and the manifest that lets a phone install the app). The push settings live in `actions.js`, `tabs.js` and `resumen.js`.
 - `public/viewport.js`: on a touch screen it sets `--vvh` to the visible height (`visualViewport`), so the one-zone layout does not move when the keyboard opens (RP180); it also keeps the page at the top and leaves a pinch-zoomed page alone. Fields are 16 px on touch screens so iOS does not zoom into them.
 - `public/app.js`: only the boot (the state, the document listeners, the timers and the first load). It loads last because it is the one that runs at load.
 
@@ -382,6 +383,15 @@ The server still listens on `127.0.0.1` only. To use the panel from a phone, put
 - **Login once.** On the remote host the page asks for the `secret` one time (`POST /login`, JSON `{ "secret": "..." }`). It answers a cookie (`HttpOnly`, `SameSite=Strict`, `Secure` when the request came through HTTPS, 180 days) signed with it and kept by no one on the server: it survives a restart and **changing `remote.secret` ends every session**. After five wrong attempts in a row the login is closed for 15 minutes (429). Everything else on the remote host (page, assets, API, `/api/events`) answers 401 without the cookie, except `/health`. The API still needs the per-run token, which the page gets together with the cookie; after a restart, reload the page. Opening the panel through `127.0.0.1` never asks for a login.
 - **Origin.** Every `POST` that carries an `Origin` header naming another host (or `null`) is refused with 403, on both hosts. Requests with no `Origin` (scripts, tests) are unchanged.
 - **On the iPhone.** Open the HTTPS address in Safari, log in and use *Share → Add to Home Screen*; log in again inside that installed app (iOS keeps its cookies apart from Safari's). There are no extra confirmations for irreversible actions: the phone does what the PC does.
+
+## Push notifications (RP179)
+
+The notices of RP178 can also reach a device with **no page open** (the phone locked, the browser closed) through Web Push. It is off until you turn it on, per device.
+
+- **Turn it on.** Open **Settings → Push notifications → Enable** and accept the permission. On an **iPhone** the app must be installed first: in Safari open the HTTPS address of the remote access (above), *Share → Add to Home Screen*, open the **installed app**, then Settings, Push notifications, Enable. Safari alone cannot receive a push. On a PC, Edge and Chrome work from the normal tab. **Disable** forgets the device; **Send a test push** checks the whole path.
+- **How it travels.** The server sends an empty, signed (VAPID, `node:crypto`, no library) push to the push service of Apple, Google, Microsoft or Mozilla, and the service wakes the service worker (`public/sw.js`), which asks the panel for the text and shows it. So the phone needs internet; the sound is the system one on iOS. If the worker cannot get the text it shows a generic notice (iOS cancels a subscription whose push shows nothing). The server only sends to the endpoints of those four services, to at most 20 devices; pending texts are kept 10 minutes and at most 10 per device.
+- **Where it lives.** `push.json`, next to `config.json`, holds the VAPID key pair and the subscribed devices. It contains the **private key**, so it is ignored by Git: never commit or share it. `GET /api/push/key` answers only the public key.
+- **The cost.** While at least one device is subscribed the notifier keeps reading the Summary even with no page open, so the store stays awake and reads Git of every repo all the time. Unsubscribe every device to go back to idle.
 
 ## Security
 
