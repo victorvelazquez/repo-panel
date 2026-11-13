@@ -6,6 +6,8 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 const V = window.RepoPanelView || null;
 // resumen.js (the Summary tab) is optional in the same way: without it the tab simply does not paint.
 const R = window.RepoPanelResumen || null;
+// notify.js (RP178) is optional in the same way: without it the page simply shows no notices.
+const N = window.RepoPanelNotify || null;
 const store = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
 
 // RP47: a region is written only when its HTML changed. The board was replaced on every redraw (about 150 times a minute at

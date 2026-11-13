@@ -28,6 +28,7 @@ const { jobsOf } = require('./jobs.js');
 const { subagentsOf } = require('./presence.js');
 const { createSummaryStore } = require('./summarystore.js');
 const { createEventHub } = require('./events.js');
+const { createNotifier } = require('./notifier.js');
 const { createRpcHost, rpcApi } = require('./rpchost.js');
 const { terminalAnswer } = require('./terminal.js');
 const { readUsage, usageFile } = require('./usage.js');
@@ -186,6 +187,7 @@ const STATIC = {
   '/view.js': ['view.js', 'text/javascript; charset=utf-8'],
   '/highlight.js': ['highlight.js', 'text/javascript; charset=utf-8'],
   '/resumen.js': ['resumen.js', 'text/javascript; charset=utf-8'],
+  '/notify.js': ['notify.js', 'text/javascript; charset=utf-8'], // RP178: the pure part of the notifications
   '/data.js': ['data.js', 'text/javascript; charset=utf-8'],
   '/feed.js': ['feed.js', 'text/javascript; charset=utf-8'],
   '/tabs.js': ['tabs.js', 'text/javascript; charset=utf-8'],
@@ -261,6 +263,8 @@ function createServer(port, deps = {}) {
   if (!deps.subagentsOf && typeof deps.rpcHost.startedAtOf === 'function') deps.subagentsOf = (id) => (typeof deps.rpcHost.startedAtOf(id) === 'number' ? subagentsOf(id, { base: deps.sessionsDir }) : null);
   // RP78: the Summary comes from a store kept in memory (server.js starts it); injected by tests, or off with noSummaryStore. Built AFTER the host: it reads its state.
   if (!deps.summaryStore && !deps.noSummaryStore) deps.summaryStore = createSummaryStore({ deps, now: deps.now, sessionOf: deps.sessionOf, jobsOf: deps.jobsOf, subagentsOf: deps.subagentsOf });
+  // RP178: tells the connected pages when a repo starts to need the person; started with the store by server.js, so a test server runs no timer.
+  const notifier = deps.summaryStore ? createNotifier({ store: deps.summaryStore, hub }) : null;
   const server = http.createServer((req, res) => {
     if (req.method === 'GET' && req.url.split('?')[0] === '/api/events') return openStream(req, res);
     const t0 = Date.now();
@@ -335,10 +339,11 @@ function createServer(port, deps = {}) {
     return send(res, 503, { error: 'Too many event streams open' });
   }
   const close = server.close.bind(server);
-  server.close = (cb) => { hub.closeAll(); deps.rpcHost.closeAll(); if (deps.summaryStore) deps.summaryStore.stop(); return close(cb); };
+  server.close = (cb) => { if (notifier) notifier.stop(); hub.closeAll(); deps.rpcHost.closeAll(); if (deps.summaryStore) deps.summaryStore.stop(); return close(cb); };
   server.hub = hub;
   server.rpcHost = deps.rpcHost;
   server.summaryStore = deps.summaryStore;
+  server.notifier = notifier;
   return server;
 }
 

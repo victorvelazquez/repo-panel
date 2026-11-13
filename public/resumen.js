@@ -1281,6 +1281,16 @@
 <div class="st-warn" role="note"><b>Privacy.</b> A result is free text and can hold secrets (for example the output of <code>cat .env</code>). It is cleaned, but no filter catches every form. The result of <code>read</code> is never shown.</div>${stMeta('<span class="chip blue">Saved in config.json · chat.showResults</span>', '<span class="chip">Default: off</span>')}`,
         stSwitch('st-l-results', opts['chat.showResults'] === true, 'data-act="setting-toggle" data-key="chat.showResults"', !ready),
       )}</div>`;
+    // RP178: the notices of this browser. The switches come from notify.js (the same keys the page reads); a missing library or model leaves the section out.
+    const nf = typeof module === 'object' && module.exports ? require('./notify.js') : root.RepoPanelNotify;
+    const nv = p.notify && typeof p.notify === 'object' ? p.notify : null;
+    const NOTE_ROWS = [['answer', 'The agent asks you a question'], ['ci', 'CI fails'], ['deliver', 'Work is done (ready for /flow-ship)'], ['merge', 'A PR is ready to merge'], ['start', 'A repo is clean (ready for /flow-next)'], ['sound', 'Sound'], ['system', 'System notification']];
+    const noteKey = (k) => (nf.PREF[k] || (k === 'sound' ? 'notifySound' : 'notifySystem'));
+    const noteHint = { granted: '', default: '<button type="button" data-act="notify-allow">Allow system notifications</button>', denied: '<span class="rs-sub">Blocked: allow notifications for this site in the browser settings.</span>', unsupported: '<span class="rs-sub">This browser has no system notifications.</span>' };
+    const notifyHtml = nf && nv
+      ? `<h3 class="st-h">Notifications <span class="chip">This browser</span></h3><div class="st-rows">${NOTE_ROWS.map(([k, label]) => stRow(`<label id="st-l-n-${k}">${label}</label>${stBrowser('on')}`, stSwitch(`st-l-n-${k}`, nv[k] === true, `data-act="pref-set" data-pref="${noteKey(k)}" data-value="${nv[k] === true ? 'false' : 'true'}"`, false))).join('')}${stRow(`<label>Test</label><p class="rs-sub">Nothing is shown while this panel is in view. A phone only hears it while the page is open.</p>${noteHint[nv.permission] || ''}`, '<button type="button" data-act="notify-test">Send a test notice</button>')}</div>
+`
+      : '';
     const status = o.error ? `<div class="st-status bad" role="status" aria-live="polite">${esc(String(o.error))}</div>` : `<div class="st-status" role="status" aria-live="polite">${esc(String(o.saved || ''))}</div>`;
     return `<div class="st"><h2>Settings</h2><p class="rs-sub">Each option says where it is saved. «Panel» options live in <code>config.json</code> and apply to every browser; «This browser» options stay in this browser only. A change is saved as soon as you make it.</p>
 `
@@ -1292,6 +1302,7 @@
       + `<h3 class="st-h">Delivery <span class="chip">This browser</span></h3><div class="st-rows">${stRow(`<label id="st-l-method">Merge method</label><p class="rs-sub">How the Merge button joins a pull request.</p>${stBrowser('squash')}`, stSeg('st-l-method', 'method', p.method, [['squash', 'squash'], ['merge', 'merge'], ['rebase', 'rebase']]))}`
       + `${stRow(`<label id="st-l-del">Delete the branch after merging</label>${stBrowser('on')}`, stSwitch('st-l-del', p.del === true, 'data-act="pref-set" data-pref="del" data-value="' + (p.del === true ? 'false' : 'true') + '"', false))}</div>
 `
+      + notifyHtml
       + `<h3 class="st-h">Visual <span class="chip">This browser</span></h3><div class="st-rows">${stRow(`<label id="st-l-diff">Diff view</label><p class="rs-sub">How the Changes tab draws a file.</p>${stBrowser('unified')}`, stSeg('st-l-diff', 'split', p.split === true, [['false', 'unified'], ['true', 'side by side']]))}`
       + `${stRow(`<label id="st-l-clean">Show clean repos as a column</label>${stBrowser('on')}`, stSwitch('st-l-clean', p.clean === true, 'data-act="pref-set" data-pref="cleanAsColumn" data-value="' + (p.clean === true ? 'false' : 'true') + '"', false))}</div>
 `

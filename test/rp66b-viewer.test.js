@@ -189,7 +189,7 @@ test('in the page, resumen.js finds the highlighter that highlight.js published'
 test('the page loads highlight.js after view.js and before resumen.js, and the server serves it', () => {
   const scripts = [...read('index.html').matchAll(/<script src="([^"]+)"><\/script>/g)].map((m) => m[1]);
   assert.deepEqual(scripts.slice(0, 3), ['/view.js', '/highlight.js', '/resumen.js']);
-  assert.deepEqual(LIB_FILES, ['view.js', 'highlight.js', 'resumen.js']);
+  assert.deepEqual(LIB_FILES, ['view.js', 'highlight.js', 'resumen.js', 'notify.js']); // RP178: notify.js follows resumen.js
   assert.match(fs.readFileSync(path.join(ROOT, 'server', 'http.js'), 'utf8'), /'\/highlight\.js': \['highlight\.js', 'text\/javascript; charset=utf-8'\]/);
 });
 

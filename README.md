@@ -349,6 +349,7 @@ Known limits and what is not verified:
 
 The page is plain scripts with no build step. `index.html` loads them one after the other and they share the global scope (the state `S`, the helpers and every function), so the order matters: every file except the last only defines things, and touches the page when one of its functions is called, never while it loads. Three files are pure (data in, HTML out) and the page tests share them: `public/view.js`, `public/highlight.js` (the syntax colors of the file and diff viewer: JavaScript and TypeScript, JSON, CSS, HTML, Markdown and shell, files up to 2,000 lines; the text of a file is always escaped, the only markup it adds is a token span) and `public/resumen.js`. The rest is split by layer, in load order:
 
+- `public/notify.js`: a pure library loaded with `view.js` and `resumen.js` before the page scripts and also required by the server: which kind of attention a Summary row asks for, the text of a notice, the check of a `notify` event and the decision of what to show (RP178).
 - `public/data.js`: the requests to the server (with their pool) and the reads of each repo.
 - `public/feed.js`: the event stream, the board data and the refresh ticks.
 - `public/tabs.js`: the derived state, the "go work on" queue and the Summary and Conformity tabs.
@@ -359,6 +360,15 @@ The page is plain scripts with no build step. `index.html` loads them one after 
 - `public/app.js`: only the boot (the state, the document listeners, the timers and the first load). It loads last because it is the one that runs at load.
 
 A new page script goes into `index.html`, into the closed list of static files in `server/http.js` and into `test/pagesrc.js`, in that order of loading.
+
+## Notifications (RP178)
+
+The panel tells you when a repo starts to need you, so you do not have to look at it. `server/notifier.js` reads the Summary every 3 seconds and, when the kind of attention of a repo **changes**, sends a `notify` event on `GET /api/events`. The kinds are: the agent **asks a question** (`answer`), the **CI fails** (`ci`), the work is done and **`/flow-ship`** can run (`deliver`), a PR is ready to **merge** (`merge`) and the repo is clean for **`/flow-next`** (`start`).
+
+- **When it speaks.** Never at the first look at a repo (a repo that already waited for you when the server started says nothing), never twice for the same state, and only after a kind holds for two looks in a row (so a flicker of the session says nothing). A look that cannot say (still loading, an error, an unknown session) keeps what was known. A repo that is added later is a baseline too.
+- **What the page does.** Nothing while the panel is in view (visible and focused: the card already says it). Otherwise it shows a notice, plays a short sound (two notes: falling for a question or a failing CI, rising for something ready) and, when you allowed it, a system notification; clicking the notification opens that repo's chat. Settings has a **Notifications** section (this browser only) with a switch per kind, the sound, the system notification, the button to allow it and a **Send a test notice** button that ignores the view and the switches.
+- **The sound** is made by the page, so a browser only plays it after you have clicked on the page once; the system notification needs the permission that button asks for.
+- **What it does not do.** It works only while at least one page is connected to the event stream: with none open it reads nothing (asking the Summary would wake the store, which then reads Git of every repo all the time), and when the last page leaves it forgets what it knew, so the next page starts from a baseline and never gets old news. A phone also freezes a page that is not on screen, so an iPhone only hears a notice while the panel is open: the notice with the phone locked or the panel closed is RP179 (Web Push).
 
 ## Remote access (phone)
 
