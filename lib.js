@@ -452,7 +452,7 @@ function conformityReport(entries) {
 
 // ---------- pi commands ----------
 // The only texts the browser can ask the panel to send to a pi session (it sends the key, never the text).
-const PI_COMMANDS = { 'flow-commit': '/flow-commit', 'flow-commit-unstage': '/flow-commit --unstage', 'flow-pr': '/flow-pr', 'flow-base': '/flow-base', 'flow-base-stash': '/flow-base --stash', 'flow-next': '/flow-next' };
+const PI_COMMANDS = { 'flow-ship': '/flow-ship', 'flow-ship-unstage': '/flow-ship --unstage', 'flow-commit': '/flow-commit', 'flow-commit-unstage': '/flow-commit --unstage', 'flow-pr': '/flow-pr', 'flow-base': '/flow-base', 'flow-base-stash': '/flow-base --stash', 'flow-next': '/flow-next' };
 
 module.exports = {
   PI_COMMANDS,

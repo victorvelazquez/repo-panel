@@ -1,4 +1,5 @@
 'use strict';
+// RP176: the /flow-commit button is now /flow-ship everywhere it is offered; each assertion here keeps holding, now for /flow-ship.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { flowButtons, fixPrAction } = require('../public/view.js');
@@ -16,9 +17,9 @@ const ctx = (o = {}) => ({ now: NOW, ...o });
 
 test('flowButtons: which button each state of the repo shows', () => {
   const rows = [
-    ['dirty tree', dirty(), prs(), null, ctx(), ['flow-commit']],
+    ['dirty tree', dirty(), prs(), null, ctx(), ['flow-ship']],
     ['dirty, declared needs-input hides the commit button', dirty(), prs(), declared('needs-input'), ctx(), []],
-    ['dirty, needs-input but the person lifted the gating', dirty(), prs(), declared('needs-input'), ctx({ override: true }), ['flow-commit']],
+    ['dirty, needs-input but the person lifted the gating', dirty(), prs(), declared('needs-input'), ctx({ override: true }), ['flow-ship']],
     ['clean, ahead, no PR', local(), prs(), null, ctx(), ['flow-pr']],
     ['clean, ahead, an open PR of the branch', local(), prs({ prs: [{ number: 7, head: 'task' }] }), null, ctx(), ['flow-pr']],
     ['clean, ahead, commit verdict running', local(), prs(), null, ctx({ verdict: 'running' }), []],
@@ -33,7 +34,7 @@ test('flowButtons: which button each state of the repo shows', () => {
 test('flowButtons: /flow-pr is labelled as an update only when the branch already has an open PR', () => {
   assert.deepEqual(flowButtons(local(), prs(), null, ctx()), [{ cmd: 'flow-pr', label: '/flow-pr' }]);
   assert.deepEqual(flowButtons(local(), prs({ prs: [{ number: 7, head: 'task' }] }), null, ctx()), [{ cmd: 'flow-pr', label: '/flow-pr (update PR)' }]);
-  assert.deepEqual(flowButtons(dirty(), prs(), null, ctx()), [{ cmd: 'flow-commit', label: '/flow-commit' }]);
+  assert.deepEqual(flowButtons(dirty(), prs(), null, ctx()), [{ cmd: 'flow-ship', label: '/flow-ship' }]);
 });
 
 test('flowButtons: /flow-base shows on a stale repo with a clean tree and explains itself', () => {
@@ -47,7 +48,7 @@ test('flowButtons: /flow-base shows on a stale repo with a clean tree and explai
   assert.deepEqual(cmds(flowButtons(local(), prs({ stale }), null, ctx())), ['flow-base']);
 });
 
-test('flowButtons: a stale repo with changed or untracked files offers /flow-base --stash and no /flow-commit', () => {
+test('flowButtons: a stale repo with changed or untracked files offers /flow-base --stash and no /flow-ship', () => {
   const untracked = { ...file, untracked: true, status: '?' };
   for (const l of [dirty(), dirty({ files: [untracked] }), dirty({ ahead: 2 })]) {
     const [b, ...rest] = flowButtons(l, prs({ stale }), null, ctx());
@@ -59,13 +60,13 @@ test('flowButtons: a stale repo with changed or untracked files offers /flow-bas
     assert.match(b.reason, /refuses and changes nothing/);
     assert.match(b.reason, /not yet merged or its remote branch not yet deleted/);
   }
-  // a declared state that hides /flow-commit does not hide the carry-over
+  // a declared state that hides /flow-ship does not hide the carry-over
   assert.deepEqual(cmds(flowButtons(dirty({ files: [untracked] }), prs({ stale }), declared('needs-input'), ctx())), ['flow-base-stash']);
 });
 
-test('flowButtons: a dirty repo that is not stale keeps /flow-commit and never shows the stash button', () => {
-  assert.deepEqual(flowButtons(dirty(), prs(), null, ctx()), [{ cmd: 'flow-commit', label: '/flow-commit' }]);
-  assert.deepEqual(cmds(flowButtons(dirty(), undefined, null, ctx())), ['flow-commit']);
+test('flowButtons: a dirty repo that is not stale keeps /flow-ship and never shows the stash button', () => {
+  assert.deepEqual(flowButtons(dirty(), prs(), null, ctx()), [{ cmd: 'flow-ship', label: '/flow-ship' }]);
+  assert.deepEqual(cmds(flowButtons(dirty(), undefined, null, ctx())), ['flow-ship']);
   assert.deepEqual(cmds(flowButtons(dirty(), prs({ stale: null }), declared('needs-input'), ctx())), []);
 });
 

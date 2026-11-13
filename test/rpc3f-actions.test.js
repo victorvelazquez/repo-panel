@@ -1,4 +1,5 @@
 'use strict';
+// RP176: the /flow-commit button is now /flow-ship everywhere it is offered; each assertion here keeps holding, now for /flow-ship.
 // RPC3f (S3): the actions of the page (merge, re-run, add repos, rooms, the ACTIONS table of click handlers and the usage bar) live in public/actions.js, between board.js and
 // app.js. Like the other page files it shares the global scope and uses S, V, R, $ and draw only when a function is called. What stays in app.js is the boot, which runs at load:
 // the document listeners, the search and group inputs, the setIntervals, loadUsage() and the init function. With this slice app.js is only the boot file.
@@ -55,5 +56,5 @@ test('actions.js loads after the other five as a separate script and touches no 
   assert.equal(vm.runInContext('typeof ACTIONS', ctx), 'object');
   assert.ok(vm.runInContext('Object.keys(ACTIONS).length', ctx) > 10, 'the table of click handlers is there');
   assert.ok(vm.runInContext('Object.values(ACTIONS).every((h) => typeof h === "function")', ctx), 'every entry is a function');
-  assert.equal(vm.runInContext('JUDGED_CMDS.join()', ctx), 'flow-commit,flow-commit-unstage,flow-pr,flow-base,flow-base-stash');
+  assert.equal(vm.runInContext('JUDGED_CMDS.join()', ctx), 'flow-ship,flow-ship-unstage,flow-commit,flow-commit-unstage,flow-pr,flow-base,flow-base-stash');
 });

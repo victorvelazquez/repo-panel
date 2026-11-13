@@ -1,5 +1,6 @@
 'use strict';
-// RP24 (S21): the /flow-commit button cannot be pressed by accident while the agent is still working.
+// RP176: the /flow-commit button is now /flow-ship everywhere it is offered; each assertion here keeps holding, now for /flow-ship.
+// RP24 (S21): the /flow-ship button cannot be pressed by accident while the agent is still working.
 // A: a declared `working` survives repo activity. B: a busy or asking pi session disables the commit pair.
 // B2: files changed a few seconds ago disable it. All through the public pure helpers of view.js.
 const test = require('node:test');
@@ -20,7 +21,7 @@ const cmds = (list) => list.map((b) => b.cmd);
 
 // ---- A: working is not invalidated by activity ----
 
-test('A: a stale working state still blocks /flow-commit and still shows as the current line', () => {
+test('A: a stale working state still blocks /flow-ship and still shows as the current line', () => {
   const st = declared('working', { stale: true });
   assert.equal(commitAllowed(st, { now: NOW }), false);
   assert.deepEqual(flowButtons(dirty(), prs(), st, ctx()), []);
@@ -52,9 +53,9 @@ test('A: a stale ready-to-commit, needs-input, ready-to-pr and blocked are still
 
 test('A: the override lifts a stale working gating and the menu item offers it; the work queue agrees', () => {
   const st = declared('working', { stale: true });
-  assert.deepEqual(commitOverrideItem(st, { now: NOW }), { act: 'show-commit', label: 'Show /flow-commit anyway' });
+  assert.deepEqual(commitOverrideItem(st, { now: NOW }), { act: 'show-commit', label: 'Show /flow-ship anyway' });
   assert.equal(commitOverrideItem(st, { now: NOW, override: true }), null);
-  assert.deepEqual(cmds(flowButtons(dirty(), prs(), st, ctx({ override: true }))), ['flow-commit']);
+  assert.deepEqual(cmds(flowButtons(dirty(), prs(), st, ctx({ override: true }))), ['flow-ship']);
   assert.deepEqual(queueFlags(dirty(), st, null, { now: NOW }), {});
   assert.equal(commitAllowed(declared('working', { stale: false }), { now: NOW }), false);
 });
@@ -63,20 +64,20 @@ test('A: the override lifts a stale working gating and the menu item offers it; 
 
 test('B: a busy session shows the commit button disabled with the reason; asking has its own reason', () => {
   const busy = flowButtons(dirty(), prs(), null, ctx({ session: 'busy' }));
-  assert.deepEqual(busy, [{ cmd: 'flow-commit', label: '/flow-commit', disabled: true, reason: 'the session is still working' }]);
+  assert.deepEqual(busy, [{ cmd: 'flow-ship', label: '/flow-ship', disabled: true, reason: 'the session is still working' }]);
   const asking = flowButtons(dirty(), prs(), null, ctx({ session: 'asking' }));
-  assert.deepEqual(asking, [{ cmd: 'flow-commit', label: '/flow-commit', disabled: true, reason: 'waiting for your answer in the session' }]);
+  assert.deepEqual(asking, [{ cmd: 'flow-ship', label: '/flow-ship', disabled: true, reason: 'waiting for your answer in the session' }]);
 });
 
 test('B: the --unstage variant is disabled the same way, keeping its label', () => {
   const out = flowButtons(dirty({ stagedCount: 2 }), prs(), null, ctx({ session: 'busy' }));
-  assert.deepEqual(out, [{ cmd: 'flow-commit-unstage', label: '/flow-commit --unstage', disabled: true, reason: 'the session is still working' }]);
+  assert.deepEqual(out, [{ cmd: 'flow-ship-unstage', label: '/flow-ship --unstage', disabled: true, reason: 'the session is still working' }]);
 });
 
 test('B: idle, closed, ambiguous, unknown, undefined and null never block (fail open)', () => {
   for (const session of ['idle', 'closed', 'ambiguous', 'unknown', 'checking', undefined, null, 'nonsense']) {
     const out = flowButtons(dirty(), prs(), null, ctx({ session }));
-    assert.deepEqual(out, [{ cmd: 'flow-commit', label: '/flow-commit' }], String(session));
+    assert.deepEqual(out, [{ cmd: 'flow-ship', label: '/flow-ship' }], String(session));
   }
 });
 
@@ -86,8 +87,8 @@ test('B: the button enables itself again when the session is no longer busy', ()
 });
 
 test('B: the override lifts the session gating and the menu offers the override while the session blocks', () => {
-  assert.deepEqual(flowButtons(dirty(), prs(), null, ctx({ session: 'busy', override: true })), [{ cmd: 'flow-commit', label: '/flow-commit' }]);
-  const item = { act: 'show-commit', label: 'Show /flow-commit anyway' };
+  assert.deepEqual(flowButtons(dirty(), prs(), null, ctx({ session: 'busy', override: true })), [{ cmd: 'flow-ship', label: '/flow-ship' }]);
+  const item = { act: 'show-commit', label: 'Show /flow-ship anyway' };
   assert.deepEqual(commitOverrideItem(null, { now: NOW, session: 'busy' }), item);
   assert.deepEqual(commitOverrideItem(null, { now: NOW, session: 'asking' }), item);
   assert.equal(commitOverrideItem(null, { now: NOW, session: 'idle' }), null);
@@ -113,10 +114,10 @@ test('B: a busy session holds EVERY delivery button of a card (RP159: it used to
 });
 
 test('B: a running command of the panel keeps its own reason over the session reason', () => {
-  const out = flowButtons(dirty(), prs(), null, ctx({ session: 'busy', running: { cmd: 'flow-commit', label: 'committing…' } }));
+  const out = flowButtons(dirty(), prs(), null, ctx({ session: 'busy', running: { cmd: 'flow-ship', label: 'committing…' } }));
   assert.equal(out.length, 1);
   assert.equal(out[0].disabled, true);
-  assert.match(out[0].reason, /^Running \/flow-commit/);
+  assert.match(out[0].reason, /^Running \/flow-ship/);
 });
 
 test('B: a state that hides the button still hides it (no disabled button for a not-ready state)', () => {
@@ -127,7 +128,7 @@ test('B: dirtyRepos lists dirty repos with no command in flight, never clean one
   const local = { a: dirty(), b: { ...dirty(), files: [] }, c: dirty(), d: { error: 'x' }, e: undefined };
   const base = { ids: ['a', 'b', 'c', 'd', 'e', 'f'], local, sent: {}, hidden: false };
   assert.deepEqual(dirtyRepos(base), ['a', 'c']);
-  assert.deepEqual(dirtyRepos({ ...base, sent: { c: { cmd: 'flow-commit' } } }), ['a']);
+  assert.deepEqual(dirtyRepos({ ...base, sent: { c: { cmd: 'flow-ship' } } }), ['a']);
   assert.deepEqual(dirtyRepos({ ...base, hidden: true }), []);
   assert.deepEqual(dirtyRepos({ ids: [], local: {}, sent: {}, hidden: false }), []);
   assert.deepEqual(dirtyRepos({ ids: ['a'], local: {}, hidden: false }), []);
@@ -154,12 +155,12 @@ test('B2: a time far in the future (clock skew) does not hold the button forever
 
 test('B2: the quiet period disables the --unstage variant too, the override lifts it, and a busy session reason wins', () => {
   const l = dirty({ stagedCount: 1, lastChangeMs: NOW - 1000 });
-  assert.deepEqual(flowButtons(l, prs(), null, ctx()), [{ cmd: 'flow-commit-unstage', label: '/flow-commit --unstage', disabled: true, reason: 'files changed a few seconds ago' }]);
-  assert.deepEqual(flowButtons(l, prs(), null, ctx({ override: true })), [{ cmd: 'flow-commit-unstage', label: '/flow-commit --unstage', reason: view.flowButtons(dirty({ stagedCount: 1 }), prs(), null, ctx())[0].reason }]);
+  assert.deepEqual(flowButtons(l, prs(), null, ctx()), [{ cmd: 'flow-ship-unstage', label: '/flow-ship --unstage', disabled: true, reason: 'files changed a few seconds ago' }]);
+  assert.deepEqual(flowButtons(l, prs(), null, ctx({ override: true })), [{ cmd: 'flow-ship-unstage', label: '/flow-ship --unstage', reason: view.flowButtons(dirty({ stagedCount: 1 }), prs(), null, ctx())[0].reason }]);
   assert.equal(flowButtons(l, prs(), null, ctx({ session: 'busy' }))[0].reason, 'the session is still working');
 });
 
-test('B2: the quiet period alone does not put the "Show /flow-commit anyway" item in the menu', () => {
+test('B2: the quiet period alone does not put the "Show /flow-ship anyway" item in the menu', () => {
   assert.equal(commitOverrideItem(null, { now: NOW }), null);
 });
 

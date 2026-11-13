@@ -1,4 +1,5 @@
 'use strict';
+// RP176: the buttons and their labels (from the flowButtons tests on) say /flow-ship; the verdict tests above keep judging the old /flow-commit records, which the page can still hold.
 // RP18: the per-command verdict (flowVerdict) and the flow buttons while a command runs or files are staged.
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -149,10 +150,10 @@ const running = (cmd, label) => ({ running: { cmd, label } });
 
 test('flowButtons with ctx.running: the same buttons come back disabled with a reason naming the running command', () => {
   const plain = flowButtons(dirty, none, null, {});
-  const during = flowButtons(dirty, none, null, running('flow-commit', 'committing…'));
+  const during = flowButtons(dirty, none, null, running('flow-ship', 'shipping…'));
   assert.deepEqual(during.map((b) => [b.cmd, b.label]), plain.map((b) => [b.cmd, b.label]));
   assert.equal(during.every((b) => b.disabled === true), true);
-  assert.equal(during[0].reason, 'Running /flow-commit (committing…): wait for it to finish');
+  assert.equal(during[0].reason, 'Running /flow-ship (shipping…): wait for it to finish');
   const pr = flowButtons(local({ ahead: 1 }), none, null, running('flow-pr', 'creating pull request…'));
   assert.deepEqual(pr.map((b) => [b.cmd, b.label, b.disabled]), [['flow-pr', '/flow-pr', true]]);
   assert.match(pr[0].reason, /^Running \/flow-pr \(creating pull request…\)/);
@@ -166,22 +167,22 @@ test('flowButtons: without ctx.running the buttons carry no disabled flag, and a
   for (const b of flowButtons(dirty, none, null, {})) assert.equal('disabled' in b, false);
   assert.deepEqual(flowButtons(local({ ahead: 1 }), none, null, { verdict: 'running' }), []);
   assert.deepEqual(flowButtons(local(), { prs: [], stale: { via: 'merged', pr: 7 } }, null, { verdict: 'running' }), []);
-  assert.deepEqual(flowButtons(dirty, none, null, running('flow-pr', 'x')).map((b) => b.cmd), ['flow-commit']);
+  assert.deepEqual(flowButtons(dirty, none, null, running('flow-pr', 'x')).map((b) => b.cmd), ['flow-ship']);
 });
 
 test('flowButtons: nothing to disable when the card has no button or needs manual action', () => {
   assert.deepEqual(flowButtons(local(), none, null, running('flow-pr', 'creating pull request…')), []);
-  assert.deepEqual(flowButtons(local({ files: [file], inProgress: 'rebase' }), none, null, running('flow-commit', 'committing…')), []);
+  assert.deepEqual(flowButtons(local({ files: [file], inProgress: 'rebase' }), none, null, running('flow-ship', 'committing…')), []);
 });
 
 // ---------- flowButtons: staged files ----------
-test('flowButtons: staged files replace /flow-commit with /flow-commit --unstage, with a reason', () => {
+test('flowButtons: staged files replace /flow-ship with /flow-ship --unstage, with a reason', () => {
   const staged = local({ files: [file], stagedCount: 2, stagedPaths: ['a', 'b'] });
   const b = flowButtons(staged, none, null, {});
-  assert.deepEqual(b.map((x) => [x.cmd, x.label]), [['flow-commit-unstage', '/flow-commit --unstage']]);
+  assert.deepEqual(b.map((x) => [x.cmd, x.label]), [['flow-ship-unstage', '/flow-ship --unstage']]);
   assert.match(b[0].reason, /empty index/);
-  assert.deepEqual(flowButtons(dirty, none, null, {}).map((x) => x.cmd), ['flow-commit']); // nothing staged: as before
-  assert.deepEqual(flowButtons(local({ files: [file], stagedCount: undefined }), none, null, {}).map((x) => x.cmd), ['flow-commit']);
+  assert.deepEqual(flowButtons(dirty, none, null, {}).map((x) => x.cmd), ['flow-ship']); // nothing staged: as before
+  assert.deepEqual(flowButtons(local({ files: [file], stagedCount: undefined }), none, null, {}).map((x) => x.cmd), ['flow-ship']);
 });
 
 test('flowButtons: staged files do not touch clean or ahead repos, a stale repo, a hidden or a manual-action card', () => {
@@ -190,15 +191,15 @@ test('flowButtons: staged files do not touch clean or ahead repos, a stale repo,
   assert.deepEqual(flowButtons(local({ files: [file], stagedCount: 1, inProgress: 'merge' }), none, null, {}), []); // manual action wins
   const needsInput = { available: true, state: 'needs-input', next: 'x', at: new Date().toISOString(), head: 'h1' };
   assert.deepEqual(flowButtons(local({ files: [file], stagedCount: 1 }), none, needsInput, {}), []); // gating still hides it
-  assert.deepEqual(flowButtons(local({ files: [file], stagedCount: 1 }), none, needsInput, { override: true }).map((x) => x.cmd), ['flow-commit-unstage']);
+  assert.deepEqual(flowButtons(local({ files: [file], stagedCount: 1 }), none, needsInput, { override: true }).map((x) => x.cmd), ['flow-ship-unstage']);
 });
 
 test('flowButtons: ctx.retry labels the commit button "Retry …" and nothing else', () => {
-  assert.deepEqual(flowButtons(dirty, none, null, { retry: true }).map((x) => x.label), ['Retry /flow-commit']);
+  assert.deepEqual(flowButtons(dirty, none, null, { retry: true }).map((x) => x.label), ['Retry /flow-ship']);
   const staged = local({ files: [file], stagedCount: 1, stagedPaths: ['a'] });
-  assert.deepEqual(flowButtons(staged, none, null, { retry: true }).map((x) => x.label), ['Retry /flow-commit --unstage']);
+  assert.deepEqual(flowButtons(staged, none, null, { retry: true }).map((x) => x.label), ['Retry /flow-ship --unstage']);
   assert.deepEqual(flowButtons(local({ ahead: 1 }), none, null, { retry: true }).map((x) => x.label), ['/flow-pr']);
-  assert.deepEqual(flowButtons(dirty, none, null, {}).map((x) => x.label), ['/flow-commit']);
+  assert.deepEqual(flowButtons(dirty, none, null, {}).map((x) => x.label), ['/flow-ship']);
 });
 
 test('localPlacement: a card keeps its column while any command verdict runs or needs attention', () => {

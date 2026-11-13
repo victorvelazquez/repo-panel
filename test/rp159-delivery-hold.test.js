@@ -1,8 +1,9 @@
 'use strict';
-// RP159 (S26, S50): the delivery buttons (/flow-commit, /flow-pr, /flow-base, /flow-next, and Fix CI of a PR card) stay disabled for as long as the session of the repo is working or asking, whatever else the page believes.
+// RP176: the /flow-commit button is now /flow-ship everywhere it is offered; each assertion here keeps holding, now for /flow-ship.
+// RP159 (S26, S50): the delivery buttons (/flow-ship, /flow-pr, /flow-base, /flow-next, and Fix CI of a PR card) stay disabled for as long as the session of the repo is working or asking, whatever else the page believes.
 // The bug the person reported: after pressing /flow-base or /flow-next the card went to «working» and the button came back. The cause is that the buttons of the Summary card for /flow-base and /flow-next were held ONLY while the
 // order was on its way (S.sending); the server decides that action from Git alone (a clean repo on main with a next unit always offers /flow-next), so as soon as the answer «sent» arrived the button was enabled again with the
-// session still working. And /flow-pr and /flow-base of the board never looked at the session, only /flow-commit did. The rule now is ONE: V.deliveryHold({ sending, running, session }) gives the reason a delivery button is held (or
+// session still working. And /flow-pr and /flow-base of the board never looked at the session, only /flow-ship did. The rule now is ONE: V.deliveryHold({ sending, running, session }) gives the reason a delivery button is held (or
 // '') and every one of those buttons asks it. The live state of the session (the one pushed by the stream) counts even while a command of this page is being judged. Merge is NOT held by the session: it does not talk to it.
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -40,7 +41,7 @@ const FILES = [{ path: 'a.js', status: 'M', added: 1, deleted: 0 }];
 const open = (o = {}) => ({ prs: [], stale: null, ...o });
 const one = (arr) => { assert.equal(arr.length, 1, JSON.stringify(arr)); return arr[0]; };
 
-test('b1: /flow-pr and /flow-base follow the session like /flow-commit: disabled with the reason of the session while it is busy or asking, enabled when it is idle, closed or unknown', () => {
+test('b1: /flow-pr and /flow-base follow the session like /flow-ship: disabled with the reason of the session while it is busy or asking, enabled when it is idle, closed or unknown', () => {
   for (const session of ['busy', 'asking']) {
     const pr = one(V.flowButtons(local(), open(), {}, { session }));
     assert.equal(pr.cmd, 'flow-pr');
@@ -59,13 +60,13 @@ test('b1: /flow-pr and /flow-base follow the session like /flow-commit: disabled
   }
 });
 
-test('b2: /flow-commit keeps its rule (held while busy or asking, and the override of the person lifts it) and the override does NOT lift the hold of the other buttons', () => {
+test('b2: /flow-ship keeps its rule (held while busy or asking, and the override of the person lifts it) and the override does NOT lift the hold of the other buttons', () => {
   const dirty = local({ files: FILES, lastChangeMs: 0 });
   const held = one(V.flowButtons(dirty, open(), { declared: 'ready-to-commit' }, { session: 'busy' }));
-  assert.equal(held.cmd, 'flow-commit');
+  assert.equal(held.cmd, 'flow-ship');
   assert.equal(held.disabled, true);
   assert.equal(one(V.flowButtons(dirty, open(), {}, { session: 'idle', override: true })).disabled, undefined);
-  assert.equal(one(V.flowButtons(local(), open(), {}, { session: 'busy', override: true })).disabled, true, 'the override is for /flow-commit only');
+  assert.equal(one(V.flowButtons(local(), open(), {}, { session: 'busy', override: true })).disabled, true, 'the override is for /flow-ship only');
 });
 
 test('b3: with a command running the buttons are all held with ITS reason (as before), and the live session does not change that', () => {
@@ -190,13 +191,13 @@ test('p4: the row of the server that says working holds it as well, and the answ
   assert.match(page.html(), /data-act="focus-repo"/);
 });
 
-test('s4: the deliver button (/flow-commit, /flow-pr) of the card is held by the hold of the page too, with its reason as the title, even when the flow button itself is enabled', () => {
+test('s4: the deliver button (/flow-ship, /flow-pr) of the card is held by the hold of the page too, with its reason as the title, even when the flow button itself is enabled', () => {
   const r = row('a', { state: 'free' }, { kind: 'deliver', label: 'Deliver', pr: null });
-  const flowFor = () => ({ cmd: 'flow-commit', label: '/flow-commit' });
-  const held = btn(card(r, { flowFor, holdFor: () => 'The session is working: wait for it to finish' }), 'flow-commit');
+  const flowFor = () => ({ cmd: 'flow-ship', label: '/flow-ship' });
+  const held = btn(card(r, { flowFor, holdFor: () => 'The session is working: wait for it to finish' }), 'flow-ship');
   assert.match(held, / disabled/);
   assert.match(held, /title="The session is working: wait for it to finish"/);
-  assert.doesNotMatch(btn(card(r, { flowFor, holdFor: () => '' }), 'flow-commit'), / disabled/);
+  assert.doesNotMatch(btn(card(r, { flowFor, holdFor: () => '' }), 'flow-ship'), / disabled/);
   assert.match(btn(card(r, { flowFor: () => ({ cmd: 'flow-pr', label: '/flow-pr', disabled: true, reason: 'x' }), holdFor: () => '' }), 'flow-pr'), / disabled/, 'a button the flow already disables stays disabled');
 });
 

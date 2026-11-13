@@ -1,8 +1,9 @@
 'use strict';
-// RP163 (S53): the page uses the count of background jobs that the server leaves in the row of the Summary (RP161, `session.jobs`). The delivery buttons (/flow-commit, /flow-pr, /flow-base, /flow-next, Fix CI) stay held while a
+// RP176: the /flow-commit button is now /flow-ship everywhere it is offered; each assertion here keeps holding, now for /flow-ship.
+// RP163 (S53): the page uses the count of background jobs that the server leaves in the row of the Summary (RP161, `session.jobs`). The delivery buttons (/flow-ship, /flow-pr, /flow-base, /flow-next, Fix CI) stay held while a
 // session waits for background jobs, with the reason «N background jobs are running» (1: «1 background job is running»), whatever the live state of the session is (it is free between the turn that launched the job and the notice
-// that it ended). The rule is the one of RP159 (V.deliveryHold): the number is one more cause, after the order on its way, a command running and the session asking or working. «Show /flow-commit anyway» lifts the hold of
-// /flow-commit only, as it does for a busy session. Only a positive safe integer holds; a closed session (the live state of the page says so) holds nothing even if the row, up to 20 s old, still carries the number. The page
+// that it ended). The rule is the one of RP159 (V.deliveryHold): the number is one more cause, after the order on its way, a command running and the session asking or working. «Show /flow-ship anyway» lifts the hold of
+// /flow-ship only, as it does for a busy session. Only a positive safe integer holds; a closed session (the live state of the page says so) holds nothing even if the row, up to 20 s old, still carries the number. The page
 // releases by itself when the next row comes without the number. Merge is not held (it does not talk to the session).
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -38,10 +39,10 @@ const FILES = [{ path: 'a.js', status: 'M', added: 1, deleted: 0 }];
 const open = (o = {}) => ({ prs: [], stale: null, ...o });
 const one = (arr) => { assert.equal(arr.length, 1, JSON.stringify(arr)); return arr[0]; };
 
-test('b1: with jobs pending and the session free: /flow-commit, /flow-pr, /flow-base and /flow-base --stash are disabled with the jobs reason; with none they are enabled', () => {
+test('b1: with jobs pending and the session free: /flow-ship, /flow-pr, /flow-base and /flow-base --stash are disabled with the jobs reason; with none they are enabled', () => {
   const reason = '2 background jobs are running';
   const commit = one(V.flowButtons(local({ files: FILES }), open(), {}, { session: 'idle', jobs: 2 }));
-  assert.equal(commit.cmd, 'flow-commit');
+  assert.equal(commit.cmd, 'flow-ship');
   assert.equal(commit.disabled, true);
   assert.equal(commit.reason, reason);
   const pr = one(V.flowButtons(local(), open(), {}, { session: 'idle', jobs: 2 }));
@@ -61,10 +62,10 @@ test('b1: with jobs pending and the session free: /flow-commit, /flow-pr, /flow-
   }
 });
 
-test('b2: «Show /flow-commit anyway» lifts the hold of /flow-commit only: /flow-pr and /flow-base stay held; and the menu item shows up while the jobs hold it', () => {
+test('b2: «Show /flow-ship anyway» lifts the hold of /flow-ship only: /flow-pr and /flow-base stay held; and the menu item shows up while the jobs hold it', () => {
   assert.equal(one(V.flowButtons(local({ files: FILES }), open(), {}, { session: 'idle', jobs: 2, override: true })).disabled, undefined);
   assert.equal(one(V.flowButtons(local(), open(), {}, { session: 'idle', jobs: 2, override: true })).disabled, true, '/flow-pr is not lifted');
-  assert.deepEqual(V.commitOverrideItem({}, { session: 'idle', jobs: 2 }), { act: 'show-commit', label: 'Show /flow-commit anyway' });
+  assert.deepEqual(V.commitOverrideItem({}, { session: 'idle', jobs: 2 }), { act: 'show-commit', label: 'Show /flow-ship anyway' });
   assert.equal(V.commitOverrideItem({}, { session: 'idle', jobs: 0 }), null);
   assert.equal(V.commitOverrideItem({}, { session: 'idle' }), null);
   assert.equal(V.commitOverrideItem({}, { session: 'idle', jobs: 2, override: true }), null, 'already lifted');
@@ -178,17 +179,17 @@ test('p3: ABUSE: a row with a number that is not a positive integer holds nothin
   for (const session of [null, undefined, 5, 'x', [], {}]) await assert.doesNotReject(async () => { await page.summary(START, session); }, String(session));
 });
 
-test('p4: the Work tab (the board): a repo with changes shows /flow-commit disabled with the jobs reason while the session is free; «Show /flow-commit anyway» lifts it; with no jobs it is enabled', async () => {
+test('p4: the Work tab (the board): a repo with changes shows /flow-ship disabled with the jobs reason while the session is free; «Show /flow-ship anyway» lifts it; with no jobs it is enabled', async () => {
   const page = await boot();
   page.run(`S.rpc['${ID}'] = { state: 'idle' }; S.state['${ID}'] = {}; S.prs['${ID}'] = { prs: [], stale: null }; S.local['${ID}'] = { branch: 'feat/x', base: 'main', files: [{ path: 'a.js', status: 'M', added: 1, deleted: 0 }], ahead: 0, behind: 0, head: 'a', noUpstream: false, stagedCount: 0, lastChangeMs: 0, error: null }`);
-  const commit = () => btn(page.app(), 'flow-commit');
+  const commit = () => btn(page.app(), 'flow-ship');
   await page.summary(START, { state: 'free', jobs: 2 });
   assert.match(commit(), / disabled/);
   assert.match(commit(), /title="2 background jobs are running"/);
   assert.doesNotMatch(page.app(), /data-act="show-commit"/, 'the menu draws its items only while it is open');
   page.run(`S.menu = '${ID}|repo'`);
   await page.redraw();
-  assert.match(page.app(), /<button role="menuitem" data-act="show-commit" data-id="abcdef0123">Show \/flow-commit anyway<\/button>/, 'the menu offers the way out');
+  assert.match(page.app(), /<button role="menuitem" data-act="show-commit" data-id="abcdef0123">Show \/flow-ship anyway<\/button>/, 'the menu offers the way out');
   page.run('S.menu = null');
   await page.redraw();
   page.run(`S.showCommit.add('${ID}')`);

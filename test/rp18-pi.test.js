@@ -157,7 +157,8 @@ test('GET /api/pi-status: the token and the 404 still apply, tail is ignored and
 });
 
 // ---------- the orders keep the index empty ----------
-const RULE = 'Never use git mv or git add; keep the git index empty (/flow-commit refuses to start with staged files).';
+// RP176: the index rule of the orders names /flow-ship.
+const RULE = 'Never use git mv or git add; keep the git index empty (/flow-ship refuses to start with staged files).';
 
 test('orders: fix-pr and put-in-conditions both ask for an empty index, stay one line and do not start with /', () => {
   const fix = fixPrOrder(failing);

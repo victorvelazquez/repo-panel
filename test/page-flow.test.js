@@ -1,4 +1,5 @@
 'use strict';
+// RP176: the /flow-commit button is now /flow-ship everywhere it is offered; each assertion here keeps holding, now for /flow-ship.
 // Renders the real public/app.js in a vm with a stubbed DOM, to check the markup of the flow buttons and the
 // request the pi buttons send. Nothing here touches the network or a browser.
 const test = require('node:test');
@@ -56,9 +57,9 @@ const prOf = (checks, o = {}) => ({ number: 7, title: 'T', url: 'https://github.
 
 const button = (cmd, label, title = `Send /${cmd} to the open session of this repo`) => `<button data-act="pi" data-id="abc" data-cmd="${cmd}" title="${title}">${label}</button>`;
 
-test('page: the /flow-commit button on a Changes card keeps its markup', () => {
+test('page: the /flow-ship button on a Changes card keeps its markup', () => {
   const html = card(loadPage(), local({ files: [file] }), {});
-  assert.ok(html.includes(`<div class="actions">${button('flow-commit', '/flow-commit')}</div>`), html);
+  assert.ok(html.includes(`<div class="actions">${button('flow-ship', '/flow-ship')}</div>`), html);
   assert.equal(html.includes('flow-pr'), false);
 });
 
@@ -79,17 +80,17 @@ test('page: a stale clean card offers /flow-base with a tooltip, and the red chi
   assert.equal(/class="chip red" title="[^"]*--stash/.test(html), false);
 });
 
-test('page: a stale card with changes offers /flow-base --stash with a tooltip and no /flow-commit', () => {
+test('page: a stale card with changes offers /flow-base --stash with a tooltip and no /flow-ship', () => {
   const html = card(loadPage(), local({ files: [file] }), { stale: { via: 'merged', pr: 7, reason: 'Merged: run /flow-base' } });
   const m = /<button data-act="pi" data-id="abc" data-cmd="flow-base-stash" title="([^"]+)">\/flow-base --stash<\/button>/.exec(html);
   assert.ok(m, html);
   assert.match(m[1], /refuses and changes nothing/);
-  assert.equal(html.includes('data-cmd="flow-commit"'), false);
+  assert.equal(html.includes('data-cmd="flow-ship"'), false);
   assert.equal(html.includes('data-cmd="flow-base"'), false);
   assert.match(html, /<span class="chip red" title="[^"]*Press the \/flow-base --stash button[^"]*uncommitted changes[^"]*">/);
 });
 
-test('page: the "Show /flow-commit anyway" menu item is offered on a dirty card, but not on a stale dirty one', () => {
+test('page: the "Show /flow-ship anyway" menu item is offered on a dirty card, but not on a stale dirty one', () => {
   const page = loadPage();
   const open = (l, p) => { page.get('S').menu = 'abc|repo'; return card(page, l, p); };
   page.get('S').state[R.id] = { available: true, state: 'needs-input', next: 'x', at: new Date().toISOString(), head: 'h1' };
@@ -116,10 +117,10 @@ test('page: the pi buttons post the command, and only the fix-pr one carries its
   page.answers['/api/local?id=abc'] = local({ files: [file] });
   const ACTIONS = page.get('ACTIONS');
   const el = (dataset) => ({ dataset, disabled: false });
-  await ACTIONS.pi(el({ id: 'abc', cmd: 'flow-commit' }));
+  await ACTIONS.pi(el({ id: 'abc', cmd: 'flow-ship' }));
   await ACTIONS.pi(el({ id: 'abc', cmd: 'fix-pr', pr: '7' }));
   const posts = page.calls.filter((c) => c.url === '/api/pi').map((c) => c.body);
-  assert.deepEqual(posts, [{ id: 'abc', command: 'flow-commit' }, { id: 'abc', command: 'fix-pr', pr: 7 }]);
+  assert.deepEqual(posts, [{ id: 'abc', command: 'flow-ship' }, { id: 'abc', command: 'fix-pr', pr: 7 }]);
 });
 
 test('page: the stash button posts only its key, after reading the baseline of its verdict', async () => {

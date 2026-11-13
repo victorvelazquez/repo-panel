@@ -29,8 +29,8 @@ function sendGuard(now = Date.now) {
   };
 }
 
-// Appended to the orders that make a session edit files: /flow-commit refuses to start when the index is not empty.
-const INDEX_RULE = 'Never use git mv or git add; keep the git index empty (/flow-commit refuses to start with staged files).';
+// Appended to the orders that make a session edit files: /flow-ship and /flow-commit refuse to start when the index is not empty.
+const INDEX_RULE = 'Never use git mv or git add; keep the git index empty (/flow-ship refuses to start with staged files).';
 
 // The one-line order that sends the agent to requirements/INSTALL.md. Built here from the requirement results
 // (non-pass ids, required first); the browser never supplies text or ids.
@@ -57,7 +57,7 @@ function fixPrOrder(pr) {
   const more = names.length - MAX_CHECK_NAMES;
   const list = names.slice(0, MAX_CHECK_NAMES).join(', ') + (more > 0 ? ` and ${more} more` : '') || 'unnamed checks';
   const n = Number(pr.number);
-  return `Pull request #${n} "${clean(pr.title, 120)}" of this repo has failing checks (${list}). Find out why with gh (gh pr checks ${n}, gh run view --log-failed) and be on its branch "${clean(pr.head, 120)}" (switch only if the tree is clean; if not, stop and ask). Fix whatever is needed, in production code, test code or configuration, as long as it serves the original objective of this pull request (its title, description and commits). If the failure is unrelated to that objective or looks transient (infrastructure, a flaky run, a runner problem), do not edit any code: say so and recommend the "Re-run failed" button. If the right fix would change the scope of the pull request or needs a product decision, stop and ask. Run this repo's tests; do not commit, push or open pull requests: the user will run /flow-commit and /flow-pr. ${INDEX_RULE} Finish with one line: what you fixed and the next step.`;
+  return `Pull request #${n} "${clean(pr.title, 120)}" of this repo has failing checks (${list}). Find out why with gh (gh pr checks ${n}, gh run view --log-failed) and be on its branch "${clean(pr.head, 120)}" (switch only if the tree is clean; if not, stop and ask). Fix whatever is needed, in production code, test code or configuration, as long as it serves the original objective of this pull request (its title, description and commits). If the failure is unrelated to that objective or looks transient (infrastructure, a flaky run, a runner problem), do not edit any code: say so and recommend the "Re-run failed" button. If the right fix would change the scope of the pull request or needs a product decision, stop and ask. Run this repo's tests; do not commit, push or open pull requests: the user will run /flow-ship. ${INDEX_RULE} Finish with one line: what you fixed and the next step.`;
 }
 
 // Looks the PR up in the repo's open PRs and refuses unless it exists and its checks failed.
@@ -87,7 +87,7 @@ const REFUSALS = { closed: 'The session is not started', starting: 'The session 
 // `extra` is { pr, prs, guard }: the PR number of fix-pr, the provider of the repo's open PRs (injectable for tests) and the duplicate-send
 // guard of sendGuard (the HTTP server always passes one; without it nothing is refused as a repeat). `host` is the rpc host (status, prompt).
 async function piSend(repo, key, host, requirements = requirementsFor, { pr, prs = prState, guard = null } = {}) {
-  if (key !== PUT_IN_CONDITIONS && key !== FIX_PR && !Object.hasOwn(lib.PI_COMMANDS, key)) throw new HttpError(400, 'Unknown command');
+  if (typeof key !== 'string' || (key !== PUT_IN_CONDITIONS && key !== FIX_PR && !Object.hasOwn(lib.PI_COMMANDS, key))) throw new HttpError(400, 'Unknown command');
   if (key === FIX_PR && !(Number.isInteger(pr) && pr > 0)) throw new HttpError(400, 'fix-pr needs the pr number of an open pull request (a positive integer)');
   const text = await orderText(repo, key, requirements, { pr, prs });
   const { state } = await host.status(repo.id);

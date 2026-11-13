@@ -1,4 +1,5 @@
 'use strict';
+// RP176: the /flow-commit button is now /flow-ship everywhere it is offered; each assertion here keeps holding, now for /flow-ship.
 // RP67 (S59): soft action palette by effect, calm chrome, and the "Fix with pi" -> "Fix CI" rename.
 const test = require('node:test');
 const { appSource, APP_FILES } = require('./pagesrc.js');
@@ -55,7 +56,7 @@ test('css: the soft and urgent numbers are the approved mockup ones', () => {
 test('css: one hue per effect, through the --h variable', () => {
   const want = {
     '[data-cmd="flow-next"]': 'blue', 'header .primary': 'blue',
-    '[data-cmd="flow-commit"]': 'yellow', '[data-cmd="flow-commit-unstage"]': 'yellow', '[data-kind="answer"]': 'yellow', '[data-kind="waiting"]': 'yellow',
+    '[data-cmd="flow-ship"]': 'yellow', '[data-cmd="flow-ship-unstage"]': 'yellow', '[data-kind="answer"]': 'yellow', '[data-kind="waiting"]': 'yellow',
     '[data-cmd="flow-pr"]': 'green', '.merge': 'green',
     '[data-cmd="flow-base"]': 'purple', '[data-cmd="flow-base-stash"]': 'purple',
     '[data-cmd="fix-pr"]': 'orange',

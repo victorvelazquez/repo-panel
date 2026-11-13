@@ -1,4 +1,5 @@
 'use strict';
+// RP176: the /flow-commit button is now /flow-ship everywhere it is offered; each assertion here keeps holding, now for /flow-ship.
 // RPC2-2 (S1, S6, S8), the page: the /flow-* buttons, put-in-conditions and fix-pr start the session first when it is closed and then post /api/pi,
 // the buttons follow S.rpc (idle free, busy working, asking waiting, closed enabled), and the verdict runs from the `rpc` state events with no poll.
 // The real public/app.js in a vm (fake fetch, a fake event stream, no timers, no network, no pi).
@@ -127,7 +128,7 @@ test('g2: the commit button is enabled with an idle or a closed session and disa
   for (const [state, disabled] of [['idle', false], ['closed', false], ['busy', true], ['starting', true], ['asking', true]]) {
     setRpc(page, state);
     const [b] = buttons(page);
-    assert.equal(b.cmd, 'flow-commit', state);
+    assert.equal(b.cmd, 'flow-ship', state);
     assert.equal(!!b.disabled, disabled, state);
     if (disabled) assert.match(b.reason, /session|answer/, state);
   }
@@ -142,10 +143,10 @@ test('g3: with S.rpc unknown sessionOf is undefined: nothing else supplies a ses
 test('g5: a click with the session closed starts it FIRST, then posts /api/pi with the same body as before', async () => {
   const { page, S } = await pagePlus({}, 'closed');
   const before = page.fetches.length;
-  await click(page, 'flow-commit');
-  assert.deepEqual(posts(page, before), [['/api/rpc/start', { id: ID }], ['/api/pi', { id: ID, command: 'flow-commit' }]]);
+  await click(page, 'flow-ship');
+  assert.deepEqual(posts(page, before), [['/api/rpc/start', { id: ID }], ['/api/pi', { id: ID, command: 'flow-ship' }]]);
   assert.equal(S.rpc[ID].state, 'idle');
-  assert.equal(S.sent[ID].cmd, 'flow-commit');
+  assert.equal(S.sent[ID].cmd, 'flow-ship');
 });
 
 test('g6: a click with an idle session posts /api/pi and never starts anything', async () => {
@@ -171,7 +172,7 @@ test('g7: fix-pr and put-in-conditions go through the same start-first flow, and
 test('g8: when the session cannot start nothing is sent, the server message is shown and the card is not marked as sent', async () => {
   const { page, S } = await pagePlus({ '/api/rpc/start': () => fail(502, { error: 'The session could not be started' }) }, 'closed');
   const before = page.fetches.length;
-  await click(page, 'flow-commit');
+  await click(page, 'flow-ship');
   assert.deepEqual(posts(page, before), [['/api/rpc/start', { id: ID }]]);
   assert.ok(toasts(page).includes('The session could not be started'), toasts(page).join('|'));
   assert.equal(S.sent[ID], undefined);
@@ -183,8 +184,8 @@ test('g8: when the session cannot start nothing is sent, the server message is s
 
 test('g9: the verdict follows the rpc state events with no poll: busy is running, idle after busy is judged', async () => {
   const { page, S, stream } = await pagePlus({}, 'idle');
-  await click(page, 'flow-commit');
-  assert.equal(S.sent[ID].cmd, 'flow-commit');
+  await click(page, 'flow-ship');
+  assert.equal(S.sent[ID].cmd, 'flow-ship');
   await page.tick();
   const polls = () => urls(page, '/api/pi-status').length;
   const base = polls();
@@ -200,7 +201,7 @@ test('g9: the verdict follows the rpc state events with no poll: busy is running
 
 test('g10: an asking state event shows the waiting verdict and an exit event reads as closed, still with no poll', async () => {
   const { page, S, stream } = await pagePlus({}, 'idle');
-  await click(page, 'flow-commit');
+  await click(page, 'flow-ship');
   await page.tick();
   const base = urls(page, '/api/pi-status').length;
   await feed(page, stream, { kind: 'state', state: 'busy' }, { kind: 'state', state: 'asking' });

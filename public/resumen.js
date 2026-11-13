@@ -906,7 +906,7 @@
 
   // The "/ Actions" menu: always the four flow commands in a fixed order, each available or not with the reason. A deliver or
   // branch flow button (unstage, stash, disabled with a reason) takes the slot of its command. ctx = { live, changes, flow }.
-  const SLOTS = [['flow-next', '/flow-next'], ['flow-commit', '/flow-commit'], ['flow-pr', '/flow-pr'], ['flow-base', '/flow-base']];
+  const SLOTS = [['flow-next', '/flow-next'], ['flow-ship', '/flow-ship'], ['flow-pr', '/flow-pr'], ['flow-base', '/flow-base']];
   function actionMenu(row, ctx = {}) {
     const items = SLOTS.map(([cmd, label]) => ({ cmd, label, available: false, why: '' }));
     const live = ctx.live || 'unknown';
@@ -926,7 +926,7 @@
     const f = ctx.flow;
     if (kind === 'branch' && !f) Object.assign(items[3], { available: true, why: 'Start a new cycle' });
     else if ((kind === 'deliver' || kind === 'branch') && f) {
-      const slot = f.cmd.startsWith('flow-commit') ? 1 : f.cmd.startsWith('flow-pr') ? 2 : f.cmd.startsWith('flow-base') ? 3 : -1;
+      const slot = f.cmd.startsWith('flow-ship') ? 1 : f.cmd.startsWith('flow-pr') ? 2 : f.cmd.startsWith('flow-base') ? 3 : -1;
       if (slot >= 0) items[slot] = { cmd: f.cmd, label: f.label, available: !f.disabled, why: f.disabled ? f.reason || 'Not available right now' : '' };
     }
     return { items };

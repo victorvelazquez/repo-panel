@@ -82,7 +82,7 @@ const LABELS = {
   branch: () => 'Start from a fresh base branch (/flow-base)',
   manual: (a) => a.reason,
   waiting: (a) => (a.next ? `Waiting: ${a.next}` : `Waiting: ${a.state}`),
-  deliver: () => 'Deliver the changes (/flow-commit, /flow-pr)',
+  deliver: () => 'Deliver the changes (/flow-ship, /flow-pr)',
   start: (a) => `Start ${a.unit.id}${a.unit.entrega ? `: ${a.unit.entrega}` : ''}`,
 };
 

@@ -20,7 +20,7 @@ function releasePress() {
 }
 
 const COLUMNS = [
-  { key: 'attention', title: 'Needs attention', hint: 'A manual action or a failed /flow-commit: a person has to step in' },
+  { key: 'attention', title: 'Needs attention', hint: 'A manual action or a failed /flow-ship: a person has to step in' },
   { key: 'clean', title: 'Clean', hint: 'Nothing to do' },
   { key: 'changes', title: 'Changes', hint: 'Uncommitted files' },
   { key: 'committed', title: 'Committed', hint: 'Commits not pushed yet' },
@@ -86,7 +86,7 @@ function buildCards() {
   for (const r of visibleRepos()) {
     if (!S.local[r.id] || !S.prs[r.id]) continue; // first load still running
     const { l, p, prs } = info(r);
-    // A stale branch, something that needs manual action and a failed /flow-commit all need a person.
+    // A stale branch, something that needs manual action and a failed /flow-ship all need a person.
     const verdict = verdictOf(r);
     const place = placement(l, p, prs.length, verdict);
     if (place.column) add(place.column, place.row ? cleanRow(r) : l.error ? repoCard(r, true) : repoCard(r, place.attn, verdict), place.attn);
@@ -298,23 +298,25 @@ function verdictRow(r, verdict) {
   return `<div class="attn-bar"><span>⚠ Needs attention: ${esc(verdict.reason)}</span><button data-act="dismiss-sent" data-id="${r.id}" title="Dismiss">✕</button></div>`;
 }
 
-// Staged files block /flow-commit (it needs an empty index): say so next to the /flow-commit --unstage button.
+// Staged files block /flow-ship (it needs an empty index): say so next to the /flow-ship --unstage button.
 function stagedBar(l) {
   const n = l.stagedCount;
-  return `<div class="staged-bar" title="${esc((l.stagedPaths || []).join('\n'))}">⚠ ${n} file${n === 1 ? ' is' : 's are'} staged: /flow-commit needs an empty index. The button clears the index (git reset, your changes stay in the working tree) and then continues with the normal commit in the same run.</div>`;
+  return `<div class="staged-bar" title="${esc((l.stagedPaths || []).join('\n'))}">⚠ ${n} file${n === 1 ? ' is' : 's are'} staged: /flow-ship needs an empty index. The button clears the index (git reset, your changes stay in the working tree) and then continues with the normal commit in the same run.</div>`;
 }
 
-const COMMIT_CMDS = ['flow-commit', 'flow-commit-unstage'];
+const COMMIT_CMDS = ['flow-ship', 'flow-ship-unstage', 'flow-commit', 'flow-commit-unstage'];
 
-// The flow buttons of a repo come from view.js; without it only /flow-commit is offered, as before. Only a /flow-commit
+// The flow buttons of a repo come from view.js; without it only /flow-ship is offered. Only a /flow-ship
 // verdict hides the delivery buttons; any running command disables the buttons it leaves. The board card and the Summary
 // row both read them here.
 function flowFor(r, l, p, verdict) {
   const override = S.showCommit.has(r.id);
   const commitVerdict = verdict && COMMIT_CMDS.includes(verdict.cmd) ? verdict.state : null;
+  // RP176: a /flow-ship that stopped after its commit leaves a clean tree with commits ahead: the /flow-pr button must still show, so the attention verdict does not hide the delivery buttons.
+  const hides = commitVerdict === 'attention' && verdict.cmd.startsWith('flow-ship') ? null : commitVerdict;
   const running = verdict && verdict.state === 'running' ? { cmd: verdict.cmd, label: verdict.label } : null;
   const retry = commitVerdict === 'attention';
-  return V ? V.flowButtons(l, p, S.state[r.id], { override, verdict: commitVerdict, running, retry, session: sessionOf(r.id), jobs: jobsOfRepo(r.id) }) : (l.files || []).length > 0 ? [{ cmd: 'flow-commit', label: '/flow-commit' }] : [];
+  return V ? V.flowButtons(l, p, S.state[r.id], { override, verdict: hides, running, retry, session: sessionOf(r.id), jobs: jobsOfRepo(r.id) }) : (l.files || []).length > 0 ? [{ cmd: 'flow-ship', label: '/flow-ship' }] : [];
 }
 
 function repoCard(r, attn = false, verdict = null) {
@@ -335,7 +337,7 @@ function repoCard(r, attn = false, verdict = null) {
     before: [
       manual ? `<div class="manual-bar">⚠ Needs manual action: ${esc(manual)}</div>` : '',
       verdictRow(r, verdict),
-      flow.some((b) => b.cmd === 'flow-commit-unstage') ? stagedBar(l) : '',
+      flow.some((b) => b.cmd === 'flow-ship-unstage') ? stagedBar(l) : '',
       reqWarn(r),
     ],
     branch: { text: branchLabel(l), title: l.branch || '' },

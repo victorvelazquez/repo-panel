@@ -129,14 +129,15 @@ test('stateLine: an expired working state is only a gray marker, never shown as 
 });
 
 test('commitOverrideItem: offered only while a declared state hides the button and the override is off', () => {
-  assert.deepEqual(commitOverrideItem(st('needs-input'), { now: NOW }), { act: 'show-commit', label: 'Show /flow-commit anyway' });
+  // RP176: the override item now says /flow-ship.
+  assert.deepEqual(commitOverrideItem(st('needs-input'), { now: NOW }), { act: 'show-commit', label: 'Show /flow-ship anyway' });
   assert.equal(commitOverrideItem(st('needs-input'), { now: NOW, override: true }), null);
   assert.equal(commitOverrideItem(st('ready-to-commit'), { now: NOW }), null);
   assert.equal(commitOverrideItem(undefined, { now: NOW }), null);
   assert.equal(commitOverrideItem(st('working', { at: ago(31 * MIN) }), { now: NOW }), null);
-  // a stale repo offers /flow-base --stash instead of /flow-commit: the item would do nothing
+  // a stale repo offers /flow-base --stash instead of /flow-ship: the item would do nothing
   assert.equal(commitOverrideItem(st('needs-input'), { now: NOW, stale: true }), null);
-  assert.deepEqual(commitOverrideItem(st('needs-input'), { now: NOW, stale: false }), { act: 'show-commit', label: 'Show /flow-commit anyway' });
+  assert.deepEqual(commitOverrideItem(st('needs-input'), { now: NOW, stale: false }), { act: 'show-commit', label: 'Show /flow-ship anyway' });
 });
 
 // ---------- commitVerdict ----------

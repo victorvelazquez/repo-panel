@@ -1,4 +1,5 @@
 'use strict';
+// RP176: the /flow-commit button is now /flow-ship everywhere it is offered; each assertion here keeps holding, now for /flow-ship.
 // RP33: the "Put in conditions" button (its own click handler) behaves like the /flow-* buttons since RP32: from the
 // click until the server answers the repo is marked as sending, a second click is ignored, and nothing is left behind.
 const test = require('node:test');
@@ -91,7 +92,7 @@ test('the click marks the repo as sending before any await, and it survives redr
   assert.equal(S.sending[R.id], CMD, 'set before any await');
   for (let i = 0; i < 4; i++) {
     const html = rendered(page);
-    assert.match(btn(html, R.id, 'flow-commit'), /disabled>/, `redraw ${i}: the flow buttons of the repo are disabled`);
+    assert.match(btn(html, R.id, 'flow-ship'), /disabled>/, `redraw ${i}: the flow buttons of the repo are disabled`);
     assert.match(html, /class="verdict-line"[^>]*title="Sending the order to the session"/);
     assert.match(html, /putting repo in conditions<span class="ell"/);
     await flush();
@@ -119,11 +120,11 @@ test('a click while another command of the repo is being sent is ignored', async
   const { order, routes } = sendRoutes(t);
   const page = await loadPage(routes);
   const S = setup(page);
-  const flow = page.get('ACTIONS').pi({ dataset: { id: R.id, cmd: 'flow-commit' }, disabled: false });
+  const flow = page.get('ACTIONS').pi({ dataset: { id: R.id, cmd: 'flow-ship' }, disabled: false });
   const other = page.get('ACTIONS')[CMD](el(R.id));
   await flush();
   assert.equal(page.posts().length, 1, 'only the order that was already on its way');
-  assert.equal(S.sending[R.id], 'flow-commit');
+  assert.equal(S.sending[R.id], 'flow-ship');
   order.resolve({ json: { sent: true, confirmed: true } });
   await Promise.all([flow, other]);
 });
@@ -139,7 +140,7 @@ test('on success the real verdict takes over and the sending flag is cleared', a
   assert.equal(S.sending[R.id], undefined);
   assert.equal(S.sent[R.id].cmd, CMD, 'startSent recorded the command');
   const html = rendered(page);
-  assert.match(btn(html, R.id, 'flow-commit'), /disabled>/, 'still disabled by the real running verdict');
+  assert.match(btn(html, R.id, 'flow-ship'), /disabled>/, 'still disabled by the real running verdict');
   assert.match(html, /putting repo in conditions<span class="ell"/);
 });
 
@@ -149,7 +150,7 @@ test('a rejected send clears the flag and allows a new click', async () => {
   await page.get('ACTIONS')[CMD](el(R.id));
   assert.equal(S.sending[R.id], undefined);
   assert.equal(S.sent[R.id], undefined);
-  assert.doesNotMatch(btn(rendered(page), R.id, 'flow-commit'), /disabled/);
+  assert.doesNotMatch(btn(rendered(page), R.id, 'flow-ship'), /disabled/);
   await page.get('ACTIONS')[CMD](el(R.id));
   assert.equal(page.posts().length, 2, 'after a failure the button works again');
 });
@@ -168,8 +169,8 @@ test('only the repo being sent is marked; the others keep their buttons', async 
   const done = page.get('ACTIONS')[CMD](el(R.id));
   assert.equal(S.sending[R2.id], undefined);
   const html = rendered(page);
-  assert.match(btn(html, R.id, 'flow-commit'), /disabled>/);
-  assert.doesNotMatch(btn(html, R2.id, 'flow-commit'), /disabled/);
+  assert.match(btn(html, R.id, 'flow-ship'), /disabled>/);
+  assert.doesNotMatch(btn(html, R2.id, 'flow-ship'), /disabled/);
   order.resolve({ json: { sent: true, confirmed: true } });
   await done;
 });

@@ -1,4 +1,5 @@
 'use strict';
+// RP176: the /flow-commit button is now /flow-ship everywhere it is offered; each assertion here keeps holding, now for /flow-ship.
 // RP68 (S49, S54): the composer of the chat (free text to the adopted pi session) and (until RP85) the "/ Actions" menu, now direct buttons. Pure helpers
 // (composerState, actionMenu, actionButtonsHtml, composerNote, chatHead), the page wiring in app.js (vm harness, fake fetch,
 // no real timers, no network) and the readChat file-name match. Temp dirs only.
@@ -167,7 +168,7 @@ const whys = (m) => m.items.map((i) => i.why);
 
 test('actionMenu: always four items in the fixed order; start offers flow-next with the unit as the reason', () => {
   const m = menuOf(card({ action: { kind: 'start' }, next: NEXT }));
-  assert.deepEqual(m.items.map((i) => i.cmd), ['flow-next', 'flow-commit', 'flow-pr', 'flow-base']);
+  assert.deepEqual(m.items.map((i) => i.cmd), ['flow-next', 'flow-ship', 'flow-pr', 'flow-base']);
   assert.deepEqual(avail(m), [true, false, false, false]);
   assert.ok(m.items.every((i) => i.label && typeof i.label === 'string'));
   assert.equal(m.items[0].why, 'RP9 — The thing');
@@ -181,15 +182,15 @@ test('actionMenu: branch offers flow-base; the flow-next reason is "Finish what 
 });
 
 test('actionMenu: deliver takes the slot of the flow command (commit, pr, unstage, stash) and a disabled flow keeps its reason', () => {
-  const commit = menuOf(card({ action: { kind: 'deliver' }, next: NEXT }), { changes: { files: 2, ahead: 0, behind: 0 }, flow: { cmd: 'flow-commit', label: '/flow-commit' } });
+  const commit = menuOf(card({ action: { kind: 'deliver' }, next: NEXT }), { changes: { files: 2, ahead: 0, behind: 0 }, flow: { cmd: 'flow-ship', label: '/flow-ship' } });
   assert.deepEqual(avail(commit), [false, true, false, false]);
   assert.deepEqual([commit.items[0].why, commit.items[2].why, commit.items[3].why], ['Deliver the current changes first', 'Commit the changes first', 'The branch has not been merged yet']);
   const pr = menuOf(card({ action: { kind: 'deliver' }, next: NEXT }), { changes: { files: 0, ahead: 1, behind: 0 }, flow: { cmd: 'flow-pr', label: '/flow-pr' } });
   assert.deepEqual(avail(pr), [false, false, true, false]);
   assert.deepEqual([pr.items[0].why, pr.items[1].why], ['Deliver the current changes first', 'No changes to commit']);
-  const unstage = menuOf(card({ action: { kind: 'deliver' } }), { changes: { files: 1, ahead: 0, behind: 0 }, flow: { cmd: 'flow-commit-unstage', label: '/flow-commit (unstage first)' } });
+  const unstage = menuOf(card({ action: { kind: 'deliver' } }), { changes: { files: 1, ahead: 0, behind: 0 }, flow: { cmd: 'flow-ship-unstage', label: '/flow-ship (unstage first)' } });
   assert.equal(unstage.items.length, 4);
-  assert.deepEqual([unstage.items[1].cmd, unstage.items[1].label, unstage.items[1].available], ['flow-commit-unstage', '/flow-commit (unstage first)', true]);
+  assert.deepEqual([unstage.items[1].cmd, unstage.items[1].label, unstage.items[1].available], ['flow-ship-unstage', '/flow-ship (unstage first)', true]);
   const stash = menuOf(card({ action: { kind: 'branch' } }), { flow: { cmd: 'flow-base-stash', label: '/flow-base --stash' } });
   assert.equal(stash.items.length, 4);
   assert.deepEqual([stash.items[3].cmd, stash.items[3].label], ['flow-base-stash', '/flow-base --stash']);
@@ -224,7 +225,7 @@ test('actionMenu: when the session is not free all four are unavailable with the
 const MENU = {
   items: [
     { cmd: 'flow-next', label: '/flow-next', available: true, why: 'RP9 — <i>x</i>' },
-    { cmd: 'flow-commit', label: '/flow-commit', available: false, why: 'No <b>changes</b>' },
+    { cmd: 'flow-ship', label: '/flow-ship', available: false, why: 'No <b>changes</b>' },
     { cmd: 'flow-pr', label: '/flow-pr', available: false, why: 'Nothing committed yet' },
     { cmd: 'flow-base', label: '/flow-base', available: false, why: 'The branch has not been merged yet' },
   ],
@@ -235,7 +236,7 @@ test('actionButtonsHtml: only the available command is drawn, as a pi button wit
   assert.equal((html.match(/<button/g) || []).length, 1);
   assert.match(html, /<button type="button" class="c-act" data-act="pi" data-id="abc" data-cmd="flow-next" title="RP9 — &lt;i&gt;x&lt;\/i&gt;">\/flow-next<\/button>/);
   assert.doesNotMatch(html, /disabled/);
-  assert.doesNotMatch(html, /flow-commit|flow-pr|flow-base|Not available|Available now|No &lt;b&gt;|<i>x|<b>/, 'the unavailable ones leave no trace');
+  assert.doesNotMatch(html, /flow-ship|flow-pr|flow-base|Not available|Available now|No &lt;b&gt;|<i>x|<b>/, 'the unavailable ones leave no trace');
   assert.match(R.actionButtonsHtml(MENU, 'a"b'), /data-id="a&quot;b"/);
 });
 
@@ -431,11 +432,11 @@ test('actions: #chatActions is painted from the open row, the live state, summar
   const S = seed(page);
   Object.assign(S.summary.rows[0], { action: { kind: 'deliver' }, next: NEXT });
   S.local = { abc: { files: [{}, {}], added: 3, deleted: 1, ahead: 0, behind: 0 } };
-  page.run("summaryFlow = () => ({ cmd: 'flow-commit', label: '/flow-commit' })");
+  page.run("summaryFlow = () => ({ cmd: 'flow-ship', label: '/flow-ship' })");
   page.run("ACTIONS['chat-open']({ dataset: { id: 'abc' } })");
   await page.tick();
   const html = page.get('#chatActions').html;
-  assert.match(html, /<button[^>]*data-act="pi" data-id="abc" data-cmd="flow-commit"[^>]*>\/flow-commit<\/button>/);
+  assert.match(html, /<button[^>]*data-act="pi" data-id="abc" data-cmd="flow-ship"[^>]*>\/flow-ship<\/button>/);
   assert.equal((html.match(/<button/g) || []).length, 1, 'only the command that conviene ahora');
   assert.doesNotMatch(html, /Commit the changes first|Deliver the current changes first|flow-next|flow-pr|flow-base/);
 });
@@ -445,16 +446,16 @@ test('actions: with the session working nothing is drawn, and it comes back when
   const S = seed(page);
   Object.assign(S.summary.rows[0], { action: { kind: 'deliver' }, next: NEXT });
   S.local = { abc: { files: [{}], added: 1, deleted: 0, ahead: 0, behind: 0 } };
-  page.run("summaryFlow = () => ({ cmd: 'flow-commit', label: '/flow-commit' })");
+  page.run("summaryFlow = () => ({ cmd: 'flow-ship', label: '/flow-ship' })");
   page.run("ACTIONS['chat-open']({ dataset: { id: 'abc' } })");
   await page.tick();
-  assert.match(page.get('#chatActions').html, /data-cmd="flow-commit"/);
+  assert.match(page.get('#chatActions').html, /data-cmd="flow-ship"/);
   page.run("S.rpc.abc = { ...S.rpc.abc, state: 'busy' }; draw();"); // RPC2b-1: the reason follows S.rpc, not the live answer
   await page.tick();
   assert.equal(page.get('#chatActions').html, '');
   page.run("S.rpc.abc = { ...S.rpc.abc, state: 'idle' }; draw();");
   await page.tick();
-  assert.match(page.get('#chatActions').html, /data-cmd="flow-commit"/);
+  assert.match(page.get('#chatActions').html, /data-cmd="flow-ship"/);
 });
 
 test('actions: the button goes through ACTIONS.pi (POST /api/pi) exactly once', async () => {
@@ -472,13 +473,13 @@ test('actions: while an order of the repo is on its way the painted buttons are 
   const S = seed(page);
   Object.assign(S.summary.rows[0], { action: { kind: 'deliver' }, next: NEXT });
   S.local = { abc: { files: [{}], added: 1, deleted: 0, ahead: 0, behind: 0 } };
-  page.run("summaryFlow = () => ({ cmd: 'flow-commit', label: '/flow-commit' })");
+  page.run("summaryFlow = () => ({ cmd: 'flow-ship', label: '/flow-ship' })");
   page.run("ACTIONS['chat-open']({ dataset: { id: 'abc' } })");
   await page.tick();
   assert.doesNotMatch(page.get('#chatActions').html, /disabled/);
-  page.run("S.sending.abc = 'flow-commit'; draw();");
+  page.run("S.sending.abc = 'flow-ship'; draw();");
   await page.tick();
-  assert.match(page.get('#chatActions').html, /data-cmd="flow-commit"[^>]*disabled/);
+  assert.match(page.get('#chatActions').html, /data-cmd="flow-ship"[^>]*disabled/);
 });
 
 // ---------- page: the keyboard ----------
