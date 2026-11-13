@@ -525,7 +525,9 @@ body.tab-summary #viewbar { display: none; }
 .ck-failed { color: var(--red); }
 .ck-pending svg { animation: ck-spin 1.4s linear infinite; }
 @keyframes ck-spin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .ck-pending svg { animation: none; } }
+.chip > i[aria-hidden="true"] { font-style: normal; display: inline-block; vertical-align: -2px; margin-right: 3px; }
+.chip > i[aria-hidden="true"] svg { display: block; animation: ck-spin 1.4s linear infinite; } /* RP170: the PR line of the card turns the same spinner where it had the dots */
+@media (prefers-reduced-motion: reduce) { .ck-pending svg { animation: none; } .chip > i[aria-hidden="true"] svg { animation: none; } }
 .ck-list { display: grid; min-width: 0; }
 .ck-r { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 4px; border-radius: 6px; font-size: 13px; }
 .ck-r:hover { background: var(--panel2); }
@@ -846,11 +848,14 @@ button.tc:hover { border-color: var(--muted); }
 .ss-green { color: var(--green); }
 .ss-yellow { color: var(--yellow); }
 .ss-gray { color: var(--muted); }
+.ss-red { color: var(--red); }
 .ss-anim .ss-dot { animation: pulse-dot 1.2s ease-in-out infinite; }
+.ss-ci.ss-anim .ss-dot { animation: ck-spin 1.4s linear infinite; } /* RP170: «Verifying Checks» turns with the spinner of the CI; «Checks Failed» does not move */
 .ss-starting.ss-anim .ss-dot { animation: ck-spin 1.4s linear infinite; } /* RP174: the open arc of «Starting…» turns like the spinner of the CI instead of pulsing */
 @media (prefers-reduced-motion: reduce) {
   .ss-anim .ss-dot { animation: none; }
   .ss-starting.ss-anim .ss-dot { animation: none; }
+  .ss-ci.ss-anim .ss-dot { animation: none; }
 }
 /* RP156 (design/panel-chips/, direction C): the icons of the chips are drawn in the line with their text; in a narrow chat (the composer is 24 px narrower than the chat: 456 px is 480 px of chat) a chip keeps only its icon, the number of
    the context and the time of the subagent. The words are hidden the clip way, NEVER with display:none: they stay in the accessible name, and the titles do not change. */

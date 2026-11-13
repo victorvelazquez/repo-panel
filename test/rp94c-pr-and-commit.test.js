@@ -33,7 +33,8 @@ test('p2: one PR with passing checks is a green chip with the number, a check ma
 
 test('p3: failing checks are a red chip with a cross and how many failed; running ones are yellow with the dots and how many are running', () => {
   assert.equal(V.prChip([pr(12, BAD)]), '<span class="chip red" title="#12 title 12 — ✘ 2 failed · 3/5 checks">PR #12 ✘ 2 failed</span>');
-  assert.equal(V.prChip([pr(12, RUN)]), '<span class="chip yellow" title="#12 title 12 — … 3 running · 2/5 checks">PR #12 … 3 running</span>');
+  // RP170: running shows the turning icon of the CI where the dots were; the colour, the counts (3 running) and the title (with the per-PR details) are pinned as before
+  assert.match(V.prChip([pr(12, RUN)]), /^<span class="chip yellow" title="#12 title 12 — … 3 running · 2\/5 checks">PR #12 <i aria-hidden="true"><svg [^>]*><circle [^>]*\/><\/svg><\/i>3 running<\/span>$/);
 });
 
 test('p4: a PR with no checks is a gray chip that says so (the number is still useful)', () => {
@@ -46,7 +47,7 @@ test('p5: several PRs make ONE chip: the count and the worst state (failed, then
   assert.match(h, /^<span class="chip red" title="/);
   assert.match(h, />3 PRs ✘ 1 failing<\/span>$/);
   assert.ok(h.includes('#1 title 1 — ✔ 5/5 checks') && h.includes('#2 title 2') && h.includes('#3 title 3'));
-  assert.match(V.prChip([pr(1, OK), pr(3, RUN)]), /^<span class="chip yellow"[\s\S]*>2 PRs … 1 running<\/span>$/);
+  assert.match(V.prChip([pr(1, OK), pr(3, RUN)]), /^<span class="chip yellow"[\s\S]*>2 PRs <i aria-hidden="true"><svg [^>]*><circle [^>]*\/><\/svg><\/i>1 running<\/span>$/); // RP170: the icon replaces the dots
   assert.match(V.prChip([pr(1, OK), pr(4, OK)]), /^<span class="chip green"[\s\S]*>2 PRs ✔ all passing<\/span>$/);
   assert.match(V.prChip([pr(1, NONE), pr(4, NONE)]), /^<span class="chip gray"[\s\S]*>2 PRs · no checks<\/span>$/);
 });
