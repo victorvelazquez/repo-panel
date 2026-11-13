@@ -15,7 +15,10 @@ async function doMerge(id, n) {
     const r = await api('/api/merge', { id, number: n, method, deleteBranch: del });
     // Merged: S.merged keeps the button disabled until GitHub stops listing the PR (or MERGE_HOLD_MS), so it never comes back to life early.
     S.merged[key] = Date.now();
-    toast(`#${n} merged${r.branch === 'deleted' ? ' · branch deleted' : r.branch === 'auto' ? ' · branch auto-deleted' : ''}`, 'ok');
+    // RP172: a merge from the panel sends /flow-base by itself, only to a session that is open and free (the hold of the delivery buttons, RP159/RP163); otherwise the card keeps its button. It never starts a closed session.
+    const go = V && sessionOf(id) === 'idle' && V.deliveryHold({ sending: S.sending[id], session: sessionOf(id), jobs: jobsOfRepo(id) }) === '';
+    toast(`#${n} merged${r.branch === 'deleted' ? ' · branch deleted' : r.branch === 'auto' ? ' · branch auto-deleted' : ''} · ${go ? 'running /flow-base' : 'run /flow-base when the session is free'}`, 'ok');
+    if (go) ACTIONS.pi({ dataset: { id, cmd: 'flow-base' }, disabled: false });
   } catch (e) {
     toast(`#${n}: ${e.message}`, 'bad');
   }
