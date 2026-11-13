@@ -349,8 +349,8 @@ function layoutNow() {
   const total = width - (listOn ? ($('#split').offsetWidth || 0) : 0) - (column ? ($('#split2').offsetWidth || 0) : 0);
   return total > 0 && R ? { total, column, listOn, ...R.blockWidths(total, layoutRatios, { column, list: listOn }) } : null;
 }
-// RP129: what the footer and the Status tab of the column need. The branch and the commits ahead are the board's facts; the PR is the open one of THAT branch and never another (on the base branch, on a
-// detached HEAD, or with nothing loaded there is none); and the two buttons are what view.js decides with the ONE rule of the card of the board: the same busy, held and running-command facts the card reads.
+// RP129: what the Status tab of the column, the head of the chat and the Merge button of the composer need. The branch and the commits ahead are the board's facts; the PR is the open one of THAT branch and never another (on the base branch, on a
+// detached HEAD, or with nothing loaded there is none); and the two buttons (Merge in the composer, Re-run in the Status tab) are what view.js decides with the ONE rule of the card of the board: the same busy, held and running-command facts the card reads.
 // What is not known yet (loading, a failed read, no remote) is never read as a PR that is ready: it keeps the button off and says so.
 function columnGit(id, facts) {
   const prs = S.prs[id];
@@ -365,7 +365,7 @@ function columnGit(id, facts) {
     rerun: V ? V.rerunButton(pr, ctx) : { show: false, enabled: false, title: '' },
   };
 }
-// RP137: the facts the ONE rule of the Merge button (V.mergeButton) reads for a PR: the method, a merge in flight, a merge already held, and a command running in the session. The column's footer and the sheet that confirms a merge
+// RP137: the facts the ONE rule of the Merge button (V.mergeButton) reads for a PR: the method, a merge in flight, a merge already held, and a command running in the session. The Merge button of the composer and the sheet that confirms a merge
 // ask the rule with the same facts.
 function mergeCtxOf(id, n) {
   const busy = S.busy[`${id}:${n}`];
@@ -530,7 +530,7 @@ function drawChat() {
   $('#msgStop').hidden = !(S.rpc[id] && S.rpc[id].state === 'busy');
   const row = S.summary && Array.isArray(S.summary.rows) ? S.summary.rows.find((r) => r.id === id) : null;
   const live = (S.rpc[id] && S.rpc[id].compacting ? 'working' : REASON_OF[S.rpc[id] && S.rpc[id].state]) || 'unknown'; // RP140: a compacting session takes no order either; RPC2b-1: the reason follows the session of the RPC host
-  paint($('#chatActions'), R.actionButtonsHtml(R.actionMenu(row, { live, changes: summaryChanges(id), flow: summaryFlow(id) }), id, { sending: !!S.sending[id] }));
+  paint($('#chatActions'), R.actionButtonsHtml(R.actionMenu(row, { live, changes: summaryChanges(id), flow: summaryFlow(id) }), id, { sending: !!S.sending[id] }) + R.composerMergeHtml(columnGit(id, S.local[id]))); // RP175: Merge is not an item of the session menu: it does not wait for the session
   paint($('#msgNote'), R.composerNote(S.notes[id] || (S.rpc[id] && S.rpc[id].error ? { text: S.rpc[id].error } : null)));
 }
 

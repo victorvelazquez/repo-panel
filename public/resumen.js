@@ -295,7 +295,6 @@
   // RP129 (S20, S21): the FOOTER of the column and its STATUS tab. Both come from `ctx.git` ({ id, branch, ahead, pr, merge, rerun, noPr }), which the page builds: the PR is the open one of THIS branch (never
   // another one), and `merge` and `rerun` are what view.js decides for the two buttons (the ONE rule of the card of the board), so nothing is decided here: the buttons are drawn as they come and they are the
   // same actions of the cards (data-act merge and rerun). Without `git` there is neither footer nor Status tab. Total: nothing the PR or the repo says becomes markup, and only a plain http(s) link is a link.
-  const ICON_BRANCH = svgIcon('<circle cx="4" cy="3.5" r="1.6"/><circle cx="4" cy="12.5" r="1.6"/><circle cx="12" cy="6" r="1.6"/><path d="M4 5.1v5.8M12 7.6c0 3-4 2.4-8 4"/>');
   const ICON_CK = {
     success: svgIcon('<circle cx="8" cy="8" r="6"/><path d="M5.2 8.2l2 2 3.6-4"/>'),
     pending: svgIcon('<circle cx="8" cy="8" r="6" stroke-dasharray="3 2.2"/>'),
@@ -310,19 +309,6 @@
   const checksOf = (pr) => {
     const k = pr && pr.checks && typeof pr.checks === 'object' ? pr.checks : {};
     return { state: CK_STATES.includes(k.state) ? k.state : 'none', total: num(k.total), passed: num(k.passed), failed: num(k.failed), pending: num(k.pending), items: Array.isArray(k.items) ? k.items : [] };
-  };
-  const ciMark = (pr) => {
-    const k = checksOf(pr);
-    if (k.state === 'none' || !k.total) return '';
-    const label = k.state === 'success' ? `All ${k.total} checks passed` : k.state === 'failed' ? `${k.failed} failed · ${k.passed}/${k.total} passed` : `${k.pending} running · ${k.passed}/${k.total} passed`;
-    return `<span class="ft-ci ft-ci-${k.state}" role="img" aria-label="${esc(label)}" title="${esc(label)}">${ICON_CK[k.state]}</span>`;
-  };
-  const footHtml = (g) => {
-    const pr = prOf(g);
-    const m = g.merge && typeof g.merge === 'object' ? g.merge : {};
-    const branch = typeof g.branch === 'string' ? g.branch : '';
-    const ahead = Number.isInteger(g.ahead) && g.ahead > 0 ? `<span class="chip" title="Commits ahead of the base">↑${g.ahead}</span>` : '';
-    return `${typeof m.why === 'string' && m.why ? `<div class="ft-why" role="status">${esc(m.why)}</div>` : ''}<div class="col-foot" role="group" aria-label="Branch and pull request"><span class="ft-br"${branch ? ` title="${esc(branch)}"` : ''}>${ICON_BRANCH}<span class="ft-name">${branch ? esc(branch) : '—'}</span></span>${ahead}${ciMark(pr)}<button type="button" class="merge ft-merge" data-act="merge" data-id="${esc(g.id ?? '')}"${pr ? ` data-n="${pr.number}"` : ''}${m.enabled === true ? '' : ' disabled'} title="${esc(m.title || 'No open pull request for this branch')}">${esc(m.label || 'Merge · squash')}</button></div>`;
   };
   const statusPanel = (g) => {
     const pr = prOf(g);
@@ -360,7 +346,7 @@
     const list = g ? [['tasks', 'Tasks'], ['changes', 'Changes'], ['status', 'Status'], ['files', 'Files']] : [['tasks', 'Tasks'], ['changes', 'Changes'], ['files', 'Files']];
     // RP157: asked for the Repo screen (`back: true`, under 760 px) it starts with a head: the arrow back to the chat and the title.
     const head = c.back === true ? `<div class="col-head"><button type="button" class="ch-back" data-act="zone-back" aria-label="Back to the chat" title="Back to the chat">${svgIcon('<path d="M10 3L5 8l5 5"/>', 20)}</button><b>Repo</b></div>` : '';
-    return `${head}<div class="col-tabs" role="tablist" aria-label="Column views">${list.map(tabBtn).join('')}</div><div class="col-pane" id="colpane" role="tabpanel" aria-labelledby="coltab-${tab}">${body}</div>${g ? footHtml(g) : ''}`;
+    return `${head}<div class="col-tabs" role="tablist" aria-label="Column views">${list.map(tabBtn).join('')}</div><div class="col-pane" id="colpane" role="tabpanel" aria-labelledby="coltab-${tab}">${body}</div>`;
   };
   // The state of the session (RPC2-1), shown inside the composer frame. Icon + word, never colour alone. c = { info, rpc } (rpc: what V.rpcReduce keeps).
   // RP156 (design/panel-chips/, direction A): the icons of the chips of the chat are drawn (the family of the icons of the page: 16 grid, stroke 1.5, currentColor), not text characters that each system draws with another shape. Every state
@@ -951,6 +937,16 @@
     const items = menu && Array.isArray(menu.items) ? menu.items : [];
     return items.filter((i) => i && i.available).map((i) => `<button type="button" class="c-act" data-act="pi" data-id="${esc(id)}" data-cmd="${esc(i.cmd)}" title="${esc(i.why || `Send ${i.label} to the open session of this repo`)}"${ctx.sending ? ' disabled' : ''}>${esc(i.label)}</button>`).join('');
   }
+  // RP175: the Merge button of the composer (it left the footer of the column). `g` is what columnGit gives (id, the open PR of THE CURRENT branch, and merge: what V.mergeButton decides plus `why`). It is the same button as the card
+  // (data-act="merge"); with no PR nothing is drawn. When it is off for a reason the reason is written next to it (`why`, the words of V.mergeWhy): a phone has no hover. Total.
+  function composerMergeHtml(g) {
+    const c = g && typeof g === 'object' && !Array.isArray(g) ? g : {};
+    const pr = c.pr && typeof c.pr === 'object' && !Array.isArray(c.pr) && Number.isInteger(c.pr.number) && c.pr.number > 0 ? c.pr : null;
+    if (!pr) return '';
+    const m = c.merge && typeof c.merge === 'object' ? c.merge : {};
+    const button = `<button type="button" class="c-act merge" data-act="merge" data-id="${esc(c.id ?? '')}" data-n="${pr.number}"${m.enabled === true ? '' : ' disabled'} title="${esc(m.title || 'No open pull request for this branch')}">${esc(m.label || 'Merge · squash')}</button>`;
+    return `${button}${typeof m.why === 'string' && m.why ? `<span class="c-why" role="status">${esc(m.why)}</span>` : ''}`;
+  }
   // The line under the box: a message (a refused send, a failed start).
   const composerNote = (n) => (n && n.text ? `<span>${esc(n.text)}</span>` : '');
 
@@ -1363,5 +1359,5 @@ ${status}</div>`;
     return `${ctx.failed ? '<div class="rs-note" role="status">⚠ Summary unavailable: showing the last data we have.</div>' : ''}<div class="rs-list">${body}</div>`;
   }
 
-  return { mergeSheetHtml, repoStatus, esc, mdHtml, settingsView, memoryChipHtml, subagentChipHtml, ctxChipHtml, compactButtonHtml, legendHtml, listCount, listHeadChips, sessionChip, blockWidths, columnView, treeFolderPaths, fileView, COLUMN_TABS, composerState, askAllowed, actionMenu, actionButtonsHtml, composerNote, chatHead, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, sessionCloseHtml, sessionTerminalHtml, terminalBlockHtml, recentlyActive, chatBody, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
+  return { mergeSheetHtml, repoStatus, esc, mdHtml, settingsView, memoryChipHtml, subagentChipHtml, ctxChipHtml, compactButtonHtml, legendHtml, listCount, listHeadChips, sessionChip, blockWidths, columnView, treeFolderPaths, fileView, COLUMN_TABS, composerState, askAllowed, actionMenu, actionButtonsHtml, composerMergeHtml, composerNote, chatHead, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, sessionCloseHtml, sessionTerminalHtml, terminalBlockHtml, recentlyActive, chatBody, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
 }));

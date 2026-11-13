@@ -510,16 +510,7 @@ body.tab-summary #viewbar { display: none; }
 .col-sum b { color: var(--text); }
 .col-sum .a { color: var(--green); }
 .col-sum .d { color: var(--red); }
-/* RP129: the footer stays at the bottom of the column in every tab (the pane takes the height that is left); the Status tab shows the PR, a summary of its checks and one row per check. */
-.col-foot { position: sticky; bottom: 0; z-index: 2; display: flex; align-items: center; gap: 8px; min-width: 0; padding: 8px 12px; background: var(--bg); border-top: 1px solid var(--line); font-size: 12px; }
-.ft-br { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; color: var(--muted); }
-.ft-br svg { flex: none; }
-.ft-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: ui-monospace, Consolas, monospace; }
-.ft-ci { flex: none; display: inline-grid; }
-.ft-ci-success { color: var(--green); }
-.ft-ci-pending { color: var(--yellow); }
-.ft-ci-failed { color: var(--red); }
-.ft-merge { flex: none; padding: 3px 10px; }
+/* RP129: the Status tab shows the PR, a summary of its checks and one row per check. */
 .st-pr { display: grid; gap: 4px; min-width: 0; padding: 6px 4px 8px; }
 .st-t { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .st-n { font-weight: 700; }
@@ -531,9 +522,9 @@ body.tab-summary #viewbar { display: none; }
 .ck-success { color: var(--green); }
 .ck-pending { color: var(--yellow); }
 .ck-failed { color: var(--red); }
-.ck-pending svg, .ft-ci-pending svg { animation: ck-spin 1.4s linear infinite; }
+.ck-pending svg { animation: ck-spin 1.4s linear infinite; }
 @keyframes ck-spin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .ck-pending svg, .ft-ci-pending svg { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .ck-pending svg { animation: none; } }
 .ck-list { display: grid; min-width: 0; }
 .ck-r { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 4px; border-radius: 6px; font-size: 13px; }
 .ck-r:hover { background: var(--panel2); }
@@ -830,8 +821,6 @@ button.tc:hover { border-color: var(--muted); }
 .ms-btns { display: flex; gap: 8px; margin-top: 12px; }
 .ms-btns button { flex: 1; min-height: 44px; }
 .ms-btns button:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
-.ft-why { display: none; padding: 6px 12px; color: var(--muted); font-size: 12px; border-top: 1px solid var(--line); background: var(--bg); overflow-wrap: anywhere; }
-#sumLayout[data-screen="repo"] .ft-why { display: block; }
 #sumLayout[data-screen="duo"] { flex-direction: row; }
 #sumLayout[data-screen="duo"] #listCol, #sumLayout[data-screen="duo"] #split { display: none; }
 #sumLayout[data-screen="duo"] #split2 { display: block; }
@@ -873,8 +862,8 @@ button.tc:hover { border-color: var(--muted); }
 .composer textarea { width: 100%; min-height: 42px; max-height: 150px; resize: none; border: 0; background: transparent; color: var(--text); font: inherit; padding: 4px 6px; }
 .composer textarea:focus-visible { outline: none; }
 .c-bar { position: relative; display: flex; align-items: center; gap: 6px; }
-.c-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-.hint { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.c-actions { display: flex; flex: 1 1 auto; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
+.c-why { flex: 1 1 100%; min-width: 0; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; } /* RP175: the reason Merge is off, always written (a phone has no hover) */
 .composer .rs-note { margin: 0; }
 .composer .rs-note:empty { display: none; }
 .composer .rs-note button { margin-left: 8px; padding: 0 8px; }
