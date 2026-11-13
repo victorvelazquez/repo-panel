@@ -192,6 +192,7 @@ const STATIC = {
   '/chat.js': ['chat.js', 'text/javascript; charset=utf-8'],
   '/board.js': ['board.js', 'text/javascript; charset=utf-8'],
   '/actions.js': ['actions.js', 'text/javascript; charset=utf-8'],
+  '/viewport.js': ['viewport.js', 'text/javascript; charset=utf-8'], // RP180: the visible height on a phone
   '/app.js': ['app.js', 'text/javascript; charset=utf-8'],
   '/style.css': ['style.css', 'text/css; charset=utf-8'],
   '/kletus-dev.svg': ['kletus-dev.svg', 'image/svg+xml'], // RP102: the logo of the header
