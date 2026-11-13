@@ -27,7 +27,7 @@ test('s1: «Starting…» spins: its icon turns with the animation of the CI spi
 test('s2: «Working…» and «Compacting…» keep the pulse of always, and nothing else pulses or spins', () => {
   assert.match(body('.ss-anim .ss-dot'), /animation:\s*pulse-dot\s+1\.2s\s+ease-in-out\s+infinite/);
   const anim = [...css.matchAll(/(^|\n)([^{}\n@/ ][^{}\n]*\.ss-[a-z-]*[^{}\n]*)\{[^}]*animation:\s*(?!none)/g)].map((m) => m[2].trim());
-  assert.deepEqual(anim.sort(), ['.ss-anim .ss-dot', '.ss-starting.ss-anim .ss-dot']);
+  assert.deepEqual(anim.sort(), ['.ss-anim .ss-dot', '.ss-ci.ss-anim .ss-dot', '.ss-starting.ss-anim .ss-dot']); // RP170: «Verifying Checks» (the CI of the PR of the branch) turns too
 });
 
 test('s3: it stops under reduced motion, like every animation of the page', () => {

@@ -870,11 +870,26 @@
     return `<span class="chip yellow" title="${htmlEsc(`#${best.p.number}${title} — ${sizeText(best.s)}`)}">large PR #${best.p.number} · +${best.s.add} −${best.s.del}</span>`;
   }
 
+  // RP170: the CI of ONE PR, the one reading of its numbers: the PR chip of the card and the state label of the chat both read them from here, so they cannot disagree. Total: anything that is not a PR with a number and a
+  // known state of checks is null, and so is a passed CI or no checks (there is nothing to say). Whole numbers only; anything else is 0.
+  const ciN = (v) => (typeof v === 'number' && Number.isFinite(v) && v > 0 && v <= Number.MAX_SAFE_INTEGER ? Math.floor(v) : 0);
+  const ciKind = (p) => { const s = isObject(p.checks) ? p.checks.state : 'none'; return s === 'none' || s === undefined ? 'none' : s === 'success' ? 'success' : s === 'failed' ? 'failed' : 'pending'; };
+  const CI_STATES = { pending: 'running', failed: 'failed' };
+  function ciOf(pr) {
+    if (!isObject(pr) || typeof pr.number !== 'number' || !Number.isFinite(pr.number) || !isObject(pr.checks) || !['none', 'success', 'failed', 'pending'].includes(pr.checks.state)) return null;
+    const kind = CI_STATES[ciKind(pr)];
+    const c = pr.checks;
+    return kind ? { kind, pending: ciN(c.pending), failed: ciN(c.failed), passed: ciN(c.passed), total: ciN(c.total), number: pr.number } : null;
+  }
+  // RP170: the turning icon of a CI that is running: the dashed ring of the CI list (RP156), the same one the state label of the chat draws; it turns with the animation of the page (ck-spin).
+  const CI_SPIN = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6" stroke-dasharray="3 2.2"/></svg>';
+
   function prChip(prs) {
     const list = numberedPrs(prs);
     if (!list.length) return '';
-    const n = (v) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? Math.floor(v) : 0);
-    const kind = (p) => { const s = isObject(p.checks) ? p.checks.state : 'none'; return s === 'none' || s === undefined ? 'none' : s === 'success' ? 'success' : s === 'failed' ? 'failed' : 'pending'; };
+    const n = ciN;
+    const kind = ciKind;
+    const SPIN = '\u0001'; // a mark no text holds: swapped for the icon after the escape
     const counts = (p) => { const c = isObject(p.checks) ? p.checks : {}; return `${n(c.passed)}/${n(c.total)}`; };
     const describe = (p) => {
       const c = isObject(p.checks) ? p.checks : {};
@@ -888,13 +903,13 @@
     if (list.length === 1) {
       const p = list[0];
       const c = isObject(p.checks) ? p.checks : {};
-      text = `PR #${p.number} ${{ none: '· no checks', success: `✔ ${counts(p)}`, failed: `✘ ${n(c.failed)} failed`, pending: `… ${n(c.pending)} running` }[worst]}`;
+      text = `PR #${p.number} ${{ none: '· no checks', success: `✔ ${counts(p)}`, failed: `✘ ${n(c.failed)} failed`, pending: `${SPIN}${n(c.pending)} running` }[worst]}`;
     } else {
       const count = (k) => kinds.filter((x) => x === k).length;
-      const tail = { failed: `✘ ${count('failed')} failing`, pending: `… ${count('pending')} running`, success: count('success') === list.length ? '✔ all passing' : `✔ ${count('success')} passing`, none: '· no checks' }[worst];
+      const tail = { failed: `✘ ${count('failed')} failing`, pending: `${SPIN}${count('pending')} running`, success: count('success') === list.length ? '✔ all passing' : `✔ ${count('success')} passing`, none: '· no checks' }[worst];
       text = `${list.length} PRs ${tail}`;
     }
-    return `<span class="chip ${tone}" title="${htmlEsc(tip)}">${htmlEsc(text)}</span>`;
+    return `<span class="chip ${tone}" title="${htmlEsc(tip)}">${text.split(SPIN).map(htmlEsc).join(`<i aria-hidden="true">${CI_SPIN}</i>`)}</span>`; // RP170: what is running shows the turning icon of the CI where the dots were; the rest of the text is escaped as ever
   }
 
   // RP86 (S9): ONE read model per repo. The page keeps each fact of a repo in its own map (local, prs, roadmap, state, req) and the Summary row in another; the
@@ -1045,5 +1060,5 @@
     return `${dot}${meters.join('')}<div class="usage-pop" role="group" aria-label="Claude usage details">${details.join('')}${note}${foot}</div>`;
   }
 
-  return { jobsHold, deliveryHold, tasksPollDue, TASKS_REFRESH_MS, mergeWhy, screenOf, bandOf, NARROW_BELOW, DUO_BELOW, parseAddress, addressOf, ADDRESS_ZONES, subClock, columnTabFor, conformityTabLabel, repoModel, changeChips, prChip, idleChip, conflictChip, sizeChip, RepoCard, stateLineHidden, usageView, usageHtml, usageRemaining, boardApply, boardWait, chatCachePut, chatCacheGet, rpcWithContext, chatFromCache, API_VERSION, mergeButton, rerunButton, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, dirtyRepos, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, taskPrs, matchesUnitId, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, parseSse, rpcEvent, rpcReduce, rpcFromStatus, eventsPlan, eventsRetryMs, eventsStale };
+  return { jobsHold, deliveryHold, tasksPollDue, TASKS_REFRESH_MS, mergeWhy, screenOf, bandOf, NARROW_BELOW, DUO_BELOW, parseAddress, addressOf, ADDRESS_ZONES, subClock, columnTabFor, conformityTabLabel, repoModel, changeChips, prChip, ciOf, idleChip, conflictChip, sizeChip, RepoCard, stateLineHidden, usageView, usageHtml, usageRemaining, boardApply, boardWait, chatCachePut, chatCacheGet, rpcWithContext, chatFromCache, API_VERSION, mergeButton, rerunButton, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, dirtyRepos, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, taskPrs, matchesUnitId, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, parseSse, rpcEvent, rpcReduce, rpcFromStatus, eventsPlan, eventsRetryMs, eventsStale };
 }));

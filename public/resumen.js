@@ -357,8 +357,23 @@
     const [tone, icon, word] = SESS_VIEW[key];
     return { key, tone, icon, word, title: SESS_TITLE[key], animate: key === 'working' || key === 'starting' || key === 'compacting' };
   }
+  // RP170: while the session is IDLE and the PR of the current branch has checks running (or failed), the label says the CI instead of «Idle»: `c.ci` is what V.ciOf answers for that PR. Only the words are `ss-word` (a narrow chat hides
+  // them); the numbers stay visible. Running turns (the spinner of the CI); failed does not (the person must act). Any other state of the session, or an input that is not a CI, leaves the label as it was.
+  const CI_LABEL = {
+    running: { tone: 'yellow', icon: ICON_CK.pending, word: 'Verifying Checks', said: 'running', anim: ' ss-anim', title: 'are running' },
+    failed: { tone: 'red', icon: ICON_CK.failed, word: 'Checks Failed', said: 'failed', anim: '', title: 'failed' },
+  };
+  const whole = (v) => (Number.isSafeInteger(v) && v > 0 ? v : 0);
+  function ciLabel(ci) {
+    if (!ci || typeof ci !== 'object' || !Object.hasOwn(CI_LABEL, ci.kind) || !Number.isSafeInteger(ci.number)) return '';
+    const L = CI_LABEL[ci.kind];
+    const [count, passed, total] = [ci.kind === 'running' ? ci.pending : ci.failed, ci.passed, ci.total].map(whole);
+    const title = `PR #${ci.number}: the checks ${L.title} (${count} ${L.said}, ${passed} of ${total} passed)`;
+    return `<span class="ss ss-${L.tone} ss-ci${L.anim}" role="status" title="${esc(title)}"><i class="ss-dot" aria-hidden="true">${L.icon}</i> <span class="ss-word">${L.word}</span><span class="ss-n"> · ${count} ${L.said} · ${passed}/${total}</span></span>`;
+  }
   const sessionLabelHtml = (c) => {
     const s = sessionState(c);
+    if (s.key === 'free') { const ci = ciLabel(c.ci); if (ci) return ci; }
     return `<span class="ss ss-${s.tone} ss-${s.key}${s.animate ? ' ss-anim' : ''}" role="status" title="${esc(s.title)}"><i class="ss-dot" aria-hidden="true">${s.icon}</i> <span class="ss-word">${s.word}</span></span>`; // RP156: the word can be hidden in a narrow chat, but stays for the accessible name
   };
 
