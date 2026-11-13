@@ -41,19 +41,14 @@ test('c3: the chat keeps its own Files tab under 1100 px exactly as before: the 
   assert.match(d[0], /flex:\s*none/);
 });
 
-test('c4: the bars stay: the tab bar sticks to the top of the column, the footer to the bottom, both over the content and with a background of their own', () => {
+test('c4: the bars stay: the tab bar sticks to the top of the column, over the content and with a background of its own (RP175: there is no footer any more)', () => {
   const tabs = decls('.col-tabs');
   assert.equal(tabs.length, 1);
   assert.match(tabs[0], /position:\s*sticky/);
   assert.match(tabs[0], /top:\s*0/);
   assert.match(tabs[0], /z-index:\s*\d+/);
   assert.match(tabs[0], /background:\s*var\(--bg\)/);
-  const foot = decls('.col-foot');
-  assert.equal(foot.length, 1);
-  assert.match(foot[0], /position:\s*sticky/);
-  assert.match(foot[0], /bottom:\s*0/);
-  assert.match(foot[0], /z-index:\s*\d+/);
-  assert.match(foot[0], /background:\s*var\(--bg\)/);
+  assert.equal(decls('.col-foot').length, 0); // RP175: the footer of the column is gone (Merge moved to the composer)
 });
 
 test('c5: the column is the scroll container of both bars (#col scrolls, #colBody does not) and the pane takes the room that is left', () => {

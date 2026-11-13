@@ -1,4 +1,5 @@
 'use strict';
+// RP175: the footer of the column is gone and the Merge button lives in the composer (see rp175-merge-in-composer.test.js); what is left here is the rule, the Status tab and the page behaviour of the tabs.
 // RP129 (S20, S21): the FIXED FOOTER of the right column (branch, commits ahead, the state of the CI and the Merge button) and the STATUS tab (the pull request of the branch, each check with its
 // name and state, and Re-run failed). By decision of the person nothing new is created: the footer button is the SAME Merge action of the cards (data-act="merge", doMerge, POST /api/merge) and the
 // re-run is the same one (doRerun). The server is the real guard (mergePr reads the PR again and refuses one that is not open or not ready); what this file pins is the page side, FIRST the
@@ -89,7 +90,7 @@ test('m4: re-run: shown only when there are failed runs, enabled only with nothi
   for (const pr of [null, undefined, {}, { checks: null }, { checks: { failedRuns: 'x' } }]) assert.deepEqual(V.rerunButton(pr, {}), { show: false, enabled: false, title: '' });
 });
 
-test('m5: the card of the board and the footer share ONE rule: both ask view.js, and the old inline rule is gone from the page', () => {
+test('m5: the card of the board and the Merge button of the composer share ONE rule: both ask view.js, and the old inline rule is gone from the page', () => {
   const board = read('board.js');
   const chat = read('chat.js');
   assert.match(board, /V\.mergeButton\(/);
@@ -102,59 +103,8 @@ test('m5: the card of the board and the footer share ONE rule: both ask view.js,
 // ---------- the footer and the Status tab: pure ----------
 const MERGE = (pr, ctx = {}) => V.mergeButton(pr, { method: 'squash', ...ctx });
 const GIT = (pr, over = {}) => ({ id: 'abc', branch: 'feat/x', ahead: 2, pr, merge: MERGE(pr), rerun: V.rerunButton(pr, {}), noPr: 'No open pull request for this branch', ...over });
-const foot = (h) => (/<div class="col-foot"[\s\S]*$/.exec(h) || [''])[0];
+// RP175: the footer is gone; its tests (r1-r4, p1-p6) moved to test/rp175-merge-in-composer.test.js, where the Merge button now lives (same rule, same guarantees).
 const tabs = (h) => [...h.matchAll(/id="coltab-(\w+)"/g)].map((m) => m[1]);
-
-test('r1: the footer has the branch, the commits ahead, the state of the CI and the Merge button of the PR of the branch', () => {
-  const h = R.columnView({ name: 'demo', files: [], git: GIT(CASES.ready) });
-  const f = foot(h);
-  assert.match(f, /^<div class="col-foot" role="group" aria-label="Branch and pull request">/);
-  assert.match(f, /<span class="ft-br" title="feat\/x">.*<span class="ft-name">feat\/x<\/span><\/span>/);
-  assert.match(f, /<span class="chip" title="Commits ahead of the base">↑2<\/span>/);
-  assert.match(f, /<span class="ft-ci ft-ci-success" role="img" aria-label="All 1 checks passed" title="All 1 checks passed">/);
-  assert.match(f, /<button type="button" class="merge ft-merge" data-act="merge" data-id="abc" data-n="7" title="Merge into main. Method: squash. Change it in Settings, Delivery.">Merge · squash<\/button><\/div>$/);
-  assert.doesNotMatch(f, /disabled/);
-});
-
-test('r2: the CI says running, failed or passed with the numbers; no PR, or no checks, draws no CI mark; ahead is only drawn when there are commits', () => {
-  const state = (pr) => (/ft-ci-(\w+)/.exec(foot(R.columnView({ files: [], git: GIT(pr) }))) || [])[1];
-  assert.equal(state(CASES.pending), 'pending');
-  assert.equal(state(CASES.failed), 'failed');
-  assert.equal(state(CASES.ready), 'success');
-  assert.equal(state(null), undefined);
-  assert.equal(state(PR({ statusCheckRollup: [] })), undefined, 'a PR with no checks has no CI mark');
-  assert.match(foot(R.columnView({ files: [], git: GIT(CASES.pending) })), /aria-label="1 running · 1\/2 passed"/);
-  assert.match(foot(R.columnView({ files: [], git: GIT(CASES.failed) })), /aria-label="1 failed · 1\/2 passed"/);
-  assert.doesNotMatch(foot(R.columnView({ files: [], git: GIT(CASES.ready, { ahead: 0 }) })), /Commits ahead/);
-  for (const ahead of [undefined, null, -1, 1.5, '3', NaN]) assert.doesNotMatch(foot(R.columnView({ files: [], git: GIT(CASES.ready, { ahead }) })), /Commits ahead/, String(ahead));
-});
-
-test('r3: the footer button is the disabled one when the rule says so, with the reason as its tooltip; without a PR it has no PR number to send', () => {
-  for (const [k, pr] of Object.entries(CASES)) {
-    const f = foot(R.columnView({ files: [], git: GIT(pr) }));
-    const btn = /<button type="button" class="merge ft-merge"[^>]*>/.exec(f)[0];
-    assert.equal(/ disabled/.test(btn), !pr.ready, k);
-    assert.match(btn, new RegExp(`data-n="${pr.number}"`));
-  }
-  const none = foot(R.columnView({ files: [], git: GIT(null, { merge: MERGE(null) }) }));
-  const btn = /<button type="button" class="merge ft-merge"[^>]*>/.exec(none)[0];
-  assert.match(btn, / disabled title="No open pull request for this branch. Method: squash. Change it in Settings, Delivery."/);
-  assert.doesNotMatch(btn, /data-n=/);
-  const busy = foot(R.columnView({ files: [], git: GIT(CASES.ready, { merge: MERGE(CASES.ready, { busy: true }) }) }));
-  assert.match(busy, / disabled title="Merge into main. Method: squash. Change it in Settings, Delivery.">Merging…<\/button>/);
-});
-
-test('r4: the footer is total: no branch, odd values, and nothing from the repo or the PR becomes markup', () => {
-  const evil = PR({ title: '<img src=x onerror=1>', headRefName: '<b>x</b>', baseRefName: '"><i>', url: 'javascript:alert(1)', statusCheckRollup: [RUN('<script>', { detailsUrl: 'javascript:alert(2)' })] });
-  const h = R.columnView({ name: '<b>', files: [], git: GIT(evil, { branch: '<u>x</u>', id: '"><s>', merge: MERGE(evil) }) });
-  assert.doesNotMatch(h, /<img|<script|<u>|<b>x|<i>|<s>|javascript:/);
-  assert.match(h, /&lt;u&gt;x&lt;\/u&gt;/);
-  for (const git of [{}, { id: 'a' }, { id: 'a', branch: 5 }, { id: 'a', pr: 'x', merge: 'x' }, null, 7]) {
-    const out = R.columnView({ files: [], git });
-    assert.doesNotMatch(out, /undefined|NaN|null/, JSON.stringify(git));
-  }
-  assert.match(foot(R.columnView({ files: [], git: { id: 'a', merge: MERGE(null) } })), /<span class="ft-name">—<\/span>/, 'no branch');
-});
 
 test('r5: with the git data the column has FOUR tabs in the order Tasks, Changes, Status, Files, and Status counts the pending checks; without it the column is as before', () => {
   assert.deepEqual(tabs(R.columnView({ files: [], git: GIT(CASES.ready) })), ['tasks', 'changes', 'status', 'files']);
@@ -218,12 +168,10 @@ test('r10: a PR with many checks is cut at 50 rows with the rest counted, and a 
   assert.match(o, /<span class="st-n">#7<\/span>/, 'a number with no safe URL is plain text');
 });
 
-test('s1: the styles: the footer stays at the bottom of the column in every tab, the checks have their states, the pending ones spin unless the person asked for less motion', () => {
+test('s1: the styles: the column is a flex column, the checks have their states, the pending ones spin unless the person asked for less motion', () => {
   assert.match(css, /#colBody\s*\{[^}]*display:\s*flex[^}]*flex-direction:\s*column[^}]*min-height:\s*100%/);
   assert.match(css, /\.col-pane\s*\{[^}]*flex:\s*1/);
-  assert.match(css, /\.col-foot\s*\{[^}]*position:\s*sticky[^}]*bottom:\s*0/);
-  assert.match(css, /\.ft-name\s*\{[^}]*text-overflow:\s*ellipsis/);
-  assert.match(css, /\.ft-merge\s*\{[^}]*flex:\s*none/);
+  assert.doesNotMatch(css, /\.col-foot|\.ft-merge/); // RP175: the footer is gone
   for (const k of ['success', 'pending', 'failed']) assert.match(css, new RegExp(`\\.ck-i\\.ck-${k}\\b|\\.ck-${k}\\b`), k);
   assert.match(css, /\.ck-nm\s*\{[^}]*text-overflow:\s*ellipsis/);
   assert.match(css, /\.col-tab \.n\.y\s*\{/);
@@ -296,97 +244,10 @@ function boot({ width = 1400, branch = 'feat/x', prs = { prs: [CASES.ready] } } 
 const open = async (page) => { page.run("ACTIONS['chat-open']({ dataset: { id: 'abc' } })"); await page.tick(); };
 const tab = (page, t) => { page.run(`ACTIONS['col-tab']({ dataset: { tab: '${t}' } })`); page.flush(); };
 const col = (page) => page.get('#colBody').html;
-const footBtn = (page) => (/<button type="button" class="merge ft-merge"[^>]*>[^<]*<\/button>/.exec(col(page)) || [''])[0];
+const footBtn = (page) => (/<button [^>]*data-act="merge"[^>]*>[^<]*<\/button>/.exec(page.get('#chatActions').html) || [''])[0]; // RP175: the Merge button is in the composer
 const posts = (page, url) => page.fetches.filter((f) => f.method === 'POST' && f.url === url);
 
-test('p1: with the column in, the footer is drawn in EVERY tab and its button is the Merge of the PR of the branch', async () => {
-  const page = boot();
-  await open(page);
-  for (const t of ['changes', 'status', 'tasks']) {
-    tab(page, t);
-    assert.match(col(page), /<div class="col-foot"/, t);
-    assert.match(footBtn(page), /data-act="merge" data-id="abc" data-n="7" title="Merge into main. Method: squash. Change it in Settings, Delivery.">Merge · squash<\/button>/, t);
-    assert.doesNotMatch(footBtn(page), /disabled/, t);
-  }
-  assert.match(col(page), /<span class="ft-name">feat\/x<\/span>/);
-  assert.match(col(page), /Commits ahead of the base">↑2</);
-});
-
-test('p2: touching the enabled footer button sends the SAME order as the card: POST /api/merge with the repo, the number, the method and the branch choice', async () => {
-  const page = boot();
-  page.routes['/api/merge'] = () => Promise.resolve(ok({ branch: 'kept' }));
-  await open(page);
-  page.click({ dataset: { act: 'merge', id: 'abc', n: '7' }, disabled: false, tagName: 'BUTTON' });
-  await page.tick();
-  assert.deepEqual(posts(page, '/api/merge').map((p) => p.body), [{ id: 'abc', number: 7, method: 'squash', deleteBranch: true }]);
-  assert.match(footBtn(page), / disabled /, 'after the merge the button stays off');
-  assert.match(footBtn(page), />Merged ✓</);
-});
-
-test('p3: a second touch while the merge is in flight, or on a held one, sends nothing more', async () => {
-  const page = boot();
-  page.routes['/api/merge'] = () => new Promise(() => {});
-  await open(page);
-  const el = { dataset: { act: 'merge', id: 'abc', n: '7' }, disabled: false, tagName: 'BUTTON' };
-  page.click(el);
-  page.click(el);
-  page.click(el);
-  await page.tick();
-  assert.equal(posts(page, '/api/merge').length, 1, 'doMerge ignores a PR that is already merging');
-  assert.match(footBtn(page), / disabled title="Merge into main. Method: squash. Change it in Settings, Delivery.">Merging…</);
-});
-
-test('p4: THE MATRIX on the page: for every kind of PR the footer button is off where the card is off, and touching it calls nothing', async () => {
-  for (const [k, pr] of Object.entries(CASES)) {
-    const page = boot({ prs: { prs: [pr] } });
-    page.routes['/api/merge'] = () => Promise.resolve(ok({}));
-    await open(page);
-    const btn = footBtn(page);
-    assert.equal(/ disabled /.test(btn), !pr.ready, `${k}: ${btn}`);
-    if (!pr.ready) assert.ok(btn.includes(`title="${pr.blockedReason.replace(/&/g, '&amp;')}"`) || /title="/.test(btn), `${k} has a tooltip`);
-    // the event the page really handles: a button with the disabled flag is dropped before any action runs
-    page.click({ dataset: { act: 'merge', id: 'abc', n: String(pr.number) }, disabled: !pr.ready, tagName: 'BUTTON' });
-    await page.tick();
-    assert.equal(posts(page, '/api/merge').length, pr.ready ? 1 : 0, k);
-  }
-});
-
-test('p5: the footer only ever points at the PR of the CURRENT branch: a ready PR of another branch is not offered, and the right one is picked among many', async () => {
-  const other = PR({ number: 9, headRefName: 'feat/other' });
-  const page = boot({ prs: { prs: [other] } });
-  await open(page);
-  assert.match(footBtn(page), / disabled title="No open pull request for this branch. Method: squash. Change it in Settings, Delivery.">/);
-  assert.doesNotMatch(footBtn(page), /data-n=/);
-  tab(page, 'status');
-  assert.match(col(page), /No open pull request for this branch/);
-  const mine = PR({ number: 8, headRefName: 'feat/x' });
-  const many = boot({ prs: { prs: [other, mine, PR({ number: 10, headRefName: 'feat/third' })] } });
-  await open(many);
-  assert.match(footBtn(many), /data-n="8"/);
-  const onMain = boot({ branch: 'main', prs: { prs: [other, mine] } });
-  await open(onMain);
-  assert.match(footBtn(onMain), / disabled /, 'on the base branch no PR belongs to it');
-  const detached = boot({ branch: null, prs: { prs: [other, mine] } });
-  await open(detached);
-  assert.match(footBtn(detached), / disabled /, 'a detached HEAD has no PR either');
-});
-
-test('p6: what is not known yet is never read as "ready": loading, a failed read, and a repo with no remote each keep the button off and say so', async () => {
-  const a = boot({ prs: null });
-  await open(a);
-  assert.match(footBtn(a), / disabled title="Loading pull requests… Method: squash. Change it in Settings, Delivery.">/);
-  const b = boot({ prs: { error: 'gh failed' } });
-  await open(b);
-  assert.match(footBtn(b), / disabled title="Pull requests unavailable. Method: squash. Change it in Settings, Delivery.">/);
-  const c = boot({ prs: { noRemote: true, prs: [] } });
-  await open(c);
-  assert.match(footBtn(c), / disabled title="This repository has no GitHub remote. Method: squash. Change it in Settings, Delivery.">/);
-  const d = boot({ prs: { prs: [] } });
-  await open(d);
-  assert.match(footBtn(d), / disabled title="No open pull request for this branch. Method: squash. Change it in Settings, Delivery.">/);
-});
-
-test('p7: while a command of the session is running the footer is off with its reason, like the card; a merge in flight turns off the Re-run too', async () => {
+test('p7: while a command of the session is running the Merge (now in the composer, RP175) and the Re-run are off with their reason, like the card', async () => {
   const page = boot({ prs: { prs: [CASES.failed] } });
   await open(page);
   tab(page, 'status');
@@ -453,7 +314,7 @@ test('p10: the arrows cycle Tasks, Changes, Status, Files and back; a fresh open
   assert.equal(sel(), 'tasks');
 });
 
-test('p11: with a layout that measures nothing (RP136: the column is in from 760 px) there is no column, so no footer and no merge button of it; and nothing is written by drawing the footer', async () => {
+test('p11: with a layout that measures nothing (RP136: the column is in from 760 px) there is no column; and nothing is written by switching tabs', async () => {
   const page = boot({ width: 0 });
   await open(page);
   assert.equal(col(page), '');
@@ -462,5 +323,5 @@ test('p11: with a layout that measures nothing (RP136: the column is in from 760
   const writes = () => wide.fetches.filter((f) => f.method !== 'GET').map((f) => f.url);
   const before = writes();
   for (const t of ['status', 'tasks', 'changes', 'status']) tab(wide, t);
-  assert.deepEqual(writes(), before, 'drawing the footer and switching tabs write nothing');
+  assert.deepEqual(writes(), before, 'switching tabs writes nothing');
 });

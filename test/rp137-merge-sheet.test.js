@@ -54,27 +54,26 @@ test('m1: the sheet says the number, the base, the method and what happens to th
   for (const bad of [null, undefined, 5, 'x', [], {}, { n: 0, base: 'main' }, { n: -1, base: 'main' }, { n: 1.5, base: 'main' }, { n: '7', base: 'main' }, { n: 7 }, { n: 7, base: 5 }]) assert.equal(R.mergeSheetHtml(bad), '', JSON.stringify(bad));
 });
 
-test('m2: the footer of the Repo screen writes the reason above it only when Merge is off for a reason, and escapes it', () => {
-  const base = { name: 'demo', tab: 'changes', fold: {}, files: [], fa: null };
-  const off = R.columnView({ ...base, git: { id: A, branch: 'feat/x', ahead: 0, pr: PENDING(), merge: { enabled: false, label: 'Merge · squash', title: 'Checks <b>pending</b>. Method: squash.', why: 'Checks <b>pending</b>. Method: squash.' } } });
-  assert.match(off, /<div class="ft-why" role="status">Checks &lt;b&gt;pending&lt;\/b&gt;\. Method: squash\.<\/div><div class="col-foot"/);
-  const on = R.columnView({ ...base, git: { id: A, branch: 'feat/x', ahead: 0, pr: READY(), merge: { enabled: true, label: 'Merge · squash', title: 'Merge into main', why: '' } } });
-  assert.doesNotMatch(on, /ft-why/);
+test('m2: RP175: the composer writes the reason next to Merge only when it is off for a reason, and escapes it', () => {
+  const off = R.composerMergeHtml({ id: A, branch: 'feat/x', ahead: 0, pr: PENDING(), merge: { enabled: false, label: 'Merge · squash', title: 'Checks <b>pending</b>. Method: squash.', why: 'Checks <b>pending</b>. Method: squash.' } });
+  assert.match(off, /<span class="c-why" role="status">Checks &lt;b&gt;pending&lt;\/b&gt;\. Method: squash\.<\/span>$/);
+  const on = R.composerMergeHtml({ id: A, branch: 'feat/x', ahead: 0, pr: READY(), merge: { enabled: true, label: 'Merge · squash', title: 'Merge into main', why: '' } });
+  assert.doesNotMatch(on, /c-why/);
 });
 
 // ---------- the stylesheet ----------
 const rules = [...css.matchAll(/(?:^|\n)([^{}\n@/ ][^{}\n]*)\{([^}]*)\}/g)].flatMap((m) => m[1].split(',').map((s) => ({ sel: s.trim().replace(/\s+/g, ' '), body: m[2] })));
 const rule = (sel) => { const r = rules.filter((x) => x.sel === sel); assert.ok(r.length, `a rule for ${sel}`); return r.map((x) => x.body).join(';'); };
 
-test('c1: the sheet is an overlay above everything with a backdrop, its buttons are 44 px targets with a visible focus ring, and the reason line is only on the Repo screen', () => {
+test('c1: the sheet is an overlay above everything with a backdrop, its buttons are 44 px targets with a visible focus ring, and the reason line is on every screen (RP175: it is in the composer now)', () => {
   assert.match(rule('#mergeSheet'), /position:\s*fixed/);
   assert.match(rule('#mergeSheet'), /z-index:\s*\d{2,}/);
   assert.match(rule('#mergeSheet[hidden]'), /display:\s*none/);
   assert.match(rule('.ms-back'), /position:\s*absolute/);
   assert.match(rule('.ms-btns button'), /min-height:\s*44px/);
   assert.match(css, /\.ms-btns button:focus-visible[^{]*\{[^}]*outline:\s*2px solid var\(--blue\)/);
-  assert.match(rule('.ft-why'), /display:\s*none/);
-  assert.match(rule('#sumLayout[data-screen="repo"] .ft-why'), /display:\s*block/);
+  assert.doesNotMatch(rule('.c-why'), /display:\s*none/); // RP175: the reason is never hidden: a phone has no hover
+  assert.doesNotMatch(css, /ft-why/);
 });
 
 // ---------- the page ----------
@@ -309,16 +308,16 @@ test('a13: the sheet takes the focus on Cancel (the safe button) when it opens',
   assert.equal(page.get('#ms-cancel').focused, true);
 });
 
-test('r1: on the Repo screen the footer writes the reason Merge is off above it, and takes it away when the PR is ready', async () => {
+test('r1: RP175: the chat screen (the composer) writes the reason Merge is off next to it, and takes it away when the PR is ready', async () => {
   const page = await boot();
   await page.click('chat-open', { id: A });
   page.run(`S.local['${A}'] = { branch: 'feat/x', ahead: 0, files: [], error: null }`);
   await page.setPr(A, PENDING());
-  await page.click('zone-set', { zone: 'repo' });
-  assert.match(page.get('#colBody').html, /<div class="ft-why" role="status">/);
+  await page.draw();
+  assert.match(page.get('#chatActions').html, /<span class="c-why" role="status">/);
   await page.setPr(A, READY());
   await page.draw();
-  assert.doesNotMatch(page.get('#colBody').html, /ft-why/);
+  assert.doesNotMatch(page.get('#chatActions').html, /c-why/);
 });
 
 test('a14: ABUSE: a tap on a Merge that is off leaves NO sheet pending in the state (it is not just hidden by the next draw)', async () => {
