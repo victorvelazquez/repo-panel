@@ -24,7 +24,8 @@ const BAD = '<img src=x onerror=alert(1)>';
 
 // ---------- pure: session chips ----------
 test('every session state shows an icon and a word, never colour alone', () => {
-  const want = { working: /● working/, waiting: /◐ asking you/, free: /○ free/, none: /○ no session/, unknown: /\? unknown/ };
+  // RP169: the card draws the chip of the chat (same tone, icon and words), not the old characters.
+  const want = { working: /ss-green ss-working[^]*Working…/, waiting: /ss-yellow ss-waiting[^]*Asking you something/, free: /ss-gray ss-free[^]*Idle/, none: /ss-gray ss-none[^]*Not started/, unknown: /ss-gray ss-unknown[^]*Unknown/ };
   for (const [state, re] of Object.entries(want)) {
     const html = view([row({ session: { state } })]);
     assert.match(html, re, state);

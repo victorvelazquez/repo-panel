@@ -294,6 +294,13 @@ function summaryHold(id) {
   const session = live !== undefined ? live : state === 'working' ? 'busy' : state === 'waiting' ? 'asking' : undefined;
   return V.deliveryHold({ sending: S.sending[id], running: v && v.state === 'running' ? { cmd: v.cmd, label: v.label } : null, session, jobs: jobsOfRepo(id) }); // RP163: and the jobs the session waits for
 }
+// RP169: the live state of the session that the chip of the card draws (the same S.rpc entry the chat label gets), or undefined when the page has none for the repo. A command that is on its way
+// (summaryShown lifts the row the same way) shows an idle session as working at once, as the card did before.
+function summaryLive(id) {
+  const rpc = S.rpc[id];
+  if (!rpc || !rpc.state) return undefined;
+  return rpc.state === 'idle' && commandRunning(id) ? { ...rpc, state: 'busy' } : rpc;
+}
 function summaryFlow(id) {
   const r = allRepos().find((x) => x.id === id);
   const m = modelOf(id);
@@ -372,7 +379,7 @@ function drawSummary() {
   const box = $('#summary');
   const ctx = {
     now: Date.now(), scope, rooms: S.rooms, q: S.q, group: S.group, roomData: S.roomData.data, filter: S.sfilter, live: S.slive, subsOpen: S.subsOpen, collapsed: S.collapsed, failed: S.summaryFailed,
-    flowFor: summaryFlow, holdFor: summaryHold, changesFor: summaryChanges, prsFor: summaryPrs, idleFor: summaryIdle, sending: S.sending, busy: busyView(), chatId: S.chat.id,
+    flowFor: summaryFlow, holdFor: summaryHold, liveFor: summaryLive, changesFor: summaryChanges, prsFor: summaryPrs, idleFor: summaryIdle, sending: S.sending, busy: busyView(), chatId: S.chat.id,
   };
   drawListHead(ctx, kept);
   const changed = paint(box, R.summaryView(summaryShown(), ctx));

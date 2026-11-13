@@ -146,11 +146,12 @@ const mergeBtn = (html, n = 7) => (new RegExp(`<button class="merge" data-act="m
 const PI_CLICK = "ACTIONS.pi({ dataset: { id: 'abc', cmd: 'flow-next' }, disabled: false })";
 
 // ====================================================================================================
+// RP169: the card chip is the chat chip now: «● working» is ss-working (Working…), «○ free» is ss-free (Idle), «◐ asking you» is ss-waiting (Asking you something); each assertion keeps its meaning.
 // A. command buttons: S.sending / S.sent show «working» at once
 // ====================================================================================================
 test('A1: precondition: a free repo shows the free chip and an enabled /flow-next button', async () => {
   const { page } = await summaryPage({}, [START_ROW(), card({ id: 'xyz', name: 'other' })]);
-  assert.match(cardOf(page, 'abc'), /○ free/);
+  assert.match(cardOf(page, 'abc'), /ss-free[^]*Idle/);
   assert.doesNotMatch(piBtn(cardOf(page, 'abc')), /disabled/);
 });
 
@@ -160,12 +161,13 @@ test('A2: a click on /flow-next makes the Summary chip say working BEFORE the PO
   page.run(PI_CLICK);
   page.flush(); // the rAF flush, nothing else: no fetch has resolved
   const html = cardOf(page, 'abc');
-  assert.match(html, /● working/, html);
-  assert.doesNotMatch(html, /○ free/, html);
+  // RP169: the card shows the live state of the session, and a click on a closed one makes it «Starting…» at once (before it only said working).
+  assert.match(html, /ss-starting[^]*Starting…/, html);
+  assert.doesNotMatch(html, /ss-free[^]*Idle/, html);
   assert.match(piBtn(html), /disabled/);
   // a repo without a command in flight keeps the server state
-  assert.match(cardOf(page, 'xyz'), /○ free/);
-  assert.doesNotMatch(cardOf(page, 'xyz'), /● working/);
+  assert.match(cardOf(page, 'xyz'), /ss-free[^]*Idle/);
+  assert.doesNotMatch(cardOf(page, 'xyz'), /ss-starting|ss-working/);
 });
 
 test('A3: the override never changes the server rows: S.summary.rows stays as received', async () => {
@@ -175,7 +177,7 @@ test('A3: the override never changes the server rows: S.summary.rows stays as re
   const before = JSON.stringify(rows);
   page.run(PI_CLICK);
   page.flush();
-  assert.match(cardOf(page, 'abc'), /● working/, 'precondition: the chip is overridden');
+  assert.match(cardOf(page, 'abc'), /ss-starting[^]*Starting…/, 'precondition: the chip is overridden (RP169: by the live state, Starting…)');
   assert.equal(JSON.stringify(page.run('S.summary.rows')), before);
   assert.deepEqual(page.run('S.summary.rows').map((r) => r.session.state), ['free', 'free']);
 });
@@ -188,12 +190,12 @@ test('A5: once the POST resolves {sent:true,confirmed:true} the chip is STILL wo
   await page.tick();
   assert.ok(page.run('S.sent.abc'), 'precondition: the command is recorded as sent');
   assert.equal(page.run('S.sending.abc'), undefined, 'precondition: no longer sending');
-  assert.match(cardOf(page, 'abc'), /● working/, 'the verdict of the sent command is running');
-  assert.doesNotMatch(cardOf(page, 'abc'), /○ free/);
+  assert.match(cardOf(page, 'abc'), /ss-working[^]*Working…/, 'the verdict of the sent command is running');
+  assert.doesNotMatch(cardOf(page, 'abc'), /ss-free[^]*Idle/);
   page.run("clearSent('abc'); draw()");
   page.flush();
-  assert.match(cardOf(page, 'abc'), /○ free/, 'back to the server state');
-  assert.doesNotMatch(cardOf(page, 'abc'), /● working/);
+  assert.match(cardOf(page, 'abc'), /ss-free[^]*Idle/, 'back to the server state');
+  assert.doesNotMatch(cardOf(page, 'abc'), /ss-working[^]*Working…/);
 });
 
 test('A6: a failed POST goes back to the server state (free) and the button is enabled again', async () => {
@@ -201,10 +203,10 @@ test('A6: a failed POST goes back to the server state (free) and the button is e
   const { page } = await summaryPage({ '/api/pi': () => post.promise }, [START_ROW(), card({ id: 'xyz', name: 'other' })]);
   page.run(PI_CLICK);
   page.flush();
-  assert.match(cardOf(page, 'abc'), /● working/, 'precondition');
+  assert.match(cardOf(page, 'abc'), /ss-starting[^]*Starting…/, 'precondition (RP169: Starting…)');
   post.resolve(fail(500, { error: 'No open session' }));
   await page.tick();
-  assert.match(cardOf(page, 'abc'), /○ free/);
+  assert.match(cardOf(page, 'abc'), /ss-free[^]*Idle/);
   assert.doesNotMatch(piBtn(cardOf(page, 'abc')), /disabled/);
 });
 
@@ -212,10 +214,11 @@ test('A7: a repo whose server state is already waiting keeps asking you (the ove
   const post = gate();
   const rows = [{ ...START_ROW(), session: { state: 'waiting' } }, card({ id: 'xyz', name: 'other' })];
   const { page } = await summaryPage({ '/api/pi': () => post.promise }, rows);
-  assert.match(cardOf(page, 'abc'), /◐ asking you/, 'precondition');
+  assert.match(cardOf(page, 'abc'), /ss-waiting[^]*Asking you something/, 'precondition');
   page.run(PI_CLICK);
   page.flush();
-  assert.match(cardOf(page, 'abc'), /◐ asking you/);
+  // RP169: the live state of the page wins over the row; the click starts the session, so the card says it (the row «waiting» is only the fallback).
+  assert.match(cardOf(page, 'abc'), /ss-starting[^]*Starting…/);
 });
 
 // ====================================================================================================
@@ -671,5 +674,5 @@ test('E2: a judged command (/flow-commit) also shows working at once, before eve
   const { page } = await summaryPage({ '/api/local': () => baseline.promise }, [{ ...START_ROW(), action: { kind: 'deliver', label: 'x' } }, card({ id: 'xyz', name: 'other' })]);
   page.run("ACTIONS.pi({ dataset: { id: 'abc', cmd: 'flow-commit' }, disabled: false })");
   page.flush();
-  assert.match(cardOf(page, 'abc'), /● working/);
+  assert.match(cardOf(page, 'abc'), /ss-starting[^]*Starting…/); // RP169: the live state of the session that this click starts
 });

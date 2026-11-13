@@ -10,11 +10,6 @@
   const clip = (s, n) => (String(s).length > n ? `${String(s).slice(0, n - 1)}…` : String(s));
   const ALL = { kind: 'all' };
   const LABEL_MAX = 24;
-  // State = icon + word, never colour alone.
-  const SESSION = {
-    working: ['green', '● working'], waiting: ['yellow', '◐ asking you'], free: ['gray', '○ free'],
-    none: ['gray', '○ no session'], unknown: ['gray', '? unknown'],
-  };
 
   const normalizeScope = (scope, rooms) => {
     if (scope && scope.kind === 'none') return { kind: 'none' };
@@ -92,7 +87,16 @@
     const items = s.list.map((e) => `<li class="rs-sub-item sbi-${e.state}"><b>${esc(e.name || 'subagent')}</b> <span>${SUB_WORD[e.state]}</span> <span>${e.minutes} min${e.idle >= 1 ? ` · idle ${e.idle} min` : ''}</span></li>`).join('');
     return `<ul class="rs-subs" aria-label="Subagents of this repo">${items}</ul>`;
   }
-  const sessionChip = (state) => { const [color, text] = SESSION[state] || SESSION.unknown; return `<span class="chip ${color}">${text}</span>`; };
+  // RP169: the card draws the chip of the chat (sessionLabelHtml) from the LIVE state of the page (ctx.liveFor); only a page with none for the repo falls back to the row of the server.
+  const ROW_RPC = { working: 'busy', waiting: 'asking', free: 'idle', none: 'closed' };
+  function sessionChip(r, ctx) {
+    const live = ctx.liveFor ? ctx.liveFor(r.id) : null;
+    const known = (st) => typeof st === 'string' && Object.hasOwn(SESS_OF, st);
+    const rowState = r.session && typeof r.session === 'object' ? r.session.state : undefined;
+    const rpc = live && typeof live === 'object' && known(live.state) ? live
+      : { state: typeof rowState === 'string' && Object.hasOwn(ROW_RPC, rowState) ? ROW_RPC[rowState] : undefined };
+    return sessionLabelHtml({ info: true, rpc });
+  }
 
   // Segmented bar plus a SHORT count; the full breakdown is the title and the aria-label. `p` is a row's progress or a sum of them.
   // With `id` (a repo card, never a room sum) the whole bar is a button that opens the tasks of that repo (RP63).
@@ -179,7 +183,7 @@
       branch: { text: r.branch ?? '', title: r.branch ?? '' }, chips,
       // RP94c: the subject of the last commit (the row already had it as the tooltip of the time), on its own small line.
       commit: !r.error && typeof lm.what === 'string' && lm.what.trim() ? `<span class="rs-sub rs-commit" title="${esc(lm.what.trim())}">${esc(lm.what.trim())}</span>` : '',
-      meta: `<span class="rs-sub rs-when" title="${esc(lm.what ?? '')}">${esc(relativeTime(lm.at, ctx.now))}</span>${r.error ? '<span class="chip red">▲ error</span>' : sessionChip(r.session && r.session.state)}${subsBadgeHtml(r, ctx)}`,
+      meta: `<span class="rs-sub rs-when" title="${esc(lm.what ?? '')}">${esc(relativeTime(lm.at, ctx.now))}</span>${r.error ? '<span class="chip red">▲ error</span>' : sessionChip(r, ctx)}${subsBadgeHtml(r, ctx)}`,
       body: `${subsListHtml(r, ctx)}${r.error ? noData : progressHtml(r.progress, r.id)}${nextHtml(r)}${actionButton(r, ctx)}`,
     }, 'summary');
   }
@@ -1359,5 +1363,5 @@ ${status}</div>`;
     return `${ctx.failed ? '<div class="rs-note" role="status">⚠ Summary unavailable: showing the last data we have.</div>' : ''}<div class="rs-list">${body}</div>`;
   }
 
-  return { mergeSheetHtml, repoStatus, esc, mdHtml, settingsView, memoryChipHtml, subagentChipHtml, ctxChipHtml, compactButtonHtml, legendHtml, listCount, listHeadChips, sessionChip, blockWidths, columnView, treeFolderPaths, fileView, COLUMN_TABS, composerState, askAllowed, actionMenu, actionButtonsHtml, composerMergeHtml, composerNote, chatHead, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, sessionCloseHtml, sessionTerminalHtml, terminalBlockHtml, recentlyActive, chatBody, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
+  return { mergeSheetHtml, repoStatus, esc, mdHtml, settingsView, memoryChipHtml, subagentChipHtml, ctxChipHtml, compactButtonHtml, legendHtml, listCount, listHeadChips, blockWidths, columnView, treeFolderPaths, fileView, COLUMN_TABS, composerState, askAllowed, actionMenu, actionButtonsHtml, composerMergeHtml, composerNote, chatHead, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, sessionCloseHtml, sessionTerminalHtml, terminalBlockHtml, recentlyActive, chatBody, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
 }));
