@@ -339,11 +339,13 @@
     }
     return false;
   }
-  function taskPrs(prs, rows) {
+  // RP173: the pull request of the CURRENT local branch is this checkout's own work in review, even when its row is not in the base roadmap yet (the row is born in the same diff as its work). Whole head, exact, case-sensitive.
+  function taskPrs(prs, rows, opts) {
+    const branch = opts && typeof opts.branch === 'string' ? opts.branch : '';
     const list = Array.isArray(prs) ? prs.filter((p) => isObject(p)) : [];
     const ids = Array.isArray(rows) ? [...new Set(rows.filter((r) => isObject(r) && typeof r.id === 'string' && r.id).map((r) => r.id))] : [];
     if (!ids.length) return list;
-    return list.filter((p) => ids.some((id) => matchesUnitId(p.title, id) || matchesUnitId(p.head, id)));
+    return list.filter((p) => (branch && p.head === branch) || ids.some((id) => matchesUnitId(p.title, id) || matchesUnitId(p.head, id)));
   }
   function queueFlags(local, stateData, verdict, { now = Date.now(), override = false } = {}) {
     const out = {};

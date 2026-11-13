@@ -32,7 +32,7 @@ function queueItems() {
     const s = rm && rm.available ? rm.summary : null;
     const flags = V ? V.queueFlags(S.local[r.id], m.state, verdictOf(r), { override: S.showCommit.has(r.id) }) : {};
     return {
-      id: r.id, name: r.name, dirty, unpushed, stale: !!p.stale, hasPrs: (V ? V.taskPrs(prs, S.roadmap[r.id] && S.roadmap[r.id].available === true ? S.roadmap[r.id].rows : null) : prs).length > 0, ...flags, // RP138
+      id: r.id, name: r.name, dirty, unpushed, stale: !!p.stale, hasPrs: (V ? V.taskPrs(prs, S.roadmap[r.id] && S.roadmap[r.id].available === true ? S.roadmap[r.id].rows : null, { branch: S.local[r.id].branch }) : prs).length > 0, ...flags, // RP138
       ready: prs.filter((x) => x.ready && !S.snoozed.has(snoozeKey(r.id, x.number))).map((x) => ({ number: x.number, title: x.title })),
       next: s && s.kind === 'next' ? { id: s.id, entrega: s.entrega } : null,
     };
