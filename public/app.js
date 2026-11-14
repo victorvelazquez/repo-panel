@@ -37,7 +37,7 @@ const S = {
   tab: 'summary', scope: { kind: 'all' }, summary: null, summaryKey: '', summaryFailed: false, sfilter: 'all', slive: store('repo-panel.live', false) === true, collapsed: {},
   timeouts: { get: 25000, post: 70000 },
   tasks: {}, tasksOpenDone: false, tasksMore: false, tasksFold: {}, changes: {}, files: {}, filesOpen: {}, fileData: {}, pad: {},
-  lh: { search: false, menu: false, legend: false, focus: false }, // RP121: the header of the repos column (search box open, filter menu open, focus the box on the next draw)
+  lh: { search: false, menu: false, focus: false }, // RP121: the header of the repos column (search box open, filter menu open, focus the box on the next draw)
   chat: { id: null, seq: 0 }, chatCache: {}, drafts: {}, recall: {}, notes: {}, askBusy: {}, quick: null, chatResults: Object.create(null), rpc: {},
 };
 S.tab = 'summary'; // the page always opens on Sessions (RP188); a saved 'work' preference is ignored on load
@@ -54,7 +54,7 @@ document.addEventListener('pointercancel', releasePress, true);
 
 document.addEventListener('click', (e) => {
   if (S.menu && !e.target.closest('.more')) { S.menu = null; draw(); }
-  if ((S.lh.menu || S.lh.legend) && !e.target.closest('#listHead')) { S.lh.menu = false; S.lh.legend = false; draw(); } // RP121: a click outside the header closes the filter menu
+  if (S.lh.menu && !e.target.closest('#listHead')) { S.lh.menu = false; draw(); } // RP121: a click outside the header closes the filter menu
   const el = e.target.closest('[data-act]');
   if (!el || el.disabled) return;
   if (el.tagName === 'A') return;
@@ -72,7 +72,7 @@ document.addEventListener('submit', (e) => {
 // Space (the buttons inside it have no chat-open act, so they are untouched).
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && S.mergeSheet) { S.mergeSheet = null; draw(); return; } // RP137: the sheet that asks before a merge closes first
-  if (e.key === 'Escape' && (S.lh.menu || S.lh.search || S.lh.legend)) { S.lh.menu = false; S.lh.search = false; S.lh.legend = false; draw(); return; } // RP121: the bar of the repos column first
+  if (e.key === 'Escape' && (S.lh.menu || S.lh.search)) { S.lh.menu = false; S.lh.search = false; draw(); return; } // RP121: the bar of the repos column first
   if (e.key === 'Escape' && S.menu) { S.menu = null; draw(); return; }
   if (e.key === 'Escape') {
     const menu = $('#addMenu');

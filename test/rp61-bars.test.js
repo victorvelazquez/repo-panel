@@ -264,7 +264,7 @@ test('the Summary cards honour S.q and S.group, and the tools are painted outsid
   S.q = 'alphab';
   page.run('render()');
   assert.deepEqual(ids(page.get('#summary').html), ['c']);
-  assert.match(page.get('#lhAttention').html, /aria-label="Needs attention · 1"/, 'RP121: the toggle lives in the header of the repos column');
+  assert.match(page.get('#lhLive').html, /aria-label="Working now · \d+"/, 'RP121/RP189: the tool lives in the header of the repos column (Working now)');
   assert.doesNotMatch(page.get('#summary').html, /sfilter/);
   S.q = '';
   S.group = 'G2';
@@ -279,27 +279,26 @@ test('the shared inputs are never repainted by render()', () => {
   for (const sel of ['#search', '#groupFilter']) assert.equal(page.get(sel).writes, 0, sel);
 });
 
-test('the sfilter action toggles between attention and all and the button carries the value it would set', () => {
+test('the sfilter action toggles between attention and all (RP189: no button of the header reaches it any more)', () => {
   const page = loadPage();
   const S = withRepos(page);
   S.summary = payload(ROWS.map((r, i) => ({ ...r, id: ['a', 'b', 'c', 'd'][i] })));
   page.run('render()');
-  assert.match(page.get('#lhAttention').html, /data-filter="attention" aria-pressed="false"/);
+  assert.equal(S.sfilter, 'all');
   page.run("ACTIONS.sfilter({ dataset: { filter: 'attention' } })");
   page.flush();
   assert.equal(S.sfilter, 'attention');
-  assert.match(page.get('#lhAttention').html, /data-filter="all" aria-pressed="true"/);
   page.run("ACTIONS.sfilter({ dataset: { filter: 'all' } })");
   page.flush();
   assert.equal(S.sfilter, 'all');
 });
 
-test('the keyboard focus stays on the Needs attention button after the redraw', () => {
-  const btn = { dataset: { act: 'sfilter', filter: 'attention' }, focused: 0, focus() { this.focused++; } };
+test('the keyboard focus stays on the Working now button after the redraw', () => {
+  const btn = { dataset: { act: 'slive', live: 'on' }, focused: 0, focus() { this.focused++; } };
   const page = loadPage();
   const S = withRepos(page);
   page.ctx.document.activeElement = btn;
-  const found = page.get('#lhAttention [data-act="sfilter"]');
+  const found = page.get('#lhLive [data-act="slive"]');
   found.focus = () => btn.focus();
   S.summary = payload(ROWS);
   page.run('render()');

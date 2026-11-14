@@ -68,9 +68,10 @@ test('f6: a payload that is not valid and a hostile name never break it: names a
 });
 
 // ---------- the icon and the chip ----------
-test('i1: the icon is next to the flag, a pressed-state button with the count in its label, and the button sets the value it is NOT in', () => {
+test('i1: the icon is the only compact tool (RP189: the flag is gone), a pressed-state button with the count in its label, and the button sets the value it is NOT in', () => {
   const off = R.summaryTools(payload, { compact: true, live: false });
-  assert.match(off, /class="lh-ic lh-att on"[\s\S]*?<\/button><button type="button" class="lh-ic lh-live on" data-act="slive" data-live="on" aria-pressed="false" aria-label="Working now · 7" title="Working now · 7"><svg [^>]*aria-hidden="true"[^>]*>[\s\S]*?<\/svg><small>7<\/small><\/button>/);
+  assert.doesNotMatch(off, /lh-att|sfilter/);
+  assert.match(off, /^<button type="button" class="lh-ic lh-live on" data-act="slive" data-live="on" aria-pressed="false" aria-label="Working now · 7" title="Working now · 7"><svg [^>]*aria-hidden="true"[^>]*>[\s\S]*?<\/svg><small>7<\/small><\/button>/);
   const on = R.summaryTools(payload, { compact: true, live: true });
   assert.match(on, /class="lh-ic lh-live on" data-act="slive" data-live="off" aria-pressed="true" aria-label="Working now · 7"/);
 });
@@ -82,14 +83,6 @@ test('i2: the number is how many repos of the scope, group and text have a live 
   assert.match(R.summaryTools(payload, { compact: true, q: 'free' }), /aria-label="Working now · 1"/);
   assert.equal(R.summaryTools(null, { compact: true }), '');
   assert.equal(R.summaryTools({ rows: 'x' }, { compact: true, live: true }), '');
-});
-
-test('i3: the chip of the active filter comes only when it is on, before Needs attention, and Clear shows with it', () => {
-  assert.doesNotMatch(R.listHeadChips({ live: false }), /Working now/);
-  assert.equal(R.listHeadChips({}), '');
-  const h = R.listHeadChips({ live: true, filter: 'attention' });
-  assert.match(h, /<button type="button" data-act="slive" data-live="off">Working now ✕<\/button><button type="button" data-act="sfilter" data-filter="all">Needs attention ✕<\/button>/);
-  assert.match(R.listHeadChips({ live: true }), /Working now ✕<\/button><button type="button" class="lh-clr" data-act="lh-clear">Clear<\/button>/);
 });
 
 test('c1: the icon looks like the flag: green when it has cards, a green frame when pressed, a visible focus ring', () => {
@@ -174,7 +167,7 @@ test('p3: Clear turns it off (and the saved value with it), together with the ot
   assert.deepEqual(page.writes.at(-1), [KEY, 'false']);
 });
 
-test('p4: drawn in the page: with the filter on the list, the count, the chip and the pressed icon follow it', async () => {
+test('p4: drawn in the page: with the filter on the list, the count and the pressed icon follow it (RP189: no chip; the dot of the ⋮ button stays off, Working now has its own pressed button)', async () => {
   const page = await boot();
   await page.show();
   assert.equal(page.list().length, ROWS.length);
@@ -182,8 +175,8 @@ test('p4: drawn in the page: with the filter on the list, the count, the chip an
   await page.click('slive', { live: 'on' });
   assert.deepEqual(page.list().sort(), ['r-badstate', 'r-bogus', 'r-free', 'r-nosession', 'r-unknown', 'r-waiting', 'r-working']);
   assert.equal(page.get('#lhCount').textContent, '7');
-  assert.match(page.get('#lhActive').html, /Working now ✕/);
-  assert.match(page.get('#lhAttention').html, /lh-live[^>]*aria-pressed="true"/);
+  assert.equal(page.get('#lhDot').hidden, true);
+  assert.match(page.get('#lhLive').html, /lh-live[^>]*aria-pressed="true"/);
   await page.click('sfilter', { filter: 'attention' });
   assert.deepEqual(page.list(), ['r-waiting']);
   assert.equal(page.get('#lhCount').textContent, '1');

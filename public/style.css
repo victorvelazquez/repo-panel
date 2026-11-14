@@ -47,7 +47,7 @@ header .rs-tabs .tab-ic { display: none; }
   header .rs-tabs .tab-dual .badge { position: absolute; top: 0; right: 0; margin: 0; padding: 0 5px; font-size: 11px; line-height: 16px; }
 }
 #addMenu > summary { color: var(--blue); }
-#addMenu > summary { padding: 0 8px; font-weight: 600; line-height: 22px; }
+#addMenu > summary { display: inline-flex; align-items: center; justify-content: center; min-width: 30px; height: 30px; padding: 0 6px; } /* the size of .lh-ic, the buttons next to it; the plus is an SVG centered by the box */
 #addMenu { position: static; } /* the popover hangs from #listHead (relative), so it never leaves a 390 px screen */
 #addMenu .pop-body { left: 12px; right: auto; width: min(270px, calc(100% - 24px)); padding: 6px; gap: 2px; }
 .pop-item { display: grid; gap: 1px; width: 100%; min-height: 44px; padding: 6px 10px; text-align: left; border: 0; border-radius: 6px; background: transparent; }
@@ -444,9 +444,9 @@ body.tab-summary #viewbar { display: none; }
 .chatlayout.chat-open { height: calc(100vh - var(--sum-top, 98px)); min-height: 480px; }
 .chatlayout.chat-open #listCol { flex: none; width: var(--list-w, 25%); min-width: 260px; }
 .chatlayout.chat-open #summary { overflow: auto; overscroll-behavior: contain; } /* RP182: an inner scroller keeps the scroll to itself at its end */
-/* RP121: the header of the repos column: a thin bar (title and count, three icons), a strip of active filters that exists only while one is set, and a menu over the list. */
+/* RP121: the header of the repos column: a thin bar (title and count, the + menu, Working now and the ⋮ button) and a menu over the list (RP189: no strip of chips, no legend). */
 #listHead { flex: none; position: relative; z-index: 3; background: var(--bg); border-bottom: 1px solid var(--line); }
-.lh-title[hidden], .lh-icons[hidden], .lh-search[hidden], .lh-active[hidden], .lh-menu[hidden], .lh-legend[hidden], .lh-dot[hidden] { display: none; }
+.lh-title[hidden], .lh-icons[hidden], .lh-search[hidden], .lh-menu[hidden], .lh-dot[hidden] { display: none; }
 .lh-bar { display: flex; align-items: center; gap: 6px; min-height: 40px; padding: 4px 12px; }
 .lh-title { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 8px; }
 .lh-title b { font-size: 13px; letter-spacing: .02em; }
@@ -456,9 +456,7 @@ body.tab-summary #viewbar { display: none; }
 .lh-ic:hover:not(:disabled) { color: var(--text); border-color: var(--line); }
 .lh-ic[aria-expanded="true"] { color: var(--text); background: var(--panel2); border-color: var(--line); }
 .lh-ic small { font-size: 12px; font-weight: 600; }
-.lh-att.on { color: var(--red); }
-.lh-att[aria-pressed="true"] { border-color: var(--red); background: #2a1213; }
-.lh-live.on { color: var(--green); } /* RP158: the icon of «Working now» next to the flag: green with cards, a green frame when pressed */
+.lh-live.on { color: var(--green); } /* RP158: the icon of «Working now»: green with cards, a green frame when pressed */
 .lh-live[aria-pressed="true"] { border-color: var(--green); background: #12261a; }
 .lh-dot { position: absolute; top: 4px; right: 4px; width: 7px; height: 7px; border-radius: 50%; background: var(--blue); }
 .lh-search { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; padding: 0 6px 0 8px; color: var(--muted); }
@@ -467,10 +465,10 @@ body.tab-summary #viewbar { display: none; }
 .lh-x:hover:not(:disabled) { color: var(--text); }
 /* The close button of the filter menu: in its top right corner, over the block. */
 .lh-menu-x { position: absolute; top: 6px; right: 6px; width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px; }
-.lh-active { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 0 12px 8px; font-size: 12px; }
-.lh-active button { padding: 1px 8px; font-size: 12px; }
-.lh-clr { border-color: transparent; background: transparent; color: var(--muted); text-decoration: underline; }
 .lh-menu { position: absolute; left: 8px; right: 8px; top: 100%; margin-top: 6px; display: grid; gap: 10px; padding: 12px; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 12px 32px #0009; }
+.lh-mi { text-align: left; min-height: 36px; padding: 6px 10px; background: transparent; border-color: transparent; color: var(--text); } /* RP189: Search and Clear filters, the rows of the ⋮ menu */
+.lh-mi:hover:not(:disabled) { background: var(--panel); border-color: var(--line); }
+@media (pointer: coarse) { .lh-mi { min-height: 44px; } }
 .lh-menu h4 { margin: 0 0 4px; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
 #listHead button:focus-visible, #listHead select:focus-visible, #listHead input:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 /* RP120: the chat and the column with no repo chosen. */

@@ -162,15 +162,11 @@ const ACTIONS = {
   'push-test': async () => {
     try { const d = await api('/api/push/test', {}); toast(d.sent ? 'Test push sent' : 'The push service did not take it', d.sent ? 'ok' : 'bad'); } catch (e) { toast(`Test failed: ${String((e && e.message) || e).slice(0, 120)}`, 'bad'); }
   },
-  // RP121: the header of the repos column. Search and menu are page-only state (S.lh); the clears undo the shared filters.
-  'lh-search-open': () => { S.lh.search = true; S.lh.legend = false; S.lh.focus = true; draw(); },
+  // RP121: the header of the repos column. Search and menu are page-only state (S.lh); Clear filters (in the ⋮ menu) undoes the shared filters.
+  'lh-search-open': () => { S.lh.search = true; S.lh.menu = false; S.lh.focus = true; draw(); }, // RP189: reached from the ⋮ menu (or the key /), which it closes
   'lh-search-close': () => { S.lh.search = false; draw(); },
-  'lh-filters': () => { S.lh.menu = !S.lh.menu; S.lh.legend = false; draw(); },
-  'lh-legend-close': () => { S.lh.legend = false; S.lh.focusInfo = true; draw(); }, // RP125: the close button of the legend: only closes it and gives the focus back to the info icon
+  'lh-filters': () => { S.lh.menu = !S.lh.menu; draw(); },
   'lh-menu-close': () => { S.lh.menu = false; S.lh.focusBtn = true; draw(); }, // the close button of the filter menu: only closes it (the filters stay) and gives the focus back to the funnel
-  'lh-legend': () => { S.lh.legend = !S.lh.legend; S.lh.menu = false; draw(); }, // RP121: the legend of the bars; it and the filter menu never show together
-  'lh-clear-q': () => { S.q = ''; draw(); },
-  'lh-clear-group': () => { S.group = ''; draw(); },
   'lh-clear': () => { S.q = ''; S.group = ''; S.scope = { kind: 'all' }; S.sfilter = 'all'; S.slive = false; persistLive(); draw(); },
   // RP158: the filter «Working now»: the button says the value it sets (on or off, anything else is off) and the page remembers it.
   'slive': (el) => { S.slive = !!el && !!el.dataset && el.dataset.live === 'on'; persistLive(); draw(); },

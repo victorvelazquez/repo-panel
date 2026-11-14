@@ -41,7 +41,7 @@
       <div id="listHead" role="group" aria-label="Repo filters">
         <div class="lh-bar">
           <div id="lhTitle" class="lh-title"><b>REPOS</b> <span id="lhCount" class="lh-n"></span></div>
-          <details class="pop" id="addMenu"><summary aria-label="Add a repo or a room" title="Add a repo or a room">+</summary><div class="pop-body">
+          <details class="pop" id="addMenu"><summary aria-label="Add a repo or a room" title="Add a repo or a room"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10"/></svg></summary><div class="pop-body">
             <button type="button" class="pop-item" data-act="add-dialog"><span>Repo…</span><small>Register a repository</small></button>
             <button type="button" class="pop-item" data-act="room-dialog" title="Register a room: a repo where you coordinate a group of repos"><span>Room…</span><small>A repo that coordinates a group</small></button>
           </div></details>
@@ -51,21 +51,16 @@
             <button type="button" class="lh-x" data-act="lh-search-close" aria-label="Close search">✕</button>
           </label>
           <div id="lhIcons" class="lh-icons">
-            <button type="button" class="lh-ic" data-act="lh-search-open" aria-label="Search repos" title="Search (/)"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg></button>
-            <button type="button" id="lhFilterBtn" class="lh-ic" data-act="lh-filters" aria-label="Filters" title="Filters" aria-expanded="false" aria-controls="lhMenu"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h12l-4.5 5.5V13l-3-1.5V8.5z"/></svg><i id="lhDot" class="lh-dot" hidden></i></button>
-            <button type="button" id="lhInfoBtn" class="lh-ic" data-act="lh-legend" aria-label="Bar legend" title="Bar legend" aria-expanded="false" aria-controls="lhLegend"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M8 7.2V11M8 5v.1"/></svg></button>
-            <span id="lhAttention"></span>
+            <span id="lhLive"></span>
+            <button type="button" id="lhFilterBtn" class="lh-ic" data-act="lh-filters" aria-label="More filters" title="More filters" aria-expanded="false" aria-controls="lhMenu"><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="8" cy="3" r="1.4"/><circle cx="8" cy="8" r="1.4"/><circle cx="8" cy="13" r="1.4"/></svg><i id="lhDot" class="lh-dot" hidden></i></button>
           </div>
-        </div>
-        <div id="lhActive" class="lh-active" aria-label="Active filters" hidden></div>
-        <div id="lhLegend" class="lh-menu lh-legend" role="group" aria-label="Bar legend" hidden>
-          <button type="button" class="lh-x lh-menu-x" data-act="lh-legend-close" aria-label="Close legend" title="Close">✕</button>
-          <div id="lhLegendBody"></div>
         </div>
         <div id="lhMenu" class="lh-menu" role="group" aria-label="Filters" hidden>
           <button type="button" class="lh-x lh-menu-x" data-act="lh-menu-close" aria-label="Close filters" title="Close">✕</button>
           <div><h4>Scope</h4><div id="lhScope" class="rs-scope"></div></div>
           <div><h4>Group</h4><select id="lhGroup" aria-label="Group"></select></div>
+          <button type="button" class="lh-mi" data-act="lh-search-open">Search…</button>
+          <button type="button" class="lh-mi" data-act="lh-clear">Clear filters</button>
         </div>
       </div>
       <section id="summary" class="rs-panel" role="tabpanel" aria-labelledby="tab-summary"></section>
