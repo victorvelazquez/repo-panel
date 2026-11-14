@@ -49,7 +49,7 @@ test('the page does not rubber-band and iOS does not inflate the text', () => {
   assert.match(css, /html, body\s*\{[^}]*overscroll-behavior: none/);
 });
 
-function fakeWindow({ coarse = true, hasVv = true, scale = 1, height = 700, scrollY = 0 } = {}) {
+function fakeWindow({ coarse = true, hasVv = true, scale = 1, height = 700, scrollY = 0, active = null } = {}) {
   const listeners = {};
   const props = {};
   const scrolls = [];
@@ -57,15 +57,15 @@ function fakeWindow({ coarse = true, hasVv = true, scale = 1, height = 700, scro
     scrollY,
     scrollTo: (x, y) => { scrolls.push([x, y]); win.scrollY = y; },
     matchMedia: (q) => ({ matches: coarse && q === '(pointer: coarse)' }),
-    document: { documentElement: { style: { setProperty: (k, v) => { props[k] = v; } } } },
+    document: { activeElement: active, documentElement: { style: { setProperty: (k, v) => { props[k] = v; } } } },
     visualViewport: hasVv ? { height, scale, addEventListener: (t, f) => { listeners[t] = f; } } : undefined,
   };
   return { win, listeners, props, scrolls };
 }
 
-test('viewport.js: sets --vvh now and on every resize, and brings a shifted page back to the top', () => {
+test('viewport.js: sets --vvh now and on every resize, and brings a shifted page back to the top while a field has the focus (RP182: only then)', () => {
   const { fitViewport } = require('../public/viewport.js');
-  const f = fakeWindow({ height: 700.4, scrollY: 120 });
+  const f = fakeWindow({ height: 700.4, scrollY: 120, active: { tagName: 'TEXTAREA', isContentEditable: false } });
   assert.equal(fitViewport(f.win), true);
   assert.equal(f.props['--vvh'], '700px');
   assert.deepEqual(f.scrolls, [[0, 0]]);

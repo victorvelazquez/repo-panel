@@ -434,7 +434,7 @@ body.tab-summary #viewbar { display: none; }
 /* RP126: the zones end at the bottom edge of the window. --sum-top is how much sits above the layout, measured by the page (the header, the tabs and, in Work, the bar under them), so a bar that comes or goes cannot leave a gap. */
 .chatlayout.chat-open { height: calc(100vh - var(--sum-top, 98px)); min-height: 480px; }
 .chatlayout.chat-open #listCol { flex: none; width: var(--list-w, 25%); min-width: 260px; }
-.chatlayout.chat-open #summary { overflow: auto; }
+.chatlayout.chat-open #summary { overflow: auto; overscroll-behavior: contain; } /* RP182: an inner scroller keeps the scroll to itself at its end */
 /* RP121: the header of the repos column: a thin bar (title and count, three icons), a strip of active filters that exists only while one is set, and a menu over the list. */
 #listHead { flex: none; position: relative; z-index: 3; background: var(--bg); border-bottom: 1px solid var(--line); }
 .lh-title[hidden], .lh-icons[hidden], .lh-search[hidden], .lh-active[hidden], .lh-menu[hidden], .lh-legend[hidden], .lh-dot[hidden] { display: none; }
@@ -481,7 +481,7 @@ body.tab-summary #viewbar { display: none; }
 #chat { flex: 1 1 0; min-width: 340px; display: flex; flex-direction: column; min-height: 0; background: var(--panel); }
 /* RP89: the right column (RP91 and RP92 will fill it); out below 1100 px of layout. */
 #col, #split2 { display: none; }
-#col { flex: none; width: var(--col-w, 25%); min-width: 220px; flex-direction: column; min-height: 0; overflow: auto; container-type: inline-size; container-name: col; }
+#col { flex: none; width: var(--col-w, 25%); min-width: 220px; flex-direction: column; min-height: 0; overflow: auto; container-type: inline-size; container-name: col; overscroll-behavior: contain; }
 @container sum (min-width: 1100px) {
   #col { display: flex; }
   #split2 { display: block; }
@@ -677,7 +677,7 @@ button.tk-gh:hover:not(:disabled) { background: var(--panel2); color: var(--text
   .cv-hr { border-left: 0; }
 }
 /* RP65: the Files tab. The tree scrolls on its own so the file below it keeps its room; the changed lines of a file are a soft amber, apart from the green and red of a diff. */
-.ft-tree { flex: none; max-height: 40vh; overflow: auto; display: flex; flex-direction: column; margin-bottom: 12px; font-size: 13px; }
+.ft-tree { flex: none; max-height: 40vh; overflow: auto; display: flex; flex-direction: column; margin-bottom: 12px; font-size: 13px; overscroll-behavior: contain; }
 /* RP132: that cap is for the chat's own Files tab (the file is below the tree); in the column the tree takes its natural height and the column scrolls. */
 #colBody .ft-tree { flex: none; max-height: none; overflow: visible; }
 .ft-row { display: flex; align-items: center; gap: 6px; width: 100%; text-align: left; border: 1px solid transparent; background: transparent; padding: 2px 6px 2px calc(6px + var(--d, 0) * var(--cf-step, 16px)); border-radius: 6px; }
@@ -704,7 +704,7 @@ button.tk-gh:hover:not(:disabled) { background: var(--panel2); color: var(--text
 .ch-name { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* RP99: the list of sessions of a repo scrolls inside the chat (up to 20 rows) and does not grow it. */
 /* RP99/RP100: the list of sessions of a repo uses the width of the chat and the height it leaves (the box shrinks and scrolls inside it); a row never squashes. */
-.ch-picks { align-self: stretch; flex: 0 1 auto; min-height: 0; max-height: 100%; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; margin: 0; }
+.ch-picks { align-self: stretch; flex: 0 1 auto; min-height: 0; max-height: 100%; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; margin: 0; overscroll-behavior: contain; }
 /* RP98: the Close session button sits at the right of the session state, inside the composer frame. */
 .sess-state { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; row-gap: 4px; } /* RP156: with the icons every chip on can pass the width; wrap, never cut a button */
 .ss-close { margin-left: auto; flex: none; font-size: 12px; padding: 1px 8px; }
@@ -725,7 +725,7 @@ button.tk-gh:hover:not(:disabled) { background: var(--panel2); color: var(--text
 .term-row { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
 .term-row button { flex: none; font-size: 12px; padding: 1px 10px; }
 .term-note { margin: 0; color: var(--muted); }
-.ch-body { flex: 1; min-height: 0; overflow: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+.ch-body { flex: 1; min-height: 0; overflow: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; overscroll-behavior: contain; }
 .ch-body .empty { padding: 30px 0; }
 .m-cut { margin-top: 6px; font-size: 12px; color: var(--muted); } /* RP162: the note under a text the history cut */
 .ch-older { text-align: center; }
