@@ -3,6 +3,7 @@
   --green: #3fb950; --red: #f85149; --yellow: #d29922; --blue: #58a6ff; --gray: #6e7681;
   --purple: #a371f7; --orange: #db6d28;
   --scroll-thumb: #333c48; --scroll-thumb-hover: #46515f;
+  --head-h: 40px; /* RP190: how tall the header of the list, the one of the chat and the one of the right column are (the border included) */
 }
 * { box-sizing: border-box; }
 /* RP84: thin, dark scrollbars for every scroller of the page (board, chat, file tree, code). The standard properties cover current Chrome, Edge and
@@ -445,9 +446,9 @@ body.tab-summary #viewbar { display: none; }
 .chatlayout.chat-open #listCol { flex: none; width: var(--list-w, 25%); min-width: 260px; }
 .chatlayout.chat-open #summary { overflow: auto; overscroll-behavior: contain; } /* RP182: an inner scroller keeps the scroll to itself at its end */
 /* RP121: the header of the repos column: a thin bar (title and count, the + menu, Working now and the ⋮ button) and a menu over the list (RP189: no strip of chips, no legend). */
-#listHead { flex: none; position: relative; z-index: 3; background: var(--bg); border-bottom: 1px solid var(--line); }
+#listHead { flex: none; position: relative; z-index: 3; height: var(--head-h); background: var(--bg); border-bottom: 1px solid var(--line); }
 .lh-title[hidden], .lh-icons[hidden], .lh-search[hidden], .lh-menu[hidden], .lh-dot[hidden] { display: none; }
-.lh-bar { display: flex; align-items: center; gap: 6px; min-height: 40px; padding: 4px 12px; }
+.lh-bar { display: flex; align-items: center; gap: 6px; height: 100%; min-height: 0; padding: 4px 12px; }
 .lh-title { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 8px; }
 .lh-title b { font-size: 13px; letter-spacing: .02em; }
 .lh-n { color: var(--muted); font-size: 12px; }
@@ -921,3 +922,16 @@ button.tc:hover { border-color: var(--muted); }
 
 /* RP180: iOS zooms into any field under 16 px when it takes focus and never zooms back. The chat box sets its own font, so the rule has to win over it. */
 @media (pointer: coarse), (max-width: 760px) { input, select, textarea, .composer textarea { font-size: 16px !important; } }
+
+/* RP190: from 760 px the three headers (the repos list, the chat, the right column) are ONE height (--head-h) and the head of the chat is ONE row: the row is dissolved into the head (display: contents), the tabs fill the middle and the panel icon and the close button go to the right. Under 760 px nothing here applies: the phone keeps its two rows until RP196 and RP195. */
+@container sum (min-width: 760px) {
+  .ch-head { display: flex; align-items: center; gap: 8px; height: var(--head-h); padding: 0 8px 0 14px; }
+  .ch-row { display: contents; }
+  .ch-name { flex: 0 1 auto; min-width: 0; max-width: 45%; }
+  .ch-tabs { order: 1; flex: 1 1 auto; min-width: 0; flex-wrap: nowrap; align-self: stretch; align-items: stretch; padding: 0; overflow: hidden; }
+  .ch-tab { padding: 0 12px; }
+  .ch-dtab { align-items: stretch; }
+  .ch-repo, .ch-row .x { order: 2; }
+  #sumLayout[data-screen="duo"] .ch-back { min-height: 0; align-self: stretch; }
+  .col-tabs { height: var(--head-h); }
+}
