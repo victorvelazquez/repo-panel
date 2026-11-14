@@ -356,7 +356,7 @@ function chatView() {
   return { ...S.chat, pending: S.pending[id], askBusy: S.askBusy, results: S.chatResults, rpc: S.rpc[id] };
 }
 
-// RP121: the header of the repos column (the filters of the Summary): the count, the icons, the strip of active filters and the menu. The state is the shared one; the inputs are
+// RP121: the header of the repos column (the filters of the Summary): the count, Working now and the ⋮ menu (RP189: the search icon, the legend, Needs attention and the strip of chips are gone). The state is the shared one; the inputs are
 // only set when they differ, so the caret stays while typing, and the bar of Work (#search, #groupFilter) shows the same values the next time it is in view.
 function drawListHead(ctx, kept) {
   const count = R.listCount(S.summary, ctx);
@@ -368,23 +368,18 @@ function drawListHead(ctx, kept) {
   const lh = S.lh;
   $('#lhSearchBox').hidden = !lh.search;
   $('#lhTitle').hidden = lh.search;
+  $('#addMenu').hidden = lh.search; // the + does not sit next to the search box
   $('#lhIcons').hidden = lh.search;
   $('#lhMenu').hidden = !lh.menu;
-  $('#lhLegend').hidden = !lh.legend;
-  $('#lhInfoBtn').setAttribute('aria-expanded', String(lh.legend));
-  paint($('#lhLegendBody'), R.legendHtml()); // only the body is painted: the close button of the block stays
   $('#lhFilterBtn').setAttribute('aria-expanded', String(lh.menu));
-  const chips = R.listHeadChips(ctx);
-  paint($('#lhActive'), chips);
-  $('#lhActive').hidden = !chips;
-  $('#lhDot').hidden = !chips;
-  if (paint($('#lhAttention'), R.summaryTools(S.summary, { ...ctx, compact: true })) && kept && (kept.act === 'sfilter' || kept.act === 'slive')) { const on = $(`#lhAttention [data-act="${kept.act}"]`); if (on && on.focus) on.focus(); }
+  // The dot says a filter of the menu is set (a room, a group or a text); Working now has its own pressed button.
+  $('#lhDot').hidden = !(R.normalizeScope(ctx.scope, ctx.rooms).kind !== 'all' || (ctx.group && ctx.group !== 'all') || String(ctx.q || '').trim());
+  if (paint($('#lhLive'), R.summaryTools(S.summary, { ...ctx, compact: true })) && kept && kept.act === 'slive') { const on = $('#lhLive [data-act="slive"]'); if (on && on.focus) on.focus(); }
   paint($('#lhGroup'), `<option value="">All groups</option>${S.groups.map((g) => `<option ${S.group === g.name ? 'selected' : ''}>${esc(g.name)}</option>`).join('')}`);
   const scopeHad = !!(document.activeElement && document.activeElement.dataset && document.activeElement.dataset.act === 'scope' && lh.menu);
   if (paint($('#lhScope'), R.scopeBar(S.rooms, allRepos().length, ctx.scope)) && scopeHad) { const on = $('#lhScope [aria-pressed="true"]'); if (on && on.focus) on.focus(); }
   if (lh.focus) { lh.focus = false; $('#lhSearch').focus(); }
   if (lh.focusBtn) { lh.focusBtn = false; $('#lhFilterBtn').focus(); }
-  if (lh.focusInfo) { lh.focusInfo = false; $('#lhInfoBtn').focus(); }
 }
 
 function drawSummary() {

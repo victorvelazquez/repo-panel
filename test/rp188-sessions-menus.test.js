@@ -55,14 +55,15 @@ test('t3: no Work tab in the header, no .hd-end group, no Add menu in the header
 
 test('t4: the Add menu is in the header of the list column, after the title, with the same two actions and a compact + summary', () => {
   const head = /<div id="listHead"[\s\S]*?<section id="summary"/.exec(html)[0];
-  const bar = /<div class="lh-bar">[\s\S]*?<div id="lhActive"/.exec(head)[0];
+  const bar = /<div class="lh-bar">[\s\S]*?<div id="lhMenu"/.exec(head)[0];
   const menu = /<details[^>]*id="addMenu"[^>]*>[\s\S]*?<\/details>/.exec(bar)[0];
   assert.ok(bar.indexOf('id="lhTitle"') < bar.indexOf('id="addMenu"'));
   assert.match(menu, /class="pop/);
   const summary = /<summary[^>]*>([\s\S]*?)<\/summary>/.exec(menu);
   assert.equal(attrs(/<summary[^>]*>/.exec(menu)[0])['aria-label'], 'Add a repo or a room');
   assert.equal(attrs(/<summary[^>]*>/.exec(menu)[0]).title, 'Add a repo or a room');
-  assert.equal(summary[1].trim(), '+');
+  assert.match(summary[1], /^\s*<svg[^>]*aria-hidden="true"[\s\S]*<\/svg>\s*$/, 'the plus is a drawing (centered by the box), not a text glyph');
+  assert.doesNotMatch(summary[1].replace(/<[^>]*>/g, ''), /\S/, 'no text inside: the name is the aria-label');
   const items = [...menu.matchAll(/<button[^>]*>[\s\S]*?<\/button>/g)].map((m) => ({ ...attrs(/<button[^>]*>/.exec(m[0])[0]), text: m[0].replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim() }));
   assert.deepEqual(items.map((i) => i['data-act']), ['add-dialog', 'room-dialog']);
   assert.match(items[0].text, /^Repo…/);
@@ -169,6 +170,15 @@ test('b4 (kept): the selected mark follows S.tab in the single header tablist, a
   assert.deepEqual(tabs.map((t) => t.attrs['aria-selected']), ['false', 'true', 'false']);
   assert.equal(V.conformityTabLabel(3), 'Conformity: 3 to review');
   assert.match(read('tabs.js'), /\$\('#tab-conformity'\)\.setAttribute\('aria-label', V \? V\.conformityTabLabel\(n\)/);
+});
+
+test('c6: the + button is as tall and as wide as the other buttons of the bar and its plus is centered by a flex box', () => {
+  const sum = ruleBody(css, '#addMenu > summary');
+  const ic = ruleBody(css, '.lh-ic');
+  const px = (b, k) => new RegExp(`(?:^|[;\\s])${k}:\\s*(\\d+)px`).exec(b)[1];
+  assert.equal(px(sum, 'height'), px(ic, 'height'), 'same height as .lh-ic');
+  assert.equal(px(sum, 'min-width'), px(ic, 'min-width'), 'same width as .lh-ic');
+  for (const p of [/display:\s*inline-flex/, /align-items:\s*center/, /justify-content:\s*center/]) assert.match(sum, p);
 });
 
 test('p6: the Work panel has no tab any more, so it is named by itself and nothing points at the removed tab-work', () => {
