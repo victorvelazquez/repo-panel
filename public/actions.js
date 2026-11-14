@@ -101,11 +101,12 @@ const ACTIONS = {
   // RP64: the chip opens the single viewer, the Changes tab of the right panel; from the Work tab the page goes to the Summary first.
   'diff': (el) => { const id = el.dataset.id; if (S.tab !== 'summary') setTab('summary'); if (S.chat.id !== id) openChat(id); setChatTab('changes'); },
   // RP90: touching a file of the Changes list opens it in the ONE diff tab of the centre (reused for every file); RP92 will open it from the files card.
-  'changes-file': (el) => { const p = el.dataset.path || ''; if (p) { leaveRepo(); S.chat.dfile = p; S.chat.ffile = ''; setChatTab('diff'); } else draw(); }, // RP130: the viewer tab is ONE, a diff or a file
+  'changes-file': (el) => { const p = el.dataset.path || ''; if (!p) { draw(); return; } S.chat.dfile = p; S.chat.ffile = ''; if (narrowOn()) { loadChanges(); showDetail('diff'); } else setChatTab('diff'); }, // RP130: the viewer tab is ONE, a diff or a file; RP196: under 760 px it is the detail screen of the column
   'diff-split': () => setPref('split', !S.prefs.split), // RP66c: the side-by-side diff on or off, kept with the other preferences
+  'detail-close': () => { S.chat.detail = ''; draw(); }, // RP196: the arrow of the detail screen of the column: back to its list
   'diff-close': () => { S.chat.dfile = ''; S.chat.ffile = ''; if (S.chat.tab === 'diff' || S.chat.tab === 'file') S.chat.tab = 'chat'; draw(); },
   // RP130: with the column in, a file of its explorer opens in the viewer tab of the centre; without it the chat's own Files tab reads it as before.
-  'files-open': (el) => { const p = el.dataset.path || ''; if (!p) return; if (columnOn()) { leaveRepo(); S.chat.ffile = p; S.chat.dfile = ''; setChatTab('file'); } loadFile(p); },
+  'files-open': (el) => { const p = el.dataset.path || ''; if (!p) return; if (columnOn()) { S.chat.ffile = p; S.chat.dfile = ''; if (narrowOn()) showDetail('file'); else setChatTab('file'); } loadFile(p); }, // RP196: under 760 px it is the detail screen of the column
   // The button says what the person SEES (data-open): the default is open only when a changed file is inside, so toggling flips that.
   'files-dir': (el) => { (S.filesOpen[S.chat.id] ||= {})[el.dataset.path || ''] = el.dataset.open !== 'true'; if (columnOn()) S.chat.colFocus = { act: 'files-dir', key: 'path', val: el.dataset.path || '' }; draw(); },
   'tab': (el) => { if (['summary', 'work', 'conformity', 'settings'].includes(el.dataset.tab)) setTab(el.dataset.tab); },
@@ -184,7 +185,7 @@ const ACTIONS = {
   'notes-mine': () => { const p = S.pad[S.chat.id]; if (p && p.status === 'conflict' && p.disk) { p.base = p.disk.rev; p.status = 'saving'; saveNotes(S.chat.id); draw(); } },
   'tasks-done': () => { S.tasksOpenDone = !S.tasksOpenDone; draw(); },
   // RP128: the right column. The tab and the folded folders belong to the opening (S.chat is replaced when another repo opens); a tab that does not exist reads as Changes.
-  'col-tab': (el) => { const t = el && el.dataset && ['tasks', 'status', 'files'].includes(el.dataset.tab) ? el.dataset.tab : 'changes'; S.chat.colTab = t; S.chat.colFocus = { id: `coltab-${t}` }; if (t === 'files') loadFiles(); if (t === 'tasks') loadTasks({ force: true }); draw(); },
+  'col-tab': (el) => { const t = el && el.dataset && (['tasks', 'status', 'files'].includes(el.dataset.tab) || (el.dataset.tab === 'notes' && narrowOn())) ? el.dataset.tab : 'changes'; if (S.chat.colTab === 'notes' && t !== 'notes') flushNotes(); S.chat.colTab = t; S.chat.colFocus = { id: `coltab-${t}` }; if (t === 'files') loadFiles(); if (t === 'tasks') loadTasks({ force: true }); if (t === 'notes') loadNotes(); draw(); },
   'col-folder': (el) => {
     const p = el && el.dataset && el.dataset.path;
     const facts = S.local[S.chat.id];

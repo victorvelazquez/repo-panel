@@ -1,7 +1,7 @@
 'use strict';
 // RP157 (S26), second half of the mobile version (design F of design/panel-movil/06): under 760 px of width the Repo is a THIRD screen on top of the chat (data-screen="repo"), reached by a button of the chat head and left by an
-// arrow next to its title. The tabs Tasks, Changes and Files leave the chat and live in Repo (the column's content is painted under 760 px, and the chat keeps Chat and Notes). A file or a diff tapped in Repo takes the person back to
-// the chat, where the viewer tab is. A task tapped in the list opens the Repo on its Tasks tab. Between 760 and 1100 px, and from 1100 px up, nothing changes.
+// arrow next to its title. The tabs Tasks, Changes and Files leave the chat and live in Repo (the column's content is painted under 760 px, and the chat keeps only Chat: RP196 moved Notes to the column too). A file or a diff tapped in Repo opens its detail
+// inside the column (RP196; RP157 took the person back to the chat, where the viewer tab is). A task tapped in the list opens the Repo on its Tasks tab. Between 760 and 1100 px, and from 1100 px up, nothing changes.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -117,33 +117,32 @@ async function boot({ width = 390, hash = '', ids = [A, B] } = {}) {
 const head = (page) => page.get('#chatHead').html;
 const colBody = (page) => page.get('#colBody').html;
 
-test('p1: the Repo button opens the repo screen; its head has the arrow; the column is painted there with its tabs; the chat head has no Tasks, Changes or Files tab but keeps Chat and Notes', async () => {
+test('p1: the Repo button opens the repo screen; its head has the arrow; the column is painted there with its tabs (and Notes, RP196); the chat head has only the Chat tab', async () => {
   const page = await boot({ width: 390 });
   await page.click('chat-open', { id: A });
   assert.equal(page.screen(), 'chat');
   await page.click('zone-set', { zone: 'repo' });
   assert.equal(page.screen(), 'repo');
   assert.match(colBody(page), /^<div class="col-head">/);
-  for (const t of ['tasks', 'changes', 'status', 'files']) assert.match(colBody(page), new RegExp(`data-tab="${t}"|data-coltab="${t}"|coltab-${t}`), t);
+  for (const t of ['tasks', 'changes', 'status', 'files', 'notes']) assert.match(colBody(page), new RegExp(`data-tab="${t}"|data-coltab="${t}"|coltab-${t}`), t);
   const h = head(page);
-  assert.doesNotMatch(h, /data-tab="tasks"|data-tab="changes"|data-tab="files"/);
+  assert.doesNotMatch(h, /data-tab="tasks"|data-tab="changes"|data-tab="files"|data-tab="notes"/);
   assert.match(h, /data-tab="chat"/);
-  assert.match(h, /data-tab="notes"/);
   assert.match(h, /data-act="zone-set" data-zone="repo"/);
 });
 
-test('p2: a file tapped in Repo takes the person back to the chat with the viewer tab; the same for a diff', async () => {
+test('p2: a file tapped in Repo opens its detail in the column and the person stays on the repo screen (RP196; RP157 used to take them back to the chat); the same for a diff', async () => {
   const page = await boot({ width: 390 });
   await page.click('chat-open', { id: A });
   await page.click('zone-set', { zone: 'repo' });
   await page.click('files-open', { path: 'src/a.js' });
-  assert.equal(page.screen(), 'chat');
-  assert.equal(page.state('S.chat.tab'), 'file');
+  assert.equal(page.screen(), 'repo');
+  assert.equal(page.state('S.chat.detail'), 'file');
   assert.equal(page.state('S.chat.ffile'), 'src/a.js');
-  await page.click('zone-set', { zone: 'repo' });
+  await page.click('detail-close');
   await page.click('changes-file', { path: 'src/b.js' });
-  assert.equal(page.screen(), 'chat');
-  assert.equal(page.state('S.chat.tab'), 'diff');
+  assert.equal(page.screen(), 'repo');
+  assert.equal(page.state('S.chat.detail'), 'diff');
   assert.equal(page.state('S.chat.dfile'), 'src/b.js');
 });
 

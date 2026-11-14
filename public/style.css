@@ -935,3 +935,10 @@ button.tc:hover { border-color: var(--muted); }
   #sumLayout[data-screen="duo"] .ch-back { min-height: 0; align-self: stretch; }
   .col-tabs { height: var(--head-h); }
 }
+
+/* RP196: under 760 px Notes is a tab of the column and a file or a diff opens as a DETAIL screen of the column (an arrow back to its list, the name of the file, the viewer under it). The only tab the chat of the phone was left with is Chat, so its row of tabs goes. */
+.col-detail { padding: 12px; min-width: 0; }
+.col-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; }
+.col-notes { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+.col-notes .notes-box { min-height: 55vh; }
+#sumLayout[data-screen="chat"] .ch-tabs { display: none; }

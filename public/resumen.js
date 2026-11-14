@@ -194,6 +194,7 @@
     files: svgIcon('<path d="M2 4.5A1.5 1.5 0 0 1 3.5 3h2.6l1.4 1.5h5A1.5 1.5 0 0 1 14 6v5.5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 11.5z"/>', 16),
     tasks: svgIcon('<path d="M3 4.5l1.3 1.3L7 3.2M3 10.5l1.3 1.3L7 9.2M9.5 5h3.5M9.5 11h3.5"/>', 16),
     status: svgIcon('<circle cx="4" cy="3.5" r="1.6"/><circle cx="4" cy="12.5" r="1.6"/><circle cx="12" cy="12.5" r="1.6"/><path d="M4 5.1v5.8M12 10.9V7a2 2 0 0 0-2-2H8"/>', 16),
+    notes: svgIcon('<path d="M4 2.5h6l2.5 2.5v8.5H4z"/><path d="M10 2.5V5h2.5M6 8h4M6 10.5h4"/>', 16),
   };
   const ICON_DIR = svgIcon('<path fill="currentColor" d="M2 4.5A1.5 1.5 0 0 1 3.5 3h2.6l1.4 1.5h5A1.5 1.5 0 0 1 14 6v5.5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 11.5z"/>');
   const ICON_FILE = svgIcon('<path d="M4 2h5l3 3v8.5a.5.5 0 0 1-.5.5h-7a.5.5 0 0 1-.5-.5z"/><path d="M9 2v3h3"/>');
@@ -306,15 +307,23 @@
   const columnView = (ctx) => {
     const c = ctx && typeof ctx === 'object' ? ctx : {};
     const g = gitOf(c);
-    const tab = c.tab === 'tasks' ? 'tasks' : c.tab === 'files' ? 'files' : c.tab === 'status' && g ? 'status' : 'changes';
+    const tab = c.tab === 'tasks' ? 'tasks' : c.tab === 'files' ? 'files' : c.tab === 'notes' && c.notes === true ? 'notes' : c.tab === 'status' && g ? 'status' : 'changes';
     const files = validFiles(c.files);
     const pending = g ? checksOf(prOf(g)).pending : 0;
     const tabBtn = ([id, label]) => `<button type="button" role="tab" class="col-tab" id="coltab-${id}" data-act="col-tab" data-tab="${id}" aria-selected="${id === tab}" aria-controls="colpane" aria-label="${label}" title="${label}">${ICON_TAB[id]}<span class="lb">${label}</span>${id === 'changes' && files ? `<span class="n">${files.length}</span>` : id === 'status' && pending > 0 ? `<span class="n y">${pending}</span>` : ''}</button>`;
-    const body = tab === 'tasks' ? (typeof c.tasksHtml === 'string' && c.tasksHtml ? c.tasksHtml : '<p class="rs-sub" role="status">No tasks to show</p>') : tab === 'status' ? statusPanel(g) : tab === 'files' ? treeHtml(c.tree, { selected: c.fselected, open: c.fopen, changed: c.changed, failed: c.filesFailed }).html : changesPanel(c, files);
+    const body = tab === 'notes' ? '<div id="colNotes" class="col-notes"></div>' : tab === 'tasks' ? (typeof c.tasksHtml === 'string' && c.tasksHtml ? c.tasksHtml : '<p class="rs-sub" role="status">No tasks to show</p>') : tab === 'status' ? statusPanel(g) : tab === 'files' ? treeHtml(c.tree, { selected: c.fselected, open: c.fopen, changed: c.changed, failed: c.filesFailed }).html : changesPanel(c, files);
     const list = g ? [['tasks', 'Tasks'], ['changes', 'Changes'], ['status', 'Status'], ['files', 'Files']] : [['tasks', 'Tasks'], ['changes', 'Changes'], ['files', 'Files']];
+    if (c.notes === true) list.push(['notes', 'Notes']); // RP196: under 760 px Notes is a tab of the column (the chat of the phone has no tabs of its own)
     // RP157: asked for the Repo screen (`back: true`, under 760 px) it starts with a head: the arrow back to the chat and the title.
     const head = c.back === true ? `<div class="col-head"><button type="button" class="ch-back" data-act="zone-back" aria-label="Back to the chat" title="Back to the chat">${svgIcon('<path d="M10 3L5 8l5 5"/>', 20)}</button><b>Repo</b></div>` : '';
     return `${head}<div class="col-tabs" role="tablist" aria-label="Column views">${list.map(tabBtn).join('')}</div><div class="col-pane" id="colpane" role="tabpanel" aria-labelledby="coltab-${tab}">${body}</div>`;
+  };
+  // RP196: under 760 px a file or a diff tapped in the column opens HERE, not in the chat: a head with the arrow back to the list of the column and the name of the file (its path is the tooltip), and the viewer under it.
+  const columnDetail = (c) => {
+    const o = c && typeof c === 'object' ? c : {};
+    const title = typeof o.title === 'string' ? o.title : '';
+    const name = title.split(/[\\/]/).pop() || title;
+    return `<div class="col-head"><button type="button" class="ch-back" data-act="detail-close" aria-label="Back to the list" title="Back to the list">${svgIcon('<path d="M10 3L5 8l5 5"/>', 20)}</button><b class="col-title" title="${esc(title)}">${esc(name)}</b></div><div class="col-detail" id="coldetail">${typeof o.html === 'string' ? o.html : ''}</div>`;
   };
   // The state of the session (RPC2-1), shown inside the composer frame. Icon + word, never colour alone. c = { info, rpc } (rpc: what V.rpcReduce keeps).
   // RP156 (design/panel-chips/, direction A): the icons of the chips of the chat are drawn (the family of the icons of the page: 16 grid, stroke 1.5, currentColor), not text characters that each system draws with another shape. Every state
@@ -464,11 +473,12 @@
     // RP91: with the right column in (`ctx.column`) the tasks are its card, so the chat has no Tasks tab; where there is no column (under 1100 px) the tab stays.
     // RP90: ONE diff tab, the last one, named after the file open in it (`c.dfile`), with its own close button; without a file there is no tab and a "diff" tab reads as the chat.
     // RP130: that ONE viewer tab holds a diff (`c.dfile`) or a file (`c.ffile`); the explorer is the column's, so with the column in the chat has no Files tab either.
-    const dfile = typeof c.dfile === 'string' ? c.dfile : '';
-    const ffile = typeof c.ffile === 'string' ? c.ffile : '';
+    const phone = ctx.narrow === true; // RP196: under 760 px Notes and the viewer live in the column, so the chat head has neither the tab nor the chip
+    const dfile = !phone && typeof c.dfile === 'string' ? c.dfile : '';
+    const ffile = !phone && typeof c.ffile === 'string' ? c.ffile : '';
     const kind = c.tab === 'file' && ffile ? 'file' : dfile ? 'diff' : ffile ? 'file' : '';
     const vfile = kind === 'file' ? ffile : dfile;
-    const hidden = (t) => ctx.column && (t === 'tasks' || t === 'changes' || t === 'files');
+    const hidden = (t) => (ctx.column && (t === 'tasks' || t === 'changes' || t === 'files')) || (phone && t === 'notes');
     const cur = kind && c.tab === kind ? kind : ['tasks', 'changes', 'files', 'notes'].includes(c.tab) && !hidden(c.tab) ? c.tab : 'chat';
     const dname = vfile.split(/[\\/]/).pop() || vfile;
     const dtab = kind ? `<span class="ch-dtab"><button type="button" role="tab" class="ch-tab" data-act="chat-tab" data-tab="${kind}" title="${esc(vfile)}" aria-selected="${cur === kind}">${esc(dname)}</button><button type="button" class="ch-dclose" data-act="diff-close" aria-label="Close the ${kind === 'file' ? 'file' : 'diff of'} ${esc(vfile)}" title="Close the ${kind}">✕</button></span>` : '';
@@ -1404,5 +1414,5 @@
     return `${ctx.failed ? '<div class="rs-note" role="status">⚠ Summary unavailable: showing the last data we have.</div>' : ''}<div class="rs-list">${body}</div>`;
   }
 
-  return { mergeSheetHtml, repoStatus, esc, mdHtml, settingsView, memoryChipHtml, ctxChipHtml, compactButtonHtml, legendHtml, listCount, blockWidths, columnView, treeFolderPaths, fileView, COLUMN_TABS, composerState, askAllowed, actionMenu, actionButtonsHtml, composerMergeHtml, composerNote, chatHead, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, sessionCloseHtml, sessionTerminalHtml, terminalBlockHtml, recentlyActive, chatBody, quickReplies, quickOf, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
+  return { mergeSheetHtml, repoStatus, esc, mdHtml, settingsView, memoryChipHtml, ctxChipHtml, compactButtonHtml, legendHtml, listCount, blockWidths, columnView, treeFolderPaths, fileView, COLUMN_TABS, columnDetail, composerState, askAllowed, actionMenu, actionButtonsHtml, composerMergeHtml, composerNote, chatHead, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, sessionCloseHtml, sessionTerminalHtml, terminalBlockHtml, recentlyActive, chatBody, quickReplies, quickOf, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
 }));
