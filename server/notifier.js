@@ -4,15 +4,15 @@
 // a kind must hold for `confirm` looks in a row (a flicker says nothing), and a row that cannot say keeps what was known.
 // The hub only writes to the clients that are connected, so with none connected it does NOTHING: asking the store for a snapshot wakes it, and an awake
 // store reads Git of every repo all the time (the panel keeps a store that nobody asked for idle on purpose). When the pages leave, what it knew is
-// forgotten, so the first look of the next one is a baseline and never old news. The push of RP179 is what reaches a person with no page open.
+// forgotten, so the first look of the next one is a baseline and never old news. RP179: a subscribed device counts as listening, so a person with no page open is reached (and the store stays awake).
 const N = require('../public/notify.js');
 
-function createNotifier({ store, hub, intervalMs = 3000, confirm = 2, setTimer = setTimeout, clearTimer = clearTimeout, onNotice } = {}) {
+function createNotifier({ store, hub, intervalMs = 3000, confirm = 2, setTimer = setTimeout, clearTimer = clearTimeout, onNotice, hasSubscribers } = {}) {
   const seen = new Map(); // repo id -> { stable: kind | null, cand: kind | null | undefined, count }
   let timer = null;
 
-  // An injected hub with no size() is taken as listened to.
-  const listened = () => (typeof hub.size !== 'function' || hub.size() > 0);
+  // An injected hub with no size() is taken as listened to. RP179: a subscribed device listens too, with every page closed.
+  const listened = () => typeof hub.size !== 'function' || hub.size() > 0 || (typeof hasSubscribers === 'function' && hasSubscribers());
 
   function tick() {
     if (!listened()) { seen.clear(); return; }

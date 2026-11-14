@@ -136,6 +136,32 @@ const ACTIONS = {
     drawSettings();
   },
   'notify-test': () => { if (N) applyNotice({ id: '0000000000', kind: 'deliver', title: 'Test', body: 'This is how a notice looks and sounds' }, true); },
+  // RP179: Web Push of this device. The permission is asked first, straight from the click (iOS refuses it otherwise).
+  'push-enable': async () => {
+    try {
+      if (await Notification.requestPermission() !== 'granted') { drawSettings(); return; }
+      const reg = await navigator.serviceWorker.register('/sw.js');
+      await navigator.serviceWorker.ready;
+      const { key } = await api('/api/push/key');
+      const applicationServerKey = Uint8Array.from(atob(key.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0));
+      const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey });
+      await api('/api/push/subscribe', sub.toJSON());
+      S.pushSub = true;
+    } catch (e) { toast(`Push not enabled: ${String((e && e.message) || e).slice(0, 120)}`, 'bad'); }
+    drawSettings();
+  },
+  'push-disable': async () => {
+    try {
+      const reg = await navigator.serviceWorker.getRegistration('/sw.js');
+      const sub = reg && await reg.pushManager.getSubscription();
+      if (sub) { await api('/api/push/unsubscribe', { endpoint: sub.endpoint }); await sub.unsubscribe(); }
+      S.pushSub = false;
+    } catch (e) { toast(`Push not disabled: ${String((e && e.message) || e).slice(0, 120)}`, 'bad'); }
+    drawSettings();
+  },
+  'push-test': async () => {
+    try { const d = await api('/api/push/test', {}); toast(d.sent ? 'Test push sent' : 'The push service did not take it', d.sent ? 'ok' : 'bad'); } catch (e) { toast(`Test failed: ${String((e && e.message) || e).slice(0, 120)}`, 'bad'); }
+  },
   // RP121: the header of the repos column. Search and menu are page-only state (S.lh); the clears undo the shared filters.
   'lh-search-open': () => { S.lh.search = true; S.lh.legend = false; S.lh.focus = true; draw(); },
   'lh-search-close': () => { S.lh.search = false; draw(); },
