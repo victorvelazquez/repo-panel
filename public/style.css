@@ -33,15 +33,23 @@ dialog button.primary { background: #1f6feb; border-color: #1f6feb; color: #fff;
 header { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; min-height: 48px; padding: 0 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
 header .rs-tabs { padding: 0; gap: 2px; border-bottom: 0; background: transparent; }
 header .rs-tabs button { min-height: 48px; }
-.hd-end { display: flex; align-items: center; gap: 2px; }
-.hd-icon { position: relative; display: inline-flex; align-items: center; justify-content: center; min-width: 36px; min-height: 36px; padding: 0 6px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); }
-.hd-icon:hover:not(:disabled) { color: var(--text); background: var(--panel2); }
-.hd-icon[aria-selected="true"] { color: var(--text); background: var(--panel2); }
-.hd-icon:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
-.hd-icon .badge { position: absolute; top: 0; right: 0; margin: 0; padding: 0 5px; font-size: 11px; line-height: 16px; }
-@media (pointer: coarse) { .hd-icon { min-width: 44px; min-height: 44px; } }
+header .rs-tabs .tab-dual { position: relative; display: inline-flex; align-items: center; justify-content: center; color: var(--muted); }
+header .rs-tabs .tab-dual:hover:not(:disabled) { color: var(--text); background: var(--panel2); }
+header .rs-tabs .tab-dual[aria-selected="true"] { color: var(--text); }
+header .rs-tabs .tab-dual:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+header .rs-tabs .tab-ic { display: none; }
+@media (pointer: coarse) { header .rs-tabs .tab-dual { min-width: 44px; min-height: 44px; } }
+@media (max-width: 759.98px) {
+  header .rs-tabs .tab-tx { display: none; }
+  header .rs-tabs .tab-ic { display: block; }
+  header .rs-tabs .tab-dual { min-width: 44px; min-height: 44px; padding: 0 6px; border-radius: 6px; }
+  header .rs-tabs .tab-dual[aria-selected="true"] { background: var(--panel2); }
+  header .rs-tabs .tab-dual .badge { position: absolute; top: 0; right: 0; margin: 0; padding: 0 5px; font-size: 11px; line-height: 16px; }
+}
 #addMenu > summary { color: var(--blue); }
-#addMenu .pop-body { width: 270px; padding: 6px; gap: 2px; }
+#addMenu > summary { padding: 0 8px; font-weight: 600; line-height: 22px; }
+#addMenu { position: static; } /* the popover hangs from #listHead (relative), so it never leaves a 390 px screen */
+#addMenu .pop-body { left: 12px; right: auto; width: min(270px, calc(100% - 24px)); padding: 6px; gap: 2px; }
 .pop-item { display: grid; gap: 1px; width: 100%; min-height: 44px; padding: 6px 10px; text-align: left; border: 0; border-radius: 6px; background: transparent; }
 .pop-item:hover { background: var(--panel2); }
 .pop-item small { color: var(--muted); font-size: 12px; }

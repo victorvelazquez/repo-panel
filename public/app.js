@@ -40,7 +40,7 @@ const S = {
   lh: { search: false, menu: false, legend: false, focus: false }, // RP121: the header of the repos column (search box open, filter menu open, focus the box on the next draw)
   chat: { id: null, seq: 0 }, chatCache: {}, drafts: {}, recall: {}, notes: {}, askBusy: {}, quick: null, chatResults: Object.create(null), rpc: {},
 };
-S.tab = S.prefs.tab === 'work' ? 'work' : 'summary';
+S.tab = 'summary'; // the page always opens on Sessions (RP188); a saved 'work' preference is ignored on load
 S.backTab = S.tab; // the tab Conformity returns to (it is never saved as the preference)
 
 // The list separator moves the list (its right edge follows the pointer); the column separator moves the column (its left edge follows the pointer, so left grows it).
