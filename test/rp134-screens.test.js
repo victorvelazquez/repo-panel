@@ -188,13 +188,13 @@ test('p5: the screen follows an address: a link to a repo opens the chat screen,
   assert.equal(page.screen(), 'repo', 'RP157: the zone repo is the screen repo (until then it read as chat)');
 });
 
-test('p6: the chat head under 760 px has the arrow and only the tabs Chat and Notes (RP157 moved Tasks, Changes and Files to the Repo screen)', async () => {
+test('p6: the chat head under 760 px has the arrow and only the tab Chat (RP157 moved Tasks, Changes and Files to the Repo screen, RP196 moved Notes to it too)', async () => {
   const page = await boot({ width: 390 });
   await page.click('chat-open', { id: A });
   const head = page.get('#chatHead').html;
   assert.match(head, /data-act="chat-back"/);
-  for (const t of ['chat', 'notes']) assert.match(head, new RegExp(`data-tab="${t}"`), t);
-  for (const t of ['tasks', 'changes', 'files']) assert.doesNotMatch(head, new RegExp(`data-tab="${t}"`), t);
+  assert.match(head, /data-tab="chat"/);
+  for (const t of ['tasks', 'changes', 'files', 'notes']) assert.doesNotMatch(head, new RegExp(`data-tab="${t}"`), t);
 });
 
 // ---------- the arrow and the Back of the phone ----------

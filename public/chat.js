@@ -130,6 +130,7 @@ function setZone(zone) {
   if (!S.chat.id || !V || !V.ADDRESS_ZONES.includes(zone) || S.chat.zone === zone) return;
   const from = S.chat.zone;
   S.chat.zone = zone;
+  if (zone !== 'repo') S.chat.detail = ''; // RP196: coming back to Repo shows the list, not the file that was open
   draw();
   const wrote = addressWrite();
   S.chat.zoneFromChat = wrote && from === 'chat' && zone === 'repo'; // RP157: the page itself wrote the entry that Repo sits on, so the arrow of Repo can use the Back of the browser
@@ -146,9 +147,12 @@ function zoneBack() {
   }
   setZone('chat');
 }
-// RP157: under 760 px a file or a diff opens in the chat, where the viewer tab is: leave the Repo screen for it.
-function leaveRepo() {
-  if (narrowOn() && S.chat.zone === 'repo') setZone('chat');
+// RP196: under 760 px a file or a diff opens in the column, as a detail screen over its list (RP157 used to take the person back to the chat for it). `kind` is 'diff' or 'file'; the column starts at its top.
+function showDetail(kind) {
+  S.chat.detail = kind;
+  draw();
+  const col = $('#col');
+  if (col) col.scrollTop = 0;
 }
 // Applies an address of the page (a link, Back, Forward, a hash typed by hand). Junk is ignored and the address bar goes back to what is open (replaceState: no new entry). Nothing happens before the list of repos is
 // known (a valid address would look like junk). Applying never writes, and it does nothing that is already so: a burst of events cannot loop.
@@ -481,8 +485,11 @@ function drawChat() {
     if (pick) S.chat.colTab = pick;
   }
   // RP128: the column is tabs (Changes, Tasks). The open one belongs to the opening (S.chat.colTab, Changes by default), the closed folders too (S.chat.colFold); with no column nothing is painted.
-  const colTab = ['tasks', 'status', 'files'].includes(S.chat.colTab) ? S.chat.colTab : 'changes';
-  paint($('#colBody'), !column ? '' : R.columnView({ back: narrowOn(), name: nameOf(S.chat.id), tab: colTab, fold: S.chat.colFold, git: columnGit(S.chat.id, facts), files: facts && !facts.error && Array.isArray(facts.files) ? facts.files : null, failed: !!(facts && facts.error), selected: S.chat.dfile || '', tree: colTab === 'files' ? S.files[S.chat.id] || null : null, changed: colTab === 'files' ? changedOf(S.chat.id) : null, fselected: S.chat.ffile || '', fopen: S.filesOpen[S.chat.id] || {}, filesFailed: !!S.chat.filesFailed, tasksHtml: colTab === 'tasks' ? R.tasksView(S.tasks[S.chat.id] || null, { compact: true, open: S.tasksFold, more: S.tasksMore, readAt: S.chat.tasksAt, now: Date.now(), refreshing: !!S.chat.tasksRefreshing, refreshFailed: !!S.chat.tasksRefreshFailed, loading: !!S.chat.tasksLoading, failed: !!S.chat.tasksFailed }) : '' }));
+  const phone = narrowOn(); // RP196: under 760 px Notes is a tab of the column and a file or a diff opens as its detail screen
+  const colTab = ['tasks', 'status', 'files'].includes(S.chat.colTab) || (phone && S.chat.colTab === 'notes') ? S.chat.colTab : 'changes';
+  const detail = column && phone ? (S.chat.detail === 'diff' && S.chat.dfile ? 'diff' : S.chat.detail === 'file' && S.chat.ffile ? 'file' : '') : '';
+  const detailHtml = () => R.columnDetail({ title: detail === 'diff' ? S.chat.dfile : S.chat.ffile, html: detail === 'diff' ? R.changesView(S.changes[S.chat.id] || null, { selected: S.chat.dfile, only: true, split: !!S.prefs.split, loading: !!S.chat.changesLoading, failed: !!S.chat.changesFailed }) : R.fileView(S.fileData[S.chat.id] || null, { selected: S.chat.ffile, fileLoading: !!S.chat.fileLoading, fileFailed: S.chat.fileFailed || '' }) });
+  paint($('#colBody'), detail ? detailHtml() : !column ? '' : R.columnView({ notes: phone, back: narrowOn(), name: nameOf(S.chat.id), tab: colTab, fold: S.chat.colFold, git: columnGit(S.chat.id, facts), files: facts && !facts.error && Array.isArray(facts.files) ? facts.files : null, failed: !!(facts && facts.error), selected: S.chat.dfile || '', tree: colTab === 'files' ? S.files[S.chat.id] || null : null, changed: colTab === 'files' ? changedOf(S.chat.id) : null, fselected: S.chat.ffile || '', fopen: S.filesOpen[S.chat.id] || {}, filesFailed: !!S.chat.filesFailed, tasksHtml: colTab === 'tasks' ? R.tasksView(S.tasks[S.chat.id] || null, { compact: true, open: S.tasksFold, more: S.tasksMore, readAt: S.chat.tasksAt, now: Date.now(), refreshing: !!S.chat.tasksRefreshing, refreshFailed: !!S.chat.tasksRefreshFailed, loading: !!S.chat.tasksLoading, failed: !!S.chat.tasksFailed }) : '' }));
   // What the person touched in the column keeps the focus across the repaint: a tab by its id, a folder or a fold by its button.
   const want = S.chat.colFocus;
   if (want) {
@@ -497,11 +504,20 @@ function drawChat() {
   const tasksTab = S.chat.tab === 'tasks' && !column;
   const changesTab = S.chat.tab === 'changes' && !column; // RP92: with the column in, the files card replaces the tab
   const filesTab = S.chat.tab === 'files' && !column; // RP130: the explorer is the column's; only without it the chat keeps its Files tab
-  const fileTab = S.chat.tab === 'file' && !!S.chat.ffile;
-  const notesTab = S.chat.tab === 'notes';
-  const diffTab = S.chat.tab === 'diff' && !!S.chat.dfile; // RP90
+  const fileTab = S.chat.tab === 'file' && !!S.chat.ffile && !phone; // RP196: on the phone the viewer and Notes are the column's, so a tab of the chat left from a wide screen is not painted
+  const notesTab = S.chat.tab === 'notes' && !phone;
+  const diffTab = S.chat.tab === 'diff' && !!S.chat.dfile && !phone; // RP90
   $('#composer').hidden = tasksTab || changesTab || filesTab || diffTab || fileTab || notesTab;
-  if (!notesTab) padShown = null;
+  // RP196: the notepad of the phone is painted in the column, once per opening (and again if the column repaints and drops the box), like the one of the chat: the caret and the focus stay while typing.
+  const colNotes = column && phone && colTab === 'notes';
+  if (colNotes) {
+    const box = $('#colNotes');
+    const p = padOf(S.chat.id);
+    const key = `${S.chat.id}:${p.loaded}:${p.gen}`;
+    if (box && (padShown !== key || !box.innerHTML)) { paint(box, R.notesView(p)); padShown = key; }
+    paint($('#notesStatus'), R.notesStatus(p));
+  }
+  if (!notesTab && !colNotes) padShown = null;
   if (notesTab) {
     // The textarea is painted once per opening (and when its text is replaced from outside); after that only the status line changes, so the caret and the focus stay.
     const p = padOf(S.chat.id);
