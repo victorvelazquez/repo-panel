@@ -90,7 +90,7 @@ test('t5: the files are plain: no script, no event handler, nothing loaded from 
 
 test('t6: the header shows the logo with the text "Kletus.dev" as its alternative, and the old word is gone as plain text', () => {
   const html = read('index.html');
-  assert.match(html, /<h1><img src="\/kletus-dev\.svg" alt="Kletus\.dev"[^>]*><\/h1>/);
+  assert.match(html, /<h1><picture>[^]*<img src="\/kletus-dev\.svg" alt="Kletus\.dev"[^>]*><\/picture><\/h1>/); // RP186: the picture shows the K on a narrow screen; the img keeps the logo and its alt
   assert.doesNotMatch(html, /<h1>Repo Panel<\/h1>/);
 });
 

@@ -12,7 +12,7 @@ La base es `public/K-icon.svg` (copia del archivo de la persona: la K blanca y u
 ## Tasks
 
 - [x] T1 · S1-S2 · pruebas del padre, implementación delegada · RP185 ícono web, iPhone, app instalada y avisos · commit: pendiente
-- [ ] T2 · S1 · inline · RP186 logo móvil de la cabecera · commit: pendiente
+- [x] T2 · S1 · inline · RP186 logo móvil de la cabecera · commit: pendiente
 - [ ] T3 · S1, S3 · inline · RP187 ícono de la bandeja con el punto de estado · commit: pendiente
 
 ## Log
@@ -22,3 +22,4 @@ La base es `public/K-icon.svg` (copia del archivo de la persona: la K blanca y u
 - **L3.** Nota del agente: la K del `icon.svg` actual y la del K-icon son la misma figura con otro origen vertical (1,8 unidades). `icon.svg` conserva su K sin tocar porque `rp102-logo` la compara con la del logo y `rp102-tray` lee el primer `d=`; el punto se agrega después con su posición en esas unidades.
 - **L4.** Nota del agente: la copia `public/K-icon.svg` es idéntica byte a byte al archivo de la persona (391 bytes, finales LF). Antes dije por error que el original tenía finales de Windows: lo había medido con un contador que coincidía con todas las líneas.
 - **L5.** Nota del agente: RP185 se cerró tras corregir dos defectos que ninguna prueba vio y salieron de mirar los PNG y de medir: la K tenía dos mellas (relleno par-impar en lugar de enrollado distinto de cero) y las pruebas tardaban 93 s. Quedan RP186 y RP187.
+- **L6.** Nota del agente: RP186 hecha. El `h1` de la cabecera es un `<picture>`: la K con el punto azul por debajo de 760 px (el corte angosto del panel) y el logo grande de ahí para arriba. Falta que la persona la apruebe mirándola en el iPhone. Queda RP187.
