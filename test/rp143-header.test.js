@@ -1,6 +1,5 @@
 'use strict';
-// RP143 (S30, S31, S37): the global header of the page is ONE row (about 48 px, it was two rows of 95 px): the logo and the tabs Summary and Work on the left; on the right the usage meters, a small indicator
-// that spins and says Updating only while something is updating, the Add menu (Repo and Room), and Conformity (an icon with its count) and Settings (a gear). The buttons Refresh and Fetch all and the Merge
+// RP143 (S30, S31, S37): the global header of the page is ONE row (about 48 px, it was two rows of 95 px): the logo and the tabs Summary and Work on the left; on the right the usage meters, the Add menu (Repo and Room), and Conformity (an icon with its count) and Settings (a gear). The buttons Refresh and Fetch all and the Merge
 // menu are gone from the page (the person hardly uses them; the merge method lives in Settings, Delivery). The actions are the same: Conformity and Settings are still tabs (data-act="tab") and Repo and Room
 // still open their dialogs. The functions that were behind the removed buttons stay (refreshAll runs by itself, fetchRepo and its route are kept on purpose). Plain CSS cannot be run here: how it LOOKS was
 // measured in the real panel and is for the person to try; these tests pin the markup, the rules, the page code and the behaviour that does not depend on the eye.
@@ -24,8 +23,8 @@ const rules = [...css.matchAll(/(?:^|\n)([^{}\n@/ ][^{}\n]*)\{([^}]*)\}/g)].flat
 const rule = (sel) => { const r = rules.filter((x) => x.sel === sel); assert.ok(r.length, `a rule for ${sel}`); return r.map((x) => x.body).join(';'); };
 
 // ---------- the markup ----------
-test('m1: the header holds, in this order, the logo, the tablist of Summary and Work, the usage, the update indicator, the Add menu and the tablist of Conformity and Settings; one row, no second nav', () => {
-  const order = ['<h1>', 'aria-label="Views"', 'id="usage"', 'id="syncState"', 'id="addMenu"', 'aria-label="More views"'].map((k) => header.indexOf(k));
+test('m1: the header holds, in this order, the logo, the tablist of Summary and Work, the usage, the Add menu and the tablist of Conformity and Settings; one row, no second nav', () => {
+  const order = ['<h1>', 'aria-label="Views"', 'id="usage"', 'id="addMenu"', 'aria-label="More views"'].map((k) => header.indexOf(k));
   assert.ok(order.every((i) => i >= 0), `every piece is in the header: ${order}`);
   assert.deepEqual([...order].sort((a, b) => a - b), order, 'in the order of the design');
   assert.equal((html.match(/<nav\b/g) || []).length, 1, 'one nav inside the header (the second group of tabs is a tablist div)');
@@ -75,16 +74,6 @@ test('m5: the Add menu is a details with a named summary and two buttons that ar
   assert.match(items[1].text, /^Room…/);
 });
 
-test('m6: the update indicator is not a control and not a live region (it would announce every refresh, about every 2 seconds): hidden from assistive tools, with the word Updating and a title, and not spinning at the start', () => {
-  const el = tagOf(header, /<span[^>]*id="syncState"[^>]*>[\s\S]*?<\/span>\s*<\/span>|<span[^>]*id="syncState"[^>]*>[\s\S]*?<\/span>/);
-  const a = attrs(/<span[^>]*>/.exec(el)[0]);
-  assert.equal(a['aria-hidden'], 'true');
-  assert.ok(!('role' in a) && !('aria-live' in a) && !('tabindex' in a) && !('data-act' in a));
-  assert.ok(!/loading/.test(a.class || ''), 'not spinning at the start');
-  assert.match(el, /Updating/);
-  assert.ok(a.title && /updating/i.test(a.title));
-});
-
 test('m7: every button of the header says type="button" and the usage element is unchanged', () => {
   for (const m of header.matchAll(/<button\b[^>]*>/g)) assert.match(m[0], /type="button"/, m[0]);
   assert.match(header, /<span id="usage" class="usage" role="status" tabindex="0" hidden><\/span>/);
@@ -94,7 +83,7 @@ test('m7: every button of the header says type="button" and the usage element is
 test('p1: the page code no longer reaches for what was removed, and reaches for what replaces it', () => {
   const src = appSource();
   for (const gone of ['#mergeMenu', '#method', '#delBranch', '[data-act="refresh-all"]']) assert.ok(!src.includes(gone), `the page code does not use ${gone}`);
-  for (const here of ['#syncState', '#addMenu']) assert.ok(src.includes(here), `the page code uses ${here}`);
+  for (const here of ['#addMenu']) assert.ok(src.includes(here), `the page code uses ${here}`);
   assert.match(src, /querySelectorAll\('header \[role=tab\]\[data-tab\]'\)/, 'the selected tab is kept in step in BOTH tablists of the header');
 });
 
@@ -134,15 +123,6 @@ test('c1: the header is one row of 48 px and still wraps on a narrow screen inst
   assert.match(tabs, /border-bottom:\s*0|border-bottom:\s*none/);
   assert.match(tabs, /background:\s*transparent/);
   assert.match(rule('header .rs-tabs button'), /min-height:\s*48px|height:\s*48px/);
-});
-
-test('c2: the update indicator keeps its place when it is not shown (visibility, not display: the meters must not jump every few seconds), spins only while loading and does not spin with reduced motion', () => {
-  assert.match(rule('.sync'), /visibility:\s*hidden/);
-  assert.doesNotMatch(rule('.sync'), /display:\s*none/);
-  assert.match(rule('.sync.loading'), /visibility:\s*visible/);
-  assert.match(rule('.sync.loading .ico'), /animation:\s*spin/);
-  const m = /@media \(prefers-reduced-motion: reduce\)\s*\{[^@]*\.sync[^}]*animation:\s*none/.exec(css);
-  assert.ok(m, 'a reduced-motion rule for the indicator');
 });
 
 test('c3: the Add menu summary is the blue primary action of the header, and its items are real, readable rows', () => {
@@ -196,23 +176,6 @@ function loadPage(tabs = []) {
   const fire = (type, e) => { const ev = { type, preventDefault() {}, stopPropagation() {}, ...e }; for (const fn of docL[type] || []) fn(ev); return ev; };
   return { get, doc, run: (code) => vm.runInContext(code, ctx), fire };
 }
-
-test('b1: the indicator spins (class loading) while any repo is refreshing and stops when none is', () => {
-  const page = loadPage();
-  const sync = page.get('#syncState');
-  const S = page.run('S');
-  S.loading = {};
-  S.boardRefreshing = [];
-  page.run('syncRefreshIcon()');
-  S.loading = { abc: 1 };
-  page.run('syncRefreshIcon()');
-  S.loading = { abc: 0 };
-  page.run('syncRefreshIcon()');
-  assert.deepEqual(sync.toggles.slice(-3), [['loading', false], ['loading', true], ['loading', false]]);
-  S.boardRefreshing = ['abc'];
-  page.run('syncRefreshIcon()');
-  assert.deepEqual(sync.toggles.slice(-1), [['loading', true]], 'a board refresh in flight counts too');
-});
 
 test('b2: Escape closes the open Add menu, puts the focus back on its summary, and does not close the open chat with the same key', () => {
   const page = loadPage();

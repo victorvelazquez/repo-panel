@@ -21,14 +21,10 @@ const stub = () => new Proxy(function stubElement() {}, {
   apply: () => stub(),
 });
 
-const BUTTON = '#syncState'; // RP143: the Updating indicator of the header (it was the icon of the Refresh button)
-
 async function loadPage() {
-  const toggles = [];
-  const button = { classList: { toggle: (...a) => toggles.push(a), add() {}, remove() {} } };
   const ctx = vm.createContext({
     console,
-    document: new Proxy({}, { get: (t, k) => (k === 'hidden' ? false : k === 'querySelector' ? (sel) => (sel === BUTTON ? button : stub()) : stub) }),
+    document: new Proxy({}, { get: (t, k) => (k === 'hidden' ? false : k === 'querySelector' ? () => stub() : stub) }),
     localStorage: { getItem: () => null, setItem() {} },
     location: { hash: '' },
     requestAnimationFrame: () => 0,
@@ -41,7 +37,7 @@ async function loadPage() {
   ctx.RepoPanelView = view;
   vm.runInContext(appSource(), ctx);
   for (let i = 0; i < 5; i++) await new Promise((r) => setImmediate(r));
-  return { get: (name) => vm.runInContext(name, ctx), toggles };
+  return { get: (name) => vm.runInContext(name, ctx) };
 }
 
 const R = { id: 'abc', name: 'demo', path: 'x' };
@@ -76,30 +72,15 @@ test('page: a repo that is refreshing no longer shows a spinning arrow on its ca
   assert.equal(busy, idle, 'the card looks the same refreshing or not');
 });
 
-test('page: the top Refresh icon is switched on while any repo is refreshing and off when all are done', async () => {
-  const page = await loadPage();
-  const S = setup(page);
-  const sync = page.get('syncRefreshIcon');
-  S.loading = {};
-  sync();
-  S.loading = { abc: 1 };
-  sync();
-  S.loading = { abc: 0 };
-  sync();
-  assert.deepEqual(page.toggles.slice(-3), [['loading', false], ['loading', true], ['loading', false]]);
-});
-
-test('page: render keeps the top icon in step with the loading count', () => {
+test('page: render leaves no spinner markup in app.js (RP181: the header indicator is gone)', () => {
   const src = appSource();
   const render = renderBody(src);
-  assert.ok(render && /syncRefreshIcon\(\)/.test(render[0]), 'render() calls syncRefreshIcon()');
+  assert.ok(render && /drawQueue/.test(render[0]), 'render() is found');
   assert.ok(!/class="spin"/.test(src), 'no spinner markup is left in app.js');
 });
 
-test('the Updating indicator has an icon element, and only that icon spins while loading (RP143: no Refresh button any more)', () => {
-  assert.match(read('index.html'), /id="syncState"[^>]*><span class="ico">↻<\/span> Updating<\/span>/);
+test('the old per-card .spin rule stays gone (RP181: the header indicator is gone too)', () => {
   const css = read('style.css');
-  assert.match(css, /\.sync\.loading \.ico\s*\{[^}]*animation:\s*spin/);
   assert.ok(!/(^|\n)\.spin\b/.test(css), 'the old per-card .spin rule is gone');
 });
 
@@ -114,6 +95,6 @@ test('the spin respects prefers-reduced-motion', () => {
 test('the checks that read the page source also work on a CRLF checkout (Windows runners)', () => {
   const crlf = appSource().replace(/\n/g, '\r\n');
   const body = renderBody(crlf);
-  assert.ok(body && /syncRefreshIcon\(\)/.test(body[0]), 'render() is found and calls syncRefreshIcon() with CRLF line endings');
+  assert.ok(body && /drawQueue/.test(body[0]), 'render() is found with CRLF line endings');
   assert.ok(!/class="spin"/.test(lf(crlf)));
 });

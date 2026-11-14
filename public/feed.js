@@ -109,6 +109,7 @@ async function readEvents(ctl) {
     if (done) return;
     ev.connected = true; // the preamble counts: the stream is open and talking
     ev.lastByteAt = Date.now();
+    S.aliveAt = ev.lastByteAt;
     ev.attempt = 0;
     const parsed = V.parseSse(rest + decoder.decode(value, { stream: true }));
     rest = parsed.rest;

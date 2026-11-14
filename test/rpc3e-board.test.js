@@ -11,7 +11,7 @@ const { PUBLIC, LIB_FILES, APP_FILES } = require('./pagesrc.js');
 
 const read = (f) => fs.readFileSync(path.join(PUBLIC, f), 'utf8').replace(/\r\n/g, '\n');
 const MOVED = ['raf', 'draw', 'PRESS_MAX_MS', 'pressedAt', 'renderWaiting', 'pressHeld', 'releasePress', 'COLUMNS', 'COLUMN_BY_KEY', 'BOARD_KEYS', 'cleanAsColumn', 'boardKeys',
-  'isProblem', 'sortPrCards', 'placement', 'verdictOf', 'buildCards', 'snoozedRow', 'snoozedBlock', 'render', 'idleBar', 'setPref', 'GROUP_HUES', 'groupTag', 'syncRefreshIcon',
+  'isProblem', 'sortPrCards', 'placement', 'verdictOf', 'buildCards', 'snoozedRow', 'snoozedBlock', 'render', 'idleBar', 'setPref', 'GROUP_HUES', 'groupTag',
   'repoName', 'removeItem', 'piBtn', 'moreMenu', 'reqWarn', 'hasRoadmapBlock', 'stateRow', 'roomTag', 'showGroupTag', 'identityHtml', 'branchLabel', 'cardTop', 'roadmapBlock',
   'cleanRow', 'animStyle', 'verdictRow', 'stagedBar', 'COMMIT_CMDS', 'flowFor', 'repoCard', 'checksChip', 'FIX_PR_HINT', 'prCard'];
 const esc = (n) => n.replace(/\$/g, '\\$');
