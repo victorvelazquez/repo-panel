@@ -47,6 +47,7 @@ header .rs-tabs button { min-height: 48px; }
 .pop-item small { color: var(--muted); font-size: 12px; }
 header h1 { font-size: 16px; margin: 0 8px 0 0; }
 header h1 img { display: block; height: 24px; width: auto; } /* RP102: the logo of the person, in place of the word */
+header h1 picture { display: block; } /* RP186: on a narrow screen the picture shows the K instead; as a block it adds no space around the image */
 .usage { font-size: 12px; color: var(--muted); white-space: nowrap; }
 .usage-warn { color: var(--yellow); }
 .usage-error { color: var(--red); }

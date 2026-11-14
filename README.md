@@ -373,6 +373,8 @@ A new page script goes into `index.html`, into the closed list of static files i
 - **Edge or Chrome:** an app installed from the browser updates its icon on its own after a while, or when it is installed again.
 - **Shortcuts:** `favicon.ico` can be given by hand to a shortcut made by hand.
 
+The header (RP186) shows `K-icon.svg` in its corner on a narrow screen, under 760 px (the narrow cut of the page, so also a narrow window on the PC), and keeps the big logo from 760 px up. It is one `<picture>`: its `<source>` carries the media of the cut and its `<img>` keeps `kletus-dev.svg` and the alternative text `Kletus.dev`, so a browser with no `<picture>` still shows the logo. `K-icon.svg` is served behind the login of the remote host, like the page that holds it. Not verified on a real phone: that is for the person to see.
+
 ## Notifications (RP178)
 
 The panel tells you when a repo starts to need you, so you do not have to look at it. `server/notifier.js` reads the Summary every 3 seconds and, when the kind of attention of a repo **changes**, sends a `notify` event on `GET /api/events`. The kinds are: the agent **asks a question** (`answer`), the **CI fails** (`ci`), the work is done and **`/flow-ship`** can run (`deliver`), a PR is ready to **merge** (`merge`) and the repo is clean for **`/flow-next`** (`start`).
