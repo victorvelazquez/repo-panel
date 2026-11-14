@@ -1,9 +1,11 @@
 # Notification-area (tray) icon for repo-panel: open the panel, start it or restart it without hunting processes.
-# Windows only. Install it at logon with install-tray.ps1. -SelfTest prints facts as JSON and creates no window.
+# Windows only. Install it at logon with install-tray.ps1. -SelfTest prints facts as JSON and creates no window. -RenderIcons <size> draws both icons at that size and prints
+# their pixels as JSON (no window, nothing written): the dot of the icon is blue while the panel runs and light gray while it is stopped (RP187).
 param(
   [string]$ConfigPath = $(if ($env:REPO_PANEL_CONFIG) { $env:REPO_PANEL_CONFIG } else { Join-Path (Split-Path -Parent $PSScriptRoot) 'config.json' }),
   [switch]$SelfTest,
-  [switch]$SelfTestRestart
+  [switch]$SelfTestRestart,
+  [int]$RenderIcons = 0
 )
 $ErrorActionPreference = 'Stop'
 
@@ -122,6 +124,76 @@ function Invoke-PanelStart([int]$Port, [scriptblock]$Pump) {
   return "repo-panel did not answer on port $Port within 15 s."
 }
 
+Add-Type -AssemblyName System.Drawing
+
+# The colors of the icon (RP187): a dark gray square (lighter than black), the K in near-white and a dot that tells the state: blue while the panel runs, light gray (lighter than the
+# square) while it is stopped.
+function Get-TrayColors {
+  return @{
+    Back    = [System.Drawing.Color]::FromArgb(52, 56, 64)
+    Key     = [System.Drawing.Color]::FromArgb(250, 251, 252)
+    Running = [System.Drawing.Color]::FromArgb(0, 127, 255)
+    Stopped = [System.Drawing.Color]::FromArgb(200, 205, 212)
+  }
+}
+
+# Draws the icon: the K of the logo (RP102) and the dot of K-icon.svg on a dark gray rounded square. The drawing is 125.116 wide: the K (85.2 wide), a gap and the dot (19.8 by 21, on the
+# baseline of the K). The K is filled with the winding rule, like SVG: its outline crosses itself at two joints and the default rule would leave a notch in each.
+function New-StateBitmap([System.Drawing.Color]$Dot, [int]$Width, [int]$Height) {
+  $colors = Get-TrayColors
+  # The K of the logo (public/icon.svg): 14 straight-line points in the units of the logo (85.2 wide, 111.75 tall from y = 1.8).
+  $kPoints = @(
+    @(0, 113.55),
+    @(0, 1.8),
+    @(14.7, 1.8),
+    @(14.7, 64.65),
+    @(11.1, 63.15),
+    @(64.5, 1.8),
+    @(82.95, 1.8),
+    @(38.1, 53.55),
+    @(38.85, 43.05),
+    @(85.2, 113.55),
+    @(67.65, 113.55),
+    @(32.25, 60.45),
+    @(14.7, 80.55),
+    @(14.7, 113.55)
+  )
+  $fit = 0.88       # the share of the width of the icon that the K and its dot take
+  $dotBoost = 1.4   # on 16 px the dot of the file is 2 px: it is drawn 1.4 times bigger, from its bottom right corner, so that it can be seen
+  $scale = $Width * $fit / 125.116
+  $offsetX = ($Width - 125.116 * $scale) / 2
+  $offsetY = ($Height - 111.75 * $scale) / 2 - 1.8 * $scale
+  $points = [System.Drawing.PointF[]]($kPoints | ForEach-Object { New-Object System.Drawing.PointF([single]($offsetX + $_[0] * $scale), [single]($offsetY + $_[1] * $scale)) })
+  $dotW = 19.8 * $dotBoost * $scale
+  $dotH = 21 * $dotBoost * $scale
+  # The dot snaps to whole pixels, so its color is flat and its edges are sharp.
+  $dotX = [int][Math]::Round($offsetX + 125.116 * $scale - $dotW)
+  $dotY = [int][Math]::Round($offsetY + 113.55 * $scale - $dotH)
+  $dotPxW = [int][Math]::Max(2, [Math]::Round($dotW))
+  $dotPxH = [int][Math]::Max(2, [Math]::Round($dotH))
+  $d = [single]([Math]::Min($Width, $Height) * 0.22 * 2)
+  $bmp = New-Object System.Drawing.Bitmap($Width, $Height)
+  $g = [System.Drawing.Graphics]::FromImage($bmp)
+  $backBrush = New-Object System.Drawing.SolidBrush($colors.Back)
+  $keyBrush = New-Object System.Drawing.SolidBrush($colors.Key)
+  $dotBrush = New-Object System.Drawing.SolidBrush($Dot)
+  $path = New-Object System.Drawing.Drawing2D.GraphicsPath
+  try {
+    $path.AddArc([single]0, [single]0, $d, $d, 180, 90)
+    $path.AddArc([single]($Width - $d), [single]0, $d, $d, 270, 90)
+    $path.AddArc([single]($Width - $d), [single]($Height - $d), $d, $d, 0, 90)
+    $path.AddArc([single]0, [single]($Height - $d), $d, $d, 90, 90)
+    $path.CloseFigure()
+    $g.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::Half   # the center of a pixel is at +0.5, as in SVG: without it everything lands half a pixel off and the corners are not clean
+    $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+    $g.FillPath($backBrush, $path)
+    $g.FillPolygon($keyBrush, $points, [System.Drawing.Drawing2D.FillMode]::Winding)
+    $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::None
+    $g.FillRectangle($dotBrush, $dotX, $dotY, $dotPxW, $dotPxH)
+  } finally { $path.Dispose(); $dotBrush.Dispose(); $keyBrush.Dispose(); $backBrush.Dispose(); $g.Dispose() }
+  return $bmp
+}
+
 if ($SelfTest -or $SelfTestRestart) {
   $port = Get-PanelPort
   if ($SelfTestRestart) {
@@ -153,6 +225,23 @@ if ($SelfTest -or $SelfTestRestart) {
   exit 0
 }
 
+if ($RenderIcons -gt 0) {
+  # -RenderIcons <size>: draws both icons at that size and prints their pixels (R, G, B and A of every pixel, row by row) as JSON. No window, no mutex, nothing written.
+  $colors = Get-TrayColors
+  $out = [ordered]@{ size = $RenderIcons }
+  foreach ($state in 'running', 'stopped') {
+    $bmp = New-StateBitmap $(if ($state -eq 'running') { $colors.Running } else { $colors.Stopped }) $RenderIcons $RenderIcons
+    $pixels = New-Object 'System.Collections.Generic.List[int]'
+    for ($y = 0; $y -lt $RenderIcons; $y++) {
+      for ($x = 0; $x -lt $RenderIcons; $x++) { $c = $bmp.GetPixel($x, $y); $pixels.Add($c.R); $pixels.Add($c.G); $pixels.Add($c.B); $pixels.Add($c.A) }
+    }
+    $bmp.Dispose()
+    $out[$state] = $pixels
+  }
+  $out | ConvertTo-Json -Compress
+  exit 0
+}
+
 # ---- UI ----
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
@@ -162,49 +251,20 @@ $created = $false
 $mutex = New-Object System.Threading.Mutex($true, 'Local\repo-panel-tray', [ref]$created)
 if (-not $created) { $mutex.Dispose(); exit 0 }
 
-# Draws a round badge with the K of the logo (RP102) and returns the icon plus the raw handle that must be destroyed later.
-function New-StateIcon([System.Drawing.Color]$Color) {
+# Makes the icon of the tray from the bitmap (RP187) and returns it plus the raw handle that must be destroyed later.
+function New-StateIcon([System.Drawing.Color]$Dot) {
   $size = [System.Windows.Forms.SystemInformation]::SmallIconSize
-  $bmp = New-Object System.Drawing.Bitmap($size.Width, $size.Height)
-  $g = [System.Drawing.Graphics]::FromImage($bmp)
-  $brush = New-Object System.Drawing.SolidBrush($Color)
-  $white = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::White)
-  # The K of the logo (public/icon.svg): 14 straight-line points in the units of the logo (85.2 wide, 111.75 tall from y = 1.8), scaled to the icon and centered.
-  $kPoints = @(
-    @(0, 113.55),
-    @(0, 1.8),
-    @(14.7, 1.8),
-    @(14.7, 64.65),
-    @(11.1, 63.15),
-    @(64.5, 1.8),
-    @(82.95, 1.8),
-    @(38.1, 53.55),
-    @(38.85, 43.05),
-    @(85.2, 113.55),
-    @(67.65, 113.55),
-    @(32.25, 60.45),
-    @(14.7, 80.55),
-    @(14.7, 113.55)
-  )
-  $scale = $size.Height * 0.6 / 111.75
-  $offsetX = ($size.Width - 85.2 * $scale) / 2
-  $offsetY = ($size.Height - 111.75 * $scale) / 2 - 1.8 * $scale
-  $points = [System.Drawing.PointF[]]($kPoints | ForEach-Object { New-Object System.Drawing.PointF([single]($offsetX + $_[0] * $scale), [single]($offsetY + $_[1] * $scale)) })
-  try {
-    $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
-    $g.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::AntiAlias
-    $g.FillEllipse($brush, 0, 0, $size.Width - 1, $size.Height - 1)
-    $g.FillPolygon($white, $points)
-    $handle = $bmp.GetHicon()
-  } finally { $white.Dispose(); $brush.Dispose(); $g.Dispose(); $bmp.Dispose() }
+  $bmp = New-StateBitmap $Dot $size.Width $size.Height
+  try { $handle = $bmp.GetHicon() } finally { $bmp.Dispose() }
   return @{ Icon = [System.Drawing.Icon]::FromHandle($handle); Handle = $handle }
 }
 
 $script:busy = $false
 $script:port = Get-PanelPort
 $script:healthy = $false
-$green = New-StateIcon ([System.Drawing.Color]::FromArgb(34, 139, 34))
-$gray = New-StateIcon ([System.Drawing.Color]::FromArgb(128, 128, 128))
+$colors = Get-TrayColors
+$running = New-StateIcon $colors.Running
+$stopped = New-StateIcon $colors.Stopped
 
 $notify = New-Object System.Windows.Forms.NotifyIcon
 $menu = New-Object System.Windows.Forms.ContextMenuStrip
@@ -222,7 +282,7 @@ function Show-Balloon([string]$Text) {
 function Update-State {
   $script:port = Get-PanelPort
   $script:healthy = Test-PanelHealthy $script:port
-  $notify.Icon = if ($script:healthy) { $green.Icon } else { $gray.Icon }
+  $notify.Icon = if ($script:healthy) { $running.Icon } else { $stopped.Icon }
   $notify.Text = if ($script:healthy) { "Kletus.dev: running (port $($script:port))" } else { 'Kletus.dev: stopped' }
   $itemStart.Enabled = -not $script:healthy
 }
@@ -267,6 +327,6 @@ try {
   $notify.Visible = $false
   $notify.Dispose()
   $menu.Dispose()
-  foreach ($i in @($green, $gray)) { $i.Icon.Dispose(); [void][RepoPanel.Native]::DestroyIcon($i.Handle) }
+  foreach ($i in @($running, $stopped)) { $i.Icon.Dispose(); [void][RepoPanel.Native]::DestroyIcon($i.Handle) }
   $mutex.ReleaseMutex(); $mutex.Dispose()
 }

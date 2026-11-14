@@ -13,7 +13,7 @@ La base es `public/K-icon.svg` (copia del archivo de la persona: la K blanca y u
 
 - [x] T1 · S1-S2 · pruebas del padre, implementación delegada · RP185 ícono web, iPhone, app instalada y avisos · commit: pendiente
 - [x] T2 · S1 · inline · RP186 logo móvil de la cabecera · commit: pendiente
-- [ ] T3 · S1, S3 · inline · RP187 ícono de la bandeja con el punto de estado · commit: pendiente
+- [x] T3 · S1, S3 · inline · RP187 ícono de la bandeja con el punto de estado · commit: pendiente
 
 ## Log
 
@@ -23,3 +23,4 @@ La base es `public/K-icon.svg` (copia del archivo de la persona: la K blanca y u
 - **L4.** Nota del agente: la copia `public/K-icon.svg` es idéntica byte a byte al archivo de la persona (391 bytes, finales LF). Antes dije por error que el original tenía finales de Windows: lo había medido con un contador que coincidía con todas las líneas.
 - **L5.** Nota del agente: RP185 se cerró tras corregir dos defectos que ninguna prueba vio y salieron de mirar los PNG y de medir: la K tenía dos mellas (relleno par-impar en lugar de enrollado distinto de cero) y las pruebas tardaban 93 s. Quedan RP186 y RP187.
 - **L6.** Nota del agente: RP186 hecha. El `h1` de la cabecera es un `<picture>`: la K con el punto azul por debajo de 760 px (el corte angosto del panel) y el logo grande de ahí para arriba. Falta que la persona la apruebe mirándola en el iPhone. Queda RP187.
+- **L7.** Nota del agente: RP187 hecha y con ella la serie del ícono K. La bandeja dibuja la K y el punto sobre un cuadrado gris oscuro; el punto dice el estado. El punto va 1,4 veces más grande que el de `K-icon.svg` para que se vea a 16 px, y es la constante `$dotBoost` si se lo quiere fiel al archivo. Falta que la persona la apruebe mirándola junto al reloj, después de salir de la bandeja y abrirla de nuevo.

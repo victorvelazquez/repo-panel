@@ -39,22 +39,26 @@ test('t1: the K of the tray is the same polygon as the K of the logo: the same 1
   a.forEach((p, i) => { assert.ok(Math.abs(p[0] - b[i][0]) < 0.001 && Math.abs(p[1] - b[i][1]) < 0.001, `point ${i}: ${p} vs ${b[i]}`); });
 });
 
-test('t2: the icon no longer types an "R": the K is drawn as a polygon, white, on the round badge', () => {
+test('t2: the icon no longer types an "R": the K is drawn as a polygon, white, on a dark rounded square (RP187)', () => {
   assert.doesNotMatch(tray, /DrawString\(\s*'R'/);
-  assert.match(tray, /FillPolygon\(\$white/);
-  assert.match(tray, /FillEllipse\(\$brush/, 'the round badge stays');
+  assert.match(tray, /FillPolygon\(\$keyBrush/);
+  assert.match(tray, /FillPath\(\$backBrush/, 'the dark rounded square');
+  assert.doesNotMatch(tray, /FillEllipse/, 'the round badge is gone');
   assert.doesNotMatch(tray, /an "R"/, 'the comment does not describe an R either');
 });
 
-test('t3: the badge keeps its state colors: green while running, gray while stopped', () => {
-  assert.match(tray, /\$green = New-StateIcon \(\[System\.Drawing\.Color\]::FromArgb\(34, 139, 34\)\)/);
-  assert.match(tray, /\$gray = New-StateIcon \(\[System\.Drawing\.Color\]::FromArgb\(128, 128, 128\)\)/);
-  assert.match(tray, /\$notify\.Icon = if \(\$script:healthy\) \{ \$green\.Icon \} else \{ \$gray\.Icon \}/);
+test('t3: the state is the dot: blue while running, light gray while stopped; the square and the K do not change (RP187)', () => {
+  assert.match(tray, /Running\s*=\s*\[System\.Drawing\.Color\]::FromArgb\(0, 127, 255\)/);
+  assert.match(tray, /Stopped\s*=\s*\[System\.Drawing\.Color\]::FromArgb\(200, 205, 212\)/);
+  assert.match(tray, /\$running = New-StateIcon \$colors\.Running/);
+  assert.match(tray, /\$stopped = New-StateIcon \$colors\.Stopped/);
+  assert.match(tray, /\$notify\.Icon = if \(\$script:healthy\) \{ \$running\.Icon \} else \{ \$stopped\.Icon \}/);
+  assert.doesNotMatch(tray, /\$green|\$gray/, 'no more green and gray badge');
 });
 
-test('t4: the K is sized to the icon (not a fixed pixel count) and centered, so it follows the small-icon size of the screen', () => {
-  assert.match(tray, /\$size\.Height \* 0\.\d+ \/ 111\.75/, 'the scale comes from the height of the icon and the height of the K');
-  assert.match(tray, /\(\$size\.Width - 85\.2 \* \$scale\) \/ 2/, 'centered across');
+test('t4: the drawing is sized to the icon (not a fixed pixel count) and centered, so it follows the small-icon size of the screen', () => {
+  assert.match(tray, /\$scale = \$Width \* \$fit \/ 125\.116/, 'the scale comes from the width of the icon and the width of the K with its dot');
+  assert.match(tray, /\(\$Width - 125\.116 \* \$scale\) \/ 2/, 'centered across');
 });
 
 test('t5: the texts the person sees say Kletus.dev: the hover text (running and stopped) and the balloon title', () => {
