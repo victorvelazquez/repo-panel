@@ -23,6 +23,7 @@ function paint(el, html) {
 }
 
 const S = {
+  aliveAt: Date.now(), visibleAt: Date.now(),
   groups: [], local: {}, prs: {}, roadmap: {}, rmOpen: {}, loading: {}, busy: {},
   snoozed: new Set(), keepSnoozed: new Set(), snoozedOpen: {}, onlyProblems: false,
   dismissed: new Set(), menu: null, reqPassOpen: {},
@@ -170,6 +171,14 @@ if (typeof addEventListener === 'function') {
   addEventListener('hashchange', () => addressApply(addressNow()));
 }
 setInterval(quietTick, 10000);
+// RP181: the quiet "not updating" notice; coming back to the app asks for the Summary and the chat at once.
+function stalledTick() { $('#stalled').hidden = !(V ? V.stalledNow({ now: Date.now(), aliveAt: S.aliveAt, visibleAt: S.visibleAt, hidden: document.hidden }) : false); }
+setInterval(stalledTick, 5000);
+function comeBack() { S.visibleAt = Date.now(); summaryTick(); chatTick(); stalledTick(); }
+if (typeof addEventListener === 'function') {
+  addEventListener('pageshow', (e) => { if (e.persisted) comeBack(); });
+  addEventListener('online', comeBack);
+}
 setInterval(() => { if (!document.hidden) loadUsage(); }, 30000);
 // RP96: Escape on the focused usage element closes its popover (the focus leaves it).
 document.addEventListener('keydown', (e) => { const el = $('#usage'); if (e.key === 'Escape' && el && document.activeElement === el && el.blur) el.blur(); });
@@ -177,6 +186,7 @@ loadUsage();
 if (window.addEventListener) window.addEventListener('pagehide', () => flushNotes());
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) { flushNotes(); stopEvents(); return; }
+  comeBack();
   loadUsage();
   ev.attempt = 0;
   startEvents();

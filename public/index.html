@@ -11,6 +11,7 @@
 </head>
 <body>
   <div id="outdated" class="outdated" hidden>The panel server is out of date or out of sync with this page. Restart the panel, then reload the page.</div>
+  <div id="stalled" class="stalled" role="status" hidden>Not updating. The data may be out of date. Check the panel server or your connection.</div>
   <header>
     <h1><img src="/kletus-dev.svg" alt="Kletus.dev"></h1>
     <nav class="rs-tabs" role="tablist" aria-label="Views">
@@ -19,7 +20,6 @@
     </nav>
     <span class="spacer"></span>
     <span id="usage" class="usage" role="status" tabindex="0" hidden></span>
-    <span id="syncState" class="sync" aria-hidden="true" title="Updating the repos"><span class="ico">↻</span> Updating</span>
     <details class="pop" id="addMenu"><summary aria-label="Add a repo or a room">+ Add</summary><div class="pop-body">
       <button type="button" class="pop-item" data-act="add-dialog"><span>Repo…</span><small>Register a repository</small></button>
       <button type="button" class="pop-item" data-act="room-dialog" title="Register a room: a repo where you coordinate a group of repos"><span>Room…</span><small>A repo that coordinates a group</small></button>

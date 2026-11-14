@@ -13,7 +13,6 @@ const V = require('../public/view.js');
 
 const PUBLIC = path.join(__dirname, '..', 'public');
 const BASE = 1000000;
-const BUTTON = '#syncState'; // RP143: the Updating indicator of the header
 
 // ---------- harness (rp79-page.test.js, plus: a fake clock, captured intervals and listeners, a queue of /api/board answers, optional auto answers) ----------
 function element(extra = {}) {
@@ -50,7 +49,7 @@ const answer = (b) => () => Promise.resolve(ok(b));
 
 function loadPage({ auto = false, boardDefault = null } = {}) {
   const clock = { t: BASE };
-  const els = { [BUTTON]: element({ on: undefined, classList: { toggle(n, on) { els[BUTTON].on = on; }, add() {}, remove() {}, contains: () => false } }) };
+  const els = {};
   const frames = [];
   const intervals = [];
   const fetches = [];
@@ -93,7 +92,7 @@ function loadPage({ auto = false, boardDefault = null } = {}) {
   const fire = (ms) => intervals.filter((i) => i.ms === ms).forEach((i) => i.fn());
   const S = run('S');
   S.groups = [{ name: 'G', repos: [{ id: 'abc', name: 'alpha', path: 'p' }, { id: 'xyz', name: 'beta', path: 'q' }] }];
-  return Object.assign(page, { ctx, S, get, flush, tick, run, fire, fetches, routes, boards, listeners, doc, intervals, clock, counter, button: () => els[BUTTON].on });
+  return Object.assign(page, { ctx, S, get, flush, tick, run, fire, fetches, routes, boards, listeners, doc, intervals, clock, counter });
 }
 // Board and per-repo requests only, as `METHOD url`, from index `from`.
 const RELEVANT = /^\/api\/(board|local|prs|roadmap|requirements|state|pi-status)\b/;
@@ -349,7 +348,7 @@ test('c: a board that is down is retried by boardTick, one request each, and whe
 });
 
 // ---------- point 6d: visibility ----------
-test('d: becoming visible asks the board once; no full refresh, no per-repo burst, no summary, prerequisites or rooms request', async () => {
+test('d: becoming visible asks the board once; no full refresh, no per-repo burst, no prerequisites or rooms request (RP181: it does ask the Summary at once)', async () => {
   const page = loadPage({ auto: true });
   const mark = await working(page);
   page.S.lastRefresh = 0; // the old handler would refresh everything now
@@ -358,7 +357,8 @@ test('d: becoming visible asks the board once; no full refresh, no per-repo burs
   for (const fn of page.listeners.visibilitychange) fn({});
   await page.tick();
   assert.deepEqual(reqs(page, mark), ['GET /api/board?since=5']);
-  assert.deepEqual(page.fetches.slice(mark).map((f) => f.url).filter((u) => /^\/api\/(summary|prerequisites|rooms)/.test(u)), []);
+  assert.deepEqual(page.fetches.slice(mark).map((f) => f.url).filter((u) => /^\/api\/(prerequisites|rooms)/.test(u)), []);
+  assert.ok(page.fetches.slice(mark).some((f) => f.url === '/api/summary'), 'RP181: coming back asks the Summary at once');
   const hiddenMark = page.fetches.length;
   page.doc.hidden = true;
   for (const fn of page.listeners.visibilitychange) fn({});
@@ -379,7 +379,7 @@ test('d: with the board down, becoming visible refreshes everything as today', a
 });
 
 // ---------- point 6e: the Refresh button ----------
-test('e: Refresh paints from memory first, then POSTs /api/board/refresh (no id, user priority); the button is busy while `refreshing` lists repos; cards follow the answers', async () => {
+test('e: Refresh paints from memory first, then POSTs /api/board/refresh (no id, user priority); S.boardRefreshing follows the repos in `refreshing`; cards follow the answers', async () => {
   const page = loadPage({ auto: true });
   const { S } = page;
   const post = gate();
@@ -398,15 +398,15 @@ test('e: Refresh paints from memory first, then POSTs /api/board/refresh (no id,
   await page.tick();
   await page.run('boardTick()');
   await page.tick();
-  assert.equal(page.button(), true, 'busy while two repos refresh');
+  assert.deepEqual(plain(S.boardRefreshing), ['abc', 'xyz'], 'two repos refreshing');
   assert.deepEqual(plain(S.local.abc), facts('m2').local);
   await page.run('boardTick()');
   await page.tick();
-  assert.equal(page.button(), true, 'busy while one still refreshes');
+  assert.deepEqual(plain(S.boardRefreshing), ['xyz'], 'one still refreshes');
   assert.deepEqual(plain(S.local.xyz), facts('n3').local);
   await page.run('boardTick()');
   await page.tick();
-  assert.equal(page.button(), false, 'idle again once nothing is refreshing');
+  assert.deepEqual(plain(S.boardRefreshing), [], 'idle again once nothing is refreshing');
   assert.deepEqual(perRepo(page, mark), [], 'not one per-repo request in the whole refresh');
 });
 

@@ -119,7 +119,6 @@ function snoozedBlock(key, rows) {
 
 function render() {
   if (pressHeld()) { renderWaiting = true; return; } // RP47: wait for the release, then draw once
-  syncRefreshIcon();
   drawQueue();
   drawConformity();
   drawSettings();
@@ -173,12 +172,6 @@ const GROUP_HUES = [265, 140, 30, 185, 330, 55];
 function groupTag(name) {
   const h = GROUP_HUES[Math.max(0, S.groups.findIndex((g) => g.name === name)) % GROUP_HUES.length];
   return `<span class="tag" style="background:hsl(${h} 40% 20%);color:hsl(${h} 70% 78%)">${esc(name)}</span>`;
-}
-
-// The only refresh signal: the small Updating indicator of the header shows and spins while any repo is refreshing. Cards show nothing.
-function syncRefreshIcon() {
-  const on = (V ? V.isRefreshing(S.loading) : Object.values(S.loading).some((n) => n > 0)) || S.boardRefreshing.length > 0;
-  $('#syncState').classList.toggle('loading', on);
 }
 
 // The repo name is the link to the repository on GitHub (plain text when there is no GitHub remote).

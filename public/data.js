@@ -24,6 +24,7 @@ async function api(url, body, opts = {}) {
     const res = await fetch(url, { method: body ? 'POST' : 'GET', headers, body: body ? JSON.stringify(body) : undefined, signal: ctl.signal });
     const data = await res.json().catch(() => ({ error: 'Invalid server response' }));
     if (!res.ok) throw Object.assign(new Error(data.error || res.statusText), { status: res.status });
+    S.aliveAt = Date.now();
     return data;
   } catch (e) {
     if (timedOut) throw new Error('Request timed out');
