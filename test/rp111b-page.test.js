@@ -72,7 +72,7 @@ const switchOf = (h, key) => new RegExp(`<button type="button" class="st-sw" rol
 
 // ---------- the tab ----------
 test('index.html: a Settings tab button after Conformity and its full-width panel, hidden at the start', () => {
-  assert.match(INDEX, /<button type="button" role="tab" class="hd-icon" id="tab-settings" data-act="tab" data-tab="settings" aria-selected="false" aria-controls="settingsView" aria-label="Settings" title="Settings">/);
+  assert.match(INDEX, /<button type="button" role="tab" class="tab-dual" id="tab-settings" data-act="tab" data-tab="settings" aria-selected="false" aria-controls="settingsView" aria-label="Settings" title="Settings">/); // RP188: the icon and the text span sit inside the button
   assert.match(INDEX, /<section id="settingsView" class="rs-panel" role="tabpanel" aria-labelledby="tab-settings" hidden><\/section>/);
   assert.ok(INDEX.indexOf('id="tab-conformity"') < INDEX.indexOf('id="tab-settings"'));
 });

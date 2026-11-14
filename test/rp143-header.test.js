@@ -23,36 +23,35 @@ const rules = [...css.matchAll(/(?:^|\n)([^{}\n@/ ][^{}\n]*)\{([^}]*)\}/g)].flat
 const rule = (sel) => { const r = rules.filter((x) => x.sel === sel); assert.ok(r.length, `a rule for ${sel}`); return r.map((x) => x.body).join(';'); };
 
 // ---------- the markup ----------
-test('m1: the header holds, in this order, the logo, the tablist of Summary and Work, the usage, the Add menu and the tablist of Conformity and Settings; one row, no second nav', () => {
-  const order = ['<h1>', 'aria-label="Views"', 'id="usage"', 'id="addMenu"', 'aria-label="More views"'].map((k) => header.indexOf(k));
+test('m1: the header holds, in this order, the logo, the ONE tablist (Sessions, Conformity, Settings) and the usage; one row, no second nav, no Add menu (RP188 moved it to the list column)', () => {
+  const order = ['<h1>', 'aria-label="Views"', 'id="usage"'].map((k) => header.indexOf(k));
   assert.ok(order.every((i) => i >= 0), `every piece is in the header: ${order}`);
   assert.deepEqual([...order].sort((a, b) => a - b), order, 'in the order of the design');
-  assert.equal((html.match(/<nav\b/g) || []).length, 1, 'one nav inside the header (the second group of tabs is a tablist div)');
+  assert.equal((html.match(/<nav\b/g) || []).length, 1, 'one nav inside the header');
+  assert.ok(!header.includes('addMenu') && !header.includes('More views'), 'no Add menu and no second group of tabs in the header');
   assert.equal((html.slice(html.indexOf('</header>')).match(/class="rs-tabs"/g) || []).length, 0, 'no row of tabs after the header');
   assert.ok(html.indexOf('</header>') < html.indexOf('id="viewbar"'), 'the view bar follows the header');
 });
 
-test('m2: Summary and Work are the tabs of the first tablist, Summary selected, wired to their panels', () => {
+test('m2: Sessions, Conformity and Settings are the tabs of the one tablist, Sessions selected, wired to their panels', () => {
   const nav = tagOf(header, /<nav[^>]*aria-label="Views"[^>]*>[\s\S]*?<\/nav>/);
   assert.match(nav, /role="tablist"/);
   const tabs = [...nav.matchAll(/<button[^>]*>/g)].map((m) => attrs(m[0]));
-  assert.deepEqual(tabs.map((t) => t['data-tab']), ['summary', 'work']);
-  assert.deepEqual(tabs.map((t) => t.id), ['tab-summary', 'tab-work']);
-  assert.deepEqual(tabs.map((t) => t['aria-selected']), ['true', 'false']);
-  assert.deepEqual(tabs.map((t) => t['aria-controls']), ['summary', 'work']);
-  for (const t of tabs) assert.equal(t.role, 'tab'), assert.equal(t['data-act'], 'tab');
+  assert.deepEqual(tabs.map((t) => t['data-tab']), ['summary', 'conformity', 'settings']);
+  assert.deepEqual(tabs.map((t) => t.id), ['tab-summary', 'tab-conformity', 'tab-settings']);
+  assert.deepEqual(tabs.map((t) => t['aria-selected']), ['true', 'false', 'false']);
+  assert.deepEqual(tabs.map((t) => t['aria-controls']), ['summary', 'conformityView', 'settingsView']);
+  for (const t of tabs) assert.equal(t.role, 'tab'), assert.equal(t['data-act'], 'tab'), assert.equal(t.type, 'button');
 });
 
-test('m3: Conformity and Settings are still tabs (same ids, same action, same panels), but icons with an accessible name; the count sits on Conformity and starts hidden', () => {
-  const group = tagOf(header, /<div[^>]*aria-label="More views"[^>]*>[\s\S]*?<\/div>/);
-  assert.match(group, /role="tablist"/);
+test('m3: Conformity and Settings are tabs with an icon, a text span and an accessible name; the count sits on Conformity and starts hidden', () => {
+  const nav = tagOf(header, /<nav[^>]*aria-label="Views"[^>]*>[\s\S]*?<\/nav>/);
+  const group = nav.slice(nav.lastIndexOf('<button', nav.indexOf('id="tab-conformity"')));
   const tabs = [...group.matchAll(/<button[^>]*>/g)].map((m) => attrs(m[0]));
-  assert.deepEqual(tabs.map((t) => t.id), ['tab-conformity', 'tab-settings'], 'document order is kept: Conformity before Settings');
-  assert.deepEqual(tabs.map((t) => t['data-tab']), ['conformity', 'settings']);
-  assert.deepEqual(tabs.map((t) => t['aria-controls']), ['conformityView', 'settingsView']);
   assert.deepEqual(tabs.map((t) => t['aria-label']), ['Conformity', 'Settings']);
-  for (const t of tabs) { assert.equal(t.role, 'tab'); assert.equal(t['data-act'], 'tab'); assert.equal(t['aria-selected'], 'false'); assert.equal(t.type, 'button'); assert.ok(t.title); }
+  for (const t of tabs) { assert.ok(t.title); assert.match(t.class, /tab-dual/); }
   assert.equal((group.match(/<svg\b[^>]*aria-hidden="true"/g) || []).length, 2, 'both icons are hidden from assistive tools: the label carries the name');
+  assert.equal((group.match(/<span class="tab-tx">/g) || []).length, 2);
   assert.match(group, /<span id="confBadge" class="badge" hidden><\/span>/);
   assert.ok(group.indexOf('confBadge') < group.indexOf('tab-settings'), 'the badge is inside the Conformity tab');
 });
@@ -62,8 +61,8 @@ test('m4: nothing of the removed controls is left in the header: no Refresh, no 
   assert.ok(!html.includes('id="method"') && !html.includes('id="delBranch"'), 'the controls are not elsewhere in the page either');
 });
 
-test('m5: the Add menu is a details with a named summary and two buttons that are the SAME actions as before: add-dialog and room-dialog', () => {
-  const menu = tagOf(header, /<details[^>]*id="addMenu"[^>]*>[\s\S]*?<\/details>/);
+test('m5: the Add menu (now in the list column header) is a details with a named summary and two buttons that are the SAME actions as before: add-dialog and room-dialog', () => {
+  const menu = tagOf(html, /<details[^>]*id="addMenu"[^>]*>[\s\S]*?<\/details>/);
   assert.match(menu, /class="pop/);
   const summary = attrs(tagOf(menu, /<summary[^>]*>/));
   assert.ok(summary['aria-label'] && /add/i.test(summary['aria-label']));
@@ -80,11 +79,11 @@ test('m7: every button of the header says type="button" and the usage element is
 });
 
 // ---------- the page code ----------
-test('p1: the page code no longer reaches for what was removed, and reaches for what replaces it', () => {
+test('p1: the page code no longer reaches for what was removed, and reaches for what replaces it (the tablist of the header is ONE now)', () => {
   const src = appSource();
   for (const gone of ['#mergeMenu', '#method', '#delBranch', '[data-act="refresh-all"]']) assert.ok(!src.includes(gone), `the page code does not use ${gone}`);
   for (const here of ['#addMenu']) assert.ok(src.includes(here), `the page code uses ${here}`);
-  assert.match(src, /querySelectorAll\('header \[role=tab\]\[data-tab\]'\)/, 'the selected tab is kept in step in BOTH tablists of the header');
+  assert.match(src, /querySelectorAll\('header \[role=tab\]\[data-tab\]'\)/, 'the selected tab is kept in step in the header tablist');
 });
 
 test('p2: what stays behind the removed buttons stays: the actions refresh-all and fetch-all, fetchRepo and its route', () => {
@@ -132,12 +131,12 @@ test('c3: the Add menu summary is the blue primary action of the header, and its
   assert.match(rule('.pop-item:hover'), /background:\s*var\(--panel2\)/);
 });
 
-test('c4: the icon tabs are touch sized (44 px with a coarse pointer), keep the visible focus ring and the selected mark, and the badge sits on the icon', () => {
-  assert.match(rule('.hd-icon'), /min-width:\s*36px/);
-  assert.match(css, /@media \(pointer:\s*coarse\)\s*\{[^@]*\.hd-icon[^}]*(?:min-width|min-height):\s*44px/);
-  assert.match(rule('.hd-icon[aria-selected="true"]'), /color:\s*var\(--text\)/);
-  assert.match(css, /\.hd-end button:focus-visible[^{]*\{[^}]*outline:\s*2px solid var\(--blue\)|\.hd-icon:focus-visible[^{]*\{[^}]*outline:\s*2px solid var\(--blue\)/);
-  assert.match(rule('.hd-icon .badge'), /position:\s*absolute/);
+test('c4: the dual tabs are touch sized (44 px with a coarse pointer, and always under 760 px), keep the visible focus ring and the selected mark, and the badge sits on the icon on the phone', () => {
+  assert.match(css, /@media \(pointer:\s*coarse\)\s*\{[^@]*\.tab-dual[^}]*(?:min-width|min-height):\s*44px/);
+  assert.match(css, /@media \(max-width: 759\.98px\)\s*\{[^@]*\.tab-dual\s*\{[^}]*min-width:\s*44px/);
+  assert.match(rule('header .rs-tabs .tab-dual[aria-selected="true"]'), /color:\s*var\(--text\)/);
+  assert.match(rule('header .rs-tabs .tab-dual:focus-visible'), /outline:\s*2px solid var\(--blue\)/);
+  assert.match(css, /@media \(max-width: 759\.98px\)\s*\{[^@]*\.tab-dual \.badge\s*\{[^}]*position:\s*absolute/);
 });
 
 test('c5: the old rules of the removed controls are gone (no dead CSS for the Merge menu popover of the header)', () => {

@@ -1313,7 +1313,7 @@
       + `${stRow(`<label id="st-l-clean">Show clean repos as a column</label>${stBrowser('on')}`, stSwitch('st-l-clean', p.clean === true, 'data-act="pref-set" data-pref="cleanAsColumn" data-value="' + (p.clean === true ? 'false' : 'true') + '"', false))}</div>
 `
       + `<h3 class="st-h">Director <span class="chip yellow">Planned · RP109</span></h3><div class="st-rows">${stRow(`<label for="st-par">Agents working in parallel</label><p class="rs-sub">How many repo agents the Director may run at once.</p>${stMeta('<span class="chip yellow">Planned · RP109</span>', '<span class="chip">Default: 3</span>')}`, '<select id="st-par" disabled aria-label="Agents working in parallel"><option>3</option></select>', true)}</div>
-${status}</div>`;
+<h3 class="st-h">Work view</h3><div class="st-rows">${stRow('<p class="rs-sub">An older view of the repos as a board. It is not in the menu any more.</p>', '<button type="button" data-act="tab" data-tab="work">Open Work</button>')}</div>${status}</div>`;
   }
 
   function chatBody(c, ctx = {}) {

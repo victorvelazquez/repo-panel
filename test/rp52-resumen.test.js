@@ -427,7 +427,8 @@ test('the deliver button on the page is disabled until the repo local state is l
 test('index.html: tab bar, scope container, summary and work wrappers, no Activity tab, script order', () => {
   const html = fs.readFileSync(path.join(PUBLIC, 'index.html'), 'utf8');
   assert.match(html, /role="tablist"/);
-  for (const t of ['summary', 'work', 'conformity']) assert.match(html, new RegExp(`role="tab"[^>]*data-act="tab" data-tab="${t}"`));
+  for (const t of ['summary', 'conformity']) assert.match(html, new RegExp(`role="tab"[^>]*data-act="tab" data-tab="${t}"`));
+  assert.doesNotMatch(html, /role="tab"[^>]*data-tab="work"/, 'RP188: Work is not in the menu (its panel stays)');
   assert.doesNotMatch(html, /Activity/);
   assert.match(html, /id="scope"/);
   assert.match(html, /<section id="summary"[^>]*role="tabpanel"/);
