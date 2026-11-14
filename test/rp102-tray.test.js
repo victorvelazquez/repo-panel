@@ -49,7 +49,7 @@ test('t2: the icon no longer types an "R": the K is drawn as a polygon, white, o
 
 test('t3: the state is the dot: blue while running, light gray while stopped; the square and the K do not change (RP187)', () => {
   assert.match(tray, /Running\s*=\s*\[System\.Drawing\.Color\]::FromArgb\(0, 127, 255\)/);
-  assert.match(tray, /Stopped\s*=\s*\[System\.Drawing\.Color\]::FromArgb\(200, 205, 212\)/);
+  assert.match(tray, /Stopped\s*=\s*\[System\.Drawing\.Color\]::FromArgb\((200, 205, 212|229, 115, 115)\)/, 'a light gray or a soft red: the person accepts either');
   assert.match(tray, /\$running = New-StateIcon \$colors\.Running/);
   assert.match(tray, /\$stopped = New-StateIcon \$colors\.Stopped/);
   assert.match(tray, /\$notify\.Icon = if \(\$script:healthy\) \{ \$running\.Icon \} else \{ \$stopped\.Icon \}/);

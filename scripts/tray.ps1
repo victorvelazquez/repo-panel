@@ -1,6 +1,6 @@
 # Notification-area (tray) icon for repo-panel: open the panel, start it or restart it without hunting processes.
 # Windows only. Install it at logon with install-tray.ps1. -SelfTest prints facts as JSON and creates no window. -RenderIcons <size> draws both icons at that size and prints
-# their pixels as JSON (no window, nothing written): the dot of the icon is blue while the panel runs and light gray while it is stopped (RP187).
+# their pixels as JSON (no window, nothing written): the dot of the icon is blue while the panel runs and soft red while it is stopped (RP187; light gray is the other option, see Get-TrayColors).
 param(
   [string]$ConfigPath = $(if ($env:REPO_PANEL_CONFIG) { $env:REPO_PANEL_CONFIG } else { Join-Path (Split-Path -Parent $PSScriptRoot) 'config.json' }),
   [switch]$SelfTest,
@@ -126,18 +126,18 @@ function Invoke-PanelStart([int]$Port, [scriptblock]$Pump) {
 
 Add-Type -AssemblyName System.Drawing
 
-# The colors of the icon (RP187): a dark gray square (lighter than black), the K in near-white and a dot that tells the state: blue while the panel runs, light gray (lighter than the
-# square) while it is stopped.
+# The colors of the icon (RP187): the dark of the panel (--bg of public/style.css, as in icon.svg), the K in near-white and a dot that tells the state: blue while the panel runs and a soft
+# red while it is stopped. The person accepts a light gray (200, 205, 212) there too: to switch, change the number of Stopped (the tests allow both).
 function Get-TrayColors {
   return @{
-    Back    = [System.Drawing.Color]::FromArgb(52, 56, 64)
+    Back    = [System.Drawing.Color]::FromArgb(15, 18, 22)
     Key     = [System.Drawing.Color]::FromArgb(250, 251, 252)
     Running = [System.Drawing.Color]::FromArgb(0, 127, 255)
-    Stopped = [System.Drawing.Color]::FromArgb(200, 205, 212)
+    Stopped = [System.Drawing.Color]::FromArgb(229, 115, 115)
   }
 }
 
-# Draws the icon: the K of the logo (RP102) and the dot of K-icon.svg on a dark gray rounded square. The drawing is 125.116 wide: the K (85.2 wide), a gap and the dot (19.8 by 21, on the
+# Draws the icon: the K of the logo (RP102) and the dot of K-icon.svg on a square of the dark of the panel with slightly rounded corners. The drawing is 125.116 wide: the K (85.2 wide), a gap and the dot (19.8 by 21, on the
 # baseline of the K). The K is filled with the winding rule, like SVG: its outline crosses itself at two joints and the default rule would leave a notch in each.
 function New-StateBitmap([System.Drawing.Color]$Dot, [int]$Width, [int]$Height) {
   $colors = Get-TrayColors
@@ -159,6 +159,7 @@ function New-StateBitmap([System.Drawing.Color]$Dot, [int]$Width, [int]$Height) 
     @(14.7, 113.55)
   )
   $fit = 0.88       # the share of the width of the icon that the K and its dot take
+  $corner = 0.14    # how rounded the corners are, as a share of the side: slightly, like the controls of the panel
   $dotBoost = 1.4   # on 16 px the dot of the file is 2 px: it is drawn 1.4 times bigger, from its bottom right corner, so that it can be seen
   $scale = $Width * $fit / 125.116
   $offsetX = ($Width - 125.116 * $scale) / 2
@@ -171,7 +172,7 @@ function New-StateBitmap([System.Drawing.Color]$Dot, [int]$Width, [int]$Height) 
   $dotY = [int][Math]::Round($offsetY + 113.55 * $scale - $dotH)
   $dotPxW = [int][Math]::Max(2, [Math]::Round($dotW))
   $dotPxH = [int][Math]::Max(2, [Math]::Round($dotH))
-  $d = [single]([Math]::Min($Width, $Height) * 0.22 * 2)
+  $d = [single]([Math]::Min($Width, $Height) * $corner * 2)
   $bmp = New-Object System.Drawing.Bitmap($Width, $Height)
   $g = [System.Drawing.Graphics]::FromImage($bmp)
   $backBrush = New-Object System.Drawing.SolidBrush($colors.Back)
