@@ -43,10 +43,16 @@ test('a failed turn with NO text is still an item (it was invisible before), wit
     msg('assistant', [call('read', { path: 'a.md' }, 'r1')], { stopReason: 'toolUse' }),
     msg('assistant', [], { stopReason: 'error', errorMessage: '400 {"error":{"message":"SECRET-API-BODY key sk-live"}}' }),
   ]);
+  // `updatedAt` is the modification time of the file, that is, the clock of the run: pin one that holds the digits of the check below, so it can never depend on the time it runs.
+  const file = path.join(S.sessionsDirFor(repoDir, sessionsBase), '2026-10-28T10-00-00-000Z_s2.jsonl');
+  const pinned = new Date('2026-11-14T12:40:14.400Z');
+  fs.utimesSync(file, pinned, pinned);
   const items = chatOf('s2').items;
   assert.deepEqual(items.map((i) => [i.role, i.text, i.stop || null]), [['user', 'go', null], ['assistant', '', 'error']]);
   assert.deepEqual(items[1].tools, ['read']);
-  assert.doesNotMatch(JSON.stringify(chatOf('s2')), /SECRET|sk-live|400/);
+  const { updatedAt, ...content } = chatOf('s2'); // the time of the file is not content: only the content must not carry the error
+  assert.equal(updatedAt, '2026-11-14T12:40:14.400Z', 'the pinned time is the one that is reported');
+  assert.doesNotMatch(JSON.stringify(content), /SECRET|sk-live|400/);
 });
 
 test('a turn that ended normally (stop, toolUse, anything else) has no stop field, and the keys of an item are the ones of before', () => {
