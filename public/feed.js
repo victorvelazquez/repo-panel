@@ -91,7 +91,7 @@ function applyNotice(n, force = false) {
   if (p.sound) beep(n.kind);
   if (!p.system) return;
   try {
-    const x = new Notification(n.title, { body: n.body, tag: `rp-${n.id}-${n.kind}`, icon: '/icon.svg' });
+    const x = new Notification(n.title, { body: n.body, tag: `rp-${n.id}-${n.kind}`, icon: '/icon-192.png' });
     x.onclick = () => { window.focus(); location.hash = V.addressOf(n.id, 'chat'); x.close(); };
   } catch { /* a browser that refuses to build one (a phone) keeps the notice and the sound */ }
 }

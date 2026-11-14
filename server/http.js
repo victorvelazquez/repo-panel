@@ -205,11 +205,18 @@ const STATIC = {
   '/style.css': ['style.css', 'text/css; charset=utf-8'],
   '/kletus-dev.svg': ['kletus-dev.svg', 'image/svg+xml'], // RP102: the logo of the header
   '/icon.svg': ['icon.svg', 'image/svg+xml'], // RP102: the K of the logo, the icon of the tab
+  '/K-icon.svg': ['K-icon.svg', 'image/svg+xml'], // RP185: the base of the person
+  '/apple-touch-icon.png': ['apple-touch-icon.png', 'image/png'],
+  '/icon-192.png': ['icon-192.png', 'image/png'],
+  '/icon-512.png': ['icon-512.png', 'image/png'],
+  '/icon-maskable-512.png': ['icon-maskable-512.png', 'image/png'],
+  '/favicon.ico': ['favicon.ico', 'image/x-icon'],
   '/sw.js': ['sw.js', 'text/javascript; charset=utf-8'], // RP179: the service worker of the push
   '/manifest.webmanifest': ['manifest.webmanifest', 'application/manifest+json; charset=utf-8'],
 };
 // RP179: these carry no data, so the remote host serves them without the login (an installed app fetches them before it has a cookie).
-const OPEN_STATIC = new Set(['/sw.js', '/manifest.webmanifest', '/icon.svg']);
+// RP185: the same for the icons of the install (K-icon.svg is only the base and stays behind the login).
+const OPEN_STATIC = new Set(['/sw.js', '/manifest.webmanifest', '/icon.svg', '/apple-touch-icon.png', '/icon-192.png', '/icon-512.png', '/icon-maskable-512.png', '/favicon.ico']);
 
 function readBody(req) {
   return new Promise((resolve, reject) => {
@@ -221,7 +228,7 @@ function readBody(req) {
 
 const send = (res, status, body, type = 'application/json; charset=utf-8', extra = {}) => {
   res.writeHead(status, { 'content-type': type, 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', ...extra });
-  res.end(typeof body === 'string' ? body : JSON.stringify(body));
+  res.end(typeof body === 'string' || Buffer.isBuffer(body) ? body : JSON.stringify(body));
 };
 
 function isPanelRunning(port) {
@@ -319,7 +326,7 @@ function createServer(port, deps = {}) {
         }
         if (req.method === 'GET' && STATIC[pathname]) {
           const [file, type] = STATIC[pathname];
-          return reply(200, fs.readFileSync(path.join(ROOT, 'public', file), 'utf8'), type);
+          return reply(200, fs.readFileSync(path.join(ROOT, 'public', file), type.startsWith('image/') && type !== 'image/svg+xml' ? undefined : 'utf8'), type);
         }
         // Lets a second launch tell "my own panel is already here" from "another project owns the port".
         if (req.method === 'GET' && pathname === '/health') return reply(200, { app: 'repo-panel', api: view.API_VERSION });

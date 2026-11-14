@@ -73,8 +73,8 @@ test('t4: the K sits inside the square with room around it (no clipped corner)',
   const t = /transform="translate\(([\d.]+)[ ,]+([\d.]+)\) scale\(([\d.]+)\)"/.exec(icon);
   assert.ok(t, 'the K is placed with translate and scale');
   const [x, y, s] = [Number(t[1]), Number(t[2]), Number(t[3])];
-  // The K spans x 0 to 85.2 and y 1.8 to 113.55 in the logo.
-  const [left, right, top, bottom] = [x, x + 85.2 * s, y + 1.8 * s, y + 113.55 * s];
+  // The K and the dot together span x 0 to 125.116 and y 1.8 to 113.55 in the logo.
+  const [left, right, top, bottom] = [x, x + 125.116 * s, y + 1.8 * s, y + 113.55 * s];
   for (const v of [left, top]) assert.ok(v >= 8, `at least 8 of 64 from the top and left edge (${v})`);
   for (const v of [right, bottom]) assert.ok(v <= 56, `at least 8 of 64 from the bottom and right edge (${v})`);
   assert.ok(Math.abs((left + right) / 2 - 32) < 1.5, 'centered across');
