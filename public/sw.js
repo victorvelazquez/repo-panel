@@ -16,8 +16,8 @@ async function pending() {
 
 async function onPush() {
   const list = await pending();
-  if (!list.length) { await registration.showNotification('Repo Panel', { body: 'Something needs you. Open the panel to see what.', icon: '/icon.svg' }); return; }
-  for (const n of list) await registration.showNotification(n.title, { body: String(n.body || ''), tag: `rp-${n.id}-${n.kind}`, icon: '/icon.svg', data: { id: n.id } });
+  if (!list.length) { await registration.showNotification('Repo Panel', { body: 'Something needs you. Open the panel to see what.', icon: '/icon-192.png' }); return; }
+  for (const n of list) await registration.showNotification(n.title, { body: String(n.body || ''), tag: `rp-${n.id}-${n.kind}`, icon: '/icon-192.png', data: { id: n.id } });
 }
 
 async function onClick(note) {

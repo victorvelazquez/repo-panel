@@ -363,6 +363,16 @@ The page is plain scripts with no build step. `index.html` loads them one after 
 
 A new page script goes into `index.html`, into the closed list of static files in `server/http.js` and into `test/pagesrc.js`, in that order of loading.
 
+## Icons (RP185)
+
+`public/K-icon.svg` is the base: the white K and the blue dot, with no background. `public/icon.svg` is that K on the dark square, because the K is almost white and would vanish on a light browser tab.
+
+`node scripts/make-icons.js` draws the PNG files from the base (no dependency): `apple-touch-icon.png` for the iPhone, and `icon-192.png`, `icon-512.png` and `icon-maskable-512.png` for the installed app and the notices. It also draws `favicon.ico`. `node scripts/make-icons.js --check` verifies that the files are what the base draws now (exit code 1 and the problems on stderr if not); `--dir <folder>` uses another folder than `public/`.
+
+- **iPhone:** to see a new icon, remove the app from the Home Screen and add it again. That loses its session and its push subscription: log in and enable Push notifications again.
+- **Edge or Chrome:** an app installed from the browser updates its icon on its own after a while, or when it is installed again.
+- **Shortcuts:** `favicon.ico` can be given by hand to a shortcut made by hand.
+
 ## Notifications (RP178)
 
 The panel tells you when a repo starts to need you, so you do not have to look at it. `server/notifier.js` reads the Summary every 3 seconds and, when the kind of attention of a repo **changes**, sends a `notify` event on `GET /api/events`. The kinds are: the agent **asks a question** (`answer`), the **CI fails** (`ci`), the work is done and **`/flow-ship`** can run (`deliver`), a PR is ready to **merge** (`merge`) and the repo is clean for **`/flow-next`** (`start`).
