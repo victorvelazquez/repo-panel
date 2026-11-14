@@ -354,7 +354,7 @@ The page is plain scripts with no build step. `index.html` loads them one after 
 - `public/data.js`: the requests to the server (with their pool) and the reads of each repo.
 - `public/feed.js`: the event stream, the board data and the refresh ticks.
 - `public/tabs.js`: the derived state, the "go work on" queue and the Summary and Conformity tabs.
-- `public/chat.js`: the chat, its composer, the notes pad and the three-block layout.
+- `public/chat.js`: the chat, its composer, the notes pad and the three-block layout. It also keeps the list of the chat in place (RP183): the list is repainted with `innerHTML` and the browser can reset its scroll to the first messages (when something arrives at the end, or when the keyboard opens), so a snapshot of the position is taken before a repaint and when the box is touched, focused or loses the focus, and restored after (now and one frame later; on every resize of the visible area for 1.5 s after the mark). Pinned to the end (under 24 px) it stays pinned, so the last message is never covered by the keyboard; reading higher up it stays where it was, and only a jump to zero is undone, so it never fights a finger that is scrolling. The cause was not reproduced on a device: the fix does not depend on what resets the scroll.
 - `public/board.js`: the Work board and its cards.
 - `public/actions.js`: the click handlers (`data-act`): merge, re-run, rooms and the usage bar.
 - `public/sw.js` and `public/manifest.webmanifest`: not page scripts; the browser fetches them (the service worker of the push, RP179, and the manifest that lets a phone install the app). The push settings live in `actions.js`, `tabs.js` and `resumen.js`.

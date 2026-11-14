@@ -184,6 +184,14 @@ setInterval(() => { if (!document.hidden) loadUsage(); }, 30000);
 document.addEventListener('keydown', (e) => { const el = $('#usage'); if (e.key === 'Escape' && el && document.activeElement === el && el.blur) el.blur(); });
 loadUsage();
 if (window.addEventListener) window.addEventListener('pagehide', () => flushNotes());
+// RP183: the keyboard moves things. Mark where the chat is when its box is touched or takes or loses the focus, and put it back on every resize of the visible area for a moment (and one frame later).
+const kbMark = () => chatKeyboardMark($('#chatBody'), Date.now());
+const kbFix = () => { chatKeyboardFix($('#chatBody'), Date.now()); chatNextFrame(() => chatKeyboardFix($('#chatBody'), Date.now())); };
+document.addEventListener('focusin', (e) => { if (e.target && e.target.id === 'msgBox') kbMark(); });
+document.addEventListener('focusout', (e) => { if (e.target && e.target.id === 'msgBox') kbMark(); });
+const composerBox = $('#composer');
+if (composerBox && composerBox.addEventListener) composerBox.addEventListener('touchstart', kbMark, { passive: true });
+if (window.visualViewport && window.visualViewport.addEventListener) window.visualViewport.addEventListener('resize', kbFix);
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) { flushNotes(); stopEvents(); return; }
   comeBack();

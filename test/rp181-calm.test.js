@@ -95,8 +95,8 @@ test('S3: what the old visibility handler did is still there (events, usage, the
   for (const k of ['flushNotes()', 'stopEvents()', 'loadUsage()', 'startEvents()', 'quietTick()', 'loadBoard()', 'refreshAll()']) assert.ok(vis.includes(k), k);
 });
 
-test('S4: there is no pull-to-refresh', () => {
-  assert.doesNotMatch(appSource(), /touchstart|touchmove|pull-to-refresh|pullToRefresh/i);
+test('S4: there is no pull-to-refresh (no drag handler, no pull gesture; a passive touchstart that only marks the chat for the keyboard, RP183, is not one)', () => {
+  assert.doesNotMatch(appSource(), /touchmove|touchend|pull-to-refresh|pullToRefresh/i);
 });
 
 // The real stalledTick, taken from app.js and run against a fake element: what the person would see.
