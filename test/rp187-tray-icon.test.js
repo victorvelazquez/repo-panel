@@ -1,8 +1,9 @@
 'use strict';
-// RP187: the icon of the tray (scripts/tray.ps1) is the K with the dot of K-icon.svg on a dark gray rounded square. The DOT tells the state: blue while the panel runs, light gray
-// (lighter than the square) while it is stopped; the square and the K never change. The dot is drawn 1.4 times bigger than the one of the file, from its bottom right corner, so
-// that it can be seen on 16 px. `tray.ps1 -RenderIcons <size>` draws both icons and prints their pixels as JSON (no window, no mutex, nothing written): on Windows the tests read
-// the pixels of what the tray really draws; on any system the script is also checked as text. It never touches the scheduled tasks.
+// RP187: the icon of the tray (scripts/tray.ps1) is the K with the dot of K-icon.svg on a square of the dark of the panel with slightly rounded corners. The DOT tells the state: blue
+// while the panel runs; while it is stopped a light gray or a soft red one (the person accepts either: one constant of the script, and both are allowed here). The square and the K
+// never change. The dot is drawn 1.4 times bigger than the one of the file, from its bottom right corner, so that it can be seen on 16 px. `tray.ps1 -RenderIcons <size>` draws both
+// icons and prints their pixels as JSON (no window, no mutex, nothing written): on Windows the tests read the pixels of what the tray really draws; on any system the script is also
+// checked as text. It never touches the scheduled tasks.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -16,17 +17,19 @@ const readme = fs.readFileSync(path.join(ROOT, 'README.md'), 'utf8');
 const WIN = process.platform === 'win32';
 const opts = { skip: WIN ? false : 'the tray icon is drawn with System.Drawing on Windows (PowerShell)' };
 
-const BACK = [52, 56, 64];
+const BACK = [15, 18, 22]; // #0f1216, the dark of the panel (--bg) and of icon.svg
 const KEY = [250, 251, 252];
 const BLUE = [0, 127, 255];
-const LIGHT = [200, 205, 212];
+const STOPPED_OPTIONS = ['200, 205, 212', '229, 115, 115']; // light gray, or soft red
+const STOPPED = (/Stopped\s*=\s*\[System\.Drawing\.Color\]::FromArgb\((\d+), (\d+), (\d+)\)/.exec(tray) || []).slice(1).map(Number);
 
 // ---------- the script, as text (any system) ----------
-test('t1: the four colors are named once: dark gray square, near-white K, blue dot when running, light gray dot when stopped', () => {
-  assert.match(tray, /Back\s*=\s*\[System\.Drawing\.Color\]::FromArgb\(52, 56, 64\)/);
+test('t1: the four colors are named once: the dark of the panel, the near-white K, the blue dot when running and, when stopped, a light gray or a soft red one', () => {
+  assert.match(tray, /Back\s*=\s*\[System\.Drawing\.Color\]::FromArgb\(15, 18, 22\)/);
   assert.match(tray, /Key\s*=\s*\[System\.Drawing\.Color\]::FromArgb\(250, 251, 252\)/);
   assert.match(tray, /Running\s*=\s*\[System\.Drawing\.Color\]::FromArgb\(0, 127, 255\)/);
-  assert.match(tray, /Stopped\s*=\s*\[System\.Drawing\.Color\]::FromArgb\(200, 205, 212\)/);
+  assert.equal(STOPPED.length, 3, 'the stopped color is there');
+  assert.ok(STOPPED_OPTIONS.includes(STOPPED.join(', ')), `the stopped dot is one of the two the person accepts (${STOPPED.join(', ')})`);
 });
 
 test('t2: the square is rounded (four arcs and a path), the K is filled with the winding rule like SVG, and the dot is a rectangle in the color of the state', () => {
@@ -38,13 +41,19 @@ test('t2: the square is rounded (four arcs and a path), the K is filled with the
   assert.match(tray, /function New-StateBitmap\(\[System\.Drawing\.Color\]\$Dot, \[int\]\$Width, \[int\]\$Height\)/);
 });
 
+test('t2b: the corners are only slightly rounded, from one constant', () => {
+  assert.match(tray, /\$corner = 0\.14/);
+  assert.match(tray, /\[Math\]::Min\(\$Width, \$Height\) \* \$corner \* 2/);
+  assert.doesNotMatch(tray, /\* 0\.22/, 'the old, rounder corner is gone');
+});
+
 test('t3: the dot of the tray is the dot of K-icon.svg (its size and its place next to the K), drawn 1.4 times bigger from its bottom right corner', () => {
   const { parseSvgShapes } = require('../scripts/make-icons.js');
   const dot = parseSvgShapes(fs.readFileSync(path.join(ROOT, 'public', 'K-icon.svg'), 'utf8'))[1].points;
   const xs = dot.map((p) => p[0]);
   const ys = dot.map((p) => p[1]);
   const [w, h, right] = [Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys), Math.max(...xs)];
-  assert.match(tray, new RegExp(`\\$dotBoost = 1\\.4`));
+  assert.match(tray, /\$dotBoost = 1\.4/);
   assert.ok(tray.includes(String(Math.round(w * 10) / 10)), `the width of the dot (${w})`);
   assert.ok(tray.includes(String(h)), `the height of the dot (${h})`);
   assert.ok(tray.includes(String(right)), `the right edge of the K and its dot (${right})`);
@@ -110,17 +119,19 @@ test('t7: -RenderIcons prints the size and both icons, as many pixels as the siz
 });
 
 for (const size of [16, 32, 48]) {
-  test(`t8 (${size} px): a dark gray rounded square with transparent corners, and the K in near-white`, opts, () => {
+  test(`t8 (${size} px): a square of the dark of the panel with slightly rounded corners, and the K in near-white`, opts, () => {
     const { running } = render(size);
-    assert.equal(px(running, 0, 0)[3], 0, 'the corner is transparent');
-    assert.equal(px(running, size - 1, size - 1)[3], 0, 'and so is the other one');
-    assert.ok(near(px(running, Math.floor(size / 2), 0).slice(0, 3), BACK, 2) && px(running, Math.floor(size / 2), 0)[3] === 255, 'the square is dark gray, not black');
+    assert.ok(px(running, 0, 0)[3] < 255 && px(running, size - 1, size - 1)[3] < 255, 'the corners are rounded (not fully opaque)');
+    if (size >= 32) assert.equal(px(running, 0, 0)[3], 0, 'and on a bigger icon the very corner is empty');
+    assert.equal(px(running, Math.ceil(size * 0.15), 0)[3], 255, 'only slightly rounded: a short way from the corner the edge is already straight');
+    const top = px(running, Math.floor(size / 2), 0);
+    assert.ok(near(top.slice(0, 3), BACK, 2) && top[3] === 255, `the square is the dark of the panel (${top})`);
     const k = boxOf(running, isKey);
     assert.ok(k.h >= size * 0.55, `the K is tall enough (${k.h} of ${size})`);
     assert.ok(k.x0 < size / 2, 'on the left');
   });
 
-  test(`t9 (${size} px): the dot is blue while running, light gray while stopped, in the same place and of a size that can be seen; nothing else changes`, opts, () => {
+  test(`t9 (${size} px): the dot is blue while running and the stopped color while stopped, in the same place and of a size that can be seen; nothing else changes`, opts, () => {
     const { running, stopped } = render(size);
     const blue = boxOf(running, isBlue);
     const dot = diffBox(running, stopped);
@@ -129,7 +140,7 @@ for (const size of [16, 32, 48]) {
     assert.deepEqual([dot.x0, dot.y0, dot.w, dot.h], [blue.x0, blue.y0, blue.w, blue.h], 'the blue pixels are exactly the ones that change with the state');
     for (let y = dot.y0; y <= dot.y1; y++) for (let x = dot.x0; x <= dot.x1; x++) {
       assert.ok(px(running, x, y)[3] === 255 && near(px(running, x, y).slice(0, 3), BLUE, 1), `blue at ${x},${y} while running`);
-      assert.ok(px(stopped, x, y)[3] === 255 && near(px(stopped, x, y).slice(0, 3), LIGHT, 1), `light gray at ${x},${y} while stopped`);
+      assert.ok(px(stopped, x, y)[3] === 255 && near(px(stopped, x, y).slice(0, 3), STOPPED, 1), `the stopped color at ${x},${y} while stopped`);
     }
     assert.equal(boxOf(stopped, isBlue).w, 0, 'no blue while stopped');
     assert.ok(blue.x0 > key.x1 - size * 0.12 && blue.y0 > size / 2 - 1, 'to the right of the K and in the lower half');
@@ -161,7 +172,7 @@ test('t10 (128 px): where a fraction of a pixel shows, the drawing is centered t
   assert.ok(Math.abs((y0 + y1) / 2 - 63.5) <= 0.51, `centered down (${y0}..${y1})`);
 });
 
-test('t11: the dot of the stopped icon is clearly lighter than the square, and it is not the white of the K', opts, () => {
+test('t11: the stopped dot is clearly lighter than the square, is not the white of the K and is clearly not the blue of the running one', opts, () => {
   const { running, stopped } = render(32);
   const box = diffBox(running, stopped);
   assert.ok(box.w > 0, 'there is a dot that changes with the state');
@@ -169,6 +180,7 @@ test('t11: the dot of the stopped icon is clearly lighter than the square, and i
   const mean = (c) => (c[0] + c[1] + c[2]) / 3;
   assert.ok(mean(dot) - mean(BACK) >= 100, `lighter than the square (${mean(dot)} vs ${mean(BACK)})`);
   assert.ok(mean(KEY) - mean(dot) >= 30, 'but not the white of the K');
+  assert.ok(Math.hypot(dot[0] - BLUE[0], dot[1] - BLUE[1], dot[2] - BLUE[2]) >= 150, 'and far from the blue of the running dot');
 });
 
 test('t12: the K has no notch where its outline crosses itself (the winding rule), at both joints', opts, () => {
@@ -183,10 +195,12 @@ test('t12: the K has no notch where its outline crosses itself (the winding rule
   }
 });
 
-test('t13: the README says what the tray shows now and how to see it', () => {
+test('t13: the README says what the tray shows now, how to switch the stopped dot and how to see it', () => {
   assert.match(readme, /RP187/);
   assert.match(readme, /blue dot/i);
+  assert.match(readme, /soft red/i);
   assert.match(readme, /light gray/i);
+  assert.match(readme, /dark of the panel/i);
   assert.match(readme, /-RenderIcons/);
   assert.match(readme, /Quit tray/);
 });
