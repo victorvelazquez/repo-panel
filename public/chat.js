@@ -10,6 +10,31 @@
 const CHAT_MS = 5000;
 const chatUrl = (path, id) => `${path}?id=${encodeURIComponent(id)}`;
 let chatShown = null;
+
+// RP183: where the list of the chat is, so a repaint or the keyboard cannot throw it back to the first messages. The list is replaced with innerHTML and only knew how to stay at
+// the end; when the browser reset it nothing put it back. `stuck` = pinned to the end (under 24 px); an empty or unmeasured list counts as stuck, as it always did.
+function chatScrollSnap(body) {
+  if (!body || typeof body !== 'object') return { top: 0, stuck: true };
+  const top = Number(body.scrollTop) || 0;
+  return { top, stuck: !(body.scrollHeight > 0) || body.scrollHeight - top - body.clientHeight < 24 };
+}
+// Pinned: back to the end. Reading higher up: back where it was, but ONLY when the browser threw it to zero (it never fights a finger that is scrolling).
+function chatScrollRestore(body, snap) {
+  if (!body || typeof body !== 'object' || !snap || typeof snap !== 'object') return false;
+  if (snap.stuck) { body.scrollTop = body.scrollHeight; return true; }
+  if (body.scrollTop === 0 && snap.top > 0) { body.scrollTop = snap.top; return true; }
+  return false;
+}
+function chatNextFrame(fn) { return typeof requestAnimationFrame === 'function' ? requestAnimationFrame(fn) : fn(); }
+// The keyboard moves things for a moment: the mark is taken when the box is touched or focused (and when it loses the focus), and every fix inside CHAT_KB_MS puts the list back.
+const CHAT_KB_MS = 1500;
+let chatKb = null;
+function chatKeyboardMark(body, now) { chatKb = { snap: chatScrollSnap(body), at: now }; }
+function chatKeyboardFix(body, now) {
+  if (!chatKb) return false;
+  if (now - chatKb.at > CHAT_KB_MS) { chatKb = null; return false; }
+  return chatScrollRestore(body, chatKb.snap);
+}
 // RP89 (S4): the three blocks of the Summary with a repo open (list | chat | column). The saved shares of the LIST and of the COLUMN ({ list, col }); the chat is what is left. The ratio the
 // old single divider saved measured another thing and is ignored. Under COLUMN_FROM px of layout the column is out (two blocks, as before).
 const LAYOUT_KEY = 'repo-panel.layout';
@@ -521,8 +546,12 @@ function drawChat() {
   paint($('#sessState'), R.sessionLabelHtml({ ...shown, ci: V ? V.ciOf(columnGit(S.chat.id, facts).pr) : null }) + R.memoryChipHtml(shown) + R.ctxChipHtml(shown) + R.compactButtonHtml(shown) + R.sessionTerminalHtml(hasSession, S.chat.terminal) + R.sessionCloseHtml(hasSession, S.chat.closing)); // RP170: the label gets the CI of the PR of the CURRENT branch (the one Merge uses); it shows only while the session is idle, and holds nothing
   paint($('#termBlock'), R.terminalBlockHtml(hasSession ? S.chat.terminal : null)); // RP118: the line for a normal terminal, only while the button is open
   const body = $('#chatBody');
-  const atBottom = chatShown !== S.chat.id || !(body.scrollHeight > 0) || body.scrollHeight - body.scrollTop - body.clientHeight < 24;
-  if (paint(body, R.chatBody(shown, { now: Date.now() })) && atBottom) body.scrollTop = body.scrollHeight;
+  const snap = chatScrollSnap(body);
+  if (chatShown !== S.chat.id) snap.stuck = true; // a different chat starts at its end
+  if (paint(body, R.chatBody(shown, { now: Date.now() }))) {
+    chatScrollRestore(body, snap);
+    chatNextFrame(() => chatScrollRestore(body, snap));
+  }
   chatShown = S.chat.id;
   const id = S.chat.id;
   const cs = composerOf(id);
