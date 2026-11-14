@@ -1,5 +1,105 @@
 # Changelog
 
+## [0.2.0](https://github.com/victorvelazquez/repo-panel/compare/v0.1.0...v0.2.0) (2026-11-14)
+
+
+### ⚠ BREAKING CHANGES
+
+* **rpc:** answer agent dialogs over RPC from a chat card (RPC2-3) ([#137](https://github.com/victorvelazquez/repo-panel/issues/137))
+
+### Features
+
+* **actions:** send /flow-base after a panel merge when the session is free (RP172) ([2279d1c](https://github.com/victorvelazquez/repo-panel/commit/2279d1c5dc29926d1e3249117a338aa54f9ee8d0))
+* **chat:** add manual Compact button and POST /api/rpc/compact (RP140) ([900e96f](https://github.com/victorvelazquez/repo-panel/commit/900e96f1275ecd0ef379de7f7be0e452f7fe3e0d))
+* **chat:** add opt-in tool result preview, off by default (RP106b) ([#165](https://github.com/victorvelazquez/repo-panel/issues/165)) ([f50ccab](https://github.com/victorvelazquez/repo-panel/commit/f50ccab8a1ba362b206cc4e7526fb7964fe8c2c8))
+* **chat:** add quick-reply buttons under the last assistant message (RP166) ([4a0ee81](https://github.com/victorvelazquez/repo-panel/commit/4a0ee8125b5bb1ceb0c5fb10e54259e03ecd8132))
+* **chat:** draw Markdown tables in the chat (RP124) ([ae49ad3](https://github.com/victorvelazquez/repo-panel/commit/ae49ad37e5b29f7285d711d13ac0bcb99b89cfba))
+* **chat:** mark stopped or failed turns and context compaction in the history (RP105b) ([#162](https://github.com/victorvelazquez/repo-panel/issues/162)) ([5f8a494](https://github.com/victorvelazquez/repo-panel/commit/5f8a4949cab6cf083e72cd93b1cf9eea54c5a05d))
+* **chat:** move Merge button into the composer and drop the column footer ([b387811](https://github.com/victorvelazquez/repo-panel/commit/b387811a41d5ba3ca1b46f68c8bf906d9e745e23))
+* **chat:** read a 512 KB history window and show a «thinking…» mark (RP104) ([#160](https://github.com/victorvelazquez/repo-panel/issues/160)) ([6bde8f9](https://github.com/victorvelazquez/repo-panel/commit/6bde8f98de346335a22ddc2b492888a8a21680e7))
+* **chat:** show a Verifying Checks state while the PR checks run (RP170) ([c25a684](https://github.com/victorvelazquez/repo-panel/commit/c25a68464d8ad46ac0fdc728d47ab6fb6ab8e3bb))
+* **chat:** show edit +N −M and result size on tool chips (RP106) ([#164](https://github.com/victorvelazquez/repo-panel/issues/164)) ([3f8db87](https://github.com/victorvelazquez/repo-panel/commit/3f8db870513726867b764969e5dbfd398219cbae))
+* **chat:** show live retry note from auto_retry events (RP105c) ([#163](https://github.com/victorvelazquez/repo-panel/issues/163)) ([f40c146](https://github.com/victorvelazquez/repo-panel/commit/f40c14685b845bd3a51a86c7a5e72a97dab77ec7))
+* **chat:** show live subagent working time next to session state ([c6c128b](https://github.com/victorvelazquez/repo-panel/commit/c6c128b8115d7483c8c9118a3aca045424a8f3d6))
+* **chat:** show the command to open the session in a terminal (RP118) ([#173](https://github.com/victorvelazquez/repo-panel/issues/173)) ([ff2b272](https://github.com/victorvelazquez/repo-panel/commit/ff2b2729bb69afa92314cb2f4e1dd8e38b78c133))
+* **chat:** show the context window usage as a read-only chip ([0d31dec](https://github.com/victorvelazquez/repo-panel/commit/0d31dec23490d222bbc2a55c654e59c8b2822626))
+* **chat:** show the memory status of a session as a chip (RP110b) ([#172](https://github.com/victorvelazquez/repo-panel/issues/172)) ([55a6564](https://github.com/victorvelazquez/repo-panel/commit/55a6564352b6074a9ace1a7492e111c25ae66d92))
+* **chat:** show the subagent as one bubble with its clock and finished line ([1db43c8](https://github.com/victorvelazquez/repo-panel/commit/1db43c85bd953828cb33941025b04e1f927cb596))
+* **chat:** show tool chips with status, duration and redacted argument (RP105) ([#161](https://github.com/victorvelazquez/repo-panel/issues/161)) ([05e2038](https://github.com/victorvelazquez/repo-panel/commit/05e20386e38a7a60d741867c9cb8f3ddbce3be33))
+* **chat:** talk to pi over RPC and drop the send routes (RPC2-1) ([#135](https://github.com/victorvelazquez/repo-panel/issues/135)) ([fa91378](https://github.com/victorvelazquez/repo-panel/commit/fa91378a60b1d3f4d5af2e8e2f9095ef990582d0))
+* **delivery:** make the delivery buttons respect the live session state (RP159) ([40c340d](https://github.com/victorvelazquez/repo-panel/commit/40c340d0cba1883338c5933371dee00e5bfae00a))
+* **fetcher:** fetch in the background without pruning (RP150) ([3b5a150](https://github.com/victorvelazquez/repo-panel/commit/3b5a15053dd9b5d78d50ce5e72c05c76aca0e9e3))
+* **header:** collapse the page header into a single row (RP143) ([b6ffebd](https://github.com/victorvelazquez/repo-panel/commit/b6ffebd97a3c218236420b20e0c1ed86e4978f69))
+* **highlight:** add pure syntax tokenizer for the viewer (RP66a) ([#148](https://github.com/victorvelazquez/repo-panel/issues/148)) ([be86d3c](https://github.com/victorvelazquez/repo-panel/commit/be86d3cfad4ee9734c4eb15ac56da41ed2c32ce3))
+* **merge:** confirm merging in a sheet under 760 px and show why Merge is off (RP137) ([0a3ef8b](https://github.com/victorvelazquez/repo-panel/commit/0a3ef8b801db8c3cbbf2ff65672d1179b059499e))
+* **mobile:** keep the screen stable on a phone (RP180) ([45b978e](https://github.com/victorvelazquez/repo-panel/commit/45b978eaa97575e3b21cfd94d819dc8e80c29664))
+* **notifications:** deliver notices by Web Push with every page closed (RP179) ([#245](https://github.com/victorvelazquez/repo-panel/issues/245)) ([385bbc9](https://github.com/victorvelazquez/repo-panel/commit/385bbc98cf86d43678be937cbd7b1792777f4d21))
+* **notifications:** notify when a repo starts to need the person (RP178) ([1ff297a](https://github.com/victorvelazquez/repo-panel/commit/1ff297a60065af6695731ac51f03e06693af712f))
+* **page:** draw chat chip icons as SVG with a narrow-width collapse (RP156) ([45380ef](https://github.com/victorvelazquez/repo-panel/commit/45380ef188dfa9b104234f79e3456c439348d78f))
+* **page:** hold delivery buttons while background jobs run (RP163) ([48061db](https://github.com/victorvelazquez/repo-panel/commit/48061dbfa9d42e272ae1bd28f2f8d37e4adc01cd))
+* **page:** show a subagent badge and list on the repo card (RP154) ([9313243](https://github.com/victorvelazquez/repo-panel/commit/9313243cb28b234d8bd6e84c67ac9f14733f1049))
+* **panel:** move Summary filters into the repos column header (RP121) ([a9b3449](https://github.com/victorvelazquez/repo-panel/commit/a9b344969fc6e49f6cca88527f924e0e2b2a1257))
+* **panel:** move the file explorer to the Summary column (RP130) ([bcdcceb](https://github.com/victorvelazquez/repo-panel/commit/bcdcceb535fb548eff9fb2c1f6bee3c1fc05779a))
+* **panel:** offer /flow-ship instead of /flow-commit everywhere ([0ff298a](https://github.com/victorvelazquez/repo-panel/commit/0ff298ac3b2f4e5bacec70d0856498b107cda4d1))
+* **panel:** open the right column on the tab that fits the situation ([2f124b1](https://github.com/victorvelazquez/repo-panel/commit/2f124b121a0c2cd06ad82666b3663f5e2fb66f53))
+* **panel:** polish the one-row header with an old-usage dot and Merge titles ([d444259](https://github.com/victorvelazquez/repo-panel/commit/d444259a24a64d76043f3caa7dfbed56178f2d67))
+* **panel:** replace the spinning refresh indicator with a quiet stalled notice ([6a777cd](https://github.com/victorvelazquez/repo-panel/commit/6a777cd0c3a7a762b91c0c462be0a302c40e2d5f))
+* **panel:** RP128 column tabs with Changes tree and compact Tasks ([b0a070e](https://github.com/victorvelazquez/repo-panel/commit/b0a070ef0d15e92a1aa6c8eb608cb67ebc796eda))
+* **panel:** RP129 fixed footer and Status tab in the Summary column ([12c3f5c](https://github.com/victorvelazquez/repo-panel/commit/12c3f5c5f3ce7801d7dfff1c3b933d73be0e28a1))
+* **pi:** RPC2-2 send /flow-* prompts over RPC instead of Orca typing ([#136](https://github.com/victorvelazquez/repo-panel/issues/136)) ([9afca80](https://github.com/victorvelazquez/repo-panel/commit/9afca80867e57aa11de00275be5149ad689d0fda))
+* **remote:** add remote access with remote.host and login cookie ([aa4e7f1](https://github.com/victorvelazquez/repo-panel/commit/aa4e7f15b5eca4e07a39b9fa0290edf11e296103))
+* **resumen:** draw the session state chip on the Summary card from the live page state ([dbc6009](https://github.com/victorvelazquez/repo-panel/commit/dbc60094904ad8042c0c0bc12b220a12a14d6b4a))
+* **rpc:** answer agent dialogs over RPC from a chat card (RPC2-3) ([#137](https://github.com/victorvelazquez/repo-panel/issues/137)) ([e5a28fd](https://github.com/victorvelazquez/repo-panel/commit/e5a28fdc636020d7d38c3d818d7fadf90f5355ef))
+* **rpc:** RPC2b-1 take session state of cards, summary and sessions from the RPC host ([#138](https://github.com/victorvelazquez/repo-panel/issues/138)) ([f62edef](https://github.com/victorvelazquez/repo-panel/commit/f62edef830b396bd1f41b5c14f67b66c1bfefba6))
+* **rpc:** run one pi in RPC mode per repo (RPC1b) ([#134](https://github.com/victorvelazquez/repo-panel/issues/134)) ([491afb1](https://github.com/victorvelazquez/repo-panel/commit/491afb1477d53b3ec12f145b9bf8f3982bda7aaf))
+* **runtime:** detect and choose between Gentle Shell and pi (RPC1a) ([#132](https://github.com/victorvelazquez/repo-panel/issues/132)) ([638454b](https://github.com/victorvelazquez/repo-panel/commit/638454b118a19919dd66450891fc68ed8fd80a99))
+* **server:** add subagent presence to the summary row (RP164) ([26c0e3e](https://github.com/victorvelazquez/repo-panel/commit/26c0e3e7c3aaa9865b31a1944255a309f24fceea))
+* **sessions:** close a repo session from the panel (RP98) ([#153](https://github.com/victorvelazquez/repo-panel/issues/153)) ([faf2840](https://github.com/victorvelazquez/repo-panel/commit/faf284024e21f498c0983749a4d39f4cb81c5a9c))
+* **sessions:** open any session from the list or start a new one (RP99) ([#154](https://github.com/victorvelazquez/repo-panel/issues/154)) ([930d297](https://github.com/victorvelazquez/repo-panel/commit/930d29707a34c2b434d29b8a238a7641b0b3876c))
+* **sessions:** warn before opening a recently active session (RP100) ([#155](https://github.com/victorvelazquez/repo-panel/issues/155)) ([95d1705](https://github.com/victorvelazquez/repo-panel/commit/95d1705dc8b18fd3ba222604fb609a95344f6e18))
+* **settings:** add the Settings tab with a closed list of options (RP111b) ([#167](https://github.com/victorvelazquez/repo-panel/issues/167)) ([69192d1](https://github.com/victorvelazquez/repo-panel/commit/69192d1eb1368da7e110e2e2bf1e827755ab29ac))
+* **summary:** add a close button to the legend panel (RP125) ([3864ff6](https://github.com/victorvelazquez/repo-panel/commit/3864ff6fb6a5811d084e39ee455a870f5da882ea))
+* **summary:** add a Working now filter to the repo list (RP158) ([be699be](https://github.com/victorvelazquez/repo-panel/commit/be699bede28f9d1c78acd1937081593ed4acdd35))
+* **summary:** add Repo as a third screen under 760 px (RP157) ([5f87439](https://github.com/victorvelazquez/repo-panel/commit/5f8743999338d3d7e9bfb4602e27e0683d7b1fb8))
+* **summary:** always show the three zones of Summary (RP120) ([#175](https://github.com/victorvelazquez/repo-panel/issues/175)) ([6e89084](https://github.com/victorvelazquez/repo-panel/commit/6e89084dd891165c0104e868ba46051660c65993))
+* **summary:** count background jobs a session waits for (RP161) ([68381ab](https://github.com/victorvelazquez/repo-panel/commit/68381ab267d062993e2cfed1c17a394358c88d68))
+* **summary:** give each screen its own address in the hash ([7f9c60b](https://github.com/victorvelazquez/repo-panel/commit/7f9c60b44338f6aea5a965e6c1e5b00e8abe620e))
+* **summary:** show one zone per screen below 760 px (RP134) ([3cfbcbe](https://github.com/victorvelazquez/repo-panel/commit/3cfbcbe0a13f946d125ca52b73e90f65661c54b2))
+* **summary:** show the chat and Repo side by side from 760 to 1100 px (RP136) ([a357e23](https://github.com/victorvelazquez/repo-panel/commit/a357e23b636ae49898604b63b122bf484b7dce2e))
+* **summary:** show the repo state in the chat head below 760 px (RP135) ([5114eed](https://github.com/victorvelazquez/repo-panel/commit/5114eedafec9cfe788e70f7cf255605993950fa4))
+* **tasks:** redesign the compact Tasks list with fixed summary row (RP149) ([4748e17](https://github.com/victorvelazquez/repo-panel/commit/4748e17e5dfb1138f8ef47210aaf3602474bd369))
+* **tasks:** reread the roadmap every minute in the Tasks tab (RP151) ([6b253fb](https://github.com/victorvelazquez/repo-panel/commit/6b253fb93deea0d2d5ba4c7a776ecd031da72b9a))
+* **ui:** show Kletus.dev logo, tab icon, name and tray icon ([0bdda04](https://github.com/victorvelazquez/repo-panel/commit/0bdda04038e7a62fc047bc9a3eae5ca2b0d9fbe4))
+* **usage:** paint the header usage bars green in the normal state (RP144) ([5887d05](https://github.com/victorvelazquez/repo-panel/commit/5887d050808da56b78b17658df76eb9ed0f48466))
+* **viewer:** add side-by-side diff view (RP66c) ([#150](https://github.com/victorvelazquez/repo-panel/issues/150)) ([21b3bf5](https://github.com/victorvelazquez/repo-panel/commit/21b3bf520858226e06d4c51aa95ec57d93041fd1))
+* **viewer:** highlight syntax and diffs in the Files and Changes tabs (RP66b) ([#149](https://github.com/victorvelazquez/repo-panel/issues/149)) ([d0caba1](https://github.com/victorvelazquez/repo-panel/commit/d0caba1e3be85f753dbcc3ac4949afd15b4929bc))
+
+
+### Bug Fixes
+
+* **chat:** keep the scroll position when the list repaints or the keyboard opens ([6072c0a](https://github.com/victorvelazquez/repo-panel/commit/6072c0a1ac4ea901e354edb324396a3fabf39287))
+* **chat:** normalize CRLF in the RP152 page-code test so it passes on Windows ([756abcc](https://github.com/victorvelazquez/repo-panel/commit/756abcc94e7f3f00df3ae3c5ba89a919d38f26e3))
+* **chat:** RP155 stop showing the same assistant message twice while a tool runs ([b994ff2](https://github.com/victorvelazquez/repo-panel/commit/b994ff299a9dc2b49a2ba540cee452e3e861c404))
+* **chat:** spin the Starting icon like the CI spinner instead of pulsing (RP174) ([6bfe79f](https://github.com/victorvelazquez/repo-panel/commit/6bfe79fb29a9ea9874d1827480a6b6852f1f03b7))
+* **chat:** stop cutting long answers and say when a text is cut (RP162) ([7686257](https://github.com/victorvelazquez/repo-panel/commit/7686257ecdedd6b025d6a1a29a86921ba9e03245))
+* **docs:** remove literal pipes from the RP164 roadmap row (RP164) ([731809e](https://github.com/victorvelazquez/repo-panel/commit/731809e47eae9c057d8b6c25662607d0426e6657))
+* **fetcher:** key each repo by the real path of its git common dir (RP150) ([df1d143](https://github.com/victorvelazquez/repo-panel/commit/df1d1434bfcb713f5757ab51219a00924429876b))
+* **panel:** count the current branch PR as task work so it hides /flow-next (RP173) ([bed4a52](https://github.com/victorvelazquez/repo-panel/commit/bed4a523115a94ef76c2a9d1c05563827624e674))
+* **panel:** only task pull requests hold back the start button ([3235c6f](https://github.com/victorvelazquez/repo-panel/commit/3235c6fd2fe44578d5bf66afdd6c58a2c667f1d0))
+* **rpchost:** make the new session id unique per repo (RP97) ([#152](https://github.com/victorvelazquez/repo-panel/issues/152)) ([6feb9de](https://github.com/victorvelazquez/repo-panel/commit/6feb9de47727023af55d44fda9f00a62586bb5df))
+* **rpchost:** recover the memory chip after a call that succeeds ([d1865e9](https://github.com/victorvelazquez/repo-panel/commit/d1865e9445abe4f884b5e50c4b830599efab99d0))
+* **session:** give a slow session start five minutes instead of two ([#156](https://github.com/victorvelazquez/repo-panel/issues/156)) ([11e9f6f](https://github.com/victorvelazquez/repo-panel/commit/11e9f6fcbfcce7cbdddaa040c87810c3bb05ea9a))
+* **summary:** fill the window height with the three zones (RP126) ([196ebf0](https://github.com/victorvelazquez/repo-panel/commit/196ebf01cedaf889555ede0e0efb3a208c7256df))
+* **test:** wait for async conditions and clean up the temp folder in the compaction tests (RP140) ([5564a60](https://github.com/victorvelazquez/repo-panel/commit/5564a60a422d27b3cc6e10ab4b4ba6c47bc44c71))
+* **ui:** give textareas the panel text colour (RP141) ([100a037](https://github.com/victorvelazquez/repo-panel/commit/100a03774d60ae9d7a0f4c7496f7820e40381d7c))
+* **ui:** let the summary column use the full window height ([ab241bc](https://github.com/victorvelazquez/repo-panel/commit/ab241bcdcdd1c0cca59ebca76077860fea585308))
+* **viewport:** stop the phone scroll from jumping to the top (RP182) ([#247](https://github.com/victorvelazquez/repo-panel/issues/247)) ([a537dae](https://github.com/victorvelazquez/repo-panel/commit/a537dae20e6dc49853efb0ce876e0b665e4c8c7a))
+
+
+### Performance Improvements
+
+* **data:** read fewer facts directly after an action (RP86b) ([#151](https://github.com/victorvelazquez/repo-panel/issues/151)) ([d136fbc](https://github.com/victorvelazquez/repo-panel/commit/d136fbcefabac1ed706855385bedaa178e622d27))
+
 ## [0.1.0](https://github.com/victorvelazquez/repo-panel/compare/v0.0.2...v0.1.0) (2026-11-02)
 
 
