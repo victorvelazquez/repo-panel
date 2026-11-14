@@ -358,7 +358,7 @@ The page is plain scripts with no build step. `index.html` loads them one after 
 - `public/board.js`: the Work board and its cards.
 - `public/actions.js`: the click handlers (`data-act`): merge, re-run, rooms and the usage bar.
 - `public/sw.js` and `public/manifest.webmanifest`: not page scripts; the browser fetches them (the service worker of the push, RP179, and the manifest that lets a phone install the app). The push settings live in `actions.js`, `tabs.js` and `resumen.js`.
-- `public/viewport.js`: on a touch screen it sets `--vvh` to the visible height (`visualViewport`), so the one-zone layout does not move when the keyboard opens (RP180); it also keeps the page at the top and leaves a pinch-zoomed page alone. Fields are 16 px on touch screens so iOS does not zoom into them.
+- `public/viewport.js`: on a touch screen it sets `--vvh` to the visible height (`visualViewport`), so the one-zone layout does not move when the keyboard opens (RP180); it also brings a shifted page back to the top, but only while a field has the focus (the keyboard), and leaves a pinch-zoomed page alone (RP182: it used to do it on every event, which made Settings jump back up at the end of a scroll). The inner scrollers (chat, column, Summary, file tree, options) keep the scroll to themselves with `overscroll-behavior: contain`. Fields are 16 px on touch screens so iOS does not zoom into them.
 - `public/app.js`: only the boot (the state, the document listeners, the timers and the first load). It loads last because it is the one that runs at load.
 
 A new page script goes into `index.html`, into the closed list of static files in `server/http.js` and into `test/pagesrc.js`, in that order of loading.
