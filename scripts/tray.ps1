@@ -184,7 +184,7 @@ Add-Type -AssemblyName System.Drawing
 function Get-TrayColors {
   return @{
     Back    = [System.Drawing.Color]::FromArgb(15, 18, 22)
-    Line    = [System.Drawing.Color]::FromArgb(42, 50, 60)   # RP199: the thin line around the square, the --line of public/style.css (#2a323c)
+    Line    = [System.Drawing.Color]::FromArgb(58, 69, 83)   # RP199, RP203: the thin line around the square, #3a4553 (the border of the cards of public/style.css). The --line of the page (42, 50, 60) was the same tone as the menu of hidden icons of Windows (44, 47, 52): it could not be seen and the square looked smaller
     Key     = [System.Drawing.Color]::FromArgb(250, 251, 252)
     Running = [System.Drawing.Color]::FromArgb(0, 127, 255)
     Stopped = [System.Drawing.Color]::FromArgb(229, 115, 115)
