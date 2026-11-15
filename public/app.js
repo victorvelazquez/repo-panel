@@ -38,7 +38,7 @@ const S = {
   timeouts: { get: 25000, post: 70000 },
   tasks: {}, tasksOpenDone: false, tasksMore: false, tasksFold: {}, changes: {}, files: {}, filesOpen: {}, fileData: {}, pad: {},
   lh: { search: false, menu: false, focus: false }, // RP121: the header of the repos column (search box open, filter menu open, focus the box on the next draw)
-  chat: { id: null, seq: 0 }, chatCache: {}, drafts: {}, recall: {}, notes: {}, askBusy: {}, quick: null, chatResults: Object.create(null), rpc: {},
+  chat: { id: null, seq: 0 }, chatCache: {}, drafts: {}, recall: {}, notes: {}, askBusy: {}, quick: null, composing: false, chatResults: Object.create(null), rpc: {},
 };
 S.tab = 'summary'; // the page always opens on Sessions (RP188); a saved 'work' preference is ignored on load
 S.backTab = S.tab; // the tab Conformity returns to (it is never saved as the preference)
@@ -47,6 +47,8 @@ S.backTab = S.tab; // the tab Conformity returns to (it is never saved as the pr
 wireSeparator($('#split'), { onDrag: (x, rect, half) => setBlocks({ list: x - rect.left - half }), onStep: (w, dir) => setBlocks({ list: w.list + dir * 24 }) });
 wireSeparator($('#split2'), { onDrag: (x, rect, half) => setBlocks({ col: rect.right - x - half }), onStep: (w, dir) => setBlocks({ col: w.col - dir * 24 }) });
 if (window.addEventListener) window.addEventListener('resize', applyLayout);
+if (window.addEventListener) for (const t of ['resize', 'orientationchange']) window.addEventListener(t, fitMsgBox); // RP208: the box is re-measured when the window turns or resizes, and when the keyboard moves the visible height
+if (window.visualViewport && window.visualViewport.addEventListener) window.visualViewport.addEventListener('resize', fitMsgBox);
 // RPC3e: the three pointer listeners run at load, so they stay here; pressedAt and releasePress (their handlers) live in board.js and are only reached when the pointer moves.
 document.addEventListener('pointerdown', () => { pressedAt = Date.now(); }, true);
 document.addEventListener('pointerup', releasePress, true);
@@ -73,6 +75,7 @@ document.addEventListener('submit', (e) => {
 // Escape closes the card menu first; with nothing else open it closes the chat. A focused repo card opens the chat with Enter or
 // Space (the buttons inside it have no chat-open act, so they are untouched).
 document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && S.composing && e.target && e.target.id === 'msgBox') { e.preventDefault(); setMsgComposing(false, true); return; } // RP208: inside the expanded box Escape only folds it; the chat stays open
   if (e.key === 'Escape' && S.mergeSheet) { S.mergeSheet = null; draw(); return; } // RP137: the sheet that asks before a merge closes first
   if (e.key === 'Escape' && (S.lh.menu || S.lh.search)) { S.lh.menu = false; S.lh.search = false; draw(); return; } // RP121: the bar of the repos column first
   if (e.key === 'Escape' && S.chat.menu) { S.chat.menu = false; S.chat.menuFocus = 'btn'; draw(); return; } // RP195: then the session menu of the chat (the focus goes back to its button), and only then the chat
@@ -109,6 +112,7 @@ document.addEventListener('keydown', (e) => {
   e.preventDefault();
   if (step.nav) S.recall[id] = step.nav; else delete S.recall[id];
   box.value = step.text;
+  fitMsgBox();
   if (box.setSelectionRange) box.setSelectionRange(step.text.length, step.text.length);
 });
 
@@ -121,7 +125,7 @@ document.addEventListener('keydown', (e) => {
   e.preventDefault();
   sendChatMessage();
 });
-document.addEventListener('input', (e) => { if (e.target && e.target.id === 'msgBox') { delete S.recall[S.chat.id]; saveDraft(); } else if (e.target && e.target.id === 'notesBox') notesInput(e.target.value); });
+document.addEventListener('input', (e) => { if (e.target && e.target.id === 'msgBox') { delete S.recall[S.chat.id]; saveDraft(); fitMsgBox(); } else if (e.target && e.target.id === 'notesBox') notesInput(e.target.value); });
 
 // The passing list of a repo stays open (or closed) across redraws. `toggle` does not bubble, so capture it.
 document.addEventListener('toggle', (e) => {

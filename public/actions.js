@@ -223,6 +223,7 @@ const ACTIONS = {
   },
   'chat-close': () => closeChat(),
   'chat-send': () => sendChatMessage(),
+  'msg-expand': () => setMsgComposing(!S.composing, true), // RP208: expand the message box over the list, or fold it back
   // RP166: a quick-reply button sends the option held in S.quick (the index is a digit, the text is never read from the element) through the message box path. It only acts while the message it was drawn for is still the
   // last one and the conditions still hold (a fresh read gives the same signature): a double click finds the pending message and does nothing.
   'quick-reply': (el) => {

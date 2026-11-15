@@ -73,7 +73,10 @@
       <div id="composer" class="composer" role="group" aria-label="Message">
         <div id="sessState" class="sess-state"></div>
         <div id="termBlock" class="term-block"></div>
-        <textarea id="msgBox" rows="2" enterkeyhint="enter" aria-label="Message to the session" title="Enter sends · Shift+Enter new line"></textarea>
+        <div class="msg-field">
+          <button id="msgExpand" class="msg-expand" type="button" data-act="msg-expand" aria-label="Expand the message box" aria-expanded="false" title="Expand the message box" hidden><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.5 2.5h4v4M13.5 2.5l-4.5 4.5M6.5 13.5h-4v-4M2.5 13.5l4.5-4.5"/></svg></button>
+          <textarea id="msgBox" rows="1" enterkeyhint="enter" aria-label="Message to the session" title="Enter sends · Shift+Enter new line"></textarea>
+        </div>
         <div class="c-bar">
           <span id="chatActions" class="c-actions"></span>
           <span class="spacer"></span>

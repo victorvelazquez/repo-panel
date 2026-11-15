@@ -74,9 +74,11 @@ function openChat(id, tab) {
   saveDraft();
   flushNotes();
   S.recall = {};
+  S.composing = false; // RP208: a chat opens with the box folded
   S.chatResults = Object.create(null);
   S.chat = { id, seq: S.chat.seq + 1, zone: 'chat', ...(V && V.chatFromCache(S.chatCache[id])), ...(tab === 'tasks' && !columnOn() ? { tab } : {}) }; // RP79: cached messages at once, state unknown (no get: opening must not reorder the cache)
   $('#msgBox').value = S.drafts[id] || '';
+  fitMsgBox();
   draw();
   if (chatCtl) chatCtl.abort();
   chatCtl = new AbortController();
@@ -176,9 +178,11 @@ function closeChat() {
   saveDraft();
   flushNotes();
   S.recall = {};
+  S.composing = false;
   S.chatResults = Object.create(null);
   if (chatCtl) { chatCtl.abort(); chatCtl = null; }
   S.chat = { id: null, seq: S.chat.seq + 1 };
+  fitMsgBox(); // RP208: the class of the expanded box goes with the chat
   chatShown = null;
   draw();
   addressWrite(); // RP133
@@ -469,6 +473,7 @@ function drawChat() {
     paint($('#chatBody'), '<p class="rs-sub rs-empty" role="status">Pick a repo to see its chat</p>');
     paint($('#colBody'), '<p class="rs-sub rs-empty" role="status">Pick a repo to see its tasks and files</p>');
     $('#composer').hidden = true;
+    fitMsgBox();
     padShown = null;
     chatShown = null;
     return;
@@ -583,6 +588,7 @@ function drawChat() {
   const live = (S.rpc[id] && S.rpc[id].compacting ? 'working' : REASON_OF[S.rpc[id] && S.rpc[id].state]) || 'unknown'; // RP140: a compacting session takes no order either; RPC2b-1: the reason follows the session of the RPC host
   paint($('#chatActions'), R.actionButtonsHtml(R.actionMenu(row, { live, changes: summaryChanges(id), flow: summaryFlow(id) }), id, { sending: !!S.sending[id] }) + R.composerMergeHtml(columnGit(id, S.local[id]))); // RP175: Merge is not an item of the session menu: it does not wait for the session
   paint($('#msgNote'), R.composerNote(S.notes[id] || (S.rpc[id] && S.rpc[id].error ? { text: S.rpc[id].error } : null)));
+  fitMsgBox();
 }
 
 // One separator: drag it with the pointer, move it with the arrows (24 px) and reset all three blocks with Enter or a double click. `onDrag(clientX, rect, half)` and
@@ -638,6 +644,42 @@ async function ensureRpcStarted(id) {
   if (S.chat.id === id) loadChat(id);
 }
 
+// RP208 (S19): the message box is one line and grows with its text (V.boxFit decides how much); S.composing is the expanded mode: a class on #chat hides the list and the CSS gives the field the free height, so
+// the height is not set inline then. Everything that sets the value of the box, the resize and the keyboard call this. A page without layout (no scrollHeight) is one line.
+function fitMsgBox() {
+  const box = $('#msgBox');
+  if (!box) return;
+  const on = !!S.composing && !!S.chat.id;
+  const chat = $('#chat');
+  if (chat && chat.classList) chat.classList.toggle('composing', on);
+  let expandable = false;
+  if (on || !V || !V.boxFit || !(box.scrollHeight > 0)) { box.style.height = ''; box.style.overflowY = ''; } else {
+    box.style.height = 'auto';
+    const cs = typeof getComputedStyle === 'function' ? getComputedStyle(box) : null;
+    const size = cs ? parseFloat(cs.fontSize) : NaN;
+    const vv = window.visualViewport;
+    const fit = V.boxFit({ scroll: box.scrollHeight, line: cs ? parseFloat(cs.lineHeight) || size * 1.2 : NaN, pad: cs ? parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom) : NaN, view: vv && vv.height > 0 ? vv.height : window.innerHeight });
+    box.style.height = `${fit.height}px`;
+    box.style.overflowY = fit.scrolls ? 'auto' : 'hidden';
+    expandable = fit.expandable;
+  }
+  const btn = $('#msgExpand');
+  if (!btn) return;
+  const label = on ? 'Collapse the message box' : 'Expand the message box';
+  btn.hidden = !(on || expandable);
+  btn.setAttribute('aria-expanded', String(on));
+  btn.setAttribute('aria-label', label);
+  btn.title = label;
+}
+// The button, Escape inside the box and a send fold or unfold it; the focus stays in the textarea.
+function setMsgComposing(on, focus) {
+  if (on && !S.chat.id) return;
+  S.composing = !!on;
+  fitMsgBox();
+  const box = $('#msgBox');
+  if (focus && box && box.focus) box.focus();
+}
+
 // Send: the session is started first if needed (ensureRpcStarted), then the prompt goes. A failure puts the text back and shows the server's message; the optimistic
 // user bubble goes with it.
 async function sendChatMessage() {
@@ -658,6 +700,8 @@ async function sendChatText(text, fromBox) {
   delete S.recall[id];
   if (fromBox) {
     $('#msgBox').value = '';
+    S.composing = false; // RP208: a sent message folds the expanded box
+    fitMsgBox();
     delete S.drafts[id];
   }
   (S.pending[id] || (S.pending[id] = [])).push(entry);
@@ -672,7 +716,7 @@ async function sendChatText(text, fromBox) {
     const now = S.chat.id === id ? $('#msgBox').value : S.drafts[id] || '';
     const back = now ? `${text}
 ${now}` : text;
-    if (S.chat.id === id) $('#msgBox').value = back; else S.drafts[id] = back;
+    if (S.chat.id === id) { $('#msgBox').value = back; fitMsgBox(); } else S.drafts[id] = back;
     sayNote(id, e.message);
   }
   draw();
