@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "chosen": "02-anillos-con-nombre.html",
+  "handoffs": {
+    "02-anillos-con-nombre.html": {
+      "status": "implemented",
+      "queued": false,
+      "sentAt": "2026-11-15T17:12:24.754Z",
+      "startedAt": "2026-11-15T17:12:24.754Z",
+      "implementedAt": "2026-11-15T17:32:58.077Z",
+      "note": "RP192 en el árbol de trabajo, sin commit: anillos de 32 px bajo 760 px. Falta que la persona lo mire en el iPhone.",
+      "previewUrl": "http://127.0.0.1:4310/"
+    }
+  }
+}

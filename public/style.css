@@ -74,6 +74,18 @@ header h1 picture { display: block; } /* RP186: on a narrow screen the picture s
 .usage-warn .um-fill { background: var(--yellow); }
 .usage-error .um-fill { background: var(--red); }
 .usage-dim .um-fill { background: var(--gray); }
+/* RP192: the ring of the phone (hidden here; the media query at the end of the header rules shows it) */
+.um-ring { display: none; flex: none; }
+.um-track { stroke: var(--panel2); }
+.um-arc { stroke: var(--green); }
+.usage-warn .um-arc { stroke: var(--yellow); }
+.usage-error .um-arc { stroke: var(--red); }
+.usage-dim .um-arc { stroke: var(--gray); }
+.um-tick { stroke: var(--text); opacity: .8; }
+.um-ring text { fill: var(--green); font-variant-numeric: tabular-nums; }
+.usage-warn .um-ring text { fill: var(--yellow); }
+.usage-error .um-ring text { fill: var(--red); }
+.usage-dim .um-ring text { fill: var(--gray); }
 .um-pct { min-width: 3ch; text-align: right; font-variant-numeric: tabular-nums; }
 .um-flag { font-weight: normal; margin-right: 2px; }
 .um-left { color: var(--muted); font-variant-numeric: tabular-nums; }
@@ -88,7 +100,7 @@ header h1 picture { display: block; } /* RP186: on a narrow screen the picture s
 .up-warn { color: var(--yellow); font-size: 12px; margin-top: 2px; }
 .up-note { color: var(--yellow); margin-top: 10px; }
 .up-foot { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 8px; }
-@media (max-width: 760px) { .um-bar, .um-left { display: none; } }
+@media (max-width: 760px) { .um-bar, .um-left, .um-pct, .um-flag { display: none; } .um-ring { display: inline-block; } .um-name { font-size: 11px; } }
 .spacer { flex: 1; }
 #filters { display: flex; gap: 6px; }
 #filters button.active { border-color: var(--blue); background: #12253d; }
