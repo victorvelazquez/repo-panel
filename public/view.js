@@ -1084,5 +1084,17 @@
   // RP207: does this Enter send? A finger keyboard (coarse pointer) keeps Enter for the new line and sends with Ctrl or Cmd; Shift and an IME composition never send.
   const enterSends = ({ shift, ctrl, meta, composing, coarse } = {}) => !shift && !composing && (!coarse || !!(ctrl || meta));
 
-  return { enterSends, STALLED_MS, stalledNow, jobsHold, deliveryHold, tasksPollDue, TASKS_REFRESH_MS, mergeWhy, screenOf, bandOf, NARROW_BELOW, DUO_BELOW, parseAddress, addressOf, ADDRESS_ZONES, subClock, columnTabFor, conformityTabLabel, repoModel, changeChips, prChip, ciOf, idleChip, conflictChip, sizeChip, RepoCard, stateLineHidden, usageView, usageHtml, ringGeometry, usageRemaining, boardApply, boardWait, chatCachePut, chatCacheGet, rpcWithContext, chatFromCache, API_VERSION, mergeButton, rerunButton, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, dirtyRepos, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, taskPrs, matchesUnitId, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, parseSse, rpcEvent, rpcReduce, rpcFromStatus, eventsPlan, eventsRetryMs, eventsStale };
+  // RP208 (S19): the height of the message box. `scroll` is the scrollHeight measured with the height on auto, `line` the computed line height, `pad` the vertical padding and `view` the visible height (visualViewport).
+  // It grows with the text up to `lines` lines and `share` of the visible height, never below one line; beyond that it scrolls inside. A measure that is not a number counts as one line.
+  const boxFit = ({ scroll, line, pad, view, lines = 10, share = 0.4 } = {}) => {
+    const num = (n, d) => (typeof n === 'number' && Number.isFinite(n) ? n : d);
+    const ln = Math.max(1, num(line, 20));
+    const pd = Math.max(0, num(pad, 0));
+    const one = ln + pd;
+    const cap = Math.max(one, Math.min(lines * ln + pd, num(view, Infinity) * share));
+    const sc = num(scroll, 0) > 0 ? scroll : one;
+    const rows = Math.max(1, Math.round((sc - pd) / ln));
+    return { height: Math.min(Math.max(sc, one), cap), scrolls: sc - cap > 1, rows, expandable: rows > 4 };
+  };
+  return { boxFit, enterSends, STALLED_MS, stalledNow, jobsHold, deliveryHold, tasksPollDue, TASKS_REFRESH_MS, mergeWhy, screenOf, bandOf, NARROW_BELOW, DUO_BELOW, parseAddress, addressOf, ADDRESS_ZONES, subClock, columnTabFor, conformityTabLabel, repoModel, changeChips, prChip, ciOf, idleChip, conflictChip, sizeChip, RepoCard, stateLineHidden, usageView, usageHtml, ringGeometry, usageRemaining, boardApply, boardWait, chatCachePut, chatCacheGet, rpcWithContext, chatFromCache, API_VERSION, mergeButton, rerunButton, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, dirtyRepos, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, taskPrs, matchesUnitId, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, parseSse, rpcEvent, rpcReduce, rpcFromStatus, eventsPlan, eventsRetryMs, eventsStale };
 }));

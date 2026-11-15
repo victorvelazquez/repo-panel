@@ -901,7 +901,7 @@ button.tc:hover { border-color: var(--muted); }
 }
 @media (pointer: coarse) { .composer { border-radius: 16px; } } /* RP207: a phone has rounded screen corners */
 .composer:focus-within { border-color: var(--blue); }
-.composer textarea { width: 100%; min-height: 42px; max-height: 150px; resize: none; border: 0; background: transparent; color: var(--text); font: inherit; padding: 4px 6px; }
+.composer textarea { width: 100%; resize: none; border: 0; background: transparent; color: var(--text); font: inherit; padding: 4px 6px; }
 .composer textarea:focus-visible { outline: none; }
 .c-bar { position: relative; display: flex; align-items: center; gap: 6px; }
 .c-actions { display: flex; flex: 1 1 auto; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
@@ -988,3 +988,20 @@ button.tc:hover { border-color: var(--muted); }
 .ch-st { display: inline-flex; color: var(--muted); }
 .ch-st-warn { color: var(--yellow); }
 .ch-st-bad { color: var(--red); }
+
+/* RP208: the box is one line and JS grows it (up to 10 lines, 40 % of the visible height). The expand button is at the top right of the field and exists only for a finger or a narrow window; expanded, a class on #chat hides the list of
+   messages and the composer takes its place (NOT a fixed box: .chatlayout and .composer are containers, which would hold a fixed box inside them). */
+.msg-field { position: relative; display: block; min-width: 0; }
+.msg-field textarea { display: block; }
+.msg-expand { display: none; position: absolute; top: 2px; right: 2px; z-index: 1; width: 28px; height: 28px; padding: 0; align-items: center; justify-content: center; background: transparent; border-color: transparent; color: var(--muted); }
+.msg-expand[hidden] { display: none; }
+.msg-expand:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+@media (pointer: coarse), (max-width: 760px) {
+  .msg-expand { display: inline-flex; }
+  .msg-field:has(.msg-expand:not([hidden])) textarea { padding-right: 34px; }
+}
+#chat.composing .ch-body { display: none; }
+#chat.composing .composer { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+#chat.composing .msg-field { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+#chat.composing .composer textarea { flex: 1 1 auto; max-height: none; }
+#chat.composing .sess-state, #chat.composing .term-block, #chat.composing .c-bar, #chat.composing .rs-note { flex: none; }
