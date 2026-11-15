@@ -119,9 +119,6 @@ function applyScreen() {
   if (!V || !layout || !layout.dataset) return;
   const screen = V.screenOf(layout.clientWidth, S.chat.id, S.chat.zone);
   if (screen) layout.dataset.screen = screen; else delete layout.dataset.screen;
-  // RP204: the app header is out on the chat and Repo screens (the stylesheet follows this mark); a page without body has nothing to mark.
-  const body = typeof document === 'object' && document ? document.body : null;
-  if (body && body.dataset) { if (V.hidesAppHead(screen)) body.dataset.appHead = 'off'; else delete body.dataset.appHead; }
   // RP157, RP136: crossing a cut (a resize) changes what the chat head and the column hold (the tabs, the arrow of Repo), so it repaints once; lastBand is set before, so the repaint cannot loop.
   const band = V.bandOf(layout.clientWidth);
   const crossed = lastBand !== null && lastBand !== band;
@@ -436,10 +433,7 @@ function applyLayout() {
   applyScreen(); // RP134
   // RP126: how much sits above the layout (0 while it is hidden in another tab: then the last good value stays; a page without the measure sets nothing).
   const top = $('#sumLayout').offsetTop;
-  // RP204: with the app header out, 0 is a real measure (nothing above the layout). applyScreen above only leaves the mark while the layout measures a width, so a hidden layout never gets here with it.
-  const body = document.body;
-  const headOut = !!body && !!body.dataset && body.dataset.appHead === 'off';
-  if (Number.isFinite(top) && (top > 0 || (headOut && top === 0)) && $('#sumLayout').style.setProperty) $('#sumLayout').style.setProperty('--sum-top', `${Math.round(top)}px`);
+  if (Number.isFinite(top) && top > 0 && $('#sumLayout').style.setProperty) $('#sumLayout').style.setProperty('--sum-top', `${Math.round(top)}px`);
   const w = layoutNow();
   if (!w) return;
   if ($('#listCol').style.setProperty) $('#listCol').style.setProperty('--list-w', `${w.list}px`); // RP121: the width is the repos column's (its header and its list)
