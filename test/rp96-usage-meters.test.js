@@ -92,7 +92,7 @@ test('r7: warn and error add the tone class AND a warning mark that is not colou
 
 test('r8: a dash window is a dim "–" with no bar; an old file dims both and shows its age', () => {
   const dash = V.usageHtml(view(null, win(40, NOW + DAY)));
-  assert.match(dash, /<span class="um usage-dim"[^>]*><span class="um-name">5h<\/span><span class="um-pct">–<\/span><\/span>/);
+  assert.match(dash, /<span class="um usage-dim"[^>]*><span class="um-name">5h<\/span>(?:<svg class="um-ring".*?<\/svg>)?<span class="um-pct">–<\/span><\/span>/);
   assert.equal((dash.slice(0, dash.indexOf('class="usage-pop"')).match(/<i class="um-fill"/g) || []).length, 1, 'only the real window has a bar in the compact row');
   const old = V.usageHtml(view(win(95, NOW + HOUR), win(50, NOW + DAY), { stale: true, updatedAt: NOW - 20 * MIN }));
   assert.equal((old.match(/class="um usage-dim"/g) || []).length, 2);

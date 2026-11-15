@@ -1,0 +1,42 @@
+{
+  "title": "Repo Panel — Consumo en anillos (celular)",
+  "brief": "RP192: el consumo de las ventanas de 5 h y 7 d en anillos para el celular (menos de 760 px), con los mismos colores y umbrales que la barra de escritorio; se compara con lo de hoy (dos textos con porcentaje).",
+  "feature": "odd/tasks/rediseno-interfaz.md",
+  "artboards": [
+    {
+      "file": "01-hoy.html",
+      "title": "Hoy · dos textos con porcentaje",
+      "tradeoff": "Ya existe; texto chico entre el logo y los íconos, sin marca de ritmo",
+      "width": 960,
+      "height": 520
+    },
+    {
+      "file": "02-anillos-con-nombre.html",
+      "title": "A · Anillos con el nombre al lado (recomendada)",
+      "tradeoff": "Legible y sin adivinar cuál es cuál; ocupa unos 110 px",
+      "width": 1300,
+      "height": 560
+    },
+    {
+      "file": "03-anillos-con-nombre-abajo.html",
+      "title": "B · Anillos con el nombre debajo",
+      "tradeoff": "La más angosta con texto; el nombre queda en 9,5 px",
+      "width": 960,
+      "height": 460
+    },
+    {
+      "file": "04-anillo-doble.html",
+      "title": "C · Un solo anillo doble",
+      "tradeoff": "Lo más limpio; no se ve cuál es cuál ni los números sin tocar",
+      "width": 960,
+      "height": 460
+    },
+    {
+      "file": "05-estados-de-a.html",
+      "title": "Estados de A",
+      "tradeoff": "Catálogo: colores, 100 %, ventana sin datos, sin archivo",
+      "width": 1300,
+      "height": 900
+    }
+  ]
+}

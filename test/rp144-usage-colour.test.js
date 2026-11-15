@@ -81,7 +81,7 @@ test('t5: a window with no data draws no bar at all (so no green bar for a missi
   const html = V.usageHtml(view(null, win(40, NOW + DAY)));
   const compact = html.slice(0, html.indexOf('class="usage-pop"'));
   assert.equal((compact.match(/class="um-fill"/g) || []).length, 1, 'only the real window has a fill');
-  assert.match(compact, /<span class="um usage-dim" data-win="5h"><span class="um-name">5h<\/span><span class="um-pct">–<\/span><\/span>/);
+  assert.match(compact, /<span class="um usage-dim" data-win="5h"><span class="um-name">5h<\/span>(?:<svg class="um-ring".*?<\/svg>)?<span class="um-pct">–<\/span><\/span>/);
 });
 
 test('t6: colour is not the only signal: the number is there, warn and error add the warning mark, and the label says it in words', () => {

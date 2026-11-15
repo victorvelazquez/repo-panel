@@ -1031,6 +1031,16 @@
   const usageEsc = htmlEsc;
   const usagePct = (v) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(100, Math.max(0, Math.round(v))) : null);
   const USAGE_WINDOWS = [['five', '5h', 'Session (5 h)'], ['seven', '7d', 'Weekly (7 d)']];
+  // RP192 (S18): the numbers of the 32 px ring of the phone, from the clamped percent and the share of the window gone. Angles run clockwise from the top; the tick is a short radial line outside the arc.
+  function ringGeometry(pct, run) {
+    const p = usagePct(pct);
+    const a = ((usagePct(run) ?? 0) / 100) * 2 * Math.PI;
+    const at = (r) => [Math.round((16 + r * Math.sin(a)) * 100) / 100, Math.round((16 - r * Math.cos(a)) * 100) / 100];
+    const [x1, y1] = at(10);
+    const [x2, y2] = at(16);
+    return { dash: p, tick: { x1, y1, x2, y2 }, font: p !== null && p >= 100 ? 9 : 11 };
+  }
+  const ringText = (txt, font) => `<text x="16" y="${Math.round((16 + font * 0.36) * 100) / 100}" text-anchor="middle" font-size="${font}" font-weight="600">${txt}</text>`;
   function usageHtml(view) {
     const v = isObject(view) ? view : {};
     if (v.state !== 'ok' && v.state !== 'old') return usageEsc(v.label);
@@ -1042,15 +1052,17 @@
       const pct = usagePct(w.percent);
       const cls = tone ? ` usage-${tone}` : '';
       if (pct === null) {
-        meters.push(`<span class="um usage-dim" data-win="${name}"><span class="um-name">${name}</span><span class="um-pct">–</span></span>`);
+        meters.push(`<span class="um usage-dim" data-win="${name}"><span class="um-name">${name}</span><svg class="um-ring" width="32" height="32" viewBox="0 0 32 32" role="img" aria-label="${name}: no data"><circle class="um-track" cx="16" cy="16" r="13" fill="none" stroke-width="4"/>${ringText('–', 11)}</svg><span class="um-pct">–</span></span>`);
         details.push(`<div class="up-win usage-dim"><div class="up-title">${title}</div><div class="up-line"><span>No data: the window reset or is not reported</span></div></div>`);
         continue;
       }
       const run = usagePct(typeof w.elapsed === 'number' ? w.elapsed * 100 : null) ?? 0;
       const said = `${name}: ${pct}% used, ${run}% of the window gone${w.ahead === true ? ', more than the clock' : ''}`;
       const bar = (c) => `<span class="${c}" role="img" aria-label="${usageEsc(said)}"><i class="um-fill" style="width:${pct}%"></i><i class="um-pace" style="left:${run}%"></i></span>`;
+      const g = ringGeometry(pct, run);
+      const ring = `<svg class="um-ring" width="32" height="32" viewBox="0 0 32 32" role="img" aria-label="${usageEsc(said)}"><circle class="um-track" cx="16" cy="16" r="13" fill="none" stroke-width="4"/><circle class="um-arc" cx="16" cy="16" r="13" fill="none" stroke-width="4" pathLength="100" stroke-dasharray="${g.dash} 100" transform="rotate(-90 16 16)"/><line class="um-tick" x1="${g.tick.x1}" y1="${g.tick.y1}" x2="${g.tick.x2}" y2="${g.tick.y2}" stroke-width="1.6"/>${ringText(pct, g.font)}</svg>`;
       const flag = tone === 'warn' || tone === 'error' ? '<b class="um-flag" aria-hidden="true">⚠</b>' : '';
-      meters.push(`<span class="um${cls}" data-win="${name}"><span class="um-name">${name}</span>${bar('um-bar')}<span class="um-pct">${flag}${pct}%</span><span class="um-left">${usageEsc(w.left)}</span></span>`);
+      meters.push(`<span class="um${cls}" data-win="${name}"><span class="um-name">${name}</span>${ring}${bar('um-bar')}<span class="um-pct">${flag}${pct}%</span><span class="um-left">${usageEsc(w.left)}</span></span>`);
       details.push(`<div class="up-win${cls}"><div class="up-title">${title}</div>${bar('um-bar up-bar')}<div class="up-line"><span>${pct}% used</span><span>Resets in ${usageEsc(w.left)}</span></div><div class="up-sub">Resets at ${usageEsc(w.reset)} · ${run}% of the window gone</div>${w.ahead === true ? '<div class="up-warn">⚠ Using it faster than the clock</div>' : ''}</div>`);
     }
     // RP147: an old file is a small yellow dot (first, as in the design) whose help text says how old the data is: never a loose «N min ago».
@@ -1069,5 +1081,5 @@
     return now - Math.max(aliveAt, visibleAt) > STALLED_MS;
   };
 
-  return { STALLED_MS, stalledNow, jobsHold, deliveryHold, tasksPollDue, TASKS_REFRESH_MS, mergeWhy, screenOf, bandOf, NARROW_BELOW, DUO_BELOW, parseAddress, addressOf, ADDRESS_ZONES, subClock, columnTabFor, conformityTabLabel, repoModel, changeChips, prChip, ciOf, idleChip, conflictChip, sizeChip, RepoCard, stateLineHidden, usageView, usageHtml, usageRemaining, boardApply, boardWait, chatCachePut, chatCacheGet, rpcWithContext, chatFromCache, API_VERSION, mergeButton, rerunButton, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, dirtyRepos, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, taskPrs, matchesUnitId, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, parseSse, rpcEvent, rpcReduce, rpcFromStatus, eventsPlan, eventsRetryMs, eventsStale };
+  return { STALLED_MS, stalledNow, jobsHold, deliveryHold, tasksPollDue, TASKS_REFRESH_MS, mergeWhy, screenOf, bandOf, NARROW_BELOW, DUO_BELOW, parseAddress, addressOf, ADDRESS_ZONES, subClock, columnTabFor, conformityTabLabel, repoModel, changeChips, prChip, ciOf, idleChip, conflictChip, sizeChip, RepoCard, stateLineHidden, usageView, usageHtml, ringGeometry, usageRemaining, boardApply, boardWait, chatCachePut, chatCacheGet, rpcWithContext, chatFromCache, API_VERSION, mergeButton, rerunButton, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, dirtyRepos, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, taskPrs, matchesUnitId, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, parseSse, rpcEvent, rpcReduce, rpcFromStatus, eventsPlan, eventsRetryMs, eventsStale };
 }));
