@@ -17,15 +17,15 @@ const WIN = process.platform === 'win32';
 const opts = { skip: WIN ? false : 'the tray icon is drawn with System.Drawing on Windows (PowerShell)' };
 
 const hex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
-const LINE = hex((/--line:\s*(#[0-9a-fA-F]{6})/.exec(style) || [])[1] || '#000000'); // the line of the panel: #2a323c
+const LINE = hex('#3a4553'); // RP203: the line is the border of the cards of the page (#3a4553), lighter than --line (#2a323c), which was as dark as the menu of hidden icons of Windows and could not be seen
 const BACK = [15, 18, 22];
 const KEY = [250, 251, 252];
 const BLUE = [0, 127, 255];
 
 // ---------- the script, as text (any system) ----------
-test('b1: the line has a name among the colors and it is the line of the panel, read from the stylesheet, not copied by hand', () => {
+test('b1: the line has a name among the colors and it is a color of the page (the border of its cards), which is found in the stylesheet', () => {
   assert.equal(LINE.length, 3);
-  assert.ok(LINE.every((v) => Number.isInteger(v) && v > 0), `--line was found in style.css (${LINE})`);
+  assert.ok(/#3a4553/i.test(style), 'that color is in style.css: it is the page\'s own');
   const m = /Line\s*=\s*\[System\.Drawing\.Color\]::FromArgb\((\d+), (\d+), (\d+)\)/.exec(tray);
   assert.ok(m, 'Get-TrayColors has a Line');
   assert.deepEqual(m.slice(1).map(Number), LINE);
@@ -108,7 +108,7 @@ for (const size of [16, 32, 48]) {
 }
 
 test('b8: the README says the icon has a thin line of one pixel and where its color comes from, and that the K is smaller so it breathes', () => {
-  assert.match(readme, /\*\*thin line\*\* of one pixel around it \(RP199: the `--line` of the page/);
+  assert.match(readme, /\*\*thin line\*\* of one pixel around it \(RP199, lighter in RP203: `#3a4553`/);
   assert.match(readme, /smaller inside its box so that it breathes/);
   assert.match(readme, /drawn 1\.6 times bigger/);
 });
