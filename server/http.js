@@ -27,6 +27,7 @@ const { summaryFor } = require('./summary.js');
 const { jobsOf } = require('./jobs.js');
 const { subagentsOf } = require('./presence.js');
 const { createSummaryStore } = require('./summarystore.js');
+const { createCodeWatch } = require('./codewatch.js'); // RP201
 const { createEventHub } = require('./events.js');
 const { createNotifier } = require('./notifier.js');
 const { createRpcHost, rpcApi } = require('./rpchost.js');
@@ -68,6 +69,8 @@ async function setPiRuntime(b, deps) {
 }
 
 const routes = {
+  // RP201: ONE boolean (never the fingerprint): true when the files of the server on disk are not the code it started with. It only informs; it is behind the token and the login like every API route.
+  'GET /api/server-state': (q, b, d) => ({ stale: d.codeWatch.stale() === true }),
   'GET /api/config': () => {
     const cfg = loadConfig();
     return {
@@ -247,6 +250,8 @@ function isPanelRunning(port) {
 function createServer(port, deps = {}) {
   // One duplicate-send guard per server (tests inject theirs with a fake clock).
   deps = { guard: sendGuard(), ...deps };
+  // RP201: the fingerprint of the code of the server is taken here, right after its modules were loaded; GET /api/server-state tells whether the disk has another code now (tests inject theirs).
+  if (!deps.codeWatch) deps.codeWatch = createCodeWatch({ root: ROOT });
   const hostOk = new Set([`127.0.0.1:${port}`, `localhost:${port}`]);
   // RP177: the remote host of config.json (read per request, so editing it needs no restart) and its login; 127.0.0.1 never goes through them.
   const clock = deps.now || Date.now;

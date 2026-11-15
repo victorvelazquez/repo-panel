@@ -240,6 +240,10 @@ async function checkHealth() {
   let health = null;
   try { health = await (await fetch('/health')).json(); } catch { /* unreachable: nothing to compare */ }
   $('#outdated').hidden = V ? !V.isOutdated(health) : false; // no view.js: the server cannot be current
+  // RP201: and whether it runs older code than the files on disk (one boolean, behind the token). Nothing to say when the question fails or the server does not know the route yet.
+  let stale = false;
+  try { stale = (await api('/api/server-state')).stale === true; } catch { /* unreachable, or an old server without the route */ }
+  $('#stale').hidden = !stale;
 }
 
 // ---------- board (RP80) ----------
