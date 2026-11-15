@@ -470,15 +470,16 @@ async function chatPage({ state = 'idle', status, compact = { compacted: true },
   page.rpc = async (id, kind, record) => { page.run(`applyRpc(${JSON.stringify({ id, kind, ...(record ? { record } : {}) })})`); await page.tick(); };
   page.click = async () => { page.run("ACTIONS['compact']({ dataset: {} })"); await page.tick(); };
   page.bar = () => page.get('#sessState').html;
+  page.menuBar = async () => { if (!page.run('!!S.chat.menu')) { page.run("ACTIONS['ch-menu']({ dataset: {} })"); await page.tick(); } return page.get('#chatHead').html; }; // RP195: Compact is an item of the ⋮ menu of the head, not a button of the foot
   return page;
 }
 
-test('page (real): an idle session draws the button next to the ctx chip, and one click posts once with no force', async () => {
+test('page (real): an idle session offers Compact in the menu of the head (the ctx chip stays in the foot), and one click posts once with no force', async () => {
   const page = await chatPage();
   await page.open();
   assert.match(page.bar(), /ctx <\/span>62%/); // RP156: the word «ctx» is in its own span
-  assert.match(page.bar(), /data-act="compact"/);
-  assert.ok(page.bar().indexOf('ctx </span>62%') < page.bar().indexOf('data-act="compact"'));
+  assert.match(await page.menuBar(), /data-act="compact"/);
+  assert.doesNotMatch(page.bar(), /data-act="compact"/, 'RP195: Compact is not in the foot any more');
   await page.click();
   assert.deepEqual(page.compactPosts().map((c) => c.body), [{ id: ID }]);
   assert.deepEqual(page.confirms, [], 'an idle session asks nothing');
@@ -486,7 +487,7 @@ test('page (real): an idle session draws the button next to the ctx chip, and on
 test('page (real): a busy session asks first; declining posts nothing, accepting posts force true once', async () => {
   const page = await chatPage({ state: 'busy' });
   await page.open();
-  assert.match(page.bar(), /data-act="compact"/);
+  assert.match(await page.menuBar(), /data-act="compact"/);
   page.ui.confirm = false;
   await page.click();
   assert.equal(page.confirms.length, 1);
@@ -505,21 +506,21 @@ test('page (real): from the click until the answer there is no second send and t
   await page.click();
   assert.equal(page.compactPosts().length, 1);
   assert.match(page.bar(), /Compacting…/);
-  assert.doesNotMatch(page.bar(), /data-act="compact"/);
+  assert.doesNotMatch(await page.menuBar(), /data-act="compact"/);
   await page.click();
   await page.click();
   assert.equal(page.compactPosts().length, 1, 'no double send');
   release();
   await page.tick();
   assert.doesNotMatch(page.bar(), /Compacting…/);
-  assert.match(page.bar(), /data-act="compact"/);
+  assert.match(await page.menuBar(), /data-act="compact"/);
 });
 test('page (real): while compacting the message cannot be sent, also when the session started it by itself (events)', async () => {
   const page = await chatPage();
   await page.open();
   await page.rpc(ID, 'event', { type: 'compaction_start', reason: 'threshold' });
   assert.match(page.bar(), /Compacting…/);
-  assert.doesNotMatch(page.bar(), /data-act="compact"/);
+  assert.doesNotMatch(await page.menuBar(), /data-act="compact"/);
   assert.equal(page.get('#msgSend').disabled, true);
   assert.equal(page.get('#msgSend').title, 'The session is compacting its context: wait a moment');
   page.get('#msgBox').value = 'hello';
@@ -530,13 +531,13 @@ test('page (real): while compacting the message cannot be sent, also when the se
   assert.equal(page.get('#msgBox').value, 'hello', 'the draft stays');
   await page.rpc(ID, 'event', { type: 'compaction_end', reason: 'threshold' });
   assert.doesNotMatch(page.bar(), /Compacting…/);
-  assert.match(page.bar(), /data-act="compact"/);
+  assert.match(await page.menuBar(), /data-act="compact"/);
 });
 test('page (real): the status of a session that is compacting (a reload in the middle) shows Compacting… too', async () => {
   const page = await chatPage({ status: STATUS('idle', { compacting: true }) });
   await page.open();
   assert.match(page.bar(), /Compacting…/);
-  assert.doesNotMatch(page.bar(), /data-act="compact"/);
+  assert.doesNotMatch(await page.menuBar(), /data-act="compact"/);
 });
 test('page (real): after success the history is read again and the context once more, and the chip reads ctx — while unknown', async () => {
   const page = await chatPage();
@@ -562,7 +563,7 @@ test('page (real): a refusal or a failure shows the fixed message under the box 
   await page.click();
   assert.match(page.get('#msgNote').html, /The context is already compacted/);
   assert.doesNotMatch(page.bar(), /Compacting…/);
-  assert.match(page.bar(), /data-act="compact"/);
+  assert.match(await page.menuBar(), /data-act="compact"/);
   assert.equal(page.compactPosts().length, 1);
   assert.equal(page.urls('/api/chat').length, 1, 'a failure does not reload the history');
 });
@@ -570,7 +571,7 @@ test('page (real): a closed, starting or asking session shows no button', async 
   for (const state of ['closed', 'starting', 'asking']) {
     const page = await chatPage({ state });
     await page.open();
-    assert.doesNotMatch(page.bar(), /data-act="compact"/, state);
+    assert.doesNotMatch(await page.menuBar(), /data-act="compact"/, state);
   }
 });
 test('page (real): the button is for the open chat only, and a click with no open chat posts nothing', async () => {

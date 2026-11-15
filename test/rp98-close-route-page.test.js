@@ -146,12 +146,13 @@ test('r6: after a close the repo starts a NEW session, which is adopted again (t
 });
 
 // ---------- the page ----------
-test('p0: Close session is next to the session state (RP72 keeps the chat head to the repo name and the ✕): the helper draws it only when there is a session, disabled while closing', () => {
-  assert.match(R.sessionCloseHtml(true, false), /^<button type="button" class="ss-close" data-act="session-close" title="[^"]+">Close<span class="ss-long"> session<\/span><\/button>$/); // RP156: a narrow chat shows «Close» (the words stay for the accessible name)
+test('p0: Close session is an item of the ⋮ menu of the head (RP195; it was a button of the foot): the helper draws it only when there is a session, disabled while closing', () => {
+  assert.match(R.sessionCloseHtml(true, false), /^<button type="button" class="ch-mi" role="menuitem" data-act="session-close" title="[^"]+">Close session<\/button>$/); // RP156: a narrow chat shows «Close» (the words stay for the accessible name)
   assert.match(R.sessionCloseHtml(true, true), /data-act="session-close" disabled /);
   assert.equal(R.sessionCloseHtml(false, false), '');
   const adopted = { id: 'abc', info: { adopted: { id: 's1' } } };
-  assert.doesNotMatch(R.chatHead(adopted, { name: 'demo', live: true }), /session-close|ss-close/, 'the head is only the name and the ✕');
+  assert.doesNotMatch(R.chatHead(adopted, { name: 'demo', live: true }), /session-close|ss-close/, 'without the data of the menu the head is the one of before');
+  assert.match(R.chatHead(adopted, { name: 'demo', menu: { open: true, session: adopted, hasSession: true } }), /data-act="session-close"/, 'with it, the menu offers Close session');
   assert.match(R.chatHead(adopted, { name: 'demo' }), /data-act="chat-close"/);
 });
 
@@ -202,12 +203,15 @@ async function boot({ adopted = { id: 's1', name: 'First', adoptedAt: 'x' } } = 
 const closes = (page) => page.fetches.filter((f) => f.url === '/api/rpc/close');
 const head = (page) => page.get('#chatHead').html;
 const sess = (page) => page.get('#sessState').html;
+// RP195: Close session is an item of the ⋮ menu of the head: open the menu once and read the head.
+const menu = async (page) => { if (!page.run('!!S.chat.menu')) { page.run("ACTIONS['ch-menu']({ dataset: {} })"); await page.tick(); } return head(page); };
 const body = (page) => page.get('#chatBody').html;
 
 test('p1: with an adopted session the head has the button; pressing it stops the session, the chat comes back to the list of sessions and the session shows as closed', async () => {
   const page = await boot();
-  assert.match(sess(page), /data-act="session-close"/);
-  assert.doesNotMatch(head(page), /session-close/, 'not in the header');
+  assert.match(head(page), /id="chMenuBtn"/, 'the head has the ⋮ button');
+  assert.doesNotMatch(sess(page), /session-close/, 'not in the foot any more');
+  assert.match(await menu(page), /data-act="session-close"/, 'the item is in the menu');
   await page.run("ACTIONS['session-close']({ dataset: {} })");
   await page.tick();
   assert.equal(closes(page).length, 1);
@@ -216,7 +220,7 @@ test('p1: with an adopted session the head has the button; pressing it stops the
   assert.equal(page.run('S.rpc.abc.state'), 'closed');
   assert.match(body(page), /No session is adopted for this folder/);
   assert.match(body(page), /data-act="chat-adopt"/, 'the sessions of the folder are listed to open one');
-  assert.doesNotMatch(sess(page), /session-close/, 'nothing left to close');
+  assert.doesNotMatch(await menu(page), /session-close/, 'nothing left to close');
 });
 
 test('p2: a session that is working or asking is confirmed first: refusing sends nothing, accepting closes it', async () => {
@@ -252,7 +256,7 @@ test('p4: a failed close keeps the session as it was, shows the error and leaves
   await page.tick();
   assert.equal(page.run('S.rpc.abc.state'), 'idle', 'not marked closed');
   assert.equal(page.run('!!S.chat.closing'), false, 'ready for another try');
-  assert.match(sess(page), /session-close/);
+  assert.match(await menu(page), /session-close/);
   assert.equal(page.world.adopted.id, 's1');
 });
 
@@ -262,7 +266,7 @@ test('p5: a second press while the first close is on its way sends nothing more'
   page.routes.unshift([(u) => u === '/api/rpc/close', () => new Promise((r) => { release = () => { page.world.adopted = null; r(ok(CLOSED)); }; })]);
   const first = page.run("ACTIONS['session-close']({ dataset: {} })");
   await page.tick();
-  assert.match(sess(page), /data-act="session-close" disabled /, 'the button is disabled while the close is on its way');
+  assert.match(await menu(page), /data-act="session-close" disabled /, 'the item is disabled while the close is on its way');
   page.run("ACTIONS['session-close']({ dataset: {} })"); // not awaited: if it were let through it would hang on its own pending answer
   await page.tick();
   assert.equal(closes(page).length, 1);

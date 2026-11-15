@@ -420,16 +420,26 @@
   const compactButtonHtml = (c) => {
     const r = c && c.info && c.rpc && typeof c.rpc === 'object' ? c.rpc : null;
     if (!r || r.compacting === true || (r.state !== 'idle' && r.state !== 'busy')) return '';
-    return `<button type="button" class="ss-compact" data-act="compact" title="${r.state === 'busy' ? 'Compact the context of this session. It stops the answer in progress first' : 'Compact the context of this session'}">Compact</button>`;
+    return `<button type="button" class="ch-mi" role="menuitem" data-act="compact" title="${r.state === 'busy' ? 'Compact the context of this session. It stops the answer in progress first' : 'Compact the context of this session'}">Compact</button>`;
   };
 
   // RP98: "Close session" stops the pi process of the repo and releases its adoption (the chat goes back to the list of sessions). It lives next to the session state in the composer frame (RP72 keeps the
   // chat header to the repo name and the ✕, which only hides the chat) and is there while the repo has a session: adopted or live.
-  const sessionCloseHtml = (show, closing) => (show ? `<button type="button" class="ss-close" data-act="session-close"${closing ? ' disabled' : ''} title="Stop this session and go back to the list of sessions">Close<span class="ss-long"> session</span></button>` : ''); // RP156: a narrow chat shows «Close»; the words stay for the accessible name and the title
+  const sessionCloseHtml = (show, closing) => (show ? `<button type="button" class="ch-mi" role="menuitem" data-act="session-close"${closing ? ' disabled' : ''} title="Stop this session and go back to the list of sessions">Close session</button>` : ''); // RP195: an item of the ⋮ menu of the head of the chat (it was a button of the foot)
 
   // RP118: "Terminal" next to "Close session" shows the line to open this session in a normal terminal. The server writes the line (GET /api/terminal); the page only shows it, escaped, and copies it from its
   // own state: the command is never put in an attribute. `term` is { open, loading | failed | available + command + reason, copied }.
-  const sessionTerminalHtml = (show, term) => (show ? `<button type="button" class="ss-term" data-act="session-terminal" aria-expanded="${term && term.open ? 'true' : 'false'}" title="Show the command to open this session in a normal terminal">Terminal</button>` : '');
+  const sessionTerminalHtml = (show, term) => (show ? `<button type="button" class="ch-mi" role="menuitem" data-act="session-terminal" aria-expanded="${term && term.open ? 'true' : 'false'}" title="Show the command to open this session in a normal terminal">Terminal</button>` : '');
+  // RP195: the ⋮ menu of the head of the chat: Compact, Terminal and Close session (they were buttons of the foot), each only under the conditions it had there. `m` = { open, session (the chat view: info and rpc), hasSession, terminal, closing }.
+  // With nothing to offer (no session) there is no button at all. The list is in the page only while it is open.
+  const chatMenuHtml = (m) => {
+    const o = m && typeof m === 'object' ? m : {};
+    const items = compactButtonHtml(o.session) + sessionTerminalHtml(!!o.hasSession, o.terminal) + sessionCloseHtml(!!o.hasSession, !!o.closing);
+    if (!items) return '';
+    const open = o.open === true;
+    const dots = '<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="8" cy="3" r="1.4"/><circle cx="8" cy="8" r="1.4"/><circle cx="8" cy="13" r="1.4"/></svg>';
+    return `<span class="ch-menu" id="chMenuWrap"><button type="button" id="chMenuBtn" class="ch-more" data-act="ch-menu" aria-label="Session menu" title="Session menu" aria-haspopup="menu" aria-expanded="${open}" aria-controls="chMenu">${dots}</button>${open ? `<div id="chMenu" class="ch-menu-list" role="menu" aria-label="Session">${items}</div>` : ''}</span>`;
+  };
   function terminalBlockHtml(term) {
     if (!term || !term.open) return '';
     const SHELLS = { powershell: ['PowerShell', 'Paste it in PowerShell: cmd reads some characters differently'], posix: ['bash or zsh', 'Paste it in bash or zsh'] };
@@ -488,7 +498,7 @@
     const st = repoStatus(ctx.git);
     const nameB = `<b class="ch-name" title="${esc(tip)}">${esc(ctx.name)}</b>`;
     const nameHtml = narrow ? `<button type="button" class="ch-id" data-act="zone-set" data-zone="repo" aria-label="${esc(st.label)}" title="Open the repo">${nameB}${st.line ? `<span class="ch-sub mono">${esc(st.line)}</span>` : ''}</button>` : nameB;
-    return `<div class="ch-row"><button type="button" class="ch-back" data-act="chat-back" aria-label="Back to the list of repos" title="Back to the list">${svgIcon('<path d="M10 3L5 8l5 5"/>', 20)}</button>${nameHtml}<button type="button" class="ch-repo" data-act="zone-set" data-zone="repo" aria-label="${esc(st.pending ? `Repo: ${st.pending} ${st.pending === 1 ? 'check' : 'checks'} pending` : 'Open the repo: tasks, changes, status and files')}" title="Open the repo">${svgIcon('<rect x="2.5" y="3" width="11" height="10" rx="1.5"/><path d="M10 3v10"/>', 20)}${narrow && st.pending ? `<i class="ch-dot" aria-hidden="true">${st.pending > 99 ? '99+' : st.pending}</i>` : ''}</button><button type="button" class="x" data-act="chat-close" aria-label="Close the chat" title="Close the chat (Esc)">✕</button></div><div class="ch-tabs" role="tablist" aria-label="Panel">${tabs}${dtab}</div>`;
+    return `<div class="ch-row"><button type="button" class="ch-back" data-act="chat-back" aria-label="Back to the list of repos" title="Back to the list">${svgIcon('<path d="M10 3L5 8l5 5"/>', 20)}</button>${nameHtml}${ctx.menu ? chatMenuHtml(ctx.menu) : ''}<button type="button" class="ch-repo" data-act="zone-set" data-zone="repo" aria-label="${esc(st.pending ? `Repo: ${st.pending} ${st.pending === 1 ? 'check' : 'checks'} pending` : 'Open the repo: tasks, changes, status and files')}" title="Open the repo">${svgIcon('<rect x="2.5" y="3" width="11" height="10" rx="1.5"/><path d="M10 3v10"/>', 20)}${narrow && st.pending ? `<i class="ch-dot" aria-hidden="true">${st.pending > 99 ? '99+' : st.pending}</i>` : ''}</button><button type="button" class="x" data-act="chat-close" aria-label="Close the chat" title="Close the chat (Esc)">✕</button></div><div class="ch-tabs" role="tablist" aria-label="Panel">${tabs}${dtab}</div>`;
   }
 
   // The Notes tab (RP93b, S8): the notepad of a repo (`.panel/notas.md`), one textarea and a status line apart so the page can repaint the status without touching the text.
@@ -1414,5 +1424,5 @@
     return `${ctx.failed ? '<div class="rs-note" role="status">⚠ Summary unavailable: showing the last data we have.</div>' : ''}<div class="rs-list">${body}</div>`;
   }
 
-  return { mergeSheetHtml, repoStatus, esc, mdHtml, settingsView, memoryChipHtml, ctxChipHtml, compactButtonHtml, legendHtml, listCount, blockWidths, columnView, treeFolderPaths, fileView, COLUMN_TABS, columnDetail, composerState, askAllowed, actionMenu, actionButtonsHtml, composerMergeHtml, composerNote, chatHead, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, sessionCloseHtml, sessionTerminalHtml, terminalBlockHtml, recentlyActive, chatBody, quickReplies, quickOf, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
+  return { mergeSheetHtml, repoStatus, esc, mdHtml, settingsView, memoryChipHtml, ctxChipHtml, compactButtonHtml, legendHtml, listCount, blockWidths, columnView, treeFolderPaths, fileView, COLUMN_TABS, columnDetail, chatMenuHtml, composerState, askAllowed, actionMenu, actionButtonsHtml, composerMergeHtml, composerNote, chatHead, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, sessionCloseHtml, sessionTerminalHtml, terminalBlockHtml, recentlyActive, chatBody, quickReplies, quickOf, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
 }));

@@ -715,14 +715,7 @@ button.tk-gh:hover:not(:disabled) { background: var(--panel2); color: var(--text
 .ch-picks { align-self: stretch; flex: 0 1 auto; min-height: 0; max-height: 100%; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; margin: 0; overscroll-behavior: contain; }
 /* RP98: the Close session button sits at the right of the session state, inside the composer frame. */
 .sess-state { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; row-gap: 4px; } /* RP156: with the icons every chip on can pass the width; wrap, never cut a button */
-.ss-close { margin-left: auto; flex: none; font-size: 12px; padding: 1px 8px; }
-.ss-close:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 /* RP118: the Terminal button sits before Close session; the block with the command opens under the state row. */
-.ss-compact { flex: none; font-size: 12px; padding: 1px 8px; }
-.ss-compact:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
-.ss-term { margin-left: auto; flex: none; font-size: 12px; padding: 1px 8px; }
-.ss-term + .ss-close { margin-left: 0; }
-.ss-term:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 .term-block { margin: 0 6px 6px; padding: 8px 10px; background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; font-size: 12px; }
 .term-block:empty { display: none; }
 .term-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
@@ -872,7 +865,7 @@ button.tc:hover { border-color: var(--muted); }
 .ss-dot svg, .mem-ic svg, .sub-dot svg { display: block; }
 .mem-ic, .sub-dot { font-style: normal; display: inline-flex; }
 @container cmp (max-width: 456px) {
-  .ss-word, .mem-word, .ss-long { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .ss-word, .mem-word { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 }
 .composer:focus-within { border-color: var(--blue); }
 .composer textarea { width: 100%; min-height: 42px; max-height: 150px; resize: none; border: 0; background: transparent; color: var(--text); font: inherit; padding: 4px 6px; }
@@ -931,7 +924,7 @@ button.tc:hover { border-color: var(--muted); }
   .ch-tabs { order: 1; flex: 1 1 auto; min-width: 0; flex-wrap: nowrap; align-self: stretch; align-items: stretch; padding: 0; overflow: hidden; }
   .ch-tab { padding: 0 12px; }
   .ch-dtab { align-items: stretch; }
-  .ch-repo, .ch-row .x { order: 2; }
+  .ch-repo, .ch-menu, .ch-row .x { order: 2; }
   #sumLayout[data-screen="duo"] .ch-back { min-height: 0; align-self: stretch; }
   .col-tabs { height: var(--head-h); }
 }
@@ -942,3 +935,15 @@ button.tc:hover { border-color: var(--muted); }
 .col-notes { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
 .col-notes .notes-box { min-height: 55vh; }
 #sumLayout[data-screen="chat"] .ch-tabs { display: none; }
+
+/* RP195: the ⋮ menu of the head of the chat (Compact, Terminal, Close session: they were buttons of the foot). The button is the size of the others of the head; the list hangs from it, to the left of its right edge. */
+.ch-menu { position: relative; display: inline-flex; flex: none; }
+.ch-more { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 30px; height: 30px; padding: 0; background: transparent; border-color: transparent; color: var(--muted); }
+.ch-more:hover:not(:disabled), .ch-more[aria-expanded="true"] { color: var(--text); background: var(--panel2); border-color: var(--line); }
+.ch-more:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+#sumLayout[data-screen] .ch-more { min-width: 44px; min-height: 44px; }
+.ch-menu-list { position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; display: grid; gap: 2px; min-width: 200px; max-width: calc(100vw - 24px); padding: 6px; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 12px 32px #0009; }
+.ch-mi { text-align: left; min-height: 36px; padding: 6px 10px; background: transparent; border-color: transparent; color: var(--text); }
+.ch-mi:hover:not(:disabled) { background: var(--panel); border-color: var(--line); }
+.ch-mi:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
+@media (pointer: coarse) { .ch-mi { min-height: 44px; } }

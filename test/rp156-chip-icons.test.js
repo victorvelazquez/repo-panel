@@ -120,9 +120,9 @@ test('u1: the subagent (RP171: a bubble of the thread, no longer a chip) draws t
 });
 
 // ---------- the buttons ----------
-test('b1: Close session keeps its words for the accessible name and the title, and a narrow chat shows «Close»; Terminal and Compact are unchanged', () => {
+test('b1: Close session keeps its words in full (RP195: it is an item of the ⋮ menu, so a narrow chat has no reason to cut them to «Close»); Terminal and Compact are unchanged', () => {
   const close = R.sessionCloseHtml(true, false);
-  assert.match(close, /^<button type="button" class="ss-close" data-act="session-close" title="Stop this session and go back to the list of sessions">Close<span class="ss-long"> session<\/span><\/button>$/);
+  assert.match(close, /^<button type="button" class="ch-mi" role="menuitem" data-act="session-close" title="Stop this session and go back to the list of sessions">Close session<\/button>$/);
   assert.equal(text(close), 'Close session');
   assert.equal(R.sessionCloseHtml(false, false), '');
   assert.match(R.sessionCloseHtml(true, true), / disabled /);
@@ -139,7 +139,7 @@ test('t1: the composer is the container of the row and a narrow chat hides ONLY 
   assert.match(rule('.composer'), /container-name:\s*cmp/);
   const q = /@container cmp \(max-width:\s*456px\)\s*\{\s*([\s\S]*?)\n\}/.exec(css);
   assert.ok(q, 'the container query of the composer');
-  assert.match(q[1], /\.ss-word,\s*\.mem-word,\s*\.ss-long\s*\{[^}]*clip-path:\s*inset\(50%\)/);
+  assert.match(q[1], /\.ss-word,\s*\.mem-word\s*\{[^}]*clip-path:\s*inset\(50%\)/); // RP195: .ss-long is gone with the footer button
   assert.doesNotMatch(q[1], /display:\s*none/);
   assert.match(q[1], /position:\s*absolute/);
   assert.match(q[1], /width:\s*1px/);
