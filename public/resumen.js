@@ -911,7 +911,7 @@
   function composerState(c, ctx = {}) {
     // RP99: with no session adopted (the list is in view) nothing can be sent: it would start and adopt a new session without telling. Open one or start a new one first.
     const reason = !c.info ? 'Loading the chat…' : !c.info.adopted ? 'Open a session or start a new one to write' : c.sending ? 'Sending…' : rpcWait(c);
-    return { canSend: !reason, reason, placeholder: reason || `Message the session of ${ctx.name ?? 'this repo'}` };
+    return { canSend: !reason, reason, placeholder: reason ? (c.info && !c.info.adopted ? 'Start a session to write' : '') : 'Message…' }; // RP207: quiet; the state line and the title of Send say why it is blocked
   }
 
   // The message-box history (RP83, S3), like the prompt of pi: the texts the person sent to the session (the chat's own messages, then the

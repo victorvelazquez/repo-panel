@@ -303,7 +303,7 @@ test('p3: with no session adopted the composer cannot send and says why; an adop
   const none = cs({ info: info(), rpc: { state: 'closed' } });
   assert.equal(none.canSend, false);
   assert.equal(none.reason, 'Open a session or start a new one to write');
-  assert.equal(none.placeholder, 'Open a session or start a new one to write');
+  assert.equal(none.placeholder, 'Start a session to write'); // RP207: the quiet placeholder; `reason` keeps the long text
   assert.equal(cs({ info: info(), rpc: { state: 'idle' } }).canSend, false, 'also with a live state');
   const adopted = info({ adopted: { id: 's1', name: 'x' }, adoptedFound: true });
   assert.equal(cs({ info: adopted, rpc: { state: 'idle' } }).canSend, true);
@@ -358,14 +358,14 @@ const posts = (page, url) => page.fetches.filter((f) => f.url === url && f.metho
 test('g1: with the list in view the Send button is disabled and the box explains why', async () => {
   const page = await boot();
   assert.equal(page.get('#msgSend').disabled, true);
-  assert.equal(page.get('#msgBox').placeholder, 'Open a session or start a new one to write');
+  assert.equal(page.get('#msgBox').placeholder, 'Start a session to write'); // RP207
   assert.equal(page.get('#msgSend').title, 'Open a session or start a new one to write');
 });
 
 test('g2: with an adopted session the Send button works again (the list is gone)', async () => {
   const page = await boot({ adopted: { id: 's1', name: 'First', adoptedAt: 'x' } });
   assert.equal(page.get('#msgSend').disabled, false);
-  assert.match(page.get('#msgBox').placeholder, /Message the session of demo/);
+  assert.equal(page.get('#msgBox').placeholder, 'Message…'); // RP207
 });
 
 test('g3: New session sends { id, new: true } to /api/rpc/start, reloads the chat and never starts by itself', async () => {

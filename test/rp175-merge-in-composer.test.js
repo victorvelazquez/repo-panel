@@ -289,7 +289,7 @@ test('s2: the hint is not visible any more; the information is the title of the 
   assert.doesNotMatch(css, /(^|\n)\.hint\s*\{/);
   assert.match(/<textarea id="msgBox"[^>]*>/.exec(html)[0], /title="Enter sends · Shift\+Enter new line"/);
   assert.match(/<textarea id="msgBox"[^>]*>/.exec(html)[0], /aria-label="Message to the session"/);
-  assert.match(read('app.js'), /e\.key !== 'Enter' \|\| !e\.target \|\| e\.target\.id !== 'msgBox' \|\| e\.shiftKey \|\| e\.isComposing \|\| e\.keyCode === 229\) return;\n\s*e\.preventDefault\(\);\n\s*sendChatMessage\(\);/);
+  assert.match(read('app.js'), /e\.key !== 'Enter' \|\| !e\.target \|\| e\.target\.id !== 'msgBox' \|\| e\.keyCode === 229\) return;\n[^\n]*\n\s*const sends = V && V\.enterSends \? V\.enterSends\([^\n]*\n\s*if \(!sends\) return;\n\s*e\.preventDefault\(\);\n\s*sendChatMessage\(\);/);
 });
 
 test('s3: the reason wraps and never cuts, the row wraps in a narrow chat, and the RP156 container query still only hides chip words', () => {

@@ -219,8 +219,8 @@ test('chatHead: the id is escaped in the title and the name too; the close butto
 
 // ---------- composerState unchanged (PRESERVE) ----------
 test('composerState: busy cannot send (same reason, same placeholder); idle can', () => {
-  assert.deepEqual(R.composerState({ id: 'r1', sending: false, info: adoptedInfo(), rpc: { state: 'busy' } }, { name: 'alpha' }), { canSend: false, reason: WORKING, placeholder: WORKING });
-  assert.deepEqual(R.composerState({ id: 'r1', sending: false, info: adoptedInfo(), rpc: { state: 'idle' } }, { name: 'alpha' }), { canSend: true, reason: '', placeholder: 'Message the session of alpha' });
+  assert.deepEqual(R.composerState({ id: 'r1', sending: false, info: adoptedInfo(), rpc: { state: 'busy' } }, { name: 'alpha' }), { canSend: false, reason: WORKING, placeholder: '' });
+  assert.deepEqual(R.composerState({ id: 'r1', sending: false, info: adoptedInfo(), rpc: { state: 'idle' } }, { name: 'alpha' }), { canSend: true, reason: '', placeholder: 'Message…' });
 });
 // ---------- index.html ----------
 test('index.html: div#sessState.sess-state is the FIRST child of div#composer and comes before textarea#msgBox; it is never hidden', () => {
