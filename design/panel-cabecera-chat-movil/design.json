@@ -1,0 +1,56 @@
+{
+  "title": "Repo Panel — Cabecera del chat en el celular",
+  "brief": "RP198: cabecera del chat en el celular, en dos niveles de información, sin agrandar la altura; la rama, los commits adelante y el contexto como chips; avisos solo cuando hacen falta. Se compara con lo que hay hoy y se recomienda el patrón más normal en apps móviles.",
+  "feature": "odd/tasks/rediseno-interfaz.md",
+  "artboards": [
+    {
+      "file": "01-hoy.html",
+      "title": "Hoy · la cabecera como está",
+      "tradeoff": "Ya existe; unos 65 px, todo en un renglón, la rama como texto con ↑N pegado",
+      "width": 960,
+      "height": 520
+    },
+    {
+      "file": "02-dos-lineas-completas.html",
+      "title": "A · Dos líneas completas",
+      "tradeoff": "Lo literal de la fila; la más alta (73 px) y con dos alineaciones distintas",
+      "width": 960,
+      "height": 620
+    },
+    {
+      "file": "03-flecha-aparte-recomendada.html",
+      "title": "B · Flecha aparte (recomendada)",
+      "tradeoff": "El patrón de las apps móviles: 57 px, más baja que hoy; la rama conserva su nombre",
+      "width": 960,
+      "height": 760
+    },
+    {
+      "file": "04-una-fila.html",
+      "title": "C · Una sola fila",
+      "tradeoff": "La más baja (49 px); la rama deja de verse al chatear",
+      "width": 960,
+      "height": 520
+    },
+    {
+      "file": "05-estados-de-b.html",
+      "title": "Estados de B",
+      "tradeoff": "Catálogo: nombre largo, main, checks, memoria caída, sin sesión",
+      "width": 960,
+      "height": 1100
+    },
+    {
+      "file": "06-titulo-e-info.html",
+      "title": "D · Título arriba, info en barra aparte",
+      "tradeoff": "Separa identidad de estado como pidió la persona; cabecera de 45 px igual a las otras, pero suma 35 px de barra fija (80 px en total)",
+      "width": 1280,
+      "height": 1500
+    },
+    {
+      "file": "07-todo-en-57.html",
+      "title": "E · Todo en 57 px (columnas propias + bloque central de dos filas)",
+      "tradeoff": "Misma altura que B (57 px); arriba repo y rama, abajo la info; los avisos pasan a ícono si no caben; sin franja aparte",
+      "width": 1280,
+      "height": 1250
+    }
+  ]
+}
