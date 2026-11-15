@@ -799,7 +799,6 @@ button.tc:hover { border-color: var(--muted); }
 .ch-back { display: none; align-items: center; justify-content: center; flex: none; padding: 0; background: transparent; border: 0; border-radius: 6px; color: var(--muted); }
 .ch-back:hover:not(:disabled) { color: var(--text); background: var(--panel2); }
 .ch-back:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
-body[data-app-head="off"] > header { display: none; } /* RP204 (S15): chat and Repo bring their own head on the phone; the mark exists only there (applyScreen) */
 #sumLayout[data-screen] { flex-direction: column; height: calc(100vh - var(--sum-top, 98px)); height: calc(100dvh - var(--sum-top, 98px)); height: calc(var(--vvh, 100dvh) - var(--sum-top, 98px)); min-height: 0; }
 #sumLayout[data-screen] #split, #sumLayout[data-screen] #split2 { display: none; }
 #sumLayout[data-screen="list"] #chat, #sumLayout[data-screen="list"] #col { display: none; }
