@@ -1,0 +1,49 @@
+{
+  "title": "Repo Panel — Input del chat (pie)",
+  "brief": "RP191: el pie del chat limpio: el estado a la izquierda con las acciones principales (/flow-ship, Merge y, si hace falta, las otras /flow-…) al lado, las respuestas rápidas en una fila sobre el campo, y un solo botón redondo con ícono que alterna Send y Stop; con espacio fijo que no cambia mientras se escribe. Se compara con lo de hoy.",
+  "feature": "odd/tasks/rediseno-interfaz.md",
+  "artboards": [
+    {
+      "file": "01-hoy.html",
+      "title": "Hoy · el pie del chat",
+      "tradeoff": "Estado arriba, botones con texto y ancho variable; las respuestas rápidas se mueven con el scroll",
+      "width": 960,
+      "height": 520
+    },
+    {
+      "file": "02-estado-y-accion-al-lado.html",
+      "title": "A · Estado y acción al lado (recomendada)",
+      "tradeoff": "Lo confirmado en S6; el estado de ancho fijo y las acciones pegadas; con 3 o más, la tercera va al ⋮",
+      "width": 1300,
+      "height": 860
+    },
+    {
+      "file": "03-accion-en-el-lugar-del-estado.html",
+      "title": "B · La acción en el lugar del estado",
+      "tradeoff": "El lugar no crece nunca; con dos acciones solo cabe una y Merge quedaría escondido",
+      "width": 1300,
+      "height": 460
+    },
+    {
+      "file": "04-acciones-sobre-el-campo.html",
+      "title": "C · Acciones en una fila sobre el campo",
+      "tradeoff": "Caben todas; la fila aparece y desaparece y el campo baja, lo que se quiere evitar",
+      "width": 960,
+      "height": 460
+    },
+    {
+      "file": "05-enviar-y-detener-con-iconos.html",
+      "title": "Enviar y detener con íconos",
+      "tradeoff": "Redondos, del mismo tamaño y en el mismo lugar; el texto queda como nombre accesible",
+      "width": 960,
+      "height": 420
+    },
+    {
+      "file": "06-zona-de-abajo-del-iphone.html",
+      "title": "La zona de abajo del iPhone",
+      "tradeoff": "Margen de 12 px más la zona segura; no verificable sin mirarlo en el teléfono",
+      "width": 960,
+      "height": 420
+    }
+  ]
+}
