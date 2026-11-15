@@ -378,6 +378,7 @@
     const L = CI_LABEL[ci.kind];
     const [count, passed, total] = [ci.kind === 'running' ? ci.pending : ci.failed, ci.passed, ci.total].map(whole);
     const title = `PR #${ci.number}: the checks ${L.title} (${count} ${L.said}, ${passed} of ${total} passed)`;
+    if (opts && opts.phone) return `<span class="ss ss-${L.tone} ss-ci${L.anim}" title="${esc(title)}" aria-label="${esc(title)}"><i class="ss-dot" aria-hidden="true">${L.icon}</i><span class="ch-n">${count}</span><span class="ch-w">${L.said}</span></span>`; // RP198: icon, number and a short word the stylesheet may hide
     return `<span class="ss ss-${L.tone} ss-ci${L.anim}"${opts && opts.head ? '' : ' role="status"'} title="${esc(title)}"><i class="ss-dot" aria-hidden="true">${L.icon}</i> <span class="ss-word">${L.word}</span><span class="ss-n"> · ${count} ${L.said} · ${passed}/${total}</span></span>`;
   }
   const sessionLabelHtml = (c) => {
@@ -399,6 +400,7 @@
     if (!r || r.state === 'closed' || typeof r.memory !== 'string' || !Object.hasOwn(MEMORY_CHIP, r.memory)) return '';
     if (opts && opts.quiet === true && r.memory === 'ready') return ''; // RP197: the head says nothing while the memory is fine
     const [cls, word, title] = MEMORY_CHIP[r.memory];
+    if (opts && opts.phone === true) return `<span class="mem ${cls}" title="${esc(title)}" aria-label="${esc(title)}"><i class="mem-ic" aria-hidden="true">${MEMORY_ICON[r.memory]}</i><span class="ch-w">${r.memory === 'disabled' ? 'off' : r.memory}</span></span>`; // RP198: a short word, hidden by the stylesheet when there is no room
     return `<span class="mem ${cls}" title="${esc(title)}"><i class="mem-ic" aria-hidden="true">${MEMORY_ICON[r.memory]}</i> <span class="mem-word">${word}</span></span>`; // RP156: the memory chip gets an icon too
   };
 
@@ -425,6 +427,13 @@
   };
   // RP197: the chips of the head of the chat. Silence when all is well: the context (once read), the memory only when it is not ready, the checks only while they run or fail (ciOf is null on green).
   const headChipsHtml = (c, ci) => ctxChipHtml(c) + memoryChipHtml(c, { quiet: true }) + ciLabel(ci, { head: true });
+  // RP198: row 2 of the phone head, in a fixed order: ↑N (only when ahead > 0), the context, then the alerts (the memory when it is not ready, the checks while they run or fail). With 4 pieces the row is `ch-tight`:
+  // the stylesheet drops the words of the alerts (icon + number stay); with fewer it drops them only when the central block is narrow (a container query). '' when there is nothing to say.
+  const aheadChipHtml = (n) => (n > 0 ? `<span class="ch-up" title="${n} ${n === 1 ? 'commit' : 'commits'} ahead" aria-label="${n} ${n === 1 ? 'commit' : 'commits'} ahead">${svgIcon('<path d="M8 13V3M4 7l4-4 4 4"/>', 13)}${n}</span>` : '');
+  const phoneInfoHtml = (c, ci, ahead) => {
+    const pieces = [aheadChipHtml(ahead), c ? ctxChipHtml(c) : '', c ? memoryChipHtml(c, { quiet: true, phone: true }) : '', ciLabel(ci, { phone: true })].filter(Boolean);
+    return pieces.length ? `<span class="ch-info${pieces.length > 3 ? ' ch-tight' : ''}">${pieces.join('')}</span>` : '';
+  };
   // RP197: the states as ICONS with no text, side by side, for the top of the ⋮ menu: the memory (also when it is ready), the context and the checks of the PR. Each has its name (aria-label and tooltip, the same words) and a tone.
   const statusIconsHtml = (c, g) => {
     const r = c && c.rpc && typeof c.rpc === 'object' ? c.rpc : null;
@@ -502,8 +511,8 @@
     const said = [branch && `branch ${branch}`, ahead && plural(ahead, 'commit ahead', 'commits ahead'), pending && `${plural(pending, 'check', 'checks')} running`, failed && `${plural(failed, 'check', 'checks')} failed`].filter(Boolean);
     return { ahead, pending, failed, branch, line, label: said.length ? `Open the repo: ${said.join(', ')}` : 'Open the repo' };
   }
-  // The header: the repo name (the session id is only its tooltip) and the close button. RP135: under 760 px (`ctx.narrow === true`) the name and the state of the repo are ONE button that opens Repo, and the Repo button carries
-  // the badge of the checks that are pending (`ctx.git` is what columnGit gives).
+  // The header: the repo name (the session id is only its tooltip) and the close button. RP198: under 760 px (`ctx.narrow === true`) the head is the block of 57 px (the arrow, a central block of two rows that is ONE button that opens Repo, and the actions); the Repo button
+  // carries the badge of the checks that are pending (RP135; `ctx.git` is what columnGit gives). From 760 px up the markup is the one of always.
   function chatHead(c, ctx = {}) {
     const adopted = c.info && c.info.adopted;
     const tip = adopted ? `${ctx.name} · ${adopted.id}` : ctx.name;
@@ -524,9 +533,18 @@
     const narrow = ctx.narrow === true;
     const st = repoStatus(ctx.git);
     const nameB = `<b class="ch-name" title="${esc(tip)}">${esc(ctx.name)}</b>`;
-    const nameHtml = narrow ? `<button type="button" class="ch-id" data-act="zone-set" data-zone="repo" aria-label="${esc(st.label)}" title="Open the repo">${nameB}${st.line ? `<span class="ch-sub mono">${esc(st.line)}</span>` : ''}</button>` : nameB;
+    const repoBtn = `<button type="button" class="ch-repo" data-act="zone-set" data-zone="repo" aria-label="${esc(st.pending ? `Repo: ${st.pending} ${st.pending === 1 ? 'check' : 'checks'} pending` : 'Open the repo: tasks, changes, status and files')}" title="Open the repo">${svgIcon('<rect x="2.5" y="3" width="11" height="10" rx="1.5"/><path d="M10 3v10"/>', 20)}${narrow && st.pending ? `<i class="ch-dot" aria-hidden="true">${st.pending > 99 ? '99+' : st.pending}</i>` : ''}</button>`;
+    const backBtn = `<button type="button" class="ch-back" data-act="chat-back" aria-label="Back to the list of repos" title="Back to the list">${svgIcon('<path d="M10 3L5 8l5 5"/>', 20)}</button>`;
+    const closeBtn = '<button type="button" class="x" data-act="chat-close" aria-label="Close the chat" title="Close the chat (Esc)">✕</button>';
+    const tabsHtml = `<div class="ch-tabs" role="tablist" aria-label="Panel">${tabs}${dtab}</div>`;
+    if (narrow) {
+      // RP198: ONE block of a fixed 57 px: the arrow, the central block (two rows, ONE button that opens Repo) and the actions (the panel button, the ⋮)
+      const br = st.branch ? `<span class="ch-br" title="${esc(st.branch)}">${ICON_TAB.status}<span class="ch-brn">${esc(st.branch)}</span></span>` : '';
+      const info = phoneInfoHtml(ctx.session, ctx.ci, st.ahead);
+      return `<div class="ch-row ch-phone">${backBtn}<button type="button" class="ch-mid" data-act="zone-set" data-zone="repo" aria-label="${esc(st.label)}" title="Open the repo"><span class="ch-l1">${nameB}${br}</span>${info}</button><span class="ch-acts">${repoBtn}${ctx.menu ? chatMenuHtml(ctx.menu) : ''}${closeBtn}</span></div>${tabsHtml}`;
+    }
     const chips = ctx.session ? headChipsHtml(ctx.session, ctx.ci) : ''; // RP197: the context, and what is wrong, in the head
-    return `<div class="ch-row"><button type="button" class="ch-back" data-act="chat-back" aria-label="Back to the list of repos" title="Back to the list">${svgIcon('<path d="M10 3L5 8l5 5"/>', 20)}</button>${nameHtml}${chips ? `<span class="ch-chips">${chips}</span>` : ''}${ctx.menu ? chatMenuHtml(ctx.menu) : ''}<button type="button" class="ch-repo" data-act="zone-set" data-zone="repo" aria-label="${esc(st.pending ? `Repo: ${st.pending} ${st.pending === 1 ? 'check' : 'checks'} pending` : 'Open the repo: tasks, changes, status and files')}" title="Open the repo">${svgIcon('<rect x="2.5" y="3" width="11" height="10" rx="1.5"/><path d="M10 3v10"/>', 20)}${narrow && st.pending ? `<i class="ch-dot" aria-hidden="true">${st.pending > 99 ? '99+' : st.pending}</i>` : ''}</button><button type="button" class="x" data-act="chat-close" aria-label="Close the chat" title="Close the chat (Esc)">✕</button></div><div class="ch-tabs" role="tablist" aria-label="Panel">${tabs}${dtab}</div>`;
+    return `<div class="ch-row">${backBtn}${nameB}${chips ? `<span class="ch-chips">${chips}</span>` : ""}${ctx.menu ? chatMenuHtml(ctx.menu) : ""}${repoBtn}${closeBtn}</div>${tabsHtml}`;
   }
 
   // The Notes tab (RP93b, S8): the notepad of a repo (`.panel/notas.md`), one textarea and a status line apart so the page can repaint the status without touching the text.

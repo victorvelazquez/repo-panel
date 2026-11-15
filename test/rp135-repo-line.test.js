@@ -1,4 +1,5 @@
 'use strict';
+// RP198: the second line and the .ch-id button of RP135 became the block of 57 px (see rp198-phone-head.test.js); the facts (repoStatus), the label that opens Repo and the badge are still RP135.
 // RP135 (S26), design F of design/panel-movil/06: under 760 px the head of the chat says the state of the repo, so the way into Repo is visible without a bar. The name of the repo gets a second line (the commits ahead, the checks that
 // are running or failed, and the branch) and the whole block is a button that opens Repo; the Repo button gets a badge with the number of checks that are pending. It reads what the page already has (the board's facts and the open PR of
 // THAT branch, the same rule as the footer of the column) and adds no reads. From 760 px up the head is the one of always.
@@ -59,16 +60,17 @@ test('l3: hostile or broken numbers and names never reach the line as anything b
 const head = (ctx) => R.chatHead({ id: A, tab: 'chat' }, { name: 'demo', column: true, ...ctx });
 const run = { git: g({ ahead: 2, pr: pr({ pending: 2, total: 4, passed: 2 }) }) };
 
-test('h1: narrow, the name and the line are ONE button that opens Repo, with the label of the state; the Repo button carries the badge of pending checks', () => {
+test('h1: narrow, the central block is ONE button that opens Repo, with the label of the state; the Repo button carries the badge of pending checks', () => {
   const h = head({ ...run, narrow: true });
-  assert.match(h, /<button type="button" class="ch-id" data-act="zone-set" data-zone="repo" aria-label="Open the repo: branch feat\/x, 2 commits ahead, 2 checks running" title="[^"]*"><b class="ch-name"[^>]*>demo<\/b><span class="ch-sub mono">↑2 · 2 checks · feat\/x<\/span><\/button>/);
+  assert.match(h, /<button type="button" class="ch-mid" data-act="zone-set" data-zone="repo" aria-label="Open the repo: branch feat\/x, 2 commits ahead, 2 checks running" title="[^"]*"><span class="ch-l1"><b class="ch-name"[^>]*>demo<\/b><span class="ch-br" title="feat\/x">/);
+  assert.match(h, /<span class="ch-up" title="2 commits ahead"/);
   assert.match(h, /<button type="button" class="ch-repo" data-act="zone-set" data-zone="repo" aria-label="Repo: 2 checks pending"[^>]*>[\s\S]*?<i class="ch-dot" aria-hidden="true">2<\/i><\/button>/);
 });
 
 test('h2: not narrow the head is the one of always: a plain name, no second line, and the Repo button keeps its plain label with no badge', () => {
   for (const ctx of [{ ...run }, { ...run, narrow: false }, { ...run, narrow: 'yes' }, { ...run, narrow: 1 }]) {
     const h = head(ctx);
-    assert.doesNotMatch(h, /ch-id|ch-sub/);
+    assert.doesNotMatch(h, /ch-id|ch-sub|ch-mid/);
     assert.match(h, /<b class="ch-name"[^>]*>demo<\/b><button type="button" class="ch-repo"/);
   }
   assert.doesNotMatch(head({ ...run, narrow: true }).replace(/<button type="button" class="ch-repo"[\s\S]*?<\/button>/, ''), /ch-dot/);
@@ -79,13 +81,13 @@ test('h3: the badge says the pending number, caps at 99+, and is out when none i
   assert.match(head({ git: g({ pr: pr({ pending: 99 }) }), narrow: true }), />99<\/i>/);
   assert.doesNotMatch(head({ git: g({ pr: pr({ pending: 0, failed: 2 }) }), narrow: true }), /ch-dot/);
   assert.doesNotMatch(head({ git: g(), narrow: true }), /ch-dot/);
-  assert.match(head({ git: g({ pr: pr({ pending: 0, failed: 2 }) }), narrow: true }), /<span class="ch-sub mono">2 failed · feat\/x<\/span>/);
+  assert.match(head({ git: g({ pr: pr({ pending: 0, failed: 2 }) }), narrow: true }), /class="ch-mid"[^>]*aria-label="Open the repo: branch feat\/x, 2 checks failed"/);
 });
 
-test('h4: with no git known the head is still right: the name is the button, with no second line, and the Repo button has its plain label', () => {
+test('h4: with no git known the head is still right: the block is the button, with no branch and no second row, and the Repo button has its plain label', () => {
   const h = head({ narrow: true });
-  assert.match(h, /<button type="button" class="ch-id" data-act="zone-set" data-zone="repo" aria-label="Open the repo"/);
-  assert.doesNotMatch(h, /ch-sub|ch-dot/);
+  assert.match(h, /<button type="button" class="ch-mid" data-act="zone-set" data-zone="repo" aria-label="Open the repo"/);
+  assert.doesNotMatch(h, /ch-br|ch-info|ch-dot/);
   assert.match(h, /aria-label="Open the repo: tasks, changes, status and files"/);
 });
 
@@ -101,14 +103,14 @@ test('h5: the branch and the name are text: markup in them is escaped everywhere
 const rules = [...css.matchAll(/(?:^|\n)([^{}\n@/ ][^{}\n]*)\{([^}]*)\}/g)].flatMap((m) => m[1].split(',').map((s) => ({ sel: s.trim().replace(/\s+/g, ' '), body: m[2] })));
 const rule = (sel) => { const r = rules.filter((x) => x.sel === sel); assert.ok(r.length, `a rule for ${sel}`); return r.map((x) => x.body).join(';'); };
 
-test('c1: the block is a 44 px target that takes the room, cuts a long name and a long branch with an ellipsis instead of pushing the buttons out, and keeps a visible focus ring; the badge sits on the corner of the Repo button', () => {
-  const id = rule('.ch-id');
-  assert.match(id, /min-height:\s*44px/);
-  assert.match(id, /flex:\s*1/);
+test('c1: the block fills its column (the 57 px row, RP198), cuts a long name and a long branch with an ellipsis instead of pushing the buttons out, and keeps a visible focus ring; the badge sits on the corner of the Repo button', () => {
+  const id = rule('#sumLayout[data-screen] .ch-phone .ch-mid');
+  assert.match(id, /height:\s*100%/);
+  assert.match(id, /width:\s*100%/);
   assert.match(id, /min-width:\s*0/);
-  assert.match(rule('.ch-sub'), /text-overflow:\s*ellipsis/);
-  assert.match(rule('.ch-sub'), /white-space:\s*nowrap/);
-  assert.match(css, /\.ch-id:focus-visible[^{]*\{[^}]*outline:\s*2px solid var\(--blue\)/);
+  assert.match(rule('#sumLayout[data-screen] .ch-phone .ch-brn'), /text-overflow:\s*ellipsis/);
+  assert.match(rule('#sumLayout[data-screen] .ch-phone .ch-brn'), /white-space:\s*nowrap/);
+  assert.match(css, /\.ch-mid:focus-visible[^{]*\{[^}]*outline:\s*2px solid var\(--blue\)/);
   assert.match(rule('.ch-repo'), /position:\s*relative/);
   assert.match(rule('.ch-dot'), /position:\s*absolute/);
 });
@@ -170,7 +172,8 @@ test('p1: narrow, the head says the state of the repo from the facts the page al
   const page = await boot(390);
   await page.click('chat-open', { id: A });
   await page.facts(FACTS, PRS('feat/x', 'pending'));
-  assert.match(page.head(), /<span class="ch-sub mono">↑2 · 1 check · feat\/x<\/span>/);
+  assert.match(page.head(), /aria-label="Open the repo: branch feat\/x, 2 commits ahead, 1 check running"/);
+  assert.match(page.head(), /<span class="ch-up"[^>]*>[\s\S]*?<\/svg>2<\/span>/);
   assert.match(page.head(), /<i class="ch-dot" aria-hidden="true">1<\/i>/);
   await page.click('zone-set', { zone: 'repo' });
   assert.equal(page.screen(), 'repo');
@@ -180,7 +183,7 @@ test('p2: a PR of ANOTHER branch is never shown as the one of this: no checks in
   const page = await boot(390);
   await page.click('chat-open', { id: A });
   await page.facts(FACTS, PRS('feat/other', 'pending'));
-  assert.match(page.head(), /<span class="ch-sub mono">↑2 · feat\/x<\/span>/);
+  assert.match(page.head(), /aria-label="Open the repo: branch feat\/x, 2 commits ahead"/);
   assert.doesNotMatch(page.head(), /ch-dot|checks/);
 });
 
@@ -191,10 +194,10 @@ test('p3: the line follows the facts: when the checks finish the line and the ba
   assert.match(page.head(), /ch-dot/);
   await page.facts(FACTS, PRS('feat/x', 'success'));
   assert.doesNotMatch(page.head(), /ch-dot/);
-  assert.match(page.head(), /<span class="ch-sub mono">↑2 · feat\/x<\/span>/);
+  assert.match(page.head(), /aria-label="Open the repo: branch feat\/x, 2 commits ahead"/);
   await page.facts({ error: 'boom' }, { error: 'x' });
-  assert.doesNotMatch(page.head(), /ch-sub|ch-dot/);
-  assert.match(page.head(), /class="ch-id"/);
+  assert.doesNotMatch(page.head(), /ch-br|ch-up|ch-dot/);
+  assert.match(page.head(), /class="ch-mid"/);
 });
 
 test('p4: from 760 px up the head is the one of always, with or without the facts', async () => {
@@ -202,21 +205,21 @@ test('p4: from 760 px up the head is the one of always, with or without the fact
     const page = await boot(width);
     await page.click('chat-open', { id: A });
     await page.facts(FACTS, PRS('feat/x', 'pending'));
-    assert.doesNotMatch(page.head(), /ch-id|ch-sub|ch-dot/, String(width));
+    assert.doesNotMatch(page.head(), /ch-id|ch-mid|ch-br|ch-dot/, String(width));
   }
 });
 
-test('p5: crossing the cut with a resize repaints the head both ways (the second line comes and goes)', async () => {
+test('p5: crossing the cut with a resize repaints the head both ways (the phone block comes and goes)', async () => {
   const page = await boot(1200);
   await page.click('chat-open', { id: A });
   await page.facts(FACTS, PRS('feat/x', 'pending'));
-  assert.doesNotMatch(page.head(), /ch-sub/);
+  assert.doesNotMatch(page.head(), /ch-mid/);
   page.get('#sumLayout').clientWidth = 500;
   page.run('applyLayout()');
   await page.tick();
-  assert.match(page.head(), /ch-sub/);
+  assert.match(page.head(), /ch-mid/);
   page.get('#sumLayout').clientWidth = 1200;
   page.run('applyLayout()');
   await page.tick();
-  assert.doesNotMatch(page.head(), /ch-sub/);
+  assert.doesNotMatch(page.head(), /ch-mid/);
 });
