@@ -1,7 +1,7 @@
 'use strict';
 // RP187: the icon of the tray (scripts/tray.ps1) is the K with the dot of K-icon.svg on a square of the dark of the panel with slightly rounded corners. The DOT tells the state: blue
 // while the panel runs; while it is stopped a light gray or a soft red one (the person accepts either: one constant of the script, and both are allowed here). The square and the K
-// never change. The dot is drawn 1.4 times bigger than the one of the file, from its bottom right corner, so that it can be seen on 16 px. `tray.ps1 -RenderIcons <size>` draws both
+// never change. The dot is drawn 1.6 times bigger than the one of the file (1.4 before RP199, which made the K smaller and put a thin line around the square), from its bottom right corner, so that it can be seen on 16 px. `tray.ps1 -RenderIcons <size>` draws both
 // icons and prints their pixels as JSON (no window, no mutex, nothing written): on Windows the tests read the pixels of what the tray really draws; on any system the script is also
 // checked as text. It never touches the scheduled tasks.
 const test = require('node:test');
@@ -33,7 +33,7 @@ test('t1: the four colors are named once: the dark of the panel, the near-white 
 });
 
 test('t2: the square is rounded (four arcs and a path), the K is filled with the winding rule like SVG, and the dot is a rectangle in the color of the state', () => {
-  assert.equal((tray.match(/\.AddArc\(/g) || []).length, 4);
+  assert.equal((tray.match(/\.AddArc\(/g) || []).length, 8, 'four arcs for the fill and four for the thin line of RP199');
   assert.match(tray, /FillPath\(\$backBrush/);
   assert.doesNotMatch(tray, /FillEllipse/);
   assert.match(tray, /FillPolygon\(\$keyBrush, \$points, \[System\.Drawing\.Drawing2D\.FillMode\]::Winding\)/, 'the outline of the K crosses itself: with the default rule it has notches');
@@ -47,13 +47,13 @@ test('t2b: the corners are only slightly rounded, from one constant', () => {
   assert.doesNotMatch(tray, /\* 0\.22/, 'the old, rounder corner is gone');
 });
 
-test('t3: the dot of the tray is the dot of K-icon.svg (its size and its place next to the K), drawn 1.4 times bigger from its bottom right corner', () => {
+test('t3: the dot of the tray is the dot of K-icon.svg (its size and its place next to the K), drawn 1.6 times bigger (RP199) from its bottom right corner', () => {
   const { parseSvgShapes } = require('../scripts/make-icons.js');
   const dot = parseSvgShapes(fs.readFileSync(path.join(ROOT, 'public', 'K-icon.svg'), 'utf8'))[1].points;
   const xs = dot.map((p) => p[0]);
   const ys = dot.map((p) => p[1]);
   const [w, h, right] = [Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys), Math.max(...xs)];
-  assert.match(tray, /\$dotBoost = 1\.4/);
+  assert.match(tray, /\$dotBoost = 1\.6/);
   assert.ok(tray.includes(String(Math.round(w * 10) / 10)), `the width of the dot (${w})`);
   assert.ok(tray.includes(String(h)), `the height of the dot (${h})`);
   assert.ok(tray.includes(String(right)), `the right edge of the K and its dot (${right})`);
@@ -81,7 +81,7 @@ test('t5: -RenderIcons is a mode like -SelfTest: it leaves before the mutex and 
 });
 
 test('t6: the fit of the drawing in the icon is one constant, and the scale and the centering come from it', () => {
-  assert.match(tray, /\$fit = 0\.88/);
+  assert.match(tray, /\$fit = 0\.72/); // RP199: it was 0.88; the K is smaller so the drawing breathes inside the line
   assert.match(tray, /\$scale = \$Width \* \$fit \/ 125\.116/);
   assert.match(tray, /\(\$Width - 125\.116 \* \$scale\) \/ 2/);
 });
@@ -108,7 +108,8 @@ function boxOf(img, pred) {
 // The dot is the ONLY thing that changes with the state: the pixels that differ between the two icons.
 const changed = (a, b) => ({ width: a.width, height: a.height, rgba: a.rgba.map((v, i) => (v === b.rgba[i] ? 0 : 255)) });
 const diffBox = (a, b) => boxOf(changed(a, b), (p) => p.slice(0, 3).some((v) => v === 255));
-const isKey = (p) => p[3] === 255 && near(p.slice(0, 3), KEY, 12);
+// RP199: the K is smaller, so on 16 px almost no pixel of it is painted at 100 %: the K is every light GRAY pixel (the line, the square and the colored dot are not light gray), with its antialiased edge.
+const isKey = (p) => p[3] === 255 && p[0] >= 90 && Math.abs(p[0] - p[1]) <= 12 && Math.abs(p[1] - p[2]) <= 12;
 const isBlue = (p) => p[3] === 255 && near(p.slice(0, 3), BLUE, 12);
 
 test('t7: -RenderIcons prints the size and both icons, as many pixels as the size says', opts, () => {
@@ -124,7 +125,7 @@ for (const size of [16, 32, 48]) {
     assert.ok(px(running, 0, 0)[3] < 255 && px(running, size - 1, size - 1)[3] < 255, 'the corners are rounded (not fully opaque)');
     if (size >= 32) assert.equal(px(running, 0, 0)[3], 0, 'and on a bigger icon the very corner is empty');
     assert.equal(px(running, Math.ceil(size * 0.15), 0)[3], 255, 'only slightly rounded: a short way from the corner the edge is already straight');
-    const top = px(running, Math.floor(size / 2), 0);
+    const top = px(running, Math.floor(size / 2), 1); // RP199: row 0 is the thin line around the square; the dark of the panel starts just inside it
     assert.ok(near(top.slice(0, 3), BACK, 2) && top[3] === 255, `the square is the dark of the panel (${top})`);
     const k = boxOf(running, isKey);
     assert.ok(k.h >= size * 0.55, `the K is tall enough (${k.h} of ${size})`);
@@ -186,7 +187,8 @@ test('t11: the stopped dot is clearly lighter than the square, is not the white 
 test('t12: the K has no notch where its outline crosses itself (the winding rule), at both joints', opts, () => {
   const size = 128;
   const { running } = render(size);
-  const scale = (size * 0.88) / 125.116;
+  const fit = Number(/\$fit = (0\.\d+)/.exec(tray)[1]); // read from the script: the K of the joints moves with it
+  const scale = (size * fit) / 125.116;
   const offsetX = (size - 125.116 * scale) / 2;
   const offsetY = (size - 111.75 * scale) / 2 - 1.8 * scale;
   for (const [ux, uy] of [[13.45, 62.29], [39.79, 48.39]]) {

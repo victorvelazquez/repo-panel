@@ -131,6 +131,7 @@ Add-Type -AssemblyName System.Drawing
 function Get-TrayColors {
   return @{
     Back    = [System.Drawing.Color]::FromArgb(15, 18, 22)
+    Line    = [System.Drawing.Color]::FromArgb(42, 50, 60)   # RP199: the thin line around the square, the --line of public/style.css (#2a323c)
     Key     = [System.Drawing.Color]::FromArgb(250, 251, 252)
     Running = [System.Drawing.Color]::FromArgb(0, 127, 255)
     Stopped = [System.Drawing.Color]::FromArgb(229, 115, 115)
@@ -158,9 +159,9 @@ function New-StateBitmap([System.Drawing.Color]$Dot, [int]$Width, [int]$Height) 
     @(14.7, 80.55),
     @(14.7, 113.55)
   )
-  $fit = 0.88       # the share of the width of the icon that the K and its dot take
+  $fit = 0.72       # the share of the width of the icon that the K and its dot take (RP199: it was 0.88; the K breathes inside its box)
   $corner = 0.14    # how rounded the corners are, as a share of the side: slightly, like the controls of the panel
-  $dotBoost = 1.4   # on 16 px the dot of the file is 2 px: it is drawn 1.4 times bigger, from its bottom right corner, so that it can be seen
+  $dotBoost = 1.6   # on 16 px the dot of the file is 2 px: it is drawn 1.6 times bigger (RP199: the K is smaller now, so the dot grows to stay 3 px), from its bottom right corner, so that it can be seen
   $scale = $Width * $fit / 125.116
   $offsetX = ($Width - 125.116 * $scale) / 2
   $offsetY = ($Height - 111.75 * $scale) / 2 - 1.8 * $scale
@@ -179,19 +180,29 @@ function New-StateBitmap([System.Drawing.Color]$Dot, [int]$Width, [int]$Height) 
   $keyBrush = New-Object System.Drawing.SolidBrush($colors.Key)
   $dotBrush = New-Object System.Drawing.SolidBrush($Dot)
   $path = New-Object System.Drawing.Drawing2D.GraphicsPath
+  $linePath = New-Object System.Drawing.Drawing2D.GraphicsPath
+  $linePen = New-Object System.Drawing.Pen($colors.Line, 1)
   try {
     $path.AddArc([single]0, [single]0, $d, $d, 180, 90)
     $path.AddArc([single]($Width - $d), [single]0, $d, $d, 270, 90)
     $path.AddArc([single]($Width - $d), [single]($Height - $d), $d, $d, 0, 90)
     $path.AddArc([single]0, [single]($Height - $d), $d, $d, 90, 90)
     $path.CloseFigure()
+    # RP199: the line is the same rounded square, half a pixel inside, so a pen of ONE pixel covers exactly the outermost row and column of pixels
+    $ld = [single]($d - 1)
+    $linePath.AddArc([single]0.5, [single]0.5, $ld, $ld, 180, 90)
+    $linePath.AddArc([single]($Width - 0.5 - $ld), [single]0.5, $ld, $ld, 270, 90)
+    $linePath.AddArc([single]($Width - 0.5 - $ld), [single]($Height - 0.5 - $ld), $ld, $ld, 0, 90)
+    $linePath.AddArc([single]0.5, [single]($Height - 0.5 - $ld), $ld, $ld, 90, 90)
+    $linePath.CloseFigure()
     $g.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::Half   # the center of a pixel is at +0.5, as in SVG: without it everything lands half a pixel off and the corners are not clean
     $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
     $g.FillPath($backBrush, $path)
+    $g.DrawPath($linePen, $linePath)
     $g.FillPolygon($keyBrush, $points, [System.Drawing.Drawing2D.FillMode]::Winding)
     $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::None
     $g.FillRectangle($dotBrush, $dotX, $dotY, $dotPxW, $dotPxH)
-  } finally { $path.Dispose(); $dotBrush.Dispose(); $keyBrush.Dispose(); $backBrush.Dispose(); $g.Dispose() }
+  } finally { $linePen.Dispose(); $linePath.Dispose(); $path.Dispose(); $dotBrush.Dispose(); $keyBrush.Dispose(); $backBrush.Dispose(); $g.Dispose() }
   return $bmp
 }
 
