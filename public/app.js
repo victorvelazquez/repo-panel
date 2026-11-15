@@ -55,9 +55,11 @@ document.addEventListener('pointercancel', releasePress, true);
 document.addEventListener('click', (e) => {
   if (S.menu && !e.target.closest('.more')) { S.menu = null; draw(); }
   if (S.lh.menu && !e.target.closest('#listHead')) { S.lh.menu = false; draw(); } // RP121: a click outside the header closes the filter menu
+  if (S.chat.menu && !e.target.closest('#chMenuWrap')) { S.chat.menu = false; draw(); } // RP195: and one outside the session menu closes it
   const el = e.target.closest('[data-act]');
   if (!el || el.disabled) return;
   if (el.tagName === 'A') return;
+  if (S.chat.menu && el.closest('#chMenu')) { S.chat.menu = false; draw(); } // RP195: an item of the session menu closes it, then runs its action
   ACTIONS[el.dataset.act]?.(el);
 });
 
@@ -73,6 +75,7 @@ document.addEventListener('submit', (e) => {
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && S.mergeSheet) { S.mergeSheet = null; draw(); return; } // RP137: the sheet that asks before a merge closes first
   if (e.key === 'Escape' && (S.lh.menu || S.lh.search)) { S.lh.menu = false; S.lh.search = false; draw(); return; } // RP121: the bar of the repos column first
+  if (e.key === 'Escape' && S.chat.menu) { S.chat.menu = false; S.chat.menuFocus = 'btn'; draw(); return; } // RP195: then the session menu of the chat (the focus goes back to its button), and only then the chat
   if (e.key === 'Escape' && S.menu) { S.menu = null; draw(); return; }
   if (e.key === 'Escape') {
     const menu = $('#addMenu');

@@ -500,7 +500,10 @@ function drawChat() {
   // RP149: the summary row of the Tasks list sticks right under the tab bar, whatever the height of the bar is: the page measures it (the CSS has a default until then).
   const tabsBar = column ? $('#colBody .col-tabs') : null;
   if (tabsBar && tabsBar.offsetHeight > 0 && $('#col').style.setProperty) $('#col').style.setProperty('--col-tabs-h', `${tabsBar.offsetHeight}px`);
-  paint($('#chatHead'), R.chatHead(S.chat, { name: nameOf(S.chat.id), column, narrow: narrowOn(), git: columnGit(S.chat.id, facts) }));
+  const hasSession = !!(S.chat.info && S.chat.info.adopted) || !!(S.rpc[S.chat.id] && S.rpc[S.chat.id].state !== 'closed'); // RP98: a session to close
+  // RP195: the ⋮ menu of the head holds Compact, Terminal and Close session (they were buttons of the foot); the head is painted before the rest of the chat, so it gets the view of the session here.
+  paint($('#chatHead'), R.chatHead(S.chat, { name: nameOf(S.chat.id), column, narrow: narrowOn(), git: columnGit(S.chat.id, facts), menu: { open: !!S.chat.menu, session: chatView(), hasSession, terminal: S.chat.terminal, closing: !!S.chat.closing } }));
+  if (S.chat.menuFocus) { const to = S.chat.menuFocus === 'item' ? $('#chMenu [role="menuitem"]') : $('#chMenuBtn'); S.chat.menuFocus = ''; if (to && to.focus) to.focus(); } // the repaint of the head drops the focus: it goes to the first item when the menu opens, back to the button when it closes
   const tasksTab = S.chat.tab === 'tasks' && !column;
   const changesTab = S.chat.tab === 'changes' && !column; // RP92: with the column in, the files card replaces the tab
   const filesTab = S.chat.tab === 'files' && !column; // RP130: the explorer is the column's; only without it the chat keeps its Files tab
@@ -558,8 +561,7 @@ function drawChat() {
   const shown = chatView();
   const qk = R.quickOf(shown); // RP166: what the buttons under the last message hold; the click reads THIS, never the DOM
   S.quick = qk ? { id: S.chat.id, ...qk } : null;
-  const hasSession = !!(S.chat.info && S.chat.info.adopted) || !!(S.rpc[S.chat.id] && S.rpc[S.chat.id].state !== 'closed'); // RP98: a session to close
-  paint($('#sessState'), R.sessionLabelHtml({ ...shown, ci: V ? V.ciOf(columnGit(S.chat.id, facts).pr) : null }) + R.memoryChipHtml(shown) + R.ctxChipHtml(shown) + R.compactButtonHtml(shown) + R.sessionTerminalHtml(hasSession, S.chat.terminal) + R.sessionCloseHtml(hasSession, S.chat.closing)); // RP170: the label gets the CI of the PR of the CURRENT branch (the one Merge uses); it shows only while the session is idle, and holds nothing
+  paint($('#sessState'), R.sessionLabelHtml({ ...shown, ci: V ? V.ciOf(columnGit(S.chat.id, facts).pr) : null }) + R.memoryChipHtml(shown) + R.ctxChipHtml(shown)); // RP170: the label gets the CI of the PR of the CURRENT branch (the one Merge uses); it shows only while the session is idle, and holds nothing
   paint($('#termBlock'), R.terminalBlockHtml(hasSession ? S.chat.terminal : null)); // RP118: the line for a normal terminal, only while the button is open
   const body = $('#chatBody');
   const snap = chatScrollSnap(body);

@@ -16,7 +16,7 @@ const ANSWER = { available: true, cwd: 'C:\\Users\\victor\\Developer\\Tools\\rep
 test('t1: the button is there only while the repo has a session, and says what it does', () => {
   assert.equal(R.sessionTerminalHtml(false, null), '');
   const html = R.sessionTerminalHtml(true, null);
-  assert.match(html, /<button type="button" class="ss-term" data-act="session-terminal"[^>]*>Terminal<\/button>/);
+  assert.match(html, /<button type="button" class="ch-mi" role="menuitem" data-act="session-terminal"[^>]*>Terminal<\/button>/); // RP195: an item of the ⋮ menu of the head
   assert.match(html, /aria-expanded="false"/);
   assert.match(html, /title="Show the command to open this session in a normal terminal"/);
   assert.match(R.sessionTerminalHtml(true, { open: true }), /aria-expanded="true"/);
@@ -109,16 +109,19 @@ async function boot({ adopted = ADOPTED, terminal = () => Promise.resolve(ok(ANS
   return page;
 }
 const terminalCalls = (page) => page.fetches.filter((f) => f.url.startsWith('/api/terminal'));
+// RP195: Terminal is an item of the ⋮ menu of the head of the chat (it was a button of the foot): open the menu once and read the head.
+const menuOf = async (page) => { if (!page.run('!!S.chat.menu')) { page.run("ACTIONS['ch-menu']({ dataset: {} })"); await page.tick(); } return page.get('#chatHead').html; };
 
-test('t7: with a session the Terminal button is drawn next to Close session; with none it is not, and opening the chat reads nothing', async () => {
+test('t7: with a session Terminal is an item of the ⋮ menu, before Close session, and not in the foot; with none it is not there, and opening the chat reads nothing', async () => {
   const page = await boot();
-  const state = page.get('#sessState').html;
+  assert.doesNotMatch(page.get('#sessState').html, /session-terminal/, 'not in the foot any more');
+  const state = await menuOf(page);
   assert.match(state, /data-act="session-terminal"/);
   assert.ok(state.indexOf('session-terminal') < state.indexOf('session-close'), 'before Close session');
   assert.equal(terminalCalls(page).length, 0, 'no request until the click');
   assert.equal(page.get('#termBlock').html, '');
   const none = await boot({ adopted: null });
-  assert.doesNotMatch(none.get('#sessState').html, /session-terminal/);
+  assert.doesNotMatch(await menuOf(none), /session-terminal/);
 });
 
 test('t8: the click reads the line of THIS repo once, shows it, and a second click hides it', async () => {
@@ -130,7 +133,7 @@ test('t8: the click reads the line of THIS repo once, shows it, and a second cli
   assert.equal(calls[0].method, 'GET');
   assert.equal(calls[0].url, '/api/terminal?id=abc');
   assert.match(page.get('#termBlock').html, /Set-Location -LiteralPath/);
-  assert.match(page.get('#sessState').html, /aria-expanded="true"/);
+  assert.match(await menuOf(page), /data-act="session-terminal" aria-expanded="true"/);
   page.run("ACTIONS['session-terminal']()");
   await page.tick();
   assert.equal(page.get('#termBlock').html, '');
@@ -195,7 +198,7 @@ test('t13: Hide closes the block; the button, the block and the actions exist in
   const html = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'public', 'index.html'), 'utf8');
   assert.match(html, /<div id="termBlock" class="term-block"><\/div>/);
   const css = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'public', 'style.css'), 'utf8').replace(/\r\n/g, '\n');
-  assert.match(css, /\.ss-term \{[^}]*margin-left: auto/);
+  assert.match(css, /\.ch-mi \{[^}]*text-align: left/); // RP195: the Terminal item is styled like the other items of the menu
   assert.match(css, /\.term-block:empty \{[^}]*display: none/);
   assert.match(css, /\.term-cmd \{[^}]*user-select: all/);
   assert.match(css, /\.term-cmd \{[^}]*white-space: pre-wrap/);
