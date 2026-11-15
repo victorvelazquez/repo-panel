@@ -137,7 +137,7 @@ const cs = (c) => R.composerState({ id: 'r1', sending: false, ...c }, { name: 'a
 test('composerState: canSend for a loaded chat whose session is idle or not started (sending starts it), not while sending, starting, working or asking', () => {
   const rpc = (state) => ({ state });
   assert.equal(cs({ info: adoptedInfo(), rpc: rpc('idle') }).canSend, true);
-  assert.match(cs({ info: adoptedInfo(), rpc: rpc('idle') }).placeholder, /alpha/);
+  assert.equal(cs({ info: adoptedInfo(), rpc: rpc('idle') }).placeholder, 'Message…');
   assert.equal(cs({ info: info(), rpc: rpc('closed') }).canSend, false, 'RP99: not adopted (the list is in view): open a session or start a new one first');
   assert.equal(cs({ info: adoptedInfo() }).canSend, false, 'no rpc entry yet: the status read has not answered');
   assert.equal(cs({ info: adoptedInfo() }).reason, 'The session state is unknown');
@@ -145,20 +145,20 @@ test('composerState: canSend for a loaded chat whose session is idle or not star
   for (const st of ['starting', 'busy', 'asking']) assert.equal(cs({ info: adoptedInfo(), rpc: rpc(st) }).canSend, false, st);
   assert.equal(cs({ info: null }).canSend, false);
 });
-test('composerState: one distinct, non-empty reason per blocked case and a non-empty placeholder always', () => {
+test('composerState: one distinct, non-empty reason per blocked case; the placeholder is empty (RP207) except to start a session', () => {
   const cases = {
     notLoaded: cs({ info: null }), sending: cs({ info: adoptedInfo(), rpc: { state: 'idle' }, sending: true }),
     starting: cs({ info: adoptedInfo(), rpc: { state: 'starting' } }), working: cs({ info: adoptedInfo(), rpc: { state: 'busy' } }), asking: cs({ info: adoptedInfo(), rpc: { state: 'asking' } }),
   };
   for (const [k, v] of Object.entries(cases)) {
     assert.ok(v.reason && typeof v.reason === 'string', `${k} has a reason`);
-    assert.ok(v.placeholder && typeof v.placeholder === 'string', `${k} has a placeholder`);
+    assert.equal(v.placeholder, '', `${k} has a quiet placeholder`);
   }
   assert.equal(new Set(Object.values(cases).map((v) => v.reason)).size, 5);
   assert.equal(cases.working.reason, WORKING);
   assert.equal(cases.asking.reason, 'pi is asking something: answer it in the card of the chat');
   assert.equal(cases.sending.reason, 'Sending…');
-  assert.ok(cs({ info: adoptedInfo(), rpc: { state: 'idle' } }).placeholder.length > 0);
+  assert.equal(cs({ info: adoptedInfo(), rpc: { state: 'idle' } }).placeholder, 'Message…');
 });
 // ---------- actionMenu ----------
 const NEXT = { id: 'RP9', entrega: 'The thing', resultadoVisible: 'x' };

@@ -112,9 +112,12 @@ document.addEventListener('keydown', (e) => {
   if (box.setSelectionRange) box.setSelectionRange(step.text.length, step.text.length);
 });
 
-// Enter in the message box sends it; Shift+Enter is a new line and an IME composition is left alone.
+// Enter in the message box sends it; Shift+Enter is a new line and an IME composition is left alone. RP207: with a finger as the pointer a plain Enter is a new line too (Ctrl/Cmd+Enter sends).
 document.addEventListener('keydown', (e) => {
-  if (e.key !== 'Enter' || !e.target || e.target.id !== 'msgBox' || e.shiftKey || e.isComposing || e.keyCode === 229) return;
+  if (e.key !== 'Enter' || !e.target || e.target.id !== 'msgBox' || e.keyCode === 229) return;
+  const coarse = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+  const sends = V && V.enterSends ? V.enterSends({ shift: e.shiftKey, ctrl: e.ctrlKey, meta: e.metaKey, composing: e.isComposing, coarse }) : !e.shiftKey && !e.isComposing; // without the helper the old rule holds
+  if (!sends) return;
   e.preventDefault();
   sendChatMessage();
 });

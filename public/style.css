@@ -876,7 +876,7 @@ button.tc:hover { border-color: var(--muted); }
 
 /* RP68: the composer at the bottom of the chat and its "/ Actions" menu (opens upwards, anchored to the bar). */
 #chat .ch-body { flex: 1 1 0; }
-.composer { container-type: inline-size; container-name: cmp; flex: none; margin: 0 12px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); padding: 8px 8px 6px; display: grid; gap: 6px; }
+.composer { container-type: inline-size; container-name: cmp; flex: none; margin: 0 max(12px, env(safe-area-inset-right, 0px)) max(12px, env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px)); border: 1px solid var(--line); border-radius: 12px; background: var(--bg); padding: 8px 8px 6px; display: grid; gap: 6px; }
 .sess-state { min-height: 18px; padding: 0 6px; font-size: 12px; color: var(--muted); }
 .ss { display: inline-flex; align-items: center; gap: 5px; }
 .ss-dot { font-style: normal; display: inline-block; }
@@ -899,6 +899,7 @@ button.tc:hover { border-color: var(--muted); }
 @container cmp (max-width: 456px) {
   .ss-word, .mem-word { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 }
+@media (pointer: coarse) { .composer { border-radius: 16px; } } /* RP207: a phone has rounded screen corners */
 .composer:focus-within { border-color: var(--blue); }
 .composer textarea { width: 100%; min-height: 42px; max-height: 150px; resize: none; border: 0; background: transparent; color: var(--text); font: inherit; padding: 4px 6px; }
 .composer textarea:focus-visible { outline: none; }
