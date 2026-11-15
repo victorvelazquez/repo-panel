@@ -924,7 +924,7 @@ button.tc:hover { border-color: var(--muted); }
   .ch-tabs { order: 1; flex: 1 1 auto; min-width: 0; flex-wrap: nowrap; align-self: stretch; align-items: stretch; padding: 0; overflow: hidden; }
   .ch-tab { padding: 0 12px; }
   .ch-dtab { align-items: stretch; }
-  .ch-repo, .ch-menu, .ch-row .x { order: 2; }
+  .ch-repo, .ch-menu, .ch-chips, .ch-row .x { order: 2; }
   #sumLayout[data-screen="duo"] .ch-back { min-height: 0; align-self: stretch; }
   .col-tabs { height: var(--head-h); }
 }
@@ -947,3 +947,11 @@ button.tc:hover { border-color: var(--muted); }
 .ch-mi:hover:not(:disabled) { background: var(--panel); border-color: var(--line); }
 .ch-mi:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
 @media (pointer: coarse) { .ch-mi { min-height: 44px; } }
+
+/* RP197: the indicators of the head of the chat. The chips (the context, and the memory or the checks only when something is wrong) hide their words the accessible way: the icon and the number stay. In the ⋮ menu the states are icons with a tone, side by side. */
+.ch-chips { display: inline-flex; align-items: center; gap: 6px; flex: none; }
+.ch-chips .mem-word, .ch-chips .ss-word, .ch-chips .ss-n { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.ch-status { display: flex; align-items: center; gap: 12px; padding: 6px 10px 8px; margin-bottom: 4px; border-bottom: 1px solid var(--line); }
+.ch-st { display: inline-flex; color: var(--muted); }
+.ch-st-warn { color: var(--yellow); }
+.ch-st-bad { color: var(--red); }

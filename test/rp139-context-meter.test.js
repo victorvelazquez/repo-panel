@@ -355,8 +355,9 @@ test('page (real): opening a chat asks once and draws ctx 62% next to the state 
   await page.open();
   assert.equal(page.ctxCalls().length, 1);
   assert.equal(page.ctxCalls()[0], `/api/rpc/context?id=${ID}`);
-  const html = page.get('#sessState').html;
-  assert.match(html, /class="ss /);
+  const html = page.get('#chatHead').html; // RP197: the context chip is in the head of the chat, not in the foot
+  assert.match(page.get('#sessState').html, /class="ss /, 'the state of the session stays in the foot');
+  assert.doesNotMatch(page.get('#sessState').html, /ctx/, 'and the foot has no context chip');
   assert.match(html, /ctx <\/span>62%/); // RP156: the word «ctx» is in its own span
   assert.match(html, /title="Context used by this session: 124k of 200k tokens"/);
 });
@@ -364,13 +365,13 @@ test('page (real): a closed session asks nothing and draws nothing', async () =>
   const page = await chatPage({ state: 'closed' });
   await page.open();
   assert.equal(page.ctxCalls().length, 0);
-  assert.doesNotMatch(page.get('#sessState').html, /ctx/);
+  assert.doesNotMatch(page.get('#chatHead').html, /ctx/);
 });
 test('page (real): unknown after a compaction reads ctx — and is never 0', async () => {
   const page = await chatPage({ context: { tokens: null, percent: null, window: null } });
   await page.open();
-  assert.match(page.get('#sessState').html, /ctx <\/span>—/); // RP156: the word «ctx» is in its own span
-  assert.doesNotMatch(page.get('#sessState').html, /ctx <\/span>0/);
+  assert.match(page.get('#chatHead').html, /ctx <\/span>—/); // RP156: the word «ctx» is in its own span
+  assert.doesNotMatch(page.get('#chatHead').html, /ctx <\/span>0/);
 });
 test('page (real): it asks again after agent_end, agent_settled and compaction_end, and for nothing else', async () => {
   const page = await chatPage();
@@ -408,7 +409,7 @@ test('page (real): a run that ends in a repo that is not open asks nothing; a se
   await page.rpc(ID, 'exit');
   await page.rpc(ID, 'event', { type: 'compaction_end', reason: 'manual' });
   assert.equal(page.ctxCalls().length, base, 'closed after an exit');
-  assert.doesNotMatch(page.get('#sessState').html, /ctx/);
+  assert.doesNotMatch(page.get('#chatHead').html, /ctx/);
   page.run(`S.rpc['${ID}'] = { ...S.rpc['${ID}'], state: 'starting' }; loadContext('${ID}')`);
   await page.tick();
   assert.equal(page.ctxCalls().length, base, 'starting');
@@ -424,14 +425,14 @@ test('page (real): a late answer for a repo the person already left is never pai
   await page.open(ID2);
   release({ tokens: 10, percent: 99, window: 100 });
   await page.tick();
-  assert.doesNotMatch(page.get('#sessState').html, /ctx <\/span>99%/); // RP156: the word «ctx» is in its own span
-  assert.match(page.get('#sessState').html, /ctx <\/span>11%/, 'the open repo shows its own reading');
+  assert.doesNotMatch(page.get('#chatHead').html, /ctx <\/span>99%/); // RP156: the word «ctx» is in its own span
+  assert.match(page.get('#chatHead').html, /ctx <\/span>11%/, 'the open repo shows its own reading');
   assert.equal(page.run(`S.rpc['${ID}'] && S.rpc['${ID}'].ctx`) || null, null, 'the repo that was left keeps no reading either');
 });
 test('page (real): a failed read draws ctx — instead of an old number', async () => {
   const page = await chatPage({ context: () => Promise.reject(new Error('down')) });
   await page.open();
-  assert.match(page.get('#sessState').html, /ctx <\/span>—/); // RP156: the word «ctx» is in its own span
+  assert.match(page.get('#chatHead').html, /ctx <\/span>—/); // RP156: the word «ctx» is in its own span
 });
 
 // ---------- wording and the closing of the unit ----------

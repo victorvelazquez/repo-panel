@@ -474,10 +474,10 @@ async function chatPage({ state = 'idle', status, compact = { compacted: true },
   return page;
 }
 
-test('page (real): an idle session offers Compact in the menu of the head (the ctx chip stays in the foot), and one click posts once with no force', async () => {
+test('page (real): an idle session offers Compact in the menu of the head (the ctx chip is in the head too, RP197), and one click posts once with no force', async () => {
   const page = await chatPage();
   await page.open();
-  assert.match(page.bar(), /ctx <\/span>62%/); // RP156: the word «ctx» is in its own span
+  assert.match(page.get('#chatHead').html, /ctx <\/span>62%/); // RP156: the word «ctx» is in its own span
   assert.match(await page.menuBar(), /data-act="compact"/);
   assert.doesNotMatch(page.bar(), /data-act="compact"/, 'RP195: Compact is not in the foot any more');
   await page.click();
@@ -554,8 +554,8 @@ test('page (real): right after a compaction the chip still reads ctx — and nev
   await page.open();
   await page.click();
   await page.rpc(ID, 'event', { type: 'compaction_end', reason: 'manual' });
-  assert.match(page.bar(), /ctx <\/span>—/); // RP156
-  assert.doesNotMatch(page.bar(), /ctx <\/span>0/);
+  assert.match(page.get('#chatHead').html, /ctx <\/span>—/); // RP156
+  assert.doesNotMatch(page.get('#chatHead').html, /ctx <\/span>0/);
 });
 test('page (real): a refusal or a failure shows the fixed message under the box and the state comes back from the status', async () => {
   const page = await chatPage({ compact: { __status: 409, json: { error: 'The context is already compacted' } } });

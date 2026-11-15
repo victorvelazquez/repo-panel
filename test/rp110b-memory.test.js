@@ -261,9 +261,10 @@ async function chatPage(rpcStatus) {
 
 test('page (real): opening a chat whose status says offline draws the chip next to the state of the session; with no memory in the status there is no chip', async () => {
   const bad = await chatPage({ state: 'idle', pendingDialogs: [], sessionId: 's1', memory: 'offline' });
-  assert.match(bad.get('#sessState').html, /class="mem mem-bad"[^>]*><i [\s\S]*<span class="mem-word">memory offline<\/span>/); // RP156
+  assert.match(bad.get('#chatHead').html, /class="mem mem-bad"[^>]*><i [\s\S]*<span class="mem-word">memory offline<\/span>/); // RP156
   assert.match(bad.get('#sessState').html, /class="ss /);
+  assert.doesNotMatch(bad.get('#sessState').html, /class="mem/, 'RP197: the memory chip is in the head, not in the foot');
   const none = await chatPage({ state: 'idle', pendingDialogs: [], sessionId: 's1' });
-  assert.doesNotMatch(none.get('#sessState').html, /class="mem /);
+  assert.doesNotMatch(none.get('#chatHead').html, /class="mem /);
   assert.match(none.get('#sessState').html, /class="ss /);
 });
