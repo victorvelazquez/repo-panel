@@ -1,17 +1,24 @@
 # Notification-area (tray) icon for repo-panel: open the panel, start it or restart it without hunting processes.
 # Windows only. Install it at logon with install-tray.ps1. -SelfTest prints facts as JSON and creates no window. -RenderIcons <size> draws both icons at that size and prints
 # their pixels as JSON (no window, nothing written): the dot of the icon is blue while the panel runs and soft red while it is stopped (RP187; light gray is the other option, see Get-TrayColors).
+# RP200: the menu has Restart tray. The tray reads this script ONCE, when it starts; Restart tray starts a NEW tray (a child of this one, like the task starts it) with -ReplacePid <this process>, which waits for
+# this process to END before it takes the single-instance lock (-ReplaceWaitSeconds is how long it waits), and then this one leaves. Before that the script on disk is tried in the dry way (-CheckScript <path>
+# prints { ok } after running that script with -SelfTest; -ReplaceWaitSeconds is also its time limit); -SelfTestReplace waits like the new tray would and prints { replaced, waitedMs }: neither opens a window or takes the lock.
 param(
   [string]$ConfigPath = $(if ($env:REPO_PANEL_CONFIG) { $env:REPO_PANEL_CONFIG } else { Join-Path (Split-Path -Parent $PSScriptRoot) 'config.json' }),
   [switch]$SelfTest,
   [switch]$SelfTestRestart,
-  [int]$RenderIcons = 0
+  [int]$RenderIcons = 0,
+  [int]$ReplacePid = 0,
+  [int]$ReplaceWaitSeconds = 20,
+  [string]$CheckScript = '',
+  [switch]$SelfTestReplace
 )
 $ErrorActionPreference = 'Stop'
 
 $script:root = Split-Path -Parent $PSScriptRoot
 $script:taskName = 'repo-panel'
-$script:menuLabels = @('Open panel', 'Restart panel', 'Start panel', 'Quit tray')
+$script:menuLabels = @('Open panel', 'Restart panel', 'Start panel', 'Restart tray', 'Quit tray')
 
 function Get-PanelPort {
   $port = 4310
@@ -124,6 +131,52 @@ function Invoke-PanelStart([int]$Port, [scriptblock]$Pump) {
   return "repo-panel did not answer on port $Port within 15 s."
 }
 
+# RP200: true when the process $ProcessId is gone (it never was, or it ended within $Seconds); false when it is still alive after that. The new tray waits like this for the old one before it takes the lock.
+function Wait-ProcessEnd([int]$ProcessId, [int]$Seconds) {
+  $end = [DateTime]::UtcNow.AddSeconds($Seconds)
+  while ([DateTime]::UtcNow -lt $end) {
+    if (-not (Get-Process -Id $ProcessId -ErrorAction SilentlyContinue)) { return $true }
+    Start-Sleep -Milliseconds 150
+  }
+  return -not (Get-Process -Id $ProcessId -ErrorAction SilentlyContinue)
+}
+
+# RP200: the dry run. Runs the script at $Path with -SelfTest (it must load and answer, with exit code 0) in a hidden process with a time limit, and ends it if it hangs. A script that does not even load never replaces the tray that works.
+function Test-TrayScript([string]$Path, [int]$Seconds = 20) {
+  $result = [ordered]@{ ok = $false; seconds = 0 }
+  if (-not (Test-Path -LiteralPath $Path)) { return $result }
+  $watch = [System.Diagnostics.Stopwatch]::StartNew()
+  $powershell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+  $sink = Join-Path ([System.IO.Path]::GetTempPath()) "repo-panel-tray-check-$PID.txt"
+  try {
+    $p = Start-Process -FilePath $powershell -ArgumentList "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$Path`" -SelfTest" -WindowStyle Hidden -PassThru -RedirectStandardOutput $sink
+    $null = $p.Handle   # keeps the handle: without it the exit code of a process that has already ended reads as empty
+    if (-not $p.WaitForExit($Seconds * 1000)) { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue } else { $result.ok = ($p.ExitCode -eq 0) }
+  } catch { $result.ok = $false } finally {
+    Remove-Item -LiteralPath $sink -Force -ErrorAction SilentlyContinue
+    $result.seconds = [Math]::Round($watch.Elapsed.TotalSeconds, 1)
+  }
+  return $result
+}
+
+# RP200: starts the NEW tray the way the task starts it (conhost --headless, the full path of powershell: conhost cannot run a shim), in the folder of the repo, with the process to wait for. The task refuses a second
+# instance (MultipleInstances: IgnoreNew), so the new tray is a child of this one; measured on this PC, such a child outlives the end of the task instance.
+function Start-NewTray([int]$OldPid) {
+  $powershell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+  Start-Process -FilePath 'conhost.exe' -ArgumentList "--headless `"$powershell`" -NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" -ReplacePid $OldPid" `
+    -WorkingDirectory $script:root -WindowStyle Hidden | Out-Null
+}
+
+# RP200: Restart tray. The script on disk is tried first; only then is the child started, and only after the child was started does the caller leave. Any failure leaves this tray where it was and says why.
+function Invoke-TrayRestart {
+  $result = [ordered]@{ restarted = $false; message = '' }
+  $check = Test-TrayScript $PSCommandPath
+  if (-not $check.ok) { $result.message = 'The tray script on disk does not load: the tray was not restarted.'; return $result }
+  try { Start-NewTray $PID } catch { $result.message = "The new tray could not start: $($_.Exception.Message)"; return $result }
+  $result.restarted = $true
+  return $result
+}
+
 Add-Type -AssemblyName System.Drawing
 
 # The colors of the icon (RP187): the dark of the panel (--bg of public/style.css, as in icon.svg), the K in near-white and a dot that tells the state: blue while the panel runs and a soft
@@ -206,6 +259,21 @@ function New-StateBitmap([System.Drawing.Color]$Dot, [int]$Width, [int]$Height) 
   return $bmp
 }
 
+if ($CheckScript) {
+  # -CheckScript <path>: the dry run of Restart tray (-ReplaceWaitSeconds is its time limit). No window, no lock, nothing started but the hidden check.
+  $r = Test-TrayScript $CheckScript $ReplaceWaitSeconds
+  $r | ConvertTo-Json -Compress
+  exit 0
+}
+
+if ($SelfTestReplace) {
+  # -SelfTestReplace: waits for -ReplacePid like the new tray does, and says whether it ended. No window, no lock.
+  $watch = [System.Diagnostics.Stopwatch]::StartNew()
+  $ended = if ($ReplacePid -gt 0) { Wait-ProcessEnd $ReplacePid $ReplaceWaitSeconds } else { $true }
+  [ordered]@{ replaced = [bool]$ended; waitedMs = $(if ($ReplacePid -gt 0) { [int]$watch.ElapsedMilliseconds } else { 0 }) } | ConvertTo-Json -Compress
+  exit 0
+}
+
 if ($SelfTest -or $SelfTestRestart) {
   $port = Get-PanelPort
   if ($SelfTestRestart) {
@@ -259,6 +327,11 @@ Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 Add-Type -Namespace RepoPanel -Name Native -MemberDefinition '[System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool DestroyIcon(System.IntPtr handle);'
 
+# RP200: a tray started by Restart tray waits for the old one to END before it takes the lock (the old one released it when it left); if the old one does not end in time it leaves quietly and the old one stays.
+if ($ReplacePid -gt 0) {
+  if (-not (Wait-ProcessEnd $ReplacePid $ReplaceWaitSeconds)) { exit 0 }
+}
+
 $created = $false
 $mutex = New-Object System.Threading.Mutex($true, 'Local\repo-panel-tray', [ref]$created)
 if (-not $created) { $mutex.Dispose(); exit 0 }
@@ -283,8 +356,9 @@ $menu = New-Object System.Windows.Forms.ContextMenuStrip
 $itemOpen = $menu.Items.Add($script:menuLabels[0])
 $itemRestart = $menu.Items.Add($script:menuLabels[1])
 $itemStart = $menu.Items.Add($script:menuLabels[2])
+$itemRestartTray = $menu.Items.Add($script:menuLabels[3])
 [void]$menu.Items.Add('-')
-$itemQuit = $menu.Items.Add($script:menuLabels[3])
+$itemQuit = $menu.Items.Add($script:menuLabels[4])
 $notify.ContextMenuStrip = $menu
 
 function Show-Balloon([string]$Text) {
@@ -319,6 +393,11 @@ $itemRestart.add_Click({ Invoke-Safe {
 } })
 $itemStart.add_Click({ Invoke-Safe {
   Show-Balloon (Invoke-PanelStart $script:port $pump)
+} })
+$itemRestartTray.add_Click({ Invoke-Safe {
+  Show-Balloon 'Restarting the tray...'
+  $r = Invoke-TrayRestart
+  if ($r.restarted) { $context.ExitThread() } else { Show-Balloon $r.message }
 } })
 $menu.add_Opening({ try { Update-State } catch { } })
 

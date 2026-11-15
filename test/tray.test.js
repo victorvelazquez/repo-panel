@@ -94,7 +94,7 @@ test('tray -SelfTest: reads the port from the config and sees the healthy throwa
   assert.equal(j.healthy, true);
   assert.ok(j.listeners.includes(panel.pid));
   assert.ok(j.ownedListeners.includes(panel.pid));
-  assert.deepEqual(j.menu, ['Open panel', 'Restart panel', 'Start panel', 'Quit tray']);
+  assert.deepEqual(j.menu, ['Open panel', 'Restart panel', 'Start panel', 'Restart tray', 'Quit tray']); // RP200: Restart tray
   assert.equal(typeof j.task, 'boolean');
   assert.equal(r.out.split(/\r?\n/).length, 1, 'exactly one line of output');
 });
