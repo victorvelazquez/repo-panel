@@ -502,7 +502,9 @@ function drawChat() {
   if (tabsBar && tabsBar.offsetHeight > 0 && $('#col').style.setProperty) $('#col').style.setProperty('--col-tabs-h', `${tabsBar.offsetHeight}px`);
   const hasSession = !!(S.chat.info && S.chat.info.adopted) || !!(S.rpc[S.chat.id] && S.rpc[S.chat.id].state !== 'closed'); // RP98: a session to close
   // RP195: the ⋮ menu of the head holds Compact, Terminal and Close session (they were buttons of the foot); the head is painted before the rest of the chat, so it gets the view of the session here.
-  paint($('#chatHead'), R.chatHead(S.chat, { name: nameOf(S.chat.id), column, narrow: narrowOn(), git: columnGit(S.chat.id, facts), menu: { open: !!S.chat.menu, session: chatView(), hasSession, terminal: S.chat.terminal, closing: !!S.chat.closing } }));
+  const headGit = columnGit(S.chat.id, facts);
+  const headView = chatView();
+  paint($('#chatHead'), R.chatHead(S.chat, { name: nameOf(S.chat.id), column, narrow: narrowOn(), git: headGit, session: headView, ci: V ? V.ciOf(headGit.pr) : null, menu: { open: !!S.chat.menu, session: headView, git: headGit, hasSession, terminal: S.chat.terminal, closing: !!S.chat.closing } })); // RP197: the indicators are in the head, and the icons of the menu need the git (the checks)
   if (S.chat.menuFocus) { const to = S.chat.menuFocus === 'item' ? $('#chMenu [role="menuitem"]') : $('#chMenuBtn'); S.chat.menuFocus = ''; if (to && to.focus) to.focus(); } // the repaint of the head drops the focus: it goes to the first item when the menu opens, back to the button when it closes
   const tasksTab = S.chat.tab === 'tasks' && !column;
   const changesTab = S.chat.tab === 'changes' && !column; // RP92: with the column in, the files card replaces the tab
@@ -561,7 +563,7 @@ function drawChat() {
   const shown = chatView();
   const qk = R.quickOf(shown); // RP166: what the buttons under the last message hold; the click reads THIS, never the DOM
   S.quick = qk ? { id: S.chat.id, ...qk } : null;
-  paint($('#sessState'), R.sessionLabelHtml({ ...shown, ci: V ? V.ciOf(columnGit(S.chat.id, facts).pr) : null }) + R.memoryChipHtml(shown) + R.ctxChipHtml(shown)); // RP170: the label gets the CI of the PR of the CURRENT branch (the one Merge uses); it shows only while the session is idle, and holds nothing
+  paint($('#sessState'), R.sessionLabelHtml({ ...shown, ci: V ? V.ciOf(columnGit(S.chat.id, facts).pr) : null })); // RP170: the label gets the CI of the PR of the CURRENT branch (the one Merge uses); it shows only while the session is idle, and holds nothing
   paint($('#termBlock'), R.terminalBlockHtml(hasSession ? S.chat.terminal : null)); // RP118: the line for a normal terminal, only while the button is open
   const body = $('#chatBody');
   const snap = chatScrollSnap(body);

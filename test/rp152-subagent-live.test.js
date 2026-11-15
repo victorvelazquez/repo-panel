@@ -294,7 +294,8 @@ test('p7: the existing state label is unchanged by this row: Working…, Idle an
   await page.open();
   assert.match(page.state(), /Working…/);
   await page.rpc(ID, { kind: 'memory', memory: 'ready' });
-  assert.match(page.state(), /memory ready/);
+  assert.doesNotMatch(page.state(), /memory ready/, 'RP197: the memory is not a chip of the foot any more');
+  assert.doesNotMatch(page.get('#chatHead').html, /memory ready/, 'and the head is quiet while it is ready');
   assert.doesNotMatch(page.state(), /Subagent/);
 });
 

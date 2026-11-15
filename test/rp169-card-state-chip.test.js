@@ -136,7 +136,7 @@ test('c12: the words of the chip are hidden only inside the composer container, 
   assert.match(css, /\.composer \{[^}]*container-name: cmp;/);
   const hide = /@container cmp \([^)]*\) \{\s*[^}]*\.ss-word[^}]*\}/.exec(css);
   assert.ok(hide, 'the collapse rule exists');
-  const outside = css.replace(hide[0], '');
+  const outside = css.replace(hide[0], '').replace(/[^\n]*\.ch-chips[^\n]*\n/g, ''); // RP197: the head of the chat hides the words of its chips in its own rule, also never on the card
   assert.doesNotMatch(outside, /[^\n]*\.ss-word[^\n]*\{[^}]*(clip-path|display: none|visibility: hidden|width: 1px)/, 'no other rule hides the word');
   for (const sel of ['.rs-list', '.rs-card', '.rs-l1']) assert.doesNotMatch(css, new RegExp(`${sel.replace('.', '\\.')}[^{]*\\{[^}]*container-name: cmp`), sel);
   assert.match(css, /\.ss \{ display: inline-flex;/);

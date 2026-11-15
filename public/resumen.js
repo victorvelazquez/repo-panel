@@ -373,12 +373,12 @@
     failed: { tone: 'red', icon: ICON_CK.failed, word: 'Checks Failed', said: 'failed', anim: '', title: 'failed' },
   };
   const whole = (v) => (Number.isSafeInteger(v) && v > 0 ? v : 0);
-  function ciLabel(ci) {
+  function ciLabel(ci, opts) {
     if (!ci || typeof ci !== 'object' || !Object.hasOwn(CI_LABEL, ci.kind) || !Number.isSafeInteger(ci.number)) return '';
     const L = CI_LABEL[ci.kind];
     const [count, passed, total] = [ci.kind === 'running' ? ci.pending : ci.failed, ci.passed, ci.total].map(whole);
     const title = `PR #${ci.number}: the checks ${L.title} (${count} ${L.said}, ${passed} of ${total} passed)`;
-    return `<span class="ss ss-${L.tone} ss-ci${L.anim}" role="status" title="${esc(title)}"><i class="ss-dot" aria-hidden="true">${L.icon}</i> <span class="ss-word">${L.word}</span><span class="ss-n"> · ${count} ${L.said} · ${passed}/${total}</span></span>`;
+    return `<span class="ss ss-${L.tone} ss-ci${L.anim}"${opts && opts.head ? '' : ' role="status"'} title="${esc(title)}"><i class="ss-dot" aria-hidden="true">${L.icon}</i> <span class="ss-word">${L.word}</span><span class="ss-n"> · ${count} ${L.said} · ${passed}/${total}</span></span>`;
   }
   const sessionLabelHtml = (c) => {
     const s = sessionState(c);
@@ -394,9 +394,10 @@
     error: ['mem-bad', 'memory error', 'The memory of this session reported an error'],
     disabled: ['mem-warn', 'memory disabled', 'The memory is disabled for this session: it will not remember anything'],
   };
-  const memoryChipHtml = (c) => {
+  const memoryChipHtml = (c, opts) => {
     const r = c && c.rpc && typeof c.rpc === 'object' ? c.rpc : null;
     if (!r || r.state === 'closed' || typeof r.memory !== 'string' || !Object.hasOwn(MEMORY_CHIP, r.memory)) return '';
+    if (opts && opts.quiet === true && r.memory === 'ready') return ''; // RP197: the head says nothing while the memory is fine
     const [cls, word, title] = MEMORY_CHIP[r.memory];
     return `<span class="mem ${cls}" title="${esc(title)}"><i class="mem-ic" aria-hidden="true">${MEMORY_ICON[r.memory]}</i> <span class="mem-word">${word}</span></span>`; // RP156: the memory chip gets an icon too
   };
@@ -404,16 +405,41 @@
   // RP139: the share of the context window the session uses, as a chip next to the memory one. c.rpc.ctx holds three validated numbers (V.rpcWithContext); unknown (null) reads `ctx —`, never 0.
   // Quiet below 70%, warning from 70%, strong warning from 90%: icon + number + words in the help, never colour alone. Nothing is drawn while the session is closed or starting, or before the first reading.
   const kTokens = (n) => (n >= 1000 ? `${Math.round(n / 1000)}k` : String(n));
-  const ctxChipHtml = (c) => {
+  // RP197: what the context says, for the chip and for the icon of the menu: null with nothing to say, { unknown, title } before the first reading, else { p, cls, kind, title }.
+  const ctxLevel = (c) => {
     const r = c && c.rpc && typeof c.rpc === 'object' ? c.rpc : null;
     const x = r && r.ctx && typeof r.ctx === 'object' ? r.ctx : null;
-    if (!x || r.state === 'closed' || r.state === 'starting') return '';
+    if (!x || r.state === 'closed' || r.state === 'starting') return null;
     const ok = (v) => typeof v === 'number' && Number.isFinite(v) && v >= 0;
-    if (!ok(x.percent) || !Number.isSafeInteger(x.window) || x.window <= 0) return '<span class="mem ctx" title="Context usage is unknown until the next answer"><i class="mem-ic" aria-hidden="true">' + ctxIcon('unknown', 0) + '</i> <span class="mem-word">ctx </span>—</span>';
+    if (!ok(x.percent) || !Number.isSafeInteger(x.window) || x.window <= 0) return { unknown: true, title: 'Context usage is unknown until the next answer' };
     const p = Math.min(100, x.percent);
     const [cls, kind, more] = p >= 90 ? ['mem-bad', 'bad', ' (almost full)'] : p >= 70 ? ['mem-warn', 'warn', ' (getting full)'] : ['', 'ok', '']; // RP156: the shape says the level, not only the colour
     const used = ok(x.tokens) ? kTokens(x.tokens) : `${Math.round(p)}%`;
-    return `<span class="mem ctx${cls ? ` ${cls}` : ''}" title="${esc(`Context used by this session: ${used} of ${kTokens(x.window)} tokens${more}`)}"><i class="mem-ic" aria-hidden="true">${ctxIcon(kind, Math.round(p))}</i> <span class="mem-word">ctx </span>${Math.round(p)}%</span>`;
+    return { p: Math.round(p), cls, kind, title: `Context used by this session: ${used} of ${kTokens(x.window)} tokens${more}` };
+  };
+  const ctxChipHtml = (c) => {
+    const l = ctxLevel(c);
+    if (!l) return '';
+    if (l.unknown) return '<span class="mem ctx" title="' + l.title + '"><i class="mem-ic" aria-hidden="true">' + ctxIcon('unknown', 0) + '</i> <span class="mem-word">ctx </span>—</span>';
+    return `<span class="mem ctx${l.cls ? ` ${l.cls}` : ''}" title="${esc(l.title)}"><i class="mem-ic" aria-hidden="true">${ctxIcon(l.kind, l.p)}</i> <span class="mem-word">ctx </span>${l.p}%</span>`;
+  };
+  // RP197: the chips of the head of the chat. Silence when all is well: the context (once read), the memory only when it is not ready, the checks only while they run or fail (ciOf is null on green).
+  const headChipsHtml = (c, ci) => ctxChipHtml(c) + memoryChipHtml(c, { quiet: true }) + ciLabel(ci, { head: true });
+  // RP197: the states as ICONS with no text, side by side, for the top of the ⋮ menu: the memory (also when it is ready), the context and the checks of the PR. Each has its name (aria-label and tooltip, the same words) and a tone.
+  const statusIconsHtml = (c, g) => {
+    const r = c && c.rpc && typeof c.rpc === 'object' ? c.rpc : null;
+    const out = [];
+    const add = (tone, label, icon) => out.push(`<span class="ch-st ch-st-${tone}" role="img" aria-label="${esc(label)}" title="${esc(label)}">${icon}</span>`);
+    if (r && r.state !== 'closed' && typeof r.memory === 'string' && Object.hasOwn(MEMORY_CHIP, r.memory)) add(r.memory === 'ready' ? 'ok' : r.memory === 'disabled' ? 'warn' : 'bad', MEMORY_CHIP[r.memory][2], MEMORY_ICON[r.memory]);
+    const l = ctxLevel(c);
+    if (l) add(l.unknown || l.kind === 'ok' ? 'ok' : l.kind, l.title, l.unknown ? ctxIcon('unknown', 0) : ctxIcon(l.kind, l.p));
+    const pr = g && typeof g === 'object' ? prOf(g) : null;
+    const k = pr ? checksOf(pr) : null;
+    if (k && k.state !== 'none') {
+      const said = k.state === 'failed' ? `the checks failed (${k.failed} failed, ${k.passed} of ${k.total} passed)` : k.state === 'pending' ? `the checks are running (${k.pending} running, ${k.passed} of ${k.total} passed)` : `all the checks passed (${k.passed} of ${k.total})`;
+      add(k.state === 'failed' ? 'bad' : k.state === 'pending' ? 'warn' : 'ok', `PR #${pr.number}: ${said}`, ICON_CK[k.state]);
+    }
+    return out.length ? `<div class="ch-status" role="group" aria-label="Status">${out.join('')}</div>` : '';
   };
 
   // RP140: "Compact" next to the ctx chip. Only a live session (idle or answering) that is not compacting already has it; the title says that an answer in progress is stopped first. The server decides anyway.
@@ -435,10 +461,11 @@
   const chatMenuHtml = (m) => {
     const o = m && typeof m === 'object' ? m : {};
     const items = compactButtonHtml(o.session) + sessionTerminalHtml(!!o.hasSession, o.terminal) + sessionCloseHtml(!!o.hasSession, !!o.closing);
+    const status = statusIconsHtml(o.session, o.git); // RP197: the states, as icons, at the top of the list
     if (!items) return '';
     const open = o.open === true;
     const dots = '<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="8" cy="3" r="1.4"/><circle cx="8" cy="8" r="1.4"/><circle cx="8" cy="13" r="1.4"/></svg>';
-    return `<span class="ch-menu" id="chMenuWrap"><button type="button" id="chMenuBtn" class="ch-more" data-act="ch-menu" aria-label="Session menu" title="Session menu" aria-haspopup="menu" aria-expanded="${open}" aria-controls="chMenu">${dots}</button>${open ? `<div id="chMenu" class="ch-menu-list" role="menu" aria-label="Session">${items}</div>` : ''}</span>`;
+    return `<span class="ch-menu" id="chMenuWrap"><button type="button" id="chMenuBtn" class="ch-more" data-act="ch-menu" aria-label="Session menu" title="Session menu" aria-haspopup="menu" aria-expanded="${open}" aria-controls="chMenu">${dots}</button>${open ? `<div id="chMenu" class="ch-menu-list" role="menu" aria-label="Session">${status}${items}</div>` : ''}</span>`;
   };
   function terminalBlockHtml(term) {
     if (!term || !term.open) return '';
@@ -498,7 +525,8 @@
     const st = repoStatus(ctx.git);
     const nameB = `<b class="ch-name" title="${esc(tip)}">${esc(ctx.name)}</b>`;
     const nameHtml = narrow ? `<button type="button" class="ch-id" data-act="zone-set" data-zone="repo" aria-label="${esc(st.label)}" title="Open the repo">${nameB}${st.line ? `<span class="ch-sub mono">${esc(st.line)}</span>` : ''}</button>` : nameB;
-    return `<div class="ch-row"><button type="button" class="ch-back" data-act="chat-back" aria-label="Back to the list of repos" title="Back to the list">${svgIcon('<path d="M10 3L5 8l5 5"/>', 20)}</button>${nameHtml}${ctx.menu ? chatMenuHtml(ctx.menu) : ''}<button type="button" class="ch-repo" data-act="zone-set" data-zone="repo" aria-label="${esc(st.pending ? `Repo: ${st.pending} ${st.pending === 1 ? 'check' : 'checks'} pending` : 'Open the repo: tasks, changes, status and files')}" title="Open the repo">${svgIcon('<rect x="2.5" y="3" width="11" height="10" rx="1.5"/><path d="M10 3v10"/>', 20)}${narrow && st.pending ? `<i class="ch-dot" aria-hidden="true">${st.pending > 99 ? '99+' : st.pending}</i>` : ''}</button><button type="button" class="x" data-act="chat-close" aria-label="Close the chat" title="Close the chat (Esc)">✕</button></div><div class="ch-tabs" role="tablist" aria-label="Panel">${tabs}${dtab}</div>`;
+    const chips = ctx.session ? headChipsHtml(ctx.session, ctx.ci) : ''; // RP197: the context, and what is wrong, in the head
+    return `<div class="ch-row"><button type="button" class="ch-back" data-act="chat-back" aria-label="Back to the list of repos" title="Back to the list">${svgIcon('<path d="M10 3L5 8l5 5"/>', 20)}</button>${nameHtml}${chips ? `<span class="ch-chips">${chips}</span>` : ''}${ctx.menu ? chatMenuHtml(ctx.menu) : ''}<button type="button" class="ch-repo" data-act="zone-set" data-zone="repo" aria-label="${esc(st.pending ? `Repo: ${st.pending} ${st.pending === 1 ? 'check' : 'checks'} pending` : 'Open the repo: tasks, changes, status and files')}" title="Open the repo">${svgIcon('<rect x="2.5" y="3" width="11" height="10" rx="1.5"/><path d="M10 3v10"/>', 20)}${narrow && st.pending ? `<i class="ch-dot" aria-hidden="true">${st.pending > 99 ? '99+' : st.pending}</i>` : ''}</button><button type="button" class="x" data-act="chat-close" aria-label="Close the chat" title="Close the chat (Esc)">✕</button></div><div class="ch-tabs" role="tablist" aria-label="Panel">${tabs}${dtab}</div>`;
   }
 
   // The Notes tab (RP93b, S8): the notepad of a repo (`.panel/notas.md`), one textarea and a status line apart so the page can repaint the status without touching the text.
@@ -1424,5 +1452,5 @@
     return `${ctx.failed ? '<div class="rs-note" role="status">⚠ Summary unavailable: showing the last data we have.</div>' : ''}<div class="rs-list">${body}</div>`;
   }
 
-  return { mergeSheetHtml, repoStatus, esc, mdHtml, settingsView, memoryChipHtml, ctxChipHtml, compactButtonHtml, legendHtml, listCount, blockWidths, columnView, treeFolderPaths, fileView, COLUMN_TABS, columnDetail, chatMenuHtml, composerState, askAllowed, actionMenu, actionButtonsHtml, composerMergeHtml, composerNote, chatHead, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, sessionCloseHtml, sessionTerminalHtml, terminalBlockHtml, recentlyActive, chatBody, quickReplies, quickOf, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
+  return { mergeSheetHtml, repoStatus, esc, mdHtml, settingsView, memoryChipHtml, ctxChipHtml, compactButtonHtml, legendHtml, listCount, blockWidths, columnView, treeFolderPaths, fileView, COLUMN_TABS, columnDetail, chatMenuHtml, headChipsHtml, statusIconsHtml, composerState, askAllowed, actionMenu, actionButtonsHtml, composerMergeHtml, composerNote, chatHead, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, sessionCloseHtml, sessionTerminalHtml, terminalBlockHtml, recentlyActive, chatBody, quickReplies, quickOf, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
 }));
