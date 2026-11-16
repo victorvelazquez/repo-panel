@@ -131,6 +131,8 @@ const ACTIONS = {
     setPref(pref, v);
     syncPrefControls();
   },
+  // RP212: under 760 px the chips of a Settings row are folded; the open rows are kept in S.settings.open so a redraw does not close them, and the focus goes back to the control that was used.
+  'st-fold': (el) => { const k = el.dataset.key; if (!k) return; const o = S.settings.open; if (o.has(k)) o.delete(k); else o.add(k); drawSettings(); $(`#settingsView [data-act="st-fold"][data-key="${k}"]`)?.focus(); },
   // RP178: the system notification needs a click of the person to ask for the permission; the test button shows what a notice does, whatever the view and the switches say.
   'notify-allow': async () => {
     if (typeof Notification === 'undefined') { toast('This browser has no system notifications', 'bad'); return; }

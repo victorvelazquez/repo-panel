@@ -1324,11 +1324,19 @@
   // route that already exists); the options of THIS BROWSER go through `pref-set`. What is not built yet is shown disabled and marked «Planned». Everything dynamic is escaped.
   const stSwitch = (id, on, attrs, disabled) => `<button type="button" class="st-sw" role="switch" aria-checked="${on === true}" aria-labelledby="${id}" ${attrs}${disabled ? ' disabled' : ''}></button><span class="st-state">${on === true ? 'On' : 'Off'}</span>`;
   const stSeg = (id, pref, current, choices) => `<span class="st-seg" role="group" aria-labelledby="${id}">${choices.map(([value, label]) => `<button type="button" aria-pressed="${String(current) === value}" data-act="pref-set" data-pref="${pref}" data-value="${value}">${label}</button>`).join('')}</span>`;
-  const stRow = (what, ctl, planned) => `<div class="st-row${planned ? ' is-planned' : ''}"><div class="st-what">${what}</div><div class="st-ctl">${ctl}</div></div>`;
+  // RP212: under 760 px the chips of a row (`.st-meta`) are folded behind a «Details» control (CSS shows it only there). The open rows live in `stOpen` (S.settings.open, so a redraw keeps them); a row is named by the id or `for` of its label.
+  let stOpen = new Set();
+  const stRow = (what, ctl, planned) => {
+    const id = /(?:id|for)="([\w-]+)"/.exec(what);
+    const open = !!id && stOpen.has(id[1]);
+    const w = id && what.includes('<div class="st-meta">') ? what.replace('<div class="st-meta">', `<button type="button" class="st-fold" data-act="st-fold" data-key="${id[1]}" aria-expanded="${open}">Details</button><div class="st-meta${open ? ' is-open' : ''}">`) : what;
+    return `<div class="st-row${planned ? ' is-planned' : ''}"><div class="st-what">${w}</div><div class="st-ctl">${ctl}</div></div>`;
+  };
   const stMeta = (...chips) => `<div class="st-meta">${chips.join('')}</div>`;
   const stBrowser = (def) => stMeta('<span class="chip">Saved in this browser</span>', `<span class="chip">Default: ${def}</span>`);
   function settingsView(m) {
     const o = m && typeof m === 'object' ? m : {};
+    stOpen = o.open instanceof Set ? o.open : new Set();
     const opts = o.options && typeof o.options === 'object' ? o.options : {};
     const p = o.prefs && typeof o.prefs === 'object' ? o.prefs : {};
     const pi = o.pi && typeof o.pi === 'object' && Array.isArray(o.pi.candidates) ? o.pi : null;
