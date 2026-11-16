@@ -1009,4 +1009,9 @@ button.c-round { flex: none; align-self: flex-end; display: inline-flex; align-i
 #chat.composing .composer { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 #chat.composing .msg-field { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 #chat.composing .composer textarea { flex: 1 1 auto; max-height: none; }
-#chat.composing .term-block, #chat.composing .c-bar, #chat.composing .rs-note { flex: none; }
+#chat.composing .term-block, #chat.composing .quick-slot, #chat.composing .c-bar, #chat.composing .rs-note { flex: none; }
+
+/* RP209: the quick replies are a thin row above the field, outside the scroll of the chat; with none, the slot takes no space. */
+.quick-slot { flex: none; min-width: 0; padding-bottom: 6px; }
+.quick-slot:empty { display: none; }
+.quick-slot .qr-row { margin: 0; gap: 6px; flex-wrap: wrap; max-height: 88px; overflow-y: auto; }

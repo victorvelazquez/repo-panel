@@ -214,8 +214,9 @@ async function chatPage(extra = {}) {
   return { page, S };
 }
 const body = (page) => page.get('#chatBody').html;
-const rows = (page) => count(body(page), 'class="qr-row"');
-const buttons = (page) => count(body(page), 'data-act="quick-reply"');
+const slot = (page) => page.get('#quickRow').html; // RP209: the quick replies are painted in their own row above the field, not in the body
+const rows = (page) => count(slot(page), 'class="qr-row"');
+const buttons = (page) => count(slot(page), 'data-act="quick-reply"');
 const sendsOf = (page) => page.fetches.filter((f) => f.method === 'POST' && f.url === '/api/rpc/prompt');
 const redraw = (page) => { page.run('draw()'); page.flush(); };
 const click = (page, i) => page.run(`ACTIONS['quick-reply']({ dataset: { i: ${JSON.stringify(i)} } })`);
@@ -231,7 +232,7 @@ test('C1: abuse: nothing is sent when the chat opens, redraws or the buttons are
 
 test('C2: the buttons appear under the last assistant message when ALL conditions hold; the options are not in a data attribute', async () => {
   const { page, S } = await chatPage();
-  const h = body(page);
+  const h = slot(page);
   assert.match(h, /<div class="qr-row" role="group" aria-label="Quick replies">/);
   for (let i = 0; i < 3; i++) assert.match(h, new RegExp(`<button type="button" class="qr" data-act="quick-reply" data-i="${i}">`));
   assert.ok(h.includes('>start_task</button>') && h.includes('>adjust_task</button>') && h.includes('>cancel</button>'));
@@ -239,7 +240,7 @@ test('C2: the buttons appear under the last assistant message when ALL condition
   assert.deepEqual(JSON.parse(JSON.stringify(S.quick.options)), ['start_task', 'adjust_task', 'cancel']);
   assert.equal(S.quick.id, 'abc');
   assert.ok(typeof S.quick.sig === 'string' && S.quick.sig.length > 0);
-  assert.ok(h.lastIndexOf('class="qr-row"') > h.lastIndexOf('class="m"'), 'the row comes after the last assistant bubble');
+  assert.ok(!body(page).includes('qr-row'), 'RP209: the row is not in the list of messages');
 });
 
 test('C3: each condition alone, when broken, removes the buttons', async () => {
@@ -362,9 +363,9 @@ test('C10: the Reply button: only for a trailing question with no options, under
   const q = { '/api/chat': histOf(item('user', 'go'), ASSISTANT('Done.\n\n¿Querés que lo suba?')) };
   const { page } = await chatPage(q);
   assert.equal(buttons(page), 0);
-  assert.match(body(page), /<button type="button" class="qr qr-reply" data-act="quick-focus">Reply<\/button>/);
-  assert.equal(count(body(page), 'qr-reply'), 1);
-  assert.match(body(page), /role="group" aria-label="Quick replies"/);
+  assert.match(slot(page), /<button type="button" class="qr qr-reply" data-act="quick-focus">Reply<\/button>/);
+  assert.equal(count(slot(page), 'qr-reply'), 1);
+  assert.match(slot(page), /role="group" aria-label="Quick replies"/);
   let focused = 0;
   page.get('#msgBox').focus = () => { focused++; };
   page.get('#msgBox').scrollIntoView = () => {};
@@ -381,17 +382,17 @@ test('C10: the Reply button: only for a trailing question with no options, under
   };
   for (const [name, hist] of Object.entries(none)) {
     const p = (await chatPage({ '/api/chat': hist })).page;
-    assert.equal(count(body(p), 'qr-reply'), 0, name);
+    assert.equal(count(slot(p), 'qr-reply'), 0, name);
   }
   const opts = (await chatPage({ '/api/chat': histOf(item('user', 'go'), ASSISTANT('Pick `a` or `b`?')) })).page;
   assert.equal(buttons(opts), 2, 'options win over a question');
-  assert.equal(count(body(opts), 'qr-reply'), 0);
+  assert.equal(count(slot(opts), 'qr-reply'), 0);
   page.run("setRpc('abc', { state: 'busy' }); draw()");
   page.flush();
-  assert.equal(count(body(page), 'qr-reply'), 0, 'busy');
+  assert.equal(count(slot(page), 'qr-reply'), 0, 'busy');
   page.run(`setRpc('abc', { state: 'idle', asks: [${JSON.stringify(ASK)}] }); draw()`);
   page.flush();
-  assert.equal(count(body(page), 'qr-reply'), 0, 'a real dialog');
+  assert.equal(count(slot(page), 'qr-reply'), 0, 'a real dialog');
 });
 
 test('C11: the message markup of a bubble with such a line is unchanged (mdHtml)', async () => {
