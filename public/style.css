@@ -40,12 +40,18 @@ header .rs-tabs .tab-dual[aria-selected="true"] { color: var(--text); }
 header .rs-tabs .tab-dual:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 header .rs-tabs .tab-ic { display: none; }
 @media (pointer: coarse) { header .rs-tabs .tab-dual { min-width: 44px; min-height: 44px; } }
+/* RP193 (S24): under 760 px the three tabs are a bar at the BOTTOM of three icons, a short word under each. The nav stays inside the header in the HTML; the header is sticky (not a containing block for fixed),
+   so the bar leaves its flow and the header shrinks to the logo and the rings. The bar hides in the chat and Repo screens (they have their own foot) ONLY while Sessions is the tab: #sumLayout keeps its data-screen when
+   another tab hides it, so the attribute alone would hide the bar in Conformity and Settings. The bottom edge keeps a floor of 12 px like the message field (RP207) and grows with the iOS inset. */
 @media (max-width: 759.98px) {
-  header .rs-tabs .tab-tx { display: none; }
+  :root { --tabbar-pad: max(12px, env(safe-area-inset-bottom, 0px)); --tabbar-h: calc(49px + var(--tabbar-pad)); }
+  header .rs-tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; display: flex; gap: 0; padding: 0 8px var(--tabbar-pad); background: var(--panel); border-top: 1px solid var(--line); }
+  header .rs-tabs button, header .rs-tabs .tab-dual { flex: 1 1 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-width: 44px; min-height: 48px; padding: 4px 6px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font-size: 11px; line-height: 1.2; }
+  header .rs-tabs button[aria-selected="true"] { color: var(--text); background: var(--panel2); border-bottom-color: transparent; }
+  header .rs-tabs .tab-dual:hover:not(:disabled):not([aria-selected="true"]) { background: transparent; color: var(--muted); } /* a touch leaves :hover stuck on the last item: only the active one is lit */
   header .rs-tabs .tab-ic { display: block; }
-  header .rs-tabs .tab-dual { min-width: 44px; min-height: 44px; padding: 0 6px; border-radius: 6px; }
-  header .rs-tabs .tab-dual[aria-selected="true"] { background: var(--panel2); }
-  header .rs-tabs .tab-dual .badge { position: absolute; top: 0; right: 0; margin: 0; padding: 0 5px; font-size: 11px; line-height: 16px; }
+  header .rs-tabs .tab-dual .badge { position: absolute; top: 2px; left: calc(50% + 4px); right: auto; margin: 0; padding: 0 5px; font-size: 11px; line-height: 16px; }
+  body.tab-summary:has(#sumLayout:not([hidden])[data-screen="chat"], #sumLayout:not([hidden])[data-screen="repo"]) header .rs-tabs { display: none; }
 }
 #addMenu > summary { color: var(--blue); }
 #addMenu > summary { display: inline-flex; align-items: center; justify-content: center; min-width: 30px; height: 30px; padding: 0 6px; } /* the size of .lh-ic, the buttons next to it; the plus is an SVG centered by the box */
@@ -448,6 +454,14 @@ body.tab-settings #viewbar { display: none; }
 .st-note { padding: 10px 14px; color: var(--muted); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
 .st-status { margin-top: 20px; min-height: 20px; color: var(--green); font-size: 12px; }
 .st-status.bad { color: var(--red); }
+/* RP193: under 760 px a Settings row is one column (the description, then its control) and nothing in it has a minimum width: with the two columns a row needed about 465 px, the page grew past the phone and the fixed bar
+   stretched with it. These rules come AFTER the base ones above on purpose (same specificity: the later wins). */
+@media (max-width: 759.98px) {
+  .st-row { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .st-ctl { min-width: 0; flex-wrap: wrap; justify-content: flex-start; }
+  .st-ctl select, .st-ctl input { max-width: 100%; min-width: 0; }
+  .st-meta .chip { white-space: normal; max-width: 100%; overflow-wrap: anywhere; }
+}
 .st button:focus-visible, .st select:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { .st-sw::after { transition: none; } }
 /* RP121: the repos column is a wrapper (header of filters above the list that scrolls). */
@@ -812,6 +826,13 @@ button.tc:hover { border-color: var(--muted); }
 .ch-back:hover:not(:disabled) { color: var(--text); background: var(--panel2); }
 .ch-back:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 #sumLayout[data-screen] { flex-direction: column; height: calc(100vh - var(--sum-top, 98px)); height: calc(100dvh - var(--sum-top, 98px)); height: calc(var(--vvh, 100dvh) - var(--sum-top, 98px)); min-height: 0; }
+/* RP193: the list screen ends where the bar begins; the chat and Repo screens have no bar, so they keep the full height. Conformity, Settings and Work leave room so nothing hides under the bar. */
+@media (max-width: 759.98px) {
+  #sumLayout[data-screen="list"] { height: calc(100vh - var(--sum-top, 98px) - var(--tabbar-h)); height: calc(100dvh - var(--sum-top, 98px) - var(--tabbar-h)); height: calc(var(--vvh, 100dvh) - var(--sum-top, 98px) - var(--tabbar-h)); }
+  .rs-panel { padding-bottom: calc(12px + var(--tabbar-h)); }
+  #work { padding-bottom: var(--tabbar-h); }
+  #toasts { bottom: calc(var(--tabbar-h) + 8px); }
+}
 #sumLayout[data-screen] #split, #sumLayout[data-screen] #split2 { display: none; }
 #sumLayout[data-screen="list"] #chat, #sumLayout[data-screen="list"] #col { display: none; }
 #sumLayout[data-screen="chat"] #listCol, #sumLayout[data-screen="chat"] #col { display: none; }
