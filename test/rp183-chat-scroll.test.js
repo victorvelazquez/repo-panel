@@ -130,7 +130,8 @@ test('drawChat takes the snapshot before the repaint, restores it now and one fr
   assert.match(block, /const snap = chatScrollSnap\(body\);/);
   assert.match(block, /if \(chatShown !== S\.chat\.id\) snap\.stuck = true;/);
   assert.ok(block.indexOf('chatScrollSnap(body)') < block.indexOf('paint(body'), 'snapshot first');
-  assert.match(block, /if \(paint\(body, R\.chatBody\(shown, \{ now: Date\.now\(\) \}\)\)\) \{\s*chatScrollRestore\(body, snap\);\s*chatNextFrame\(\(\) => chatScrollRestore\(body, snap\)\);\s*\}/);
+  // RP209: the position is restored when the body changed OR when the quick row above the field appeared or went (it changes the free height of the body even if no message changed)
+  assert.match(block, /const bodyChanged = paint\(body, R\.chatBody\(shown, \{ now: Date\.now\(\) \}\)\);\s*if \(bodyChanged \|\| slotChanged\) \{\s*chatScrollRestore\(body, snap\);\s*chatNextFrame\(\(\) => chatScrollRestore\(body, snap\)\);\s*\}/);
 });
 
 test('app.js wires the keyboard, guarded for a page with no visualViewport: mark on touching the box and on focus in and out, fix on every resize', () => {

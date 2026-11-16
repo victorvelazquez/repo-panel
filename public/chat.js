@@ -568,12 +568,15 @@ function drawChat() {
   const shown = chatView();
   const qk = R.quickOf(shown); // RP166: what the buttons under the last message hold; the click reads THIS, never the DOM
   S.quick = qk ? { id: S.chat.id, ...qk } : null;
+  const quickSlot = $('#quickRow'); // RP209: the quick replies live above the field, outside the scroll; painted BEFORE the snapshot so the reading position is measured with the final composer height
+  const slotChanged = quickSlot ? paint(quickSlot, R.quickRow(qk)) : false; // a row that appears or goes changes the free height of the body even when no message changed
   paint($('#sessState'), R.sessionLabelHtml(shown)); // RP191: the foot shows the session state only; the checks are in the head (the label still takes a `ci` for its other callers)
   paint($('#termBlock'), R.terminalBlockHtml(hasSession ? S.chat.terminal : null)); // RP118: the line for a normal terminal, only while the button is open
   const body = $('#chatBody');
   const snap = chatScrollSnap(body);
   if (chatShown !== S.chat.id) snap.stuck = true; // a different chat starts at its end
-  if (paint(body, R.chatBody(shown, { now: Date.now() }))) {
+  const bodyChanged = paint(body, R.chatBody(shown, { now: Date.now() }));
+  if (bodyChanged || slotChanged) {
     chatScrollRestore(body, snap);
     chatNextFrame(() => chatScrollRestore(body, snap));
   }
