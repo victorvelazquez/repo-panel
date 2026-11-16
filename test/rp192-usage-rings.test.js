@@ -1,5 +1,5 @@
 'use strict';
-// RP192 (S3, S18): under 760 px the usage of the header is two rings of 32 px (name at the left, percent inside, arc in the tone colour, a tick for the
+// RP192 (S3, S18; geometry and name changed by RP211, see rp211-thin-rings.test.js): under 760 px the usage of the header is two rings of 26 px (no name, percent inside, arc in the tone colour, a tick for the
 // share of the window already gone). The ring is extra markup: on desktop and tablet it is display:none and the bars stay as they were.
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -28,10 +28,10 @@ test('a1: each window has ONE ring svg.um-ring with role img and the same aria-l
     const ring = ringOf(h, n);
     assert.equal(attr(ring, 'role'), 'img');
     const said = new RegExp(`data-win="${n}">.*?class="um-bar" role="img" aria-label="([^"]*)"`).exec(meters(h))[1];
-    assert.equal(attr(ring, 'aria-label'), said);
-    assert.match(ring, /width="32" height="32"/);
+    assert.ok(attr(ring, 'aria-label').startsWith(`${said}, resets in `), 'the ring says the same as the bar and then when it resets');
+    assert.match(ring, /width="26" height="26"/);
   }
-  assert.equal(attr(ringOf(h, '5h'), 'aria-label'), '5h: 22% used, 40% of the window gone');
+  assert.equal(attr(ringOf(h, '5h'), 'aria-label'), '5h: 22% used, 40% of the window gone, resets in 3h 0m');
 });
 
 test('a2: the arc has pathLength 100 and a dasharray with the clamped percent; the number inside is the percent', () => {
@@ -46,10 +46,10 @@ test('a2: the arc has pathLength 100 and a dasharray with the clamped percent; t
   assert.match(seven, /<text [^>]*>100<\/text>/);
 });
 
-test('a3: the number is 11 px, and 9 px from 100', () => {
+test('a3: the number is 9.5 px, and 8 px from 100', () => {
   const h = html(win(99, NOW + 3 * HOUR), win(100, NOW + 3 * DAY));
-  assert.equal(attr(/<text [^>]*>/.exec(ringOf(h, '5h'))[0], 'font-size'), '11');
-  assert.equal(attr(/<text [^>]*>/.exec(ringOf(h, '7d'))[0], 'font-size'), '9');
+  assert.equal(attr(/<text [^>]*>/.exec(ringOf(h, '5h'))[0], 'font-size'), '9.5');
+  assert.equal(attr(/<text [^>]*>/.exec(ringOf(h, '7d'))[0], 'font-size'), '8');
 });
 
 test('a4: the tick follows elapsed (from the top, clockwise) and is clamped', () => {
@@ -57,11 +57,11 @@ test('a4: the tick follows elapsed (from the top, clockwise) and is clamped', ()
   const g = (pct, run) => V.ringGeometry(pct, run);
   const near = (a, b) => assert.ok(Math.abs(a - b) < 0.01, `${a} vs ${b}`);
   const t0 = g(10, 0).tick;
-  near(t0.x1, 16); near(t0.y1, 6); near(t0.x2, 16); near(t0.y2, 0);
+  near(t0.x1, 13); near(t0.y1, 5.5); near(t0.x2, 13); near(t0.y2, 0.5);
   const t25 = g(10, 25).tick;
-  near(t25.x1, 26); near(t25.y1, 16);
+  near(t25.x1, 20.5); near(t25.y1, 13);
   const t40 = g(22, 40).tick;
-  near(t40.x1, 21.88); near(t40.y1, 24.09); near(t40.x2, 25.40); near(t40.y2, 28.94);
+  near(t40.x1, 17.41); near(t40.y1, 19.07); near(t40.x2, 20.35); near(t40.y2, 23.11);
   assert.deepEqual(g(10, 400).tick, g(10, 100).tick);
   assert.deepEqual(g(10, -30).tick, g(10, 0).tick);
   assert.deepEqual(g(10, NaN).tick, g(10, 0).tick);
@@ -70,8 +70,8 @@ test('a4: the tick follows elapsed (from the top, clockwise) and is clamped', ()
   assert.equal(g(null, 5).dash, null);
   const h = html(win(22, NOW + 3 * HOUR), win(74, NOW + 3 * DAY));
   const line = /<line class="um-tick"[^>]*>/.exec(ringOf(h, '5h'))[0];
-  near(Number(attr(line, 'x1')), 21.88);
-  near(Number(attr(line, 'y2')), 28.94);
+  near(Number(attr(line, 'x1')), 17.41);
+  near(Number(attr(line, 'y2')), 23.11);
 });
 
 test('a5: a window with no percent shows an empty ring with a dash, gray, and no arc or tick', () => {
@@ -100,13 +100,12 @@ test('a6: the tone classes colour the arc through the stylesheet, from the root 
   assert.doesNotMatch(ringOf(h, '5h'), /style=|#[0-9a-fA-F]{3,6}/);
 });
 
-test('a7: under 760 px the ring shows and the bar, the percent text, the flag and the time left hide; the name stays; outside it the ring is hidden', () => {
+test('a7: under 760 px the ring shows and the bar, the percent text, the flag, the spaced time left and the name hide; outside it the ring is hidden', () => {
   assert.match(rule('.um-ring'), /display:\s*none/);
   const m = mediaPhone();
   assert.match(m, /\.um-ring\s*\{[^}]*display:\s*(inline-block|block|inline-flex)/);
   const hidden = /([^{}]*)\{[^}]*display:\s*none/.exec(m)[1].split(',').map((s) => s.trim());
-  for (const c of ['.um-bar', '.um-left', '.um-pct', '.um-flag']) assert.ok(hidden.includes(c), c);
-  assert.ok(!hidden.includes('.um-name'));
+  for (const c of ['.um-bar', '.um-left', '.um-pct', '.um-flag', '.um-name']) assert.ok(hidden.includes(c), c);
   assert.match(rule('.um-name'), /color:\s*var\(--muted\)/);
 });
 

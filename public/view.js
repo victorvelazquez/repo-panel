@@ -1037,16 +1037,16 @@
   const usageEsc = htmlEsc;
   const usagePct = (v) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(100, Math.max(0, Math.round(v))) : null);
   const USAGE_WINDOWS = [['five', '5h', 'Session (5 h)'], ['seven', '7d', 'Weekly (7 d)']];
-  // RP192 (S18): the numbers of the 32 px ring of the phone, from the clamped percent and the share of the window gone. Angles run clockwise from the top; the tick is a short radial line outside the arc.
+  // RP192 (S18), RP211 (S23): the numbers of the 26 px ring of the phone (centre 13, arc radius 10.5), from the clamped percent and the share of the window gone. Angles run clockwise from the top; the tick is a short radial line across the arc.
   function ringGeometry(pct, run) {
     const p = usagePct(pct);
     const a = ((usagePct(run) ?? 0) / 100) * 2 * Math.PI;
-    const at = (r) => [Math.round((16 + r * Math.sin(a)) * 100) / 100, Math.round((16 - r * Math.cos(a)) * 100) / 100];
-    const [x1, y1] = at(10);
-    const [x2, y2] = at(16);
-    return { dash: p, tick: { x1, y1, x2, y2 }, font: p !== null && p >= 100 ? 9 : 11 };
+    const at = (r) => [Math.round((13 + r * Math.sin(a)) * 100) / 100, Math.round((13 - r * Math.cos(a)) * 100) / 100];
+    const [x1, y1] = at(7.5);
+    const [x2, y2] = at(12.5);
+    return { dash: p, tick: { x1, y1, x2, y2 }, font: p !== null && p >= 100 ? 8 : 9.5 };
   }
-  const ringText = (txt, font) => `<text x="16" y="${Math.round((16 + font * 0.36) * 100) / 100}" text-anchor="middle" font-size="${font}" font-weight="600">${txt}</text>`;
+  const ringText = (txt, font) => `<text x="13" y="${Math.round((13 + font * 0.36) * 100) / 100}" text-anchor="middle" font-size="${font}" font-weight="600">${txt}</text>`;
   function usageHtml(view) {
     const v = isObject(view) ? view : {};
     if (v.state !== 'ok' && v.state !== 'old') return usageEsc(v.label);
@@ -1058,7 +1058,7 @@
       const pct = usagePct(w.percent);
       const cls = tone ? ` usage-${tone}` : '';
       if (pct === null) {
-        meters.push(`<span class="um usage-dim" data-win="${name}"><span class="um-name">${name}</span><svg class="um-ring" width="32" height="32" viewBox="0 0 32 32" role="img" aria-label="${name}: no data"><circle class="um-track" cx="16" cy="16" r="13" fill="none" stroke-width="4"/>${ringText('–', 11)}</svg><span class="um-pct">–</span></span>`);
+        meters.push(`<span class="um usage-dim" data-win="${name}"><span class="um-name">${name}</span><svg class="um-ring" width="26" height="26" viewBox="0 0 26 26" role="img" aria-label="${name}: no data"><circle class="um-track" cx="13" cy="13" r="10.5" fill="none" stroke-width="2.5"/>${ringText('–', 9.5)}</svg><span class="um-pct">–</span></span>`);
         details.push(`<div class="up-win usage-dim"><div class="up-title">${title}</div><div class="up-line"><span>No data: the window reset or is not reported</span></div></div>`);
         continue;
       }
@@ -1066,9 +1066,13 @@
       const said = `${name}: ${pct}% used, ${run}% of the window gone${w.ahead === true ? ', more than the clock' : ''}`;
       const bar = (c) => `<span class="${c}" role="img" aria-label="${usageEsc(said)}"><i class="um-fill" style="width:${pct}%"></i><i class="um-pace" style="left:${run}%"></i></span>`;
       const g = ringGeometry(pct, run);
-      const ring = `<svg class="um-ring" width="32" height="32" viewBox="0 0 32 32" role="img" aria-label="${usageEsc(said)}"><circle class="um-track" cx="16" cy="16" r="13" fill="none" stroke-width="4"/><circle class="um-arc" cx="16" cy="16" r="13" fill="none" stroke-width="4" pathLength="100" stroke-dasharray="${g.dash} 100" transform="rotate(-90 16 16)"/><line class="um-tick" x1="${g.tick.x1}" y1="${g.tick.y1}" x2="${g.tick.x2}" y2="${g.tick.y2}" stroke-width="1.6"/>${ringText(pct, g.font)}</svg>`;
+      // RP211: the phone shows the time left next to the ring, compact («2h29m»), so the ring's own name says it too; the desktop um-left keeps its spaced text
+      const left = typeof w.left === 'string' && w.left.trim() ? w.left : '';
+      const ringSaid = left ? `${said}, resets in ${left}` : said;
+      const time = left ? `<span class="um-time" aria-hidden="true">${usageEsc(left.replace(/\s+/g, ''))}</span>` : '';
+      const ring = `<svg class="um-ring" width="26" height="26" viewBox="0 0 26 26" role="img" aria-label="${usageEsc(ringSaid)}"><circle class="um-track" cx="13" cy="13" r="10.5" fill="none" stroke-width="2.5"/><circle class="um-arc" cx="13" cy="13" r="10.5" fill="none" stroke-width="2.5" pathLength="100" stroke-dasharray="${g.dash} 100" transform="rotate(-90 13 13)"/><line class="um-tick" x1="${g.tick.x1}" y1="${g.tick.y1}" x2="${g.tick.x2}" y2="${g.tick.y2}" stroke-width="1.4"/>${ringText(pct, g.font)}</svg>`;
       const flag = tone === 'warn' || tone === 'error' ? '<b class="um-flag" aria-hidden="true">⚠</b>' : '';
-      meters.push(`<span class="um${cls}" data-win="${name}"><span class="um-name">${name}</span>${ring}${bar('um-bar')}<span class="um-pct">${flag}${pct}%</span><span class="um-left">${usageEsc(w.left)}</span></span>`);
+      meters.push(`<span class="um${cls}" data-win="${name}"><span class="um-name">${name}</span>${ring}${time}${bar('um-bar')}<span class="um-pct">${flag}${pct}%</span><span class="um-left">${usageEsc(w.left)}</span></span>`);
       details.push(`<div class="up-win${cls}"><div class="up-title">${title}</div>${bar('um-bar up-bar')}<div class="up-line"><span>${pct}% used</span><span>Resets in ${usageEsc(w.left)}</span></div><div class="up-sub">Resets at ${usageEsc(w.reset)} · ${run}% of the window gone</div>${w.ahead === true ? '<div class="up-warn">⚠ Using it faster than the clock</div>' : ''}</div>`);
     }
     // RP147: an old file is a small yellow dot (first, as in the design) whose help text says how old the data is: never a loose «N min ago».
