@@ -2,7 +2,7 @@
 // RP137 (S26, S48), HIGH RISK (the merge cannot be undone): under 760 px a tap on ANY Merge button (the footer of the column, the card of the list, the Work tab: all go through the action `merge`) does not merge: it opens a sheet that
 // says what will happen, and only the Merge button of the sheet sends the order, ONCE. The sheet asks the SAME rule as the button (V.mergeButton) again when confirmed: a PR that is not ready any more, one that is already merging, or one
 // that is gone does not merge. It closes with Cancel, Esc, a tap outside, and when the PR or the open repo changes. From 760 px up (and when the width is not known) a tap merges as it did. The server is not touched: POST /api/merge
-// still revalidates. The reason why Merge is off is written above the footer of the Repo screen (there is no tooltip on a phone).
+// still revalidates. The reason why Merge is off is the title of its button and, when the PR is the reason, the placeholder of the message box (RP191, S22).
 // The abuse tests come first: a tap on Merge does not call /api/merge, the sheet's button does and once, a PR that stopped being ready does not merge, a change of PR or repo closes the sheet, a second tap while merging sends nothing.
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -54,9 +54,10 @@ test('m1: the sheet says the number, the base, the method and what happens to th
   for (const bad of [null, undefined, 5, 'x', [], {}, { n: 0, base: 'main' }, { n: -1, base: 'main' }, { n: 1.5, base: 'main' }, { n: '7', base: 'main' }, { n: 7 }, { n: 7, base: 5 }]) assert.equal(R.mergeSheetHtml(bad), '', JSON.stringify(bad));
 });
 
-test('m2: RP175: the composer writes the reason next to Merge only when it is off for a reason, and escapes it', () => {
+test('m2: RP191: the composer draws Merge alone: the reason of an off Merge is not written next to it (it stays in the escaped title)', () => {
   const off = R.composerMergeHtml({ id: A, branch: 'feat/x', ahead: 0, pr: PENDING(), merge: { enabled: false, label: 'Merge · squash', title: 'Checks <b>pending</b>. Method: squash.', why: 'Checks <b>pending</b>. Method: squash.' } });
-  assert.match(off, /<span class="c-why" role="status">Checks &lt;b&gt;pending&lt;\/b&gt;\. Method: squash\.<\/span>$/);
+  assert.match(off, /title="Checks &lt;b&gt;pending&lt;\/b&gt;\. Method: squash\.">Merge · squash<\/button>$/);
+  assert.doesNotMatch(off, /c-why/);
   const on = R.composerMergeHtml({ id: A, branch: 'feat/x', ahead: 0, pr: READY(), merge: { enabled: true, label: 'Merge · squash', title: 'Merge into main', why: '' } });
   assert.doesNotMatch(on, /c-why/);
 });
@@ -65,14 +66,14 @@ test('m2: RP175: the composer writes the reason next to Merge only when it is of
 const rules = [...css.matchAll(/(?:^|\n)([^{}\n@/ ][^{}\n]*)\{([^}]*)\}/g)].flatMap((m) => m[1].split(',').map((s) => ({ sel: s.trim().replace(/\s+/g, ' '), body: m[2] })));
 const rule = (sel) => { const r = rules.filter((x) => x.sel === sel); assert.ok(r.length, `a rule for ${sel}`); return r.map((x) => x.body).join(';'); };
 
-test('c1: the sheet is an overlay above everything with a backdrop, its buttons are 44 px targets with a visible focus ring, and the reason line is on every screen (RP175: it is in the composer now)', () => {
+test('c1: the sheet is an overlay above everything with a backdrop, its buttons are 44 px targets with a visible focus ring, and the reason line is gone (RP191: the placeholder of the box carries the reason of the PR)', () => {
   assert.match(rule('#mergeSheet'), /position:\s*fixed/);
   assert.match(rule('#mergeSheet'), /z-index:\s*\d{2,}/);
   assert.match(rule('#mergeSheet[hidden]'), /display:\s*none/);
   assert.match(rule('.ms-back'), /position:\s*absolute/);
   assert.match(rule('.ms-btns button'), /min-height:\s*44px/);
   assert.match(css, /\.ms-btns button:focus-visible[^{]*\{[^}]*outline:\s*2px solid var\(--blue\)/);
-  assert.doesNotMatch(rule('.c-why'), /display:\s*none/); // RP175: the reason is never hidden: a phone has no hover
+  assert.doesNotMatch(css, /\.c-why/);
   assert.doesNotMatch(css, /ft-why/);
 });
 
@@ -308,13 +309,14 @@ test('a13: the sheet takes the focus on Cancel (the safe button) when it opens',
   assert.equal(page.get('#ms-cancel').focused, true);
 });
 
-test('r1: RP175: the chat screen (the composer) writes the reason Merge is off next to it, and takes it away when the PR is ready', async () => {
+test('r1: RP191: the chat screen writes no reason next to Merge; the box shows the PR reason as its placeholder and takes it away when the PR is ready', async () => {
   const page = await boot();
   await page.click('chat-open', { id: A });
   page.run(`S.local['${A}'] = { branch: 'feat/x', ahead: 0, files: [], error: null }`);
   await page.setPr(A, PENDING());
   await page.draw();
-  assert.match(page.get('#chatActions').html, /<span class="c-why" role="status">/);
+  assert.doesNotMatch(page.get('#chatActions').html, /c-why/);
+  assert.match(page.get('#chatActions').html, /data-act="merge"/);
   await page.setPr(A, READY());
   await page.draw();
   assert.doesNotMatch(page.get('#chatActions').html, /c-why/);

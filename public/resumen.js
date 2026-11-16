@@ -976,14 +976,14 @@
     return items.filter((i) => i && i.available).map((i) => `<button type="button" class="c-act" data-act="pi" data-id="${esc(id)}" data-cmd="${esc(i.cmd)}" title="${esc(i.why || `Send ${i.label} to the open session of this repo`)}"${ctx.sending ? ' disabled' : ''}>${esc(i.label)}</button>`).join('');
   }
   // RP175: the Merge button of the composer (it left the footer of the column). `g` is what columnGit gives (id, the open PR of THE CURRENT branch, and merge: what V.mergeButton decides plus `why`). It is the same button as the card
-  // (data-act="merge"); with no PR nothing is drawn. When it is off for a reason the reason is written next to it (`why`, the words of V.mergeWhy): a phone has no hover. Total.
+  // (data-act="merge"); with no PR nothing is drawn. It is only the button: the reason it is off is not written here (RP191, S22: the PR's reason is the placeholder of the message box, V.mergeNote). Total.
   function composerMergeHtml(g) {
     const c = g && typeof g === 'object' && !Array.isArray(g) ? g : {};
     const pr = c.pr && typeof c.pr === 'object' && !Array.isArray(c.pr) && Number.isInteger(c.pr.number) && c.pr.number > 0 ? c.pr : null;
     if (!pr) return '';
     const m = c.merge && typeof c.merge === 'object' ? c.merge : {};
     const button = `<button type="button" class="c-act merge" data-act="merge" data-id="${esc(c.id ?? '')}" data-n="${pr.number}"${m.enabled === true ? '' : ' disabled'} title="${esc(m.title || 'No open pull request for this branch')}">${esc(m.label || 'Merge · squash')}</button>`;
-    return `${button}${typeof m.why === 'string' && m.why ? `<span class="c-why" role="status">${esc(m.why)}</span>` : ''}`;
+    return button;
   }
   // The line under the box: a message (a refused send, a failed start).
   const composerNote = (n) => (n && n.text ? `<span>${esc(n.text)}</span>` : '');

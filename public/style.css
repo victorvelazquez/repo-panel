@@ -902,6 +902,7 @@ button.tc:hover { border-color: var(--muted); }
 .composer:focus-within { border-color: var(--blue); }
 .composer textarea { width: 100%; resize: none; border: 0; background: transparent; color: var(--text); font: inherit; padding: 4px 6px; }
 .composer textarea:focus-visible { outline: none; }
+.composer textarea::placeholder { color: var(--muted); opacity: 1; } /* RP191 (S22): the reason Merge is off lives here, muted and soft; it takes no space and goes when the person types */
 .c-bar { position: relative; display: flex; align-items: center; gap: 8px; }
 .c-left { display: flex; flex: 1 1 auto; align-items: center; min-width: min-content; } /* RP191: the state at the left takes the free space, so the actions and the round button sit at the right; it never shrinks below the state */
 .c-actions { display: flex; flex: 0 1 auto; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 6px; min-width: 0; } /* RP191: glued to the round button; when they do not fit next to the state they wrap onto a second line, aligned to the right */
@@ -910,7 +911,6 @@ button.tc:hover { border-color: var(--muted); }
 button.c-round { flex: none; align-self: flex-end; display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; padding: 0; border-radius: 50%; } /* RP191: the border stays (the soft layer of the palette colours it); `button.` so the padding of that layer does not win */
 @media (pointer: coarse) { button.c-round { width: 44px; height: 44px; } }
 .c-stop { background: var(--panel2); color: var(--red); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--red) 35%, transparent); }
-.c-why { flex: 0 1 auto; min-width: 0; text-align: right; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; } /* RP175: the reason Merge is off, always written (a phone has no hover) */
 .composer .rs-note { margin: 0; }
 .composer .rs-note:empty { display: none; }
 .composer .rs-note button { margin-left: 8px; padding: 0 8px; }
