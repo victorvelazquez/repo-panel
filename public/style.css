@@ -456,11 +456,24 @@ body.tab-settings #viewbar { display: none; }
 .st-status.bad { color: var(--red); }
 /* RP193: under 760 px a Settings row is one column (the description, then its control) and nothing in it has a minimum width: with the two columns a row needed about 465 px, the page grew past the phone and the fixed bar
    stretched with it. These rules come AFTER the base ones above on purpose (same specificity: the later wins). */
+.st-fold { display: none; }
 @media (max-width: 759.98px) {
   .st-row { grid-template-columns: minmax(0, 1fr); gap: 10px; }
   .st-ctl { min-width: 0; flex-wrap: wrap; justify-content: flex-start; }
   .st-ctl select, .st-ctl input { max-width: 100%; min-width: 0; }
   .st-meta .chip { white-space: normal; max-width: 100%; overflow-wrap: anywhere; }
+  /* RP212 (S25): a switch on the line of its name; chips folded behind «Details»; selects and inputs at the full width of the row; buttons 44 px tall (the switch keeps its 22 px look and gets a 44 px hit area). */
+  .st-row:has(.st-sw) { grid-template-columns: minmax(0, 1fr) auto; }
+  .st-row:has(.st-sw) .st-ctl { justify-content: flex-end; flex-wrap: nowrap; }
+  .st-ctl select, .st-ctl input { width: 100%; }
+  .st-meta:not(.is-open) { display: none; }
+  .st-row .st-fold { display: flex; width: fit-content; align-items: center; gap: 4px; margin-top: 2px; padding: 0 4px; background: none; border: 0; color: var(--muted); }
+  .st-row .st-fold::after { content: "\25BE"; }
+  .st-row .st-fold[aria-expanded="true"]::after { content: "\25B4"; }
+  .st-row button:not(.st-sw), .conf-item button { min-height: 44px; }
+  .conf-title button { min-height: 44px; }
+  .st-ctl select, .st-ctl input, .conf-item select { min-height: 44px; }
+  .st-sw::before { content: ""; position: absolute; top: -11px; bottom: -11px; left: -2px; right: -2px; }
 }
 .st button:focus-visible, .st select:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { .st-sw::after { transition: none; } }
