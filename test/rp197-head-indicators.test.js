@@ -208,13 +208,13 @@ const withPr = async (page, state) => {
 };
 const chips = (page) => (/<span class="ch-chips">[\s\S]*?<\/span><span class="ch-menu"|<span class="ch-chips">[\s\S]*$/.exec(head(page)) || [''])[0];
 
-test('p6: checks that FAIL show a chip in the head, with the words hidden and without announcing itself (the foot has the label that does)', async () => {
+test('p6: checks that FAIL show a chip in the head, with the words hidden and without announcing itself (RP191: and the foot no longer says it)', async () => {
   const page = await boot(RPC('ready'));
   await withPr(page, 'failed');
   assert.match(chips(page), /ss ss-red ss-ci/);
   assert.match(chips(page), /PR #7: the checks failed/);
   assert.doesNotMatch(chips(page), /role="status"/);
-  assert.match(foot(page), /ss-ci/, 'the state label of the foot says it too, as before');
+  assert.doesNotMatch(foot(page), /ss-ci/, 'RP191: the state label of the foot has no CI words any more');
 });
 
 test('p7: checks that are running show the turning chip; checks that PASSED show nothing in the head (silence when all is well)', async () => {

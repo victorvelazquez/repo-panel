@@ -568,7 +568,7 @@ function drawChat() {
   const shown = chatView();
   const qk = R.quickOf(shown); // RP166: what the buttons under the last message hold; the click reads THIS, never the DOM
   S.quick = qk ? { id: S.chat.id, ...qk } : null;
-  paint($('#sessState'), R.sessionLabelHtml({ ...shown, ci: V ? V.ciOf(columnGit(S.chat.id, facts).pr) : null })); // RP170: the label gets the CI of the PR of the CURRENT branch (the one Merge uses); it shows only while the session is idle, and holds nothing
+  paint($('#sessState'), R.sessionLabelHtml(shown)); // RP191: the foot shows the session state only; the checks are in the head (the label still takes a `ci` for its other callers)
   paint($('#termBlock'), R.terminalBlockHtml(hasSession ? S.chat.terminal : null)); // RP118: the line for a normal terminal, only while the button is open
   const body = $('#chatBody');
   const snap = chatScrollSnap(body);
@@ -583,7 +583,9 @@ function drawChat() {
   $('#msgSend').disabled = !cs.canSend;
   $('#msgSend').title = cs.reason;
   $('#msgBox').placeholder = cs.placeholder;
-  $('#msgStop').hidden = !(S.rpc[id] && S.rpc[id].state === 'busy');
+  const busy = !!(S.rpc[id] && S.rpc[id].state === 'busy');
+  $('#msgStop').hidden = !busy; // RP191: Stop takes the place of Send while the session works
+  $('#msgSend').hidden = busy;
   const row = S.summary && Array.isArray(S.summary.rows) ? S.summary.rows.find((r) => r.id === id) : null;
   const live = (S.rpc[id] && S.rpc[id].compacting ? 'working' : REASON_OF[S.rpc[id] && S.rpc[id].state]) || 'unknown'; // RP140: a compacting session takes no order either; RPC2b-1: the reason follows the session of the RPC host
   paint($('#chatActions'), R.actionButtonsHtml(R.actionMenu(row, { live, changes: summaryChanges(id), flow: summaryFlow(id) }), id, { sending: !!S.sending[id] }) + R.composerMergeHtml(columnGit(id, S.local[id]))); // RP175: Merge is not an item of the session menu: it does not wait for the session

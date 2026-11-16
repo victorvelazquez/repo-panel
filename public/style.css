@@ -387,22 +387,22 @@ details.pop > summary:focus-visible { outline: 2px solid var(--blue); outline-of
    green = publish (/flow-pr, Merge), violet = new cycle (/flow-base), orange = fix (Fix CI). Urgent ones (answer, waiting,
    Fix CI) are one step stronger. Gray stays for secondary buttons. Urgency is shown by the card, never by a solid button;
    a disabled button loses its hue. */
-button:is([data-cmd="flow-next"], header .primary, .empty .primary) { --h: var(--blue); }
+button:is([data-cmd="flow-next"], header .primary, .empty .primary, .c-send) { --h: var(--blue); }
 button:is([data-cmd="flow-ship"], [data-cmd="flow-ship-unstage"], [data-kind="answer"], [data-kind="waiting"]) { --h: var(--yellow); }
 button:is([data-cmd="flow-pr"], .merge) { --h: var(--green); }
 button:is([data-cmd="flow-base"], [data-cmd="flow-base-stash"]) { --h: var(--purple); }
 button[data-cmd="fix-pr"] { --h: var(--orange); }
-button:is([data-cmd="flow-next"], [data-cmd="flow-ship"], [data-cmd="flow-ship-unstage"], [data-cmd="flow-pr"], [data-cmd="flow-base"], [data-cmd="flow-base-stash"], [data-cmd="fix-pr"], [data-kind="answer"], [data-kind="waiting"], header .primary, .empty .primary, .merge) {
+button:is([data-cmd="flow-next"], [data-cmd="flow-ship"], [data-cmd="flow-ship-unstage"], [data-cmd="flow-pr"], [data-cmd="flow-base"], [data-cmd="flow-base-stash"], [data-cmd="fix-pr"], [data-kind="answer"], [data-kind="waiting"], header .primary, .empty .primary, .merge, .c-send) {
   background: color-mix(in srgb, var(--h) 13%, var(--panel)); border-color: color-mix(in srgb, var(--h) 42%, var(--panel)); color: color-mix(in srgb, var(--h) 68%, #fff); font-weight: 500; padding: 2px 11px;
 }
-button:is([data-cmd="flow-next"], [data-cmd="flow-ship"], [data-cmd="flow-ship-unstage"], [data-cmd="flow-pr"], [data-cmd="flow-base"], [data-cmd="flow-base-stash"], [data-cmd="fix-pr"], [data-kind="answer"], [data-kind="waiting"], header .primary, .empty .primary, .merge):hover:not(:disabled) {
+button:is([data-cmd="flow-next"], [data-cmd="flow-ship"], [data-cmd="flow-ship-unstage"], [data-cmd="flow-pr"], [data-cmd="flow-base"], [data-cmd="flow-base-stash"], [data-cmd="fix-pr"], [data-kind="answer"], [data-kind="waiting"], header .primary, .empty .primary, .merge, .c-send):hover:not(:disabled) {
   background: color-mix(in srgb, var(--h) 24%, var(--panel)); border-color: color-mix(in srgb, var(--h) 68%, var(--panel));
 }
 button:is([data-kind="answer"], [data-kind="waiting"], [data-cmd="fix-pr"]) { background: color-mix(in srgb, var(--h) 20%, var(--panel)); border-color: color-mix(in srgb, var(--h) 62%, var(--panel)); color: color-mix(in srgb, var(--h) 62%, #fff); font-weight: 600; }
 button:is([data-kind="answer"], [data-kind="waiting"], [data-cmd="fix-pr"]):hover:not(:disabled) { background: color-mix(in srgb, var(--h) 30%, var(--panel)); border-color: var(--h); }
 .card button:is([data-cmd], .merge) { justify-self: start; align-self: flex-start; }
 .merge-row .merge { flex: 0 1 auto; padding: 2px 11px; }
-button:is([data-cmd], [data-kind], header .primary, .empty .primary, .merge):disabled { --h: var(--gray); background: var(--panel2); border-color: var(--line); color: var(--muted); font-weight: 400; opacity: .45; cursor: not-allowed; }
+button:is([data-cmd], [data-kind], header .primary, .empty .primary, .merge, .c-send):disabled { --h: var(--gray); background: var(--panel2); border-color: var(--line); color: var(--muted); font-weight: 400; opacity: .45; cursor: not-allowed; }
 
 /* RP67: calm chrome. Chips are plain text; only the clickable diff chip keeps a faint border. */
 .chip:not(.chip-btn), .chip.green:not(.chip-btn), .chip.red:not(.chip-btn), .chip.yellow:not(.chip-btn), .chip.blue:not(.chip-btn), .chip.purple:not(.chip-btn) { border-color: transparent; background: transparent; padding: 0 2px; }
@@ -726,7 +726,6 @@ button.tk-gh:hover:not(:disabled) { background: var(--panel2); color: var(--text
 /* RP99/RP100: the list of sessions of a repo uses the width of the chat and the height it leaves (the box shrinks and scrolls inside it); a row never squashes. */
 .ch-picks { align-self: stretch; flex: 0 1 auto; min-height: 0; max-height: 100%; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; margin: 0; overscroll-behavior: contain; }
 /* RP98: the Close session button sits at the right of the session state, inside the composer frame. */
-.sess-state { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; row-gap: 4px; } /* RP156: with the icons every chip on can pass the width; wrap, never cut a button */
 /* RP118: the Terminal button sits before Close session; the block with the command opens under the state row. */
 .term-block { margin: 0 6px 6px; padding: 8px 10px; background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; font-size: 12px; }
 .term-block:empty { display: none; }
@@ -749,7 +748,7 @@ button.tk-gh:hover:not(:disabled) { background: var(--panel2); color: var(--text
 .m.stopnote { color: var(--muted); font-size: 12px; padding: 3px 10px; }
 .m.stopnote.error { color: #e07a7a; border-color: #6b2c2c; }
 .sysnote { align-self: center; color: var(--muted); font-size: 12px; padding: 2px 10px; }
-#msgStop[hidden] { display: none; }
+#msgSend[hidden], #msgStop[hidden] { display: none; } /* RP191: the author display of the round buttons beats the attribute */
 .m p, .m ul, .m ol, .m pre, .m blockquote, .m h3, .m h4, .m h5 { margin: 6px 0; }
 .m > .who + *, .m > :first-child:not(.who) { margin-top: 0; }
 .m > :last-child { margin-bottom: 0; }
@@ -877,7 +876,7 @@ button.tc:hover { border-color: var(--muted); }
 /* RP68: the composer at the bottom of the chat and its "/ Actions" menu (opens upwards, anchored to the bar). */
 #chat .ch-body { flex: 1 1 0; }
 .composer { container-type: inline-size; container-name: cmp; flex: none; margin: 0 max(12px, env(safe-area-inset-right, 0px)) max(12px, env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px)); border: 1px solid var(--line); border-radius: 12px; background: var(--bg); padding: 8px 8px 6px; display: grid; gap: 6px; }
-.sess-state { min-height: 18px; padding: 0 6px; font-size: 12px; color: var(--muted); }
+.sess-state { display: inline-flex; flex: none; align-items: center; min-height: 28px; min-width: 84px; padding: 0 6px; font-size: 12px; color: var(--muted); } /* RP191: an item of the bar; the width changes with the state, never while typing */
 .ss { display: inline-flex; align-items: center; gap: 5px; }
 .ss-dot { font-style: normal; display: inline-block; }
 .ss-green { color: var(--green); }
@@ -903,9 +902,15 @@ button.tc:hover { border-color: var(--muted); }
 .composer:focus-within { border-color: var(--blue); }
 .composer textarea { width: 100%; resize: none; border: 0; background: transparent; color: var(--text); font: inherit; padding: 4px 6px; }
 .composer textarea:focus-visible { outline: none; }
-.c-bar { position: relative; display: flex; align-items: center; gap: 6px; }
-.c-actions { display: flex; flex: 1 1 auto; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
-.c-why { flex: 1 1 100%; min-width: 0; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; } /* RP175: the reason Merge is off, always written (a phone has no hover) */
+.c-bar { position: relative; display: flex; align-items: center; gap: 8px; }
+.c-left { display: flex; flex: 1 1 auto; align-items: center; min-width: min-content; } /* RP191: the state at the left takes the free space, so the actions and the round button sit at the right; it never shrinks below the state */
+.c-actions { display: flex; flex: 0 1 auto; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 6px; min-width: 0; } /* RP191: glued to the round button; when they do not fit next to the state they wrap onto a second line, aligned to the right */
+.c-act { height: 28px; padding: 0 10px; font: 12.5px ui-monospace, "Cascadia Mono", Consolas, monospace; white-space: nowrap; }
+.c-act.merge { font-family: inherit; }
+button.c-round { flex: none; align-self: flex-end; display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; padding: 0; border-radius: 50%; } /* RP191: the border stays (the soft layer of the palette colours it); `button.` so the padding of that layer does not win */
+@media (pointer: coarse) { button.c-round { width: 44px; height: 44px; } }
+.c-stop { background: var(--panel2); color: var(--red); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--red) 35%, transparent); }
+.c-why { flex: 0 1 auto; min-width: 0; text-align: right; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; } /* RP175: the reason Merge is off, always written (a phone has no hover) */
 .composer .rs-note { margin: 0; }
 .composer .rs-note:empty { display: none; }
 .composer .rs-note button { margin-left: 8px; padding: 0 8px; }
@@ -1004,4 +1009,4 @@ button.tc:hover { border-color: var(--muted); }
 #chat.composing .composer { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 #chat.composing .msg-field { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 #chat.composing .composer textarea { flex: 1 1 auto; max-height: none; }
-#chat.composing .sess-state, #chat.composing .term-block, #chat.composing .c-bar, #chat.composing .rs-note { flex: none; }
+#chat.composing .term-block, #chat.composing .c-bar, #chat.composing .rs-note { flex: none; }
