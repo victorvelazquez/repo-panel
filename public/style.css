@@ -89,6 +89,7 @@ header h1 picture { display: block; } /* RP186: on a narrow screen the picture s
 .um-pct { min-width: 3ch; text-align: right; font-variant-numeric: tabular-nums; }
 .um-flag { font-weight: normal; margin-right: 2px; }
 .um-left { color: var(--muted); font-variant-numeric: tabular-nums; }
+.um-time { display: none; } /* RP211: the compact time left of the phone (shown under 760 px) */
 .um-old { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--yellow); } /* RP147: the usage file is old; the help text says how old */
 .usage-pop { display: none; position: absolute; top: calc(100% + 8px); right: 0; z-index: 20; width: 300px; padding: 12px 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 10px 30px #0008; white-space: normal; color: var(--text); font-size: 13px; }
 .usage:hover .usage-pop, .usage:focus .usage-pop, .usage:focus-within .usage-pop { display: block; }
@@ -100,7 +101,7 @@ header h1 picture { display: block; } /* RP186: on a narrow screen the picture s
 .up-warn { color: var(--yellow); font-size: 12px; margin-top: 2px; }
 .up-note { color: var(--yellow); margin-top: 10px; }
 .up-foot { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 8px; }
-@media (max-width: 760px) { .um-bar, .um-left, .um-pct, .um-flag { display: none; } .um-ring { display: inline-block; } .um-name { font-size: 11px; } }
+@media (max-width: 760px) { .um-bar, .um-left, .um-pct, .um-flag, .um-name { display: none; } .um-ring { display: inline-block; } .um-time { display: inline; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; } }
 .spacer { flex: 1; }
 #filters { display: flex; gap: 6px; }
 #filters button.active { border-color: var(--blue); background: #12253d; }
