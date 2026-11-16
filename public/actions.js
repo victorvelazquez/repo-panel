@@ -131,6 +131,8 @@ const ACTIONS = {
     setPref(pref, v);
     syncPrefControls();
   },
+  // RP213: under 760 px a repo block of Conformity folds. S.conf.fold keeps only what the person chose (id -> true open / false closed); a repo with no entry follows V.reqFold's rule, so a redraw changes nothing.
+  'req-fold': (el) => { const id = el.dataset.id; if (!id) return; const shown = V.reqFold(S.req[id], S.conf.fold.get(id)).open; S.conf.fold.set(id, !shown); drawConformity(); $(`#conformityView [data-act="req-fold"][data-id="${id}"]`)?.focus(); },
   // RP212: under 760 px the chips of a Settings row are folded; the open rows are kept in S.settings.open so a redraw does not close them, and the focus goes back to the control that was used.
   'st-fold': (el) => { const k = el.dataset.key; if (!k) return; const o = S.settings.open; if (o.has(k)) o.delete(k); else o.add(k); drawSettings(); $(`#settingsView [data-act="st-fold"][data-key="${k}"]`)?.focus(); },
   // RP178: the system notification needs a click of the person to ask for the permission; the test button shows what a notice does, whatever the view and the switches say.

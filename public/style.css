@@ -475,6 +475,21 @@ body.tab-settings #viewbar { display: none; }
   .st-ctl select, .st-ctl input, .conf-item select { min-height: 44px; }
   .st-sw::before { content: ""; position: absolute; top: -11px; bottom: -11px; left: -2px; right: -2px; }
 }
+/* RP213 (S25): Conformity on the phone. The counters as figures (the text line stays for assistive tools); each repo block folds to its name and state. Desktop and tablet: the figures and the fold control are hidden.
+   Rules of the media block come AFTER the base ones. */
+.conf-figs, .req-fold { display: none; }
+@media (max-width: 759.98px) {
+  .conf-figs { display: flex; gap: 8px; margin-bottom: 12px; }
+  .conf-fig { flex: 1 1 0; min-width: 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--muted); font-size: 12px; }
+  .conf-fig b { display: block; font-size: 22px; line-height: 1.2; color: var(--text); }
+  .conf-figs + .conf-sum { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .conf-item:has(> .req-fold) { display: flex; flex-wrap: wrap; align-items: center; gap: 0 8px; }
+  .conf-item .req-fold { display: flex; align-items: center; gap: 4px; margin-left: auto; min-height: 44px; padding: 0 4px; background: none; border: 0; color: var(--muted); font-size: 12px; }
+  .req-fold::after { content: "\25BE"; }
+  .req-fold[aria-expanded="true"]::after { content: "\25B4"; }
+  .req-fold ~ div, .req-fold ~ details { flex: 1 0 100%; }
+  .req-fold[aria-expanded="false"] ~ * { display: none; }
+}
 .st button:focus-visible, .st select:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { .st-sw::after { transition: none; } }
 /* RP121: the repos column is a wrapper (header of filters above the list that scrolls). */
