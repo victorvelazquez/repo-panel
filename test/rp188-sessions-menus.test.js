@@ -30,7 +30,7 @@ test('t1: the header has ONE tablist Views with three tabs in order: Sessions, C
   assert.deepEqual(tabButtons.map((t) => t['aria-controls']), ['summary', 'conformityView', 'settingsView']);
   assert.deepEqual(tabButtons.map((t) => t['aria-selected']), ['true', 'false', 'false']);
   for (const t of tabButtons) { assert.equal(t.role, 'tab'); assert.equal(t['data-act'], 'tab'); assert.equal(t.type, 'button'); }
-  assert.match(tabButtons[0].src, />Sessions<\/button>$/);
+  assert.match(tabButtons[0].src, /<span class="tab-tx">Sessions<\/span><\/button>$/, 'RP193: the word of Sessions is in .tab-tx like the other two');
   assert.ok(!/Summary/.test(tabButtons[0].src));
 });
 
@@ -73,13 +73,12 @@ test('t4: the Add menu is in the header of the list column, after the title, wit
 // ---------- the stylesheet ----------
 const ruleBody = (src, sel) => [...src.matchAll(/(?:^|\n|\})\s*([^{}@]+)\{([^}]*)\}/g)].filter((m) => m[1].split(',').some((s) => s.trim().replace(/\s+/g, ' ') === sel)).map((m) => m[2]).join(';');
 
-test('c1: on desktop the dual tabs show text only (the icon is hidden); under 760 px they show only the icon, touch sized, the badge on the icon; Sessions stays text', () => {
+test('c1: on desktop the tabs show text only (the icon is hidden); under 760 px (RP193) they show the icon AND the word, touch sized, the badge on the icon', () => {
   assert.match(ruleBody(css, 'header .rs-tabs .tab-ic'), /display:\s*none/);
-  assert.match(ruleBody(mobile, 'header .rs-tabs .tab-tx'), /display:\s*none/);
+  assert.doesNotMatch(ruleBody(mobile, 'header .rs-tabs .tab-tx'), /display:\s*none/, 'RP193: the word stays under the icon');
   assert.match(ruleBody(mobile, 'header .rs-tabs .tab-ic'), /display:\s*(inline-)?block|display:\s*inline-flex|display:\s*block/);
   assert.match(ruleBody(mobile, 'header .rs-tabs .tab-dual'), /min-width:\s*44px/);
   assert.match(ruleBody(mobile, 'header .rs-tabs .tab-dual .badge'), /position:\s*absolute/);
-  assert.ok(!/tab-summary/.test(mobile), 'Sessions has no mobile rule: it stays text');
 });
 
 test('c2: the dual tabs reuse the old icon look (muted, hover, selected, focus ring); the badge is the inline yellow pill on desktop', () => {
@@ -87,7 +86,7 @@ test('c2: the dual tabs reuse the old icon look (muted, hover, selected, focus r
   assert.match(ruleBody(css, 'header .rs-tabs .tab-dual:hover:not(:disabled)'), /background:\s*var\(--panel2\)/);
   assert.match(ruleBody(css, 'header .rs-tabs .tab-dual:focus-visible'), /outline:\s*2px solid var\(--blue\)/);
   assert.match(ruleBody(css, '.rs-tabs .badge'), /background:\s*var\(--yellow\)/);
-  assert.ok(!/header \.rs-tabs \.tab-dual \.badge/.test(css.replace(mobile, '')), 'the absolute badge is only in the phone rules');
+  assert.ok(!/header \.rs-tabs \.tab-dual \.badge/.test(mediaBlocks.filter((b) => b.cond === '(max-width: 759.98px)').reduce((acc, b) => acc.replace(b.body, ''), css)), 'the absolute badge is only in the phone rules');
 });
 
 test('c3: the Add menu popover hangs from the list header, not from its small + button (a phone is 390 px wide and the + sits to the right); the summary stays blue', () => {
