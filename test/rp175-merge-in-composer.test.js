@@ -1,7 +1,7 @@
 'use strict';
 // RP175: the Merge button left the footer of the right column and lives in the composer, next to the commands of the flow (/flow-commit, /flow-pr, /flow-base). It is the SAME Merge as the card of the board:
 // data-act="merge", the ONE rule V.mergeButton, the same POST /api/merge. It is drawn only when the repo has an open PR of the CURRENT branch, and it is NOT held by the state of the session (RP159).
-// When it is off, the reason is written next to it (a phone has no hover). The footer of the column and the visible hint «Enter sends · Shift+Enter new line» are gone. The abuse cases come first.
+// When it is off, nothing is written next to it (RP191, S22: the title keeps the reason and the PR's reason is the placeholder of the message box). The footer of the column and the visible hint «Enter sends · Shift+Enter new line» are gone. The abuse cases come first.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -46,7 +46,7 @@ test('a1: hostile PR title, branch, id and reason never become markup', () => {
   g.merge = { enabled: false, label: 'Merge · <b>x</b>', title: '"><img src=x>', why: '<script>alert(1)</script> & "q"' };
   const o = R.composerMergeHtml(g);
   assert.doesNotMatch(o, /<script|<img|<b>/);
-  assert.equal(why(o), '&lt;script&gt;alert(1)&lt;/script&gt; &amp; &quot;q&quot;');
+  assert.doesNotMatch(o, /c-why|status/); // RP191: `why` is never written
 });
 
 test('a2: no PR (nothing, odd values, a PR without a number) draws NOTHING: no button and no reason line; the function is total', () => {
@@ -55,13 +55,13 @@ test('a2: no PR (nothing, odd values, a PR without a number) draws NOTHING: no b
   assert.doesNotMatch(R.composerMergeHtml({ id: 'a', pr: CASES.ready }), /undefined|NaN|null/);
 });
 
-test('a3: a PR that is not ready: the button is disabled AND the reason is a visible line with the exact V.mergeWhy text (escaped)', () => {
+test('a3: a PR that is not ready: the button is disabled with its title, and NO reason line is written (RP191)', () => {
   for (const [k, pr] of Object.entries(CASES)) {
     const h = R.composerMergeHtml(GIT(pr));
     assert.equal(/ disabled /.test(btn(h)), !pr.ready, k);
-    if (pr.ready) { assert.equal(why(h), undefined, k); continue; }
+    assert.equal(why(h), undefined, k);
+    if (pr.ready) continue;
     const b = V.mergeButton(pr, { method: 'squash' });
-    assert.equal(why(h), esc(V.mergeWhy(b)), k);
     assert.ok(V.mergeWhy(b).length > 0, k);
     assert.ok(btn(h).includes(`title="${esc(b.title)}"`), `${k}: the title stays on the button`);
   }
@@ -80,11 +80,12 @@ test('a4: ready: enabled with the label «Merge · <method>», the same data of 
   assert.equal(why(busy), undefined);
   const running = R.composerMergeHtml(GIT(CASES.ready, { hold: 'Running /flow-commit (committing…): wait for it to finish' }));
   assert.match(btn(running), / disabled /);
-  assert.equal(why(running), 'Running /flow-commit (committing…): wait for it to finish');
+  assert.equal(why(running), undefined);
+  assert.ok(btn(running).includes('title="Running /flow-commit (committing…): wait for it to finish"'), 'the hold stays in the title');
 });
 
-test('a5: the reason line comes right after the button, inside the actions row', () => {
-  assert.match(R.composerMergeHtml(GIT(CASES.draft)), /^<button [^>]*>Merge · squash<\/button><span class="c-why" role="status">Draft pull request\. Method: squash\. Change it in Settings, Delivery\.<\/span>$/);
+test('a5: an off Merge is ONLY the button: nothing comes after it (RP191)', () => {
+  assert.match(R.composerMergeHtml(GIT(CASES.draft)), /^<button [^>]*>Merge · squash<\/button>$/);
 });
 
 // ---------- the page ----------
@@ -191,8 +192,8 @@ test('p4: THE MATRIX on the page: the composer button is off where the card is o
     await open(page);
     const h = actions(page);
     assert.equal(/ disabled /.test(btn(h)), !pr.ready, `${k}: ${btn(h)}`);
-    assert.equal(why(h) !== undefined, !pr.ready, `${k}: the reason line is there exactly when it is off`);
-    if (!pr.ready) assert.equal(why(h), esc(V.mergeWhy(V.mergeButton(pr, { method: 'squash' }))), k);
+    assert.equal(why(h), undefined, `${k}: no reason line is written (RP191)`);
+    if (!pr.ready) assert.ok(btn(h).includes(`title="${esc(V.mergeWhy(V.mergeButton(pr, { method: 'squash' })))}"`), `${k}: the reason stays in the title`);
     page.click(MERGE_EL({ disabled: !pr.ready }));
     await page.tick();
     assert.equal(posts(page, '/api/merge').length, pr.ready ? 1 : 0, k);
@@ -250,7 +251,8 @@ test('p8: a command that the panel itself is running in the session turns the bu
   page.run('draw()');
   page.flush();
   assert.match(btn(actions(page)), / disabled /);
-  assert.match(why(actions(page)), /^Running /);
+  assert.equal(why(actions(page)), undefined);
+  assert.match(btn(actions(page)), /title="Running /);
 });
 
 test('p9: the footer is gone from the column in every tab, and the PR of the branch still shows in the Status tab', async () => {
@@ -292,14 +294,9 @@ test('s2: the hint is not visible any more; the information is the title of the 
   assert.match(read('app.js'), /e\.key !== 'Enter' \|\| !e\.target \|\| e\.target\.id !== 'msgBox' \|\| e\.keyCode === 229\) return;\n[^\n]*\n\s*const sends = V && V\.enterSends \? V\.enterSends\([^\n]*\n\s*if \(!sends\) return;\n\s*e\.preventDefault\(\);\n\s*sendChatMessage\(\);/);
 });
 
-test('s3: the reason wraps and never cuts, the row wraps in a narrow chat, and the RP156 container query still only hides chip words', () => {
+test('s3: the reason line has no style any more (RP191), the row wraps in a narrow chat, and the RP156 container query still only hides chip words', () => {
   const decl = (sel) => [...css.matchAll(/(?:^|\n)([^{}\n@/][^{}\n]*)\{([^}]*)\}/g)].filter((m) => m[1].split(',').map((s) => s.trim()).includes(sel)).map((m) => m[2]).join(';');
-  const w = decl('.c-why');
-  assert.match(w, /flex:\s*0 1 auto/); // RP191: the reason sits right after its button (glued to the right) and wraps only when it does not fit
-  assert.match(w, /text-align:\s*right/);
-  assert.match(w, /overflow-wrap:\s*anywhere/);
-  assert.doesNotMatch(w, /nowrap|text-overflow|overflow:\s*hidden|display:\s*none/);
-  assert.match(w, /color:\s*var\(--muted\)/);
+  assert.equal(decl('.c-why'), '');
   const a = decl('.c-actions');
   assert.match(a, /flex-wrap:\s*wrap/);
   assert.match(a, /min-width:\s*0/);

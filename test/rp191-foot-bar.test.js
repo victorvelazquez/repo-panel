@@ -158,7 +158,7 @@ test('B3: actionButtonsHtml and composerMergeHtml give the same markup as before
   );
   assert.equal(
     R.composerMergeHtml({ id: 'r1', pr: { number: 7 }, merge: { enabled: false, label: 'Merge · squash', title: 't', why: 'checks running' } }),
-    '<button type="button" class="c-act merge" data-act="merge" data-id="r1" data-n="7" disabled title="t">Merge · squash</button><span class="c-why" role="status">checks running</span>',
+    '<button type="button" class="c-act merge" data-act="merge" data-id="r1" data-n="7" disabled title="t">Merge · squash</button>', // RP191 (S22): the reason line is gone
   );
 });
 
@@ -176,9 +176,7 @@ test('C1 (S21): the bar centers its items; the state group takes the free space 
   const acts = rule('.c-actions');
   for (const re of [/display:\s*flex/, /flex:\s*0 1 auto/, /flex-wrap:\s*wrap/, /justify-content:\s*flex-end/, /align-items:\s*center/, /gap:\s*6px/, /min-width:\s*0/]) assert.match(acts, re);
   assert.match(rule('button.c-round'), /align-self:\s*flex-end/, 'the button stays at the bottom right when the actions wrap');
-  const why = rule('.c-why');
-  assert.match(why, /text-align:\s*right/);
-  assert.doesNotMatch(why, /flex:\s*1 1 auto/);
+  assert.doesNotMatch(css, /\.c-why/, 'RP191 (S22): the reason line has no rule any more');
 });
 
 test('C2: the state is an inline-flex item with a minimum width and no row layout of its own', () => {
@@ -191,14 +189,14 @@ test('C2: the state is an inline-flex item with a minimum width and no row layou
   assert.match(css, /@container cmp \(max-width: 456px\) \{\s*\.ss-word, \.mem-word \{/, 'the words are still hidden in a narrow chat');
 });
 
-test('C3: the actions are compact (28 px, 12.5 px, monospace); Merge has the page font and NO colour of its own, so the soft green of the palette shows when it is on and the muted gray when it is off; the reason stays beside it', () => {
+test('C3: the actions are compact (28 px, 12.5 px, monospace); Merge has the page font and NO colour of its own, so the soft green of the palette shows when it is on and the muted gray when it is off; no reason is written beside it (RP191, S22)', () => {
   const act = rule('.c-act');
   assert.match(act, /height:\s*28px/);
   assert.match(act, /font:\s*12\.5px ui-monospace/);
   const merge = rule('.c-act.merge');
   assert.doesNotMatch(merge, /color:/, 'a colour here would beat the disabled rule of the palette (a disabled Merge would look on)');
   assert.match(merge, /font-family:\s*inherit/);
-  assert.match(css, /\n\.c-why \{[^}]*\}/);
+  assert.doesNotMatch(css, /\.c-why/);
 });
 
 test('C4: the round buttons are 40 px (44 px with a coarse pointer), keep their border and have no padding for the soft layer to give back; Send is in the SOFT blue layer of the palette (RP67: no solid action button) with its hover and its disabled gray; Stop is panel2 with a red icon and ring', () => {

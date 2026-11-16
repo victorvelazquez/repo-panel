@@ -394,7 +394,7 @@ function columnGit(id, facts) {
   const ctx = { ...mergeCtxOf(id, pr ? pr.number : 0), noPr }; // RP137: the facts of the ONE rule, asked the same way by the sheet that confirms a merge
   return {
     id, branch, ahead: facts && Number.isInteger(facts.ahead) ? facts.ahead : 0, pr, noPr,
-    merge: V ? (() => { const b = V.mergeButton(pr, ctx); return { ...b, why: V.mergeWhy(b) }; })() : { enabled: false, label: `Merge · ${S.prefs.method}`, title: 'view.js did not load' },
+    merge: V ? (() => { const b = V.mergeButton(pr, ctx); return { ...b, why: V.mergeWhy(b), held: !!ctx.hold }; })() : { enabled: false, label: `Merge · ${S.prefs.method}`, title: 'view.js did not load' },
     rerun: V ? V.rerunButton(pr, ctx) : { show: false, enabled: false, title: '' },
   };
 }
@@ -582,7 +582,10 @@ function drawChat() {
   const cs = composerOf(id);
   $('#msgSend').disabled = !cs.canSend;
   $('#msgSend').title = cs.reason;
-  $('#msgBox').placeholder = cs.placeholder;
+  const git = cs.canSend && V ? columnGit(id, S.local[id]) : null;
+  const gm = git && git.pr ? git.merge : null; // no PR, no Merge button, no reason
+  const note = gm ? V.mergeNote(gm, gm.held) : ''; // RP191 (S22): the reason of the PR, muted, where the person writes; a hold reason is shown nowhere
+  $('#msgBox').placeholder = note || cs.placeholder;
   const busy = !!(S.rpc[id] && S.rpc[id].state === 'busy');
   $('#msgStop').hidden = !busy; // RP191: Stop takes the place of Send while the session works
   $('#msgSend').hidden = busy;
