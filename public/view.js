@@ -90,13 +90,33 @@
       if (conf.items.length) parts.push(`${conf.items.length} need attention`);
       if (notReady.length) parts.push(`${notReady.length} not ready`);
       if (roomsNotReady.length) parts.push(`${roomsNotReady.length} room${roomsNotReady.length === 1 ? '' : 's'} not ready`);
-      return { state: 'issues', summary: parts.join(' · '), message: '', count };
+      // RP213: the same counters as figures for the phone (the text above stays for desktop and assistive tools).
+      const figures = [{ n: conf.ok, word: 'conform' }];
+      if (conf.items.length) figures.push({ n: conf.items.length, word: 'attention' });
+      if (notReady.length) figures.push({ n: notReady.length, word: 'not ready' });
+      if (roomsNotReady.length) figures.push({ n: roomsNotReady.length, word: 'rooms' });
+      return { state: 'issues', summary: parts.join(' · '), figures, message: '', count };
     }
     if (req.prereq === 'failed' || repos.some((r) => r.state === 'failed') || rooms.state === 'failed') {
       return { state: 'error', summary: '', message: 'Could not check the requirements (is the panel server out of date? restart it)', count: 0 };
     }
     if (req.prereq !== 'loaded' || repos.some((r) => r.state !== 'loaded') || rooms.state !== 'loaded') return { state: 'computing', summary: '', message: 'Computing the report…', count: 0 };
-    return { state: 'ok', summary: `${conf.ok} conform`, message: 'All repositories conform.', count: 0 };
+    return { state: 'ok', summary: `${conf.ok} conform`, figures: [{ n: conf.ok, word: 'conform' }], message: 'All repositories conform.', count: 0 };
+  }
+
+  // RP213: a repo block of Conformity on the phone. `entry` is S.req[id] (absent = still loading); `choice` is what the person set (true open, false closed, undefined none) and wins.
+  // Without a choice a repo opens when it asks for attention (not ready, could not be read) or is still loading, the same reading as reqSummary (loaded and ready = conforms).
+  function reqFold(entry, choice) {
+    const ready = !!(entry && entry.state === 'loaded' && entry.data && entry.data.summary && entry.data.summary.ready);
+    let state = 'Checking…';
+    if (entry && entry.state !== 'loaded') state = 'Could not read';
+    else if (entry) {
+      const d = entry.data || {};
+      const pass = (d.results || []).filter((x) => x.status === 'pass').length;
+      const req = (d.summary && d.summary.required) || { pass: 0, total: 0 };
+      state = ready ? `Ready · ${pass} passing` : `Not ready · required ${req.pass}/${req.total}`;
+    }
+    return { open: typeof choice === 'boolean' ? choice : !ready, state };
   }
 
   // `entry` is the page's record of one repo's requirements: { state: 'loading' | 'loaded' | 'failed', data }.
@@ -1106,5 +1126,5 @@
     const rows = Math.max(1, Math.round((sc - pd) / ln));
     return { height: Math.min(Math.max(sc, one), cap), scrolls: sc - cap > 1, rows, expandable: rows > 4 };
   };
-  return { boxFit, enterSends, STALLED_MS, stalledNow, jobsHold, deliveryHold, tasksPollDue, TASKS_REFRESH_MS, mergeWhy, mergeNote, screenOf, bandOf, NARROW_BELOW, DUO_BELOW, parseAddress, addressOf, ADDRESS_ZONES, subClock, columnTabFor, conformityTabLabel, repoModel, changeChips, prChip, ciOf, idleChip, conflictChip, sizeChip, RepoCard, stateLineHidden, usageView, usageHtml, ringGeometry, usageRemaining, boardApply, boardWait, chatCachePut, chatCacheGet, rpcWithContext, chatFromCache, API_VERSION, mergeButton, rerunButton, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, dirtyRepos, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, taskPrs, matchesUnitId, isOutdated, conformityView, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, parseSse, rpcEvent, rpcReduce, rpcFromStatus, eventsPlan, eventsRetryMs, eventsStale };
+  return { boxFit, enterSends, STALLED_MS, stalledNow, jobsHold, deliveryHold, tasksPollDue, TASKS_REFRESH_MS, mergeWhy, mergeNote, screenOf, bandOf, NARROW_BELOW, DUO_BELOW, parseAddress, addressOf, ADDRESS_ZONES, subClock, columnTabFor, conformityTabLabel, repoModel, changeChips, prChip, ciOf, idleChip, conflictChip, sizeChip, RepoCard, stateLineHidden, usageView, usageHtml, ringGeometry, usageRemaining, boardApply, boardWait, chatCachePut, chatCacheGet, rpcWithContext, chatFromCache, API_VERSION, mergeButton, rerunButton, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, dirtyRepos, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, taskPrs, matchesUnitId, isOutdated, conformityView, reqFold, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, parseSse, rpcEvent, rpcReduce, rpcFromStatus, eventsPlan, eventsRetryMs, eventsStale };
 }));

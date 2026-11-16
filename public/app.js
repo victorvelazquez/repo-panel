@@ -28,7 +28,7 @@ const S = {
   snoozed: new Set(), keepSnoozed: new Set(), snoozedOpen: {}, onlyProblems: false,
   dismissed: new Set(), menu: null, reqPassOpen: {},
   group: '', q: '', queue: [], queueKey: '', queueSeq: 0,
-  conf: { items: [], ok: 0, loaded: false, failed: false, key: '', seq: 0 },
+  conf: { items: [], ok: 0, loaded: false, failed: false, key: '', seq: 0, fold: new Map() },
   req: {}, reqSeq: {}, state: {}, stateSeq: {}, sent: {}, pistatus: {}, pistatusSeq: {}, sending: {}, merged: {}, pending: {}, finishing: {}, showCommit: new Set(), settings: { state: 'idle', seq: 0, options: {}, saved: '', error: '', open: new Set() }, prereq: { state: 'loading', items: [], seq: 0, pi: null },
   rooms: [], roomIssues: [], roomData: { state: 'loading', data: null }, roomSeq: 0,
   prefs: store('prefs', { method: 'squash', del: true }),

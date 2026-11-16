@@ -173,7 +173,9 @@ function reqResults(key, { results, summary }) {
 
 function reqBlock(r) {
   const e = S.req[r.id];
-  const name = `<button class="repo-name" data-act="queue-pick" data-close="1" data-name="${esc(r.name)}" title="Filter the board to this repo">${esc(r.name)}</button>`;
+  // RP213: under 760 px the block folds behind this control (CSS hides it elsewhere); what it shows, and whether it is open, comes from V.reqFold and S.conf.fold.
+  const fold = V.reqFold(e, S.conf.fold.get(r.id));
+  const name = `<button class="repo-name" data-act="queue-pick" data-close="1" data-name="${esc(r.name)}" title="Filter the board to this repo">${esc(r.name)}</button><button type="button" class="req-fold" data-act="req-fold" data-id="${esc(r.id)}" aria-expanded="${fold.open}" aria-label="${esc(r.name)}: ${esc(fold.state)}">${esc(fold.state)}</button>`;
   if (!e || e.state !== 'loaded') return `<div class="conf-item">${name}<div class="conf-line">${e ? 'Could not read the requirements' : 'Checking the requirements…'}</div></div>`;
   // The same action as the card's ⋯ menu (and its protection against a second click): offered while any requirement is open.
   const offered = V && V.cardMenu(e, false).some((i) => i.act === 'put-in-conditions');
@@ -216,7 +218,8 @@ function drawConformity() {
   $('#confBadge').textContent = n;
   $('#tab-conformity').setAttribute('aria-label', V ? V.conformityTabLabel(n) : 'Conformity');
   if (S.tab !== 'conformity') return;
-  const sum = v.summary ? `<div class="conf-sum">${esc(v.summary)}</div>` : '';
+  const figs = v.figures && v.figures.length ? `<div class="conf-figs" aria-hidden="true">${v.figures.map((f) => `<span class="conf-fig"><b>${f.n}</b> ${esc(f.word)}</span>`).join('')}</div>` : '';
+  const sum = v.summary ? `${figs}<div class="conf-sum">${esc(v.summary)}</div>` : '';
   const body = v.state === 'issues' ? S.conf.items.map(confBlock).join('') : `<div class="${v.state === 'error' ? 'conf-error' : 'empty'}">${esc(v.message)}</div>`;
   const reqs = V ? `<div class="conf-heading">Requirements</div>${allRepos().map(reqBlock).join('')}${roomsBlock()}` : '';
   paint($('#conformityView'), sum + prereqBlock() + body + reqs);
