@@ -484,6 +484,8 @@ body.tab-settings #viewbar { display: none; }
   .conf-fig b { display: block; font-size: 22px; line-height: 1.2; color: var(--text); }
   .conf-figs + .conf-sum { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .conf-item:has(> .req-fold) { display: flex; flex-wrap: wrap; align-items: center; gap: 0 8px; }
+  /* RP214: a button keeps the white-space of the browser, so a very long repo name pushed the page wider than the phone (and the fixed bar with it); here the name wraps inside its block. */
+  .conf-item .repo-name { white-space: normal; overflow-wrap: anywhere; text-align: left; min-width: 0; max-width: 100%; }
   .conf-item .req-fold { display: flex; align-items: center; gap: 4px; margin-left: auto; min-height: 44px; padding: 0 4px; background: none; border: 0; color: var(--muted); font-size: 12px; }
   .req-fold::after { content: "\25BE"; }
   .req-fold[aria-expanded="true"]::after { content: "\25B4"; }
