@@ -223,14 +223,14 @@ test('composerState: busy cannot send (same reason, same placeholder); idle can'
   assert.deepEqual(R.composerState({ id: 'r1', sending: false, info: adoptedInfo(), rpc: { state: 'idle' } }, { name: 'alpha' }), { canSend: true, reason: '', placeholder: 'Message…' });
 });
 // ---------- index.html ----------
-test('index.html: div#sessState.sess-state is the FIRST child of div#composer and comes before textarea#msgBox; it is never hidden', () => {
+test('index.html: div#sessState.sess-state is the FIRST child of div.c-left in the bar (RP191), after textarea#msgBox; it is never hidden', () => {
   const html = read('index.html');
-  assert.match(html, /<div id="composer"[^>]*>\s*<div id="sessState" class="sess-state"><\/div>/);
+  assert.match(html, /<div class="c-bar">\s*<div class="c-left">\s*<div id="sessState" class="sess-state"><\/div>/);
   const composer = html.indexOf('id="composer"');
   const at = html.indexOf('id="sessState"');
   const box = html.indexOf('id="msgBox"');
   assert.ok(composer >= 0 && at > composer, 'sessState is inside the composer');
-  assert.ok(box > at, 'sessState comes before the textarea');
+  assert.ok(box < at, 'sessState comes after the textarea (RP191: it left the line above the field)');
   assert.doesNotMatch((/<[^>]*id="sessState"[^>]*>/.exec(html) || [''])[0], /\bhidden\b/);
 });
 

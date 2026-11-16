@@ -295,7 +295,8 @@ test('s2: the hint is not visible any more; the information is the title of the 
 test('s3: the reason wraps and never cuts, the row wraps in a narrow chat, and the RP156 container query still only hides chip words', () => {
   const decl = (sel) => [...css.matchAll(/(?:^|\n)([^{}\n@/][^{}\n]*)\{([^}]*)\}/g)].filter((m) => m[1].split(',').map((s) => s.trim()).includes(sel)).map((m) => m[2]).join(';');
   const w = decl('.c-why');
-  assert.match(w, /flex:\s*1 1 100%/);
+  assert.match(w, /flex:\s*0 1 auto/); // RP191: the reason sits right after its button (glued to the right) and wraps only when it does not fit
+  assert.match(w, /text-align:\s*right/);
   assert.match(w, /overflow-wrap:\s*anywhere/);
   assert.doesNotMatch(w, /nowrap|text-overflow|overflow:\s*hidden|display:\s*none/);
   assert.match(w, /color:\s*var\(--muted\)/);

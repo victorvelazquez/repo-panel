@@ -192,8 +192,9 @@ test('k4: the session chip of the card is byte for byte the same with or without
 });
 
 // ---------- the page ----------
-test('w1: chat.js gives the label the CI of the PR of the current branch, through ciOf', () => {
-  assert.match(chatJs, /R\.sessionLabelHtml\(\{ \.\.\.shown, ci: [^}]*ciOf\(columnGit\(S\.chat\.id, facts\)\.pr\)/);
+test('w1: chat.js no longer gives the label of the foot a CI (RP191: the head shows the checks); the label itself still takes one', () => {
+  assert.match(chatJs, /R\.sessionLabelHtml\(shown\)\);/);
+  assert.doesNotMatch(chatJs, /sessionLabelHtml\(\{[^\n]*\bci\b/);
   const src = read('resumen.js');
   const at = src.indexOf('function sessionChip');
   assert.doesNotMatch(src.slice(at, src.indexOf('\n  }\n', at)), /\bci\b/, 'the card chip is called without ci');
@@ -246,15 +247,16 @@ async function boot() {
     },
   };
 }
-test('w2: page: idle + a running PR of the current branch reads Verifying Checks; another branch, another state, passed or none read as today', async () => {
+test('w2: page (RP191): the foot state reads Idle whatever the checks of the PR of the current branch do; busy still reads Working', async () => {
   const page = await boot();
   await page.set({ rpc: IDLE, prs: [PR(RUN)] });
-  assert.equal(words(page.state()).startsWith('Verifying Checks · 2 running · 2/4'), true, page.state());
+  assert.match(page.state(), /ss-word">Idle</, page.state());
+  assert.doesNotMatch(page.state(), /Verifying|ss-ci/);
   await page.set({ rpc: IDLE, prs: [PR(RUN, { head: 'feat/other' })] });
   assert.match(page.state(), /ss-word">Idle</);
   await page.set({ rpc: IDLE, prs: [PR(RUN, { head: 'feat/other', number: 3 }), PR(BAD, { number: 9 })] });
-  assert.equal(words(page.state()).startsWith('Checks Failed · 1 failed · 3/4'), true, 'only the PR of the current branch counts');
-  assert.match(page.state(), /title="PR #9: the checks failed/);
+  assert.match(page.state(), /ss-word">Idle</);
+  assert.doesNotMatch(page.state(), /Checks Failed|ss-ci/);
   await page.set({ rpc: { state: 'busy' }, prs: [PR(RUN)] });
   assert.match(page.state(), /Working…/);
   assert.doesNotMatch(page.state(), /Verifying/);

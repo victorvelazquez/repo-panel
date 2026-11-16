@@ -153,7 +153,7 @@ test('t2: the icons sit in the line with the text (inline-flex, centred) and do 
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)[^{]*\{[^}]*\.ss-anim \.ss-dot[^}]*animation:\s*none/);
 });
 
-test('t3: the row of the chips wraps to a second line instead of cutting a button at the edge of the composer (seen at 1440 and 360 px with every chip on)', () => {
-  assert.match(rule('.sess-state'), /flex-wrap:\s*wrap/);
-  assert.match(rule('.sess-state'), /row-gap:\s*4px/);
+test('t3: the actions of the bar wrap to a second line instead of cutting a button at the edge of the composer (RP191: the wrap moved from .sess-state, now one item of the bar, to .c-actions)', () => {
+  assert.match(rule('.c-actions'), /flex-wrap:\s*wrap/);
+  assert.doesNotMatch(rule('.sess-state'), /flex-wrap/);
 });
