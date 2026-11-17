@@ -91,7 +91,7 @@ document.addEventListener('keydown', (e) => {
 document.addEventListener('keydown', (e) => {
   const t = e.target;
   if (!R || !t || !t.dataset || t.dataset.act !== 'col-tab' || e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
-  const tabs = R.COLUMN_TABS;
+  const tabs = roomByFolder(S.chat.id) ? R.ROOM_COLUMN_TABS : R.COLUMN_TABS; // RP220: in a room the arrows walk Projects, Changes, Status, Files
   const i = tabs.indexOf(t.dataset.tab);
   const to = e.key === 'ArrowRight' ? tabs[(i + 1) % tabs.length] : e.key === 'ArrowLeft' ? tabs[(i + tabs.length - 1) % tabs.length] : e.key === 'Home' ? tabs[0] : e.key === 'End' ? tabs[tabs.length - 1] : null;
   if (!to) return;

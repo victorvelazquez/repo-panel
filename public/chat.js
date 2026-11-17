@@ -483,18 +483,23 @@ function drawChat() {
   if (column) loadTasks();
   // RP92: the files card is drawn from the facts the board keeps fresh (S.local), so it reads nothing.
   const facts = S.local[S.chat.id];
+  const room = roomByFolder(S.chat.id); // RP220: the open chat is the folder of a room: its column opens on Projects and has no Tasks
   // RP148: the tab the column opens on follows the situation of the repo. It is decided ONCE per opening, as soon as the facts are known: never over a tab the person chose, never again when the situation changes.
+  // RP220 (A27): the room of the open chat is known from the configuration of the page (roomByFolder), so the choice does not wait for /api/rooms, and a room always opens on Projects.
   if (column && !S.chat.colTab && V) {
-    const pr = !!columnGit(S.chat.id, facts).pr;
-    const pick = V.columnTabFor({ files: facts && !facts.error ? facts.files : null, ahead: facts ? facts.ahead : undefined, hasPr: pr, prsKnown: !!S.prs[S.chat.id] });
-    if (pick) S.chat.colTab = pick;
+    if (room) S.chat.colTab = 'members';
+    else {
+      const pr = !!columnGit(S.chat.id, facts).pr;
+      const pick = V.columnTabFor({ files: facts && !facts.error ? facts.files : null, ahead: facts ? facts.ahead : undefined, hasPr: pr, prsKnown: !!S.prs[S.chat.id] });
+      if (pick) S.chat.colTab = pick;
+    }
   }
   // RP128: the column is tabs (Changes, Tasks). The open one belongs to the opening (S.chat.colTab, Changes by default), the closed folders too (S.chat.colFold); with no column nothing is painted.
   const phone = narrowOn(); // RP196: under 760 px Notes is a tab of the column and a file or a diff opens as its detail screen
-  const colTab = ['tasks', 'status', 'files'].includes(S.chat.colTab) || (phone && S.chat.colTab === 'notes') ? S.chat.colTab : 'changes';
+  const colTab = V ? V.columnTabOf(S.chat.colTab, { room: !!room, phone }) : 'changes'; // RP220
   const detail = column && phone ? (S.chat.detail === 'diff' && S.chat.dfile ? 'diff' : S.chat.detail === 'file' && S.chat.ffile ? 'file' : '') : '';
   const detailHtml = () => R.columnDetail({ title: detail === 'diff' ? S.chat.dfile : S.chat.ffile, html: detail === 'diff' ? R.changesView(S.changes[S.chat.id] || null, { selected: S.chat.dfile, only: true, split: !!S.prefs.split, loading: !!S.chat.changesLoading, failed: !!S.chat.changesFailed }) : R.fileView(S.fileData[S.chat.id] || null, { selected: S.chat.ffile, fileLoading: !!S.chat.fileLoading, fileFailed: S.chat.fileFailed || '' }) });
-  paint($('#colBody'), detail ? detailHtml() : !column ? '' : R.columnView({ notes: phone, back: narrowOn(), name: nameOf(S.chat.id), tab: colTab, fold: S.chat.colFold, git: columnGit(S.chat.id, facts), files: facts && !facts.error && Array.isArray(facts.files) ? facts.files : null, failed: !!(facts && facts.error), selected: S.chat.dfile || '', tree: colTab === 'files' ? S.files[S.chat.id] || null : null, changed: colTab === 'files' ? changedOf(S.chat.id) : null, fselected: S.chat.ffile || '', fopen: S.filesOpen[S.chat.id] || {}, filesFailed: !!S.chat.filesFailed, tasksHtml: colTab === 'tasks' ? R.tasksView(S.tasks[S.chat.id] || null, { compact: true, open: S.tasksFold, more: S.tasksMore, readAt: S.chat.tasksAt, now: Date.now(), refreshing: !!S.chat.tasksRefreshing, refreshFailed: !!S.chat.tasksRefreshFailed, loading: !!S.chat.tasksLoading, failed: !!S.chat.tasksFailed }) : '' }));
+  paint($('#colBody'), detail ? detailHtml() : !column ? '' : R.columnView({ notes: phone, back: narrowOn(), name: nameOf(S.chat.id), tab: colTab, room: !!room, members: room ? V.roomMembers(room, { repos: allRepos(), rows: S.summary && Array.isArray(S.summary.rows) ? S.summary.rows : [], prsFor: summaryPrs, liveFor: summaryLive }) : null, now: Date.now(), fold: S.chat.colFold, git: columnGit(S.chat.id, facts), files: facts && !facts.error && Array.isArray(facts.files) ? facts.files : null, failed: !!(facts && facts.error), selected: S.chat.dfile || '', tree: colTab === 'files' ? S.files[S.chat.id] || null : null, changed: colTab === 'files' ? changedOf(S.chat.id) : null, fselected: S.chat.ffile || '', fopen: S.filesOpen[S.chat.id] || {}, filesFailed: !!S.chat.filesFailed, tasksHtml: colTab === 'tasks' ? R.tasksView(S.tasks[S.chat.id] || null, { compact: true, open: S.tasksFold, more: S.tasksMore, readAt: S.chat.tasksAt, now: Date.now(), refreshing: !!S.chat.tasksRefreshing, refreshFailed: !!S.chat.tasksRefreshFailed, loading: !!S.chat.tasksLoading, failed: !!S.chat.tasksFailed }) : '' }));
   // What the person touched in the column keeps the focus across the repaint: a tab by its id, a folder or a fold by its button.
   const want = S.chat.colFocus;
   if (want) {

@@ -190,7 +190,7 @@ const ACTIONS = {
   'notes-mine': () => { const p = S.pad[S.chat.id]; if (p && p.status === 'conflict' && p.disk) { p.base = p.disk.rev; p.status = 'saving'; saveNotes(S.chat.id); draw(); } },
   'tasks-done': () => { S.tasksOpenDone = !S.tasksOpenDone; draw(); },
   // RP128: the right column. The tab and the folded folders belong to the opening (S.chat is replaced when another repo opens); a tab that does not exist reads as Changes.
-  'col-tab': (el) => { const t = el && el.dataset && (['tasks', 'status', 'files'].includes(el.dataset.tab) || (el.dataset.tab === 'notes' && narrowOn())) ? el.dataset.tab : 'changes'; if (S.chat.colTab === 'notes' && t !== 'notes') flushNotes(); S.chat.colTab = t; S.chat.colFocus = { id: `coltab-${t}` }; if (t === 'files') loadFiles(); if (t === 'tasks') loadTasks({ force: true }); if (t === 'notes') loadNotes(); draw(); },
+  'col-tab': (el) => { const t = el && el.dataset && (['tasks', 'status', 'files'].includes(el.dataset.tab) || (el.dataset.tab === 'members' && !!roomByFolder(S.chat.id)) || (el.dataset.tab === 'notes' && narrowOn())) ? el.dataset.tab : 'changes'; if (S.chat.colTab === 'notes' && t !== 'notes') flushNotes(); S.chat.colTab = t; S.chat.colFocus = { id: `coltab-${t}` }; if (t === 'files') loadFiles(); if (t === 'tasks') loadTasks({ force: true }); if (t === 'notes') loadNotes(); draw(); },
   'col-folder': (el) => {
     const p = el && el.dataset && el.dataset.path;
     const facts = S.local[S.chat.id];
