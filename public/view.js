@@ -172,6 +172,56 @@
     return (Array.isArray(repos) ? repos : []).filter((r) => !folders.has(r.id));
   }
 
+  // RP220: the room whose folder is the repo with this id (the one open in the chat), or null. `rooms` is the list of /api/rooms (each with the `id` of its folder, or null). Total.
+  function roomOfFolder(rooms, id) {
+    if (!Array.isArray(rooms) || typeof id !== 'string' || !id) return null;
+    return rooms.find((m) => isObject(m) && m.id === id) || null;
+  }
+  // RP220: the tab of the right column that is open, from the one the person has (`tab`) and where the page is (`o.room`: the folder of a room, `o.phone`: under 760 px, where Notes is a tab of the
+  // column). A room opens on Projects (the id of the tab is `members`), keeps it, Status, Files and Changes, and has no Tasks (a room carries no roadmap); a repo that is not a room reads as it always did: Tasks, Status, Files,
+  // Notes (only on a phone) and anything else is Changes. Total.
+  function columnTabOf(tab, o) {
+    const x = isObject(o) ? o : {};
+    const notes = x.phone === true && tab === 'notes';
+    if (x.room === true) return !tab ? 'members' : ['members', 'status', 'files'].includes(tab) || notes ? tab : 'changes';
+    return ['tasks', 'status', 'files'].includes(tab) || notes ? tab : 'changes';
+  }
+  // RP220 (A27): the rooms the page shows. The card of a room, its chat and its Projects tab must not wait for GET /api/rooms (it runs git: tens of seconds, and the page gives up at 25 s), so
+  // the room is built from what the page already has: `configRooms` (S.rooms, from /api/config: name, path, members) and `repos` (id, path, name, to find the id of the folder of the room). `dataRooms`
+  // (the `rooms` of /api/rooms, or null) only COMPLETES it (id, last commit, requirements). One entry per configured room, in its order, then the rooms that only the data has. Pure and total.
+  function mergeRooms(configRooms, repos, dataRooms) {
+    const list = (a) => (Array.isArray(a) ? a : []);
+    const norm = (p) => String(p).replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase(); // like the server: slashes, trailing slashes and case do not matter
+    const known = list(repos).filter((r) => isObject(r) && typeof r.id === 'string' && r.id && typeof r.path === 'string');
+    const data = list(dataRooms).filter((m) => isObject(m) && typeof m.name === 'string');
+    const folderId = (p) => { if (typeof p !== 'string' || !p) return null; const want = norm(p); const hit = known.find((r) => norm(r.path) === want); return hit ? hit.id : null; };
+    const out = list(configRooms).filter((c) => isObject(c) && typeof c.name === 'string').map((c) => {
+      const d = data.find((m) => m.name === c.name) || {};
+      const path = typeof c.path === 'string' ? c.path : d.path;
+      const members = Array.isArray(c.repos) ? c.repos : d.repos;
+      return { ...d, name: c.name, path, repos: Array.isArray(members) ? members : [], id: typeof d.id === 'string' && d.id ? d.id : folderId(path) };
+    });
+    const have = new Set(out.map((m) => m.name));
+    for (const d of data) if (!have.has(d.name)) out.push({ ...d });
+    return out;
+  }
+  // RP220: what the Projects tab of a room shows for each member id, in the order of the room, from what the page already has: `repos` (id and name), `rows` (the rows of the summary) and the
+  // getters `prsFor(id)` and `liveFor(id)` (a getter that throws is no data). A member that is not a repo of the panel stays in the list with `known: false`. Total.
+  function roomMembers(room, d) {
+    const ids = isObject(room) && Array.isArray(room.repos) ? room.repos.filter((id) => typeof id === 'string' && id) : [];
+    const x = isObject(d) ? d : {};
+    const repos = Array.isArray(x.repos) ? x.repos : [];
+    const rows = Array.isArray(x.rows) ? x.rows : [];
+    const ask = (fn, id) => { try { return typeof fn === 'function' ? fn(id) : undefined; } catch { return undefined; } };
+    return ids.map((id) => {
+      const repo = repos.find((r) => isObject(r) && r.id === id);
+      const row = rows.find((r) => isObject(r) && r.id === id);
+      const last = row && isObject(row.lastMovement) ? row.lastMovement : {};
+      const prs = ask(x.prsFor, id);
+      return { id, name: repo && typeof repo.name === 'string' ? repo.name : id, known: !!repo, state: row && isObject(row.session) ? row.session.state : undefined, at: typeof last.at === 'string' ? last.at : null, what: typeof last.what === 'string' ? last.what : '', prs: prs === undefined ? null : prs, live: ask(x.liveFor, id) };
+    });
+  }
+
   function roomIssuesNotice(issues) {
     const reasons = (Array.isArray(issues) ? issues : []).filter((s) => typeof s === 'string' && s);
     if (!reasons.length) return null;
@@ -1132,5 +1182,5 @@
     const rows = Math.max(1, Math.round((sc - pd) / ln));
     return { height: Math.min(Math.max(sc, one), cap), scrolls: sc - cap > 1, rows, expandable: rows > 4 };
   };
-  return { boxFit, enterSends, STALLED_MS, stalledNow, jobsHold, deliveryHold, tasksPollDue, TASKS_REFRESH_MS, mergeWhy, mergeNote, screenOf, bandOf, NARROW_BELOW, DUO_BELOW, parseAddress, addressOf, ADDRESS_ZONES, subClock, columnTabFor, conformityTabLabel, repoModel, changeChips, prChip, ciOf, idleChip, conflictChip, sizeChip, RepoCard, stateLineHidden, usageView, usageHtml, ringGeometry, usageRemaining, boardApply, boardWait, chatCachePut, chatCacheGet, rpcWithContext, chatFromCache, API_VERSION, mergeButton, rerunButton, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, dirtyRepos, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, taskPrs, matchesUnitId, isOutdated, conformityView, reqFold, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, parseSse, rpcEvent, rpcReduce, rpcFromStatus, eventsPlan, eventsRetryMs, eventsStale, projectRepos };
+  return { boxFit, enterSends, STALLED_MS, stalledNow, jobsHold, deliveryHold, tasksPollDue, TASKS_REFRESH_MS, mergeWhy, mergeNote, screenOf, bandOf, NARROW_BELOW, DUO_BELOW, parseAddress, addressOf, ADDRESS_ZONES, subClock, columnTabFor, conformityTabLabel, repoModel, changeChips, prChip, ciOf, idleChip, conflictChip, sizeChip, RepoCard, stateLineHidden, usageView, usageHtml, ringGeometry, usageRemaining, boardApply, boardWait, chatCachePut, chatCacheGet, rpcWithContext, chatFromCache, API_VERSION, mergeButton, rerunButton, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, dirtyRepos, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, taskPrs, matchesUnitId, isOutdated, conformityView, reqFold, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, parseSse, rpcEvent, rpcReduce, rpcFromStatus, eventsPlan, eventsRetryMs, eventsStale, projectRepos, roomOfFolder, roomMembers, columnTabOf, mergeRooms };
 }));

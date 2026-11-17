@@ -186,6 +186,7 @@
   // uncommitted changes (`files`, the board's facts: path, status, added, deleted): a chain of single folders is ONE row, folders come first, each has a count and the total is on top; each file is the
   // button that opens it in the diff tab (`selected` marks the one open there) and `fold` ({path: true}) holds the closed folders. Tasks is `tasksHtml`, the compact answer of R.tasksView. Total.
   const COLUMN_TABS = ['tasks', 'changes', 'status', 'files']; // RP148: the order of the cycle (what to do, do it, deliver it) and Files last, as a look-up
+  const ROOM_COLUMN_TABS = ['members', 'changes', 'status', 'files']; // RP220: the tabs of the column of a ROOM (the arrows of the keyboard walk this list there): Projects (id members) first, no Tasks (a room carries no roadmap)
   const FILES_MAX = 200;
   const TREE_DEPTH_MAX = 8;
   const svgIcon = (d, s = 14) => `<svg width="${s}" height="${s}" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
@@ -195,6 +196,7 @@
     tasks: svgIcon('<path d="M3 4.5l1.3 1.3L7 3.2M3 10.5l1.3 1.3L7 9.2M9.5 5h3.5M9.5 11h3.5"/>', 16),
     status: svgIcon('<circle cx="4" cy="3.5" r="1.6"/><circle cx="4" cy="12.5" r="1.6"/><circle cx="12" cy="12.5" r="1.6"/><path d="M4 5.1v5.8M12 10.9V7a2 2 0 0 0-2-2H8"/>', 16),
     notes: svgIcon('<path d="M4 2.5h6l2.5 2.5v8.5H4z"/><path d="M10 2.5V5h2.5M6 8h4M6 10.5h4"/>', 16),
+    members: svgIcon('<rect x="2.5" y="2.5" width="4.5" height="4.5" rx="1"/><rect x="9" y="2.5" width="4.5" height="4.5" rx="1"/><rect x="2.5" y="9" width="4.5" height="4.5" rx="1"/><rect x="9" y="9" width="4.5" height="4.5" rx="1"/>', 16), // RP220: the Projects tab of a room (its id stays `members`, the word of the model)
   };
   const ICON_DIR = svgIcon('<path fill="currentColor" d="M2 4.5A1.5 1.5 0 0 1 3.5 3h2.6l1.4 1.5h5A1.5 1.5 0 0 1 14 6v5.5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 11.5z"/>');
   const ICON_FILE = svgIcon('<path d="M4 2h5l3 3v8.5a.5.5 0 0 1-.5.5h-7a.5.5 0 0 1-.5-.5z"/><path d="M9 2v3h3"/>');
@@ -304,15 +306,33 @@
     const reason = !pr.ready && pr.blockedReason && k.state !== 'pending' && k.state !== 'failed' ? `<p class="rs-sub" role="status">${esc(pr.blockedReason)}</p>` : '';
     return `<div class="st-pr"><div class="st-t">${number}${state}${review}</div><div class="st-ti">${esc(pr.title ?? '')}</div><div class="st-mt">${meta}</div></div>${sum}<div class="ck-list">${rows}</div>${more}${rerun}${reason}`;
   };
+  // RP220: the Projects tab (id `members`) of the column of a room: one block per member (a project), a line between one block and the next, with what the page already knows: the state of its session (the live one wins,
+  // as in the card of the list), how long ago it moved and its PR with its CI. Read-only. `c.members` is what V.roomMembers answers and `c.now` the clock of the page. Total.
+  const membersView = (c) => {
+    const x = c && typeof c === 'object' ? c : {};
+    const list = (Array.isArray(x.members) ? x.members : []).filter((m) => m && typeof m === 'object' && !Array.isArray(m) && typeof m.id === 'string');
+    if (!list.length) return '<p class="rs-sub" role="status">No projects yet. Assign repos to this room from the ⋯ menu of a card.</p>';
+    const block = (m) => {
+      const name = `<b class="mb-name" title="${esc(m.name)}">${esc(m.name)}</b>`;
+      if (m.known === false) return `<div class="mb-row" data-id="${esc(m.id)}"><div class="mb-l1">${name}</div><div class="mb-l2 rs-sub">not in the panel</div></div>`;
+      const state = sessionChip({ id: m.id, session: { state: m.state } }, { liveFor: () => m.live });
+      const prs = prChipOf(m.prs);
+      const what = typeof m.what === 'string' && m.what.trim() ? `<div class="mb-l3 rs-sub rs-commit" title="${esc(m.what.trim())}">${esc(m.what.trim())}</div>` : '';
+      return `<div class="mb-row" data-id="${esc(m.id)}"><div class="mb-l1">${name}${state}</div><div class="mb-l2 rs-sub"><span class="rs-when">${esc(relativeTime(m.at, x.now))}</span>${prs || '<span class="rs-sub">no open PR</span>'}</div>${what}</div>`;
+    };
+    return `<div class="mb-list" role="list">${list.map(block).join('')}</div>`;
+  };
   const columnView = (ctx) => {
     const c = ctx && typeof ctx === 'object' ? ctx : {};
     const g = gitOf(c);
-    const tab = c.tab === 'tasks' ? 'tasks' : c.tab === 'files' ? 'files' : c.tab === 'notes' && c.notes === true ? 'notes' : c.tab === 'status' && g ? 'status' : 'changes';
+    const room = c.room === true; // RP220: the column of a room opens on Projects and has no Tasks tab
+    const tab = room ? (c.tab === 'files' ? 'files' : c.tab === 'notes' && c.notes === true ? 'notes' : c.tab === 'status' && g ? 'status' : c.tab === 'changes' ? 'changes' : 'members') : c.tab === 'tasks' ? 'tasks' : c.tab === 'files' ? 'files' : c.tab === 'notes' && c.notes === true ? 'notes' : c.tab === 'status' && g ? 'status' : 'changes';
     const files = validFiles(c.files);
     const pending = g ? checksOf(prOf(g)).pending : 0;
     const tabBtn = ([id, label]) => `<button type="button" role="tab" class="col-tab" id="coltab-${id}" data-act="col-tab" data-tab="${id}" aria-selected="${id === tab}" aria-controls="colpane" aria-label="${label}" title="${label}">${ICON_TAB[id]}<span class="lb">${label}</span>${id === 'changes' && files ? `<span class="n">${files.length}</span>` : id === 'status' && pending > 0 ? `<span class="n y">${pending}</span>` : ''}</button>`;
-    const body = tab === 'notes' ? '<div id="colNotes" class="col-notes"></div>' : tab === 'tasks' ? (typeof c.tasksHtml === 'string' && c.tasksHtml ? c.tasksHtml : '<p class="rs-sub" role="status">No tasks to show</p>') : tab === 'status' ? statusPanel(g) : tab === 'files' ? treeHtml(c.tree, { selected: c.fselected, open: c.fopen, changed: c.changed, failed: c.filesFailed }).html : changesPanel(c, files);
-    const list = g ? [['tasks', 'Tasks'], ['changes', 'Changes'], ['status', 'Status'], ['files', 'Files']] : [['tasks', 'Tasks'], ['changes', 'Changes'], ['files', 'Files']];
+    const body = tab === 'members' ? membersView(c) : tab === 'notes' ? '<div id="colNotes" class="col-notes"></div>' : tab === 'tasks' ? (typeof c.tasksHtml === 'string' && c.tasksHtml ? c.tasksHtml : '<p class="rs-sub" role="status">No tasks to show</p>') : tab === 'status' ? statusPanel(g) : tab === 'files' ? treeHtml(c.tree, { selected: c.fselected, open: c.fopen, changed: c.changed, failed: c.filesFailed }).html : changesPanel(c, files);
+    const base = g ? [['tasks', 'Tasks'], ['changes', 'Changes'], ['status', 'Status'], ['files', 'Files']] : [['tasks', 'Tasks'], ['changes', 'Changes'], ['files', 'Files']];
+    const list = room ? [['members', 'Projects'], ...base.filter(([id]) => id !== 'tasks')] : base;
     if (c.notes === true) list.push(['notes', 'Notes']); // RP196: under 760 px Notes is a tab of the column (the chat of the phone has no tabs of its own)
     // RP157: asked for the Repo screen (`back: true`, under 760 px) it starts with a head: the arrow back to the chat and the title.
     const head = c.back === true ? `<div class="col-head"><button type="button" class="ch-back" data-act="zone-back" aria-label="Back to the chat" title="Back to the chat">${svgIcon('<path d="M10 3L5 8l5 5"/>', 20)}</button><b>Repo</b></div>` : '';
@@ -1481,5 +1501,5 @@
     return `${ctx.failed ? '<div class="rs-note" role="status">⚠ Summary unavailable: showing the last data we have.</div>' : ''}<div class="rs-list">${body}</div>`;
   }
 
-  return { mergeSheetHtml, repoStatus, esc, mdHtml, settingsView, memoryChipHtml, ctxChipHtml, compactButtonHtml, legendHtml, listCount, blockWidths, columnView, treeFolderPaths, fileView, COLUMN_TABS, columnDetail, chatMenuHtml, headChipsHtml, statusIconsHtml, composerState, askAllowed, actionMenu, actionButtonsHtml, composerMergeHtml, composerNote, chatHead, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, sessionCloseHtml, sessionTerminalHtml, terminalBlockHtml, recentlyActive, chatBody, quickReplies, quickOf, quickRow, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
+  return { mergeSheetHtml, repoStatus, esc, mdHtml, settingsView, memoryChipHtml, ctxChipHtml, compactButtonHtml, legendHtml, listCount, blockWidths, columnView, membersView, ROOM_COLUMN_TABS, treeFolderPaths, fileView, COLUMN_TABS, columnDetail, chatMenuHtml, headChipsHtml, statusIconsHtml, composerState, askAllowed, actionMenu, actionButtonsHtml, composerMergeHtml, composerNote, chatHead, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, sessionCloseHtml, sessionTerminalHtml, terminalBlockHtml, recentlyActive, chatBody, quickReplies, quickOf, quickRow, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
 }));

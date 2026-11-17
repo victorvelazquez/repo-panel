@@ -84,8 +84,11 @@ function drawQueue() {
 
 // ---------- conformity ----------
 // RP218: the folder of a room is the room itself, not a project: it gets no roadmap audit and its requirements are the room's (roomsBlock).
-const roomList = () => (S.roomData.data && S.roomData.data.rooms) || [];
+// RP220 (A27): the rooms the page shows are built from the configuration (instant) and COMPLETED by /api/rooms when it answers (it runs git and can take longer than the page waits).
+const roomList = () => (V ? V.mergeRooms(S.rooms, allRepos(), S.roomData.data && S.roomData.data.rooms) : (S.roomData.data && S.roomData.data.rooms) || []);
 const projectRepos = () => (V ? V.projectRepos(allRepos(), roomList()) : allRepos());
+// RP220: the room whose folder is the repo with this id (the open chat), or null.
+const roomByFolder = (id) => (V ? V.roomOfFolder(roomList(), id) : null);
 
 // Audits every project (filters do not apply). Asks the server only when the roadmap facts changed.
 function refreshConformity() {
@@ -400,7 +403,7 @@ function drawSummary() {
   const kept = ae && ae.dataset && (ae.dataset.act === 'sfilter' || ae.dataset.act === 'slive' || ae.dataset.act === 'toggle-group') ? { act: ae.dataset.act, filter: ae.dataset.filter, group: ae.dataset.group } : null;
   const box = $('#summary');
   const ctx = {
-    now: Date.now(), scope, rooms: S.rooms, q: S.q, group: S.group, roomData: S.roomData.data, filter: S.sfilter, live: S.slive, collapsed: S.collapsed, failed: S.summaryFailed,
+    now: Date.now(), scope, rooms: S.rooms, q: S.q, group: S.group, roomData: { rooms: roomList() }, filter: S.sfilter, live: S.slive, collapsed: S.collapsed, failed: S.summaryFailed,
     flowFor: summaryFlow, holdFor: summaryHold, liveFor: summaryLive, changesFor: summaryChanges, prsFor: summaryPrs, idleFor: summaryIdle, sending: S.sending, busy: busyView(), chatId: S.chat.id,
   };
   drawListHead(ctx, kept);

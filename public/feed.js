@@ -223,7 +223,7 @@ function loadRooms() {
   if (!S.rooms.length) { S.roomData = { state: 'loaded', data: { rooms: [] } }; return Promise.resolve(); }
   return pooled(() => api('/api/rooms')).then(
     (d) => { if (seq === S.roomSeq) { S.roomData = { state: 'loaded', data: d }; draw(); } },
-    () => { if (seq === S.roomSeq) { S.roomData = { state: 'failed', data: null }; draw(); } },
+    () => { if (seq === S.roomSeq) { S.roomData = { state: 'failed', data: S.roomData.data }; draw(); } }, // RP220 (A27): a read that fails keeps the last good data; the state still says failed
   );
 }
 

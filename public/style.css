@@ -572,6 +572,14 @@ body.tab-summary #viewbar { display: none; }
   .ck-c .w { display: none; }
 }
 .col-pane { flex: 1; padding: 4px 8px 12px; min-width: 0; }
+/* RP220: the Projects tab of a room: one block per member and a line between one block and the next */
+.mb-list { display: grid; }
+.mb-row { display: grid; gap: 4px; min-width: 0; padding: 10px 4px; }
+.mb-row + .mb-row { border-top: 1px solid var(--line); }
+.mb-l1 { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
+.mb-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mb-l2 { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; }
+.mb-l3 { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .col-sum { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 6px 4px 8px; color: var(--muted); font-size: 12px; }
 .col-sum b { color: var(--text); }
 .col-sum .a { color: var(--green); }

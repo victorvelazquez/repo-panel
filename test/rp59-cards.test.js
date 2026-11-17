@@ -410,13 +410,14 @@ test('the page feeds the cards: change chips from the local state, nothing while
   assert.doesNotMatch(page.get('#summary').html, /chip-btn|unpushed/);
 });
 
-test('the page feeds the room card from the room data, and none while it has not loaded', () => {
+test('the page feeds the room card from the configuration at once (RP220, A27: it does not wait for the slow room read) and the room data completes it', () => {
   const page = loadPage();
   const S = withRepos(page);
   S.rooms = [{ name: 'UPEN', repos: ['abc'] }];
   S.summary = payload([row({ id: 'abc', name: 'demo', room: 'UPEN' })]);
   page.run('render()');
-  assert.doesNotMatch(page.get('#summary').html, /rs-room/);
+  assert.match(page.get('#summary').html, /★ UPEN/);
+  assert.doesNotMatch(page.get('#summary').html, /undefined|NaN|Invalid/);
   S.roomData = { state: 'loaded', data: { rooms: [{ name: 'UPEN', repos: ['abc'], presence: { state: 'idle' }, lastCommit: null }] } };
   page.run('render()');
   assert.match(page.get('#summary').html, /★ UPEN/);
