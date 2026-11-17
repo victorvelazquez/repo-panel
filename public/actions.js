@@ -17,7 +17,7 @@ async function doMerge(id, n) {
     S.merged[key] = Date.now();
     // RP172: a merge from the panel sends /flow-base by itself, only to a session that is open and free (the hold of the delivery buttons, RP159/RP163); otherwise the card keeps its button. It never starts a closed session.
     const go = V && sessionOf(id) === 'idle' && V.deliveryHold({ sending: S.sending[id], session: sessionOf(id), jobs: jobsOfRepo(id) }) === '';
-    toast(`#${n} merged${r.branch === 'deleted' ? ' · branch deleted' : r.branch === 'auto' ? ' · branch auto-deleted' : ''} · ${go ? 'running /flow-base' : 'run /flow-base when the session is free'}`, 'ok');
+    toast(`#${n} merged${r.branch === 'deleted' ? ' · branch deleted' : r.branch === 'auto' ? ' · branch auto-deleted' : ''}${r.requested ? ` · merged with ${r.method} (${r.requested} is not allowed here)` : ''} · ${go ? 'running /flow-base' : 'run /flow-base when the session is free'}`, 'ok');
     if (go) ACTIONS.pi({ dataset: { id, cmd: 'flow-base' }, disabled: false });
   } catch (e) {
     toast(`#${n}: ${e.message}`, 'bad');

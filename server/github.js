@@ -23,14 +23,17 @@ const NO_REMOTE = /no git remotes|none of the git remotes|not a git repository|c
 async function repoMeta(repo) {
   const hit = metaCache.get(repo.id);
   if (hit && Date.now() - hit.t < 10 * 60 * 1000) return hit.data;
-  const r = await gh(repo.path, ['repo', 'view', '--json', 'nameWithOwner,url,deleteBranchOnMerge']);
+  const r = await gh(repo.path, ['repo', 'view', '--json', 'nameWithOwner,url,deleteBranchOnMerge,mergeCommitAllowed,squashMergeAllowed,rebaseMergeAllowed']);
   if (r.code !== 0) {
     const msg = firstLine(r.stderr);
     if (NO_REMOTE.test(r.stderr)) return { noRemote: true };
     throw new Error(msg || 'gh repo view failed');
   }
   const j = JSON.parse(r.stdout);
-  const data = { slug: j.nameWithOwner, url: j.url, deleteBranchOnMerge: !!j.deleteBranchOnMerge };
+  // RP226: the methods the repo allows; null when gh said none of them, which means "use the requested one". A flag gh did not answer counts as allowed, one that says false is honored.
+  const flags = [j.mergeCommitAllowed, j.squashMergeAllowed, j.rebaseMergeAllowed];
+  const methods = flags.some((f) => typeof f === 'boolean') ? { merge: flags[0], squash: flags[1], rebase: flags[2] } : null;
+  const data = { slug: j.nameWithOwner, url: j.url, deleteBranchOnMerge: !!j.deleteBranchOnMerge, methods };
   metaCache.set(repo.id, { t: Date.now(), data });
   return data;
 }
@@ -90,6 +93,8 @@ async function mergePr(repo, number, method, deleteBranch) {
   if (!Number.isInteger(number)) throw new HttpError(400, 'Invalid PR number');
   const meta = await repoMeta(repo);
   if (meta.noRemote) throw new HttpError(400, 'Repository has no GitHub remote');
+  const pick = lib.pickMergeMethod(method, meta.methods);
+  if (!pick) throw new HttpError(409, 'This repository allows no merge method');
   const pr = await viewPr(repo, number);
   if (pr.state !== 'OPEN') throw new HttpError(409, `PR is ${pr.state}`);
   if (!pr.ready) throw new HttpError(409, `Not ready to merge: ${pr.blockedReason}`);
@@ -97,7 +102,7 @@ async function mergePr(repo, number, method, deleteBranch) {
   // Merge through the API so the local working tree and branches are never touched.
   const m = await gh(repo.path, [
     'api', '-X', 'PUT', `repos/${meta.slug}/pulls/${number}/merge`,
-    '-f', `merge_method=${method}`, '-f', `sha=${pr.headOid}`,
+    '-f', `merge_method=${pick.method}`, '-f', `sha=${pr.headOid}`,
   ]);
   if (m.code !== 0) {
     const after = await viewPr(repo, number).catch(() => null);
@@ -113,7 +118,7 @@ async function mergePr(repo, number, method, deleteBranch) {
     const d = await gh(repo.path, ['api', '-X', 'DELETE', `repos/${meta.slug}/git/refs/heads/${lib.encodeRef(pr.head)}`]);
     branch = d.code === 0 || /reference does not exist/i.test(d.stdout + d.stderr) ? 'deleted' : 'kept';
   }
-  return { merged: true, branch };
+  return pick.fellBack ? { merged: true, branch, method: pick.method, requested: pick.requested } : { merged: true, branch };
 }
 
 async function rerunFailed(repo, number) {
