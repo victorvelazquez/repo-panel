@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { HttpError } = require('./errors.js');
 const { git } = require('./exec.js');
-const { loadConfig, saveConfig, findRepo, roomIssues, nameProblem, pathProblem, ROOMS_NOT_LIST } = require('./config.js');
+const { loadConfig, saveConfig, findRepo, repoByPath, roomIssues, nameProblem, pathProblem, ROOMS_NOT_LIST } = require('./config.js');
 const { roomRequirementsFor } = require('./requirements.js');
 
 // ISO date of the last commit of the room's local HEAD, or null when Git cannot say.
@@ -17,13 +17,14 @@ async function lastCommitOf(room, gitRun) {
 }
 
 // The runners are injectable so tests need no real repos.
-async function roomsState({ rooms = loadConfig().rooms || [], git: gitRun = git, requirements = roomRequirementsFor } = {}) {
+// RP218: `id` is the id of the room's folder as a repo of a group (null when it is not one), so the page can open the chat of that session.
+async function roomsState({ rooms = loadConfig().rooms || [], git: gitRun = git, requirements = roomRequirementsFor, repoOf = repoByPath } = {}) {
   if (!rooms.length) return { rooms: [] };
   return {
     rooms: await Promise.all(rooms.map(async (room) => {
       const [req, lastCommit] = await Promise.all([requirements(room), lastCommitOf(room, gitRun)]);
       return {
-        name: room.name, path: room.path, repos: room.repos,
+        id: (repoOf(room.path) || {}).id || null, name: room.name, path: room.path, repos: room.repos,
         available: req.available, base: req.base, results: req.results, summary: req.summary,
         lastCommit,
       };
@@ -41,6 +42,9 @@ function folderProblem(dir) {
   return fs.existsSync(path.join(dir, '.git')) ? null : 'folder is not a git repository';
 }
 
+// RP218 (A12): a room is a repo of a group, so its folder must be one (the same folder, whatever the slashes or the case).
+const groupProblem = (dir) => (repoByPath(dir) ? null : 'folder is not in a group of the panel');
+
 function editableRooms(cfg) {
   if (roomIssues(cfg).includes(ROOMS_NOT_LIST)) throw new HttpError(409, 'rooms in config.json is not a list: fix it by hand first');
   return cfg.rooms || [];
@@ -54,7 +58,7 @@ function createRoom(rawName, rawPath) {
   const rooms = editableRooms(cfg);
   const name = typeof rawName === 'string' ? rawName.trim() : '';
   const problem = nameProblem(name, new Set(rooms.map((r) => r.name.toLowerCase())))
-    || pathProblem(rawPath) || folderProblem(rawPath);
+    || pathProblem(rawPath) || folderProblem(rawPath) || groupProblem(rawPath);
   if (problem) throw new HttpError(400, upper(problem));
   cfg.rooms = [...rooms, { name, path: path.resolve(rawPath), repos: [] }];
   saveConfig(cfg);

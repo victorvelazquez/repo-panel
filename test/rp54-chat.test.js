@@ -220,7 +220,7 @@ const card = (o = {}) => ({
 });
 const summary = (rows, ctx = {}) => R.summaryView({ rows, generatedAt: 'x' }, { now: Date.parse('2026-05-01T12:00:00Z'), scope: { kind: 'all' }, rooms: [], ...ctx });
 
-test('a repo card opens the chat (data-act, tabindex, aria-current only for the open one); its buttons keep their own data-act; the room card does not', () => {
+test('a repo card opens the chat (data-act, tabindex, aria-current only for the open one); its buttons keep their own data-act; a room card without the id of its folder does not (RP218: with the id it does)', () => {
   const html = summary([card(), card({ id: 'r2', name: 'beta', action: { kind: 'merge', pr: 7 } })], { chatId: 'r2', roomData: { rooms: [{ name: 'U', repos: [], presence: { state: 'idle' } }] } });
   const cards = html.split('<article').slice(1);
   const r1 = cards.find((c) => c.includes('data-id="r1"'));

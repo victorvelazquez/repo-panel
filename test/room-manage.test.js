@@ -153,14 +153,15 @@ test('rooms routes need the token', async () => {
 
 test('POST /api/rooms/create registers the room, trims the name and never touches the folder', async () => {
   const dir = roomFolder('ceo');
+  const tools = roomFolder('tools');
   const before = snapshot(dir);
-  await withPanel({ groups: GROUPS }, async ({ post, getApi, read }) => {
+  await withPanel({ groups: [...GROUPS, { name: 'rooms', repos: [{ path: dir }, { path: tools }] }] }, async ({ post, getApi, read }) => {
     const r = await post('/api/rooms/create', { name: '  UPEN  ', path: dir });
     assert.equal(r.status, 200);
     assert.deepEqual(r.json, { rooms: [{ name: 'UPEN', path: dir, repos: [] }] });
     assert.deepEqual(read().rooms, r.json.rooms);
     assert.deepEqual((await getApi('/api/config')).json.rooms, r.json.rooms);
-    const second = await post('/api/rooms/create', { name: 'TOOLS', path: roomFolder('tools') });
+    const second = await post('/api/rooms/create', { name: 'TOOLS', path: tools });
     assert.deepEqual(second.json.rooms.map((x) => x.name), ['UPEN', 'TOOLS']);
   });
   assert.deepEqual(snapshot(dir), before);
@@ -171,7 +172,7 @@ test('POST /api/rooms/create refuses every invalid name and path with a clear 40
   const plain = roomFolder('plain', { git: false });
   const file = path.join(dir, 'AGENTS.md');
   const missing = path.join(tmp(), 'nope');
-  await withPanel({ groups: GROUPS, rooms: [{ name: 'UPEN', path: dir, repos: [] }] }, async ({ post, read }) => {
+  await withPanel({ groups: [...GROUPS, { name: 'rooms', repos: [{ path: dir }] }], rooms: [{ name: 'UPEN', path: dir, repos: [] }] }, async ({ post, read }) => {
     const cases = [
       [{ name: '', path: dir }, 'Name is empty'],
       [{ name: '   ', path: dir }, 'Name is empty'],
@@ -192,6 +193,20 @@ test('POST /api/rooms/create refuses every invalid name and path with a clear 40
     assert.deepEqual(read().rooms, rooms);
   });
   assert.deepEqual(snapshot(plain), { 'AGENTS.md': '# room\n' });
+});
+
+// RP218 (A12): a room is a repo of a group, so its folder gets the chat, the git state and the flow commands of any repo.
+test('POST /api/rooms/create refuses a folder that is a git repository but is in no group of the panel, and accepts it written with forward slashes', async () => {
+  const dir = roomFolder('ceo');
+  const loose = roomFolder('loose');
+  await withPanel({ groups: [...GROUPS, { name: 'rooms', repos: [{ path: dir }] }] }, async ({ post, read }) => {
+    const refused = await post('/api/rooms/create', { name: 'New', path: loose });
+    assert.deepEqual([refused.status, refused.json.error], [400, 'Folder is not in a group of the panel']);
+    assert.deepEqual(read().rooms || [], []);
+    const ok = await post('/api/rooms/create', { name: 'UPEN', path: dir.replace(/\\/g, '/') });
+    assert.equal(ok.status, 200);
+    assert.deepEqual(ok.json.rooms.map((x) => x.name), ['UPEN']);
+  });
 });
 
 test('POST /api/rooms/remove drops only the config entry; unknown rooms are 404; ignored entries stay', async () => {

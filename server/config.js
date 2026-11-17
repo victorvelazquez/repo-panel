@@ -187,4 +187,14 @@ function roomByPath(p) {
   return (loadConfig().rooms || []).find((r) => normPath(r.path) === want) || null;
 }
 
-module.exports = { loadConfig, saveConfig, findRepo, roomOf, roomByPath, roomIssues, PI_RUNTIMES, nameProblem, pathProblem, ROOM_NAME_MAX, ROOMS_NOT_LIST };
+// RP218: the repo of a group whose folder is `p` (compared like roomByPath), with its id and group, or null. A room is a repo of a group: its folder gets the chat and the git state of any repo.
+function repoByPath(p) {
+  if (typeof p !== 'string' || !p) return null;
+  const want = normPath(p);
+  for (const g of loadConfig().groups) {
+    for (const r of g.repos) if (normPath(r.path) === want) return { ...r, id: lib.repoId(r.path), group: g.name };
+  }
+  return null;
+}
+
+module.exports = { loadConfig, saveConfig, findRepo, roomOf, roomByPath, repoByPath, roomIssues, PI_RUNTIMES, nameProblem, pathProblem, ROOM_NAME_MAX, ROOMS_NOT_LIST };
