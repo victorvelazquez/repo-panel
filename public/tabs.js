@@ -83,9 +83,13 @@ function drawQueue() {
 }
 
 // ---------- conformity ----------
-// Audits every repo (filters do not apply). Asks the server only when the roadmap facts changed.
+// RP218: the folder of a room is the room itself, not a project: it gets no roadmap audit and its requirements are the room's (roomsBlock).
+const roomList = () => (S.roomData.data && S.roomData.data.rooms) || [];
+const projectRepos = () => (V ? V.projectRepos(allRepos(), roomList()) : allRepos());
+
+// Audits every project (filters do not apply). Asks the server only when the roadmap facts changed.
 function refreshConformity() {
-  const entries = allRepos().map((r) => {
+  const entries = projectRepos().map((r) => {
     const rp = S.roadmap[r.id];
     return { id: r.id, name: r.name, roadmap: rp ? { available: rp.available, reason: rp.reason, problems: rp.problems } : null };
   });
@@ -134,7 +138,7 @@ const reqSummary = () => ({
     state: S.roomData.state,
     list: ((S.roomData.data && S.roomData.data.rooms) || []).map((m) => ({ name: m.name, ready: !!(m.summary && m.summary.ready) })),
   },
-  repos: allRepos().map((r) => {
+  repos: projectRepos().map((r) => {
     const e = S.req[r.id];
     return { id: r.id, state: e ? e.state : 'loading', ready: !!(e && e.data && e.data.summary && e.data.summary.ready) };
   }),
@@ -221,7 +225,7 @@ function drawConformity() {
   const figs = v.figures && v.figures.length ? `<div class="conf-figs" aria-hidden="true">${v.figures.map((f) => `<span class="conf-fig"><b>${f.n}</b> ${esc(f.word)}</span>`).join('')}</div>` : '';
   const sum = v.summary ? `${figs}<div class="conf-sum">${esc(v.summary)}</div>` : '';
   const body = v.state === 'issues' ? S.conf.items.map(confBlock).join('') : `<div class="${v.state === 'error' ? 'conf-error' : 'empty'}">${esc(v.message)}</div>`;
-  const reqs = V ? `<div class="conf-heading">Requirements</div>${allRepos().map(reqBlock).join('')}${roomsBlock()}` : '';
+  const reqs = V ? `<div class="conf-heading">Requirements</div>${projectRepos().map(reqBlock).join('')}${roomsBlock()}` : '';
   paint($('#conformityView'), sum + prereqBlock() + body + reqs);
 }
 

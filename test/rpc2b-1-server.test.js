@@ -234,8 +234,10 @@ test('l4: without a getter sessionsState says none, and adopt/release still answ
 test('o1: roomsState has no presence', async () => {
   const requirements = async () => ({ available: true, base: 'main', results: [], summary: { ready: true } });
   const git = async () => ({ code: 0, stdout: '2026-10-24T10:00:00-05:00\n', stderr: '' });
-  const out = await roomsState({ rooms: [{ name: 'R', path: ROOM, repos: ['a'] }], git, requirements });
-  assert.deepEqual(Object.keys(out.rooms[0]).sort(), ['available', 'base', 'lastCommit', 'name', 'path', 'repos', 'results', 'summary']);
+  // RP218: the folder of a room reports its id as a repo of a group; `repoOf` is injected so the test does not read the real config.
+  const out = await roomsState({ rooms: [{ name: 'R', path: ROOM, repos: ['a'] }], git, requirements, repoOf: () => ({ id: 'r9' }) });
+  assert.deepEqual(Object.keys(out.rooms[0]).sort(), ['available', 'base', 'id', 'lastCommit', 'name', 'path', 'repos', 'results', 'summary']);
+  assert.equal(out.rooms[0].id, 'r9');
   assert.equal(out.rooms[0].lastCommit, '2026-10-24T10:00:00-05:00');
 });
 

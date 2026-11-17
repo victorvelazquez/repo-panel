@@ -1407,9 +1407,10 @@
     return `${note}${c.hist && c.hist.truncated ? '<div class="rs-sub ch-older">Older messages are not shown</div>' : ''}${items.map((it) => bubble(it, who, rx)).join('') || (pending ? '' : '<div class="empty">No messages yet.</div>')}${pending}${rpcTail(c, who, items, ctx.now)}`;
   }
 
-  // Pinned room card (not clickable yet): the aggregate of its member rows (a room has no session state any more).
+  // Pinned room card: the aggregate of its member rows. RP218: its folder is a repo with a session of its own, so when the room has its `id` the card opens that chat and counts the folder when it needs attention.
   function roomCard(room, rows, ctx) {
     const mine = rows.filter((r) => r.room === room.name);
+    const folder = room.id ? rows.find((r) => r.id === room.id) : null;
     const sum = { total: null, completada: 0, enRevision: 0, bloqueada: 0, pendiente: 0, enCurso: 0 };
     for (const r of mine) {
       const p = r.progress;
@@ -1417,8 +1418,9 @@
       sum.total = num(sum.total) + num(p.total);
       for (const k of ['completada', 'enRevision', 'bloqueada', 'pendiente', 'enCurso']) sum[k] += num(p[k]);
     }
-    const need = mine.filter((r) => r.needs).length;
-    return `<article class="rs-card rs-room" aria-label="Room ${esc(room.name)}">
+    const need = mine.filter((r) => r.needs).length + (folder && folder.needs && !mine.includes(folder) ? 1 : 0);
+    const open = room.id ? ` data-id="${esc(room.id)}" data-act="chat-open" tabindex="0"${ctx && ctx.chatId === room.id ? ' aria-current="true"' : ''}` : '';
+    return `<article class="rs-card rs-room"${open} aria-label="Room ${esc(room.name)}">
       <div class="rs-l1"><b class="rs-name" title="${esc(room.name)}">★ ${esc(room.name)}</b><span class="chip purple">room</span><span class="rs-spacer"></span><span class="rs-sub">last commit ${esc(relativeTime(room.lastCommit, ctx.now))}</span></div>
       <div class="rs-l2">${progressHtml(sum)}<div class="rs-next"><span class="rs-sub">${plural(mine.length, 'project')} · ${need} need attention</span></div></div>
     </article>`;
@@ -1464,8 +1466,9 @@
       body = needing.length ? needing.slice().sort((x, y) => num(x.rank) - num(y.rank)).map((r) => cardHtml(r, ctx)).join('') : '<div class="empty">Nothing needs your attention right now.</div>';
     } else {
       const rooms = ctx.roomData && Array.isArray(ctx.roomData.rooms) && scope.kind !== 'none' && !ctx.q && !(ctx.group && ctx.group !== 'all') && ctx.live !== true ? ctx.roomData.rooms.filter((m) => scope.kind === 'all' || m.name === scope.name) : [];
+      const folders = new Set(rooms.map((m) => m.id).filter(Boolean)); // RP218: the folder of a shown room is that room's card, not a second card
       const groups = new Map();
-      for (const r of rows) groups.set(r.group ?? '', (groups.get(r.group ?? '') || []).concat(r));
+      for (const r of rows) if (!folders.has(r.id)) groups.set(r.group ?? '', (groups.get(r.group ?? '') || []).concat(r));
       const parts = rooms.map((m) => roomCard(m, payload.rows, ctx));
       for (const [g, list] of groups) {
         const shut = groups.size > 1 && !!(ctx.collapsed && ctx.collapsed[g]);

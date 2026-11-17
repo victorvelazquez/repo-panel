@@ -12,35 +12,37 @@ const gitAt = (stdout = '2026-10-24T10:00:00-05:00\n', code = 0) => {
   return Object.assign(run, { calls });
 };
 
-const state = async (room = ROOM) => ({ room: (await roomsState({ rooms: [room], git: gitAt(), requirements })).rooms[0] });
+// RP218: `repoOf` is injected so no test reads the real config.json to find the folder of a room as a repo.
+const state = async (room = ROOM) => ({ room: (await roomsState({ rooms: [room], git: gitAt(), requirements, repoOf: () => ({ id: 'r9' }) })).rooms[0] });
 
 test('roomsState: no rooms answers an empty list without touching Git', async () => {
   const g = gitAt();
-  assert.deepEqual(await roomsState({ rooms: [], git: g, requirements }), { rooms: [] });
+  assert.deepEqual(await roomsState({ rooms: [], git: g, requirements, repoOf: () => null }), { rooms: [] });
   assert.equal(g.calls.length, 0);
 });
 
 test('roomsState: a room reports its config, requirements and last commit, and no presence', async () => {
   const { room } = await state();
-  assert.deepEqual(Object.keys(room).sort(), ['available', 'base', 'lastCommit', 'name', 'path', 'repos', 'results', 'summary']);
+  assert.deepEqual(Object.keys(room).sort(), ['available', 'base', 'id', 'lastCommit', 'name', 'path', 'repos', 'results', 'summary']);
+  assert.equal(room.id, 'r9');
   assert.deepEqual([room.name, room.path, room.repos], ['UPEN', 'C:\\dev\\ceo', ['a', 'b']]);
   assert.deepEqual([room.available, room.base, room.results, room.summary], [true, 'main', REQ.results, REQ.summary]);
 });
 
 test('lastCommit: the ISO date of the room HEAD, or null when Git cannot say', async () => {
   const g = gitAt();
-  const ok = await roomsState({ rooms: [ROOM], git: g, requirements });
+  const ok = await roomsState({ rooms: [ROOM], git: g, requirements, repoOf: () => null });
   assert.equal(ok.rooms[0].lastCommit, '2026-10-24T10:00:00-05:00');
   assert.equal(g.calls.length, 1);
   assert.equal(g.calls[0].cwd, ROOM.path);
   assert.deepEqual(g.calls[0].args, ['log', '-1', '--format=%cI', 'HEAD']);
   for (const bad of [gitAt('', 128), gitAt('\n', 0), gitAt('not a date', 0)]) {
-    assert.equal((await roomsState({ rooms: [ROOM], git: bad, requirements })).rooms[0].lastCommit, null);
+    assert.equal((await roomsState({ rooms: [ROOM], git: bad, requirements, repoOf: () => null })).rooms[0].lastCommit, null);
   }
 });
 
 test('roomsState: each room has its own requirements and last commit', async () => {
   const other = { name: 'TOOLS', path: 'C:\dev\tools', repos: [] };
-  const out = await roomsState({ rooms: [ROOM, other], git: gitAt(), requirements });
+  const out = await roomsState({ rooms: [ROOM, other], git: gitAt(), requirements, repoOf: () => null });
   assert.deepEqual(out.rooms.map((r) => [r.name, r.available, 'presence' in r]), [['UPEN', true, false], ['TOOLS', true, false]]);
 });
