@@ -250,11 +250,22 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
     } catch { return null; }
   }
 
+  // RP228: how the last task of a repo's live session ended, { kind: 'done' | 'failed' | 'stopped', at }, or null. Memory only, total: no live entry, still starting, closed, a client with none or a malformed value are null.
+  function outcomeOf(id) {
+    try {
+      const entry = live.get(id);
+      if (!entry || entry.up !== true || entry.closed || typeof entry.client.outcome !== 'function') return null;
+      const o = entry.client.outcome();
+      return o && typeof o === 'object' && typeof o.kind === 'string' && Number.isFinite(o.at) ? { kind: o.kind, at: o.at } : null;
+    } catch { return null; }
+  }
+
   return {
     start,
     close,
     stateOf,
     startedAtOf,
+    outcomeOf,
     async prompt(id, value, { behavior } = {}) {
       repoOf(id);
       if (behavior !== undefined && !BEHAVIORS.includes(behavior)) throw new HttpError(400, 'behavior must be steer or followUp');

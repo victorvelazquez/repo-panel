@@ -164,8 +164,8 @@ test('B2: the quiet period alone does not put the "Show /flow-ship anyway" item 
   assert.equal(commitOverrideItem(null, { now: NOW }), null);
 });
 
-test('B2: the API changed, so API_VERSION is 15', () => {
-  assert.equal(view.API_VERSION, 15);
+test('B2: the API changed, so API_VERSION is 16', () => {
+  assert.equal(view.API_VERSION, 16);
 });
 
 // ---- C: the estado block text ----

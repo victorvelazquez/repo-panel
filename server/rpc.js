@@ -64,6 +64,8 @@ function createRpcClient({ command, args = [], cwd, env, spawn = cp.spawn, platf
   let buf = '';
   let seq = 0;
   let ends = 0;
+  let stopReason = null; // RP228: how the last turn of the run ended
+  let outcome = null; // RP228: { kind, at } of the last finished task
   let startTimer = null;
   let lastState = 'starting';
   const safe = (fn, arg) => { try { fn(arg); } catch { /* a listener must not break the client */ } };
@@ -180,7 +182,9 @@ function createRpcClient({ command, args = [], cwd, env, spawn = cp.spawn, platf
     if (!rec || typeof rec !== 'object' || Array.isArray(rec)) return;
     if (rec.type === 'response') return onResponse(rec);
     if (rec.type === 'extension_ui_request') return onUi(rec);
-    if (rec.type === 'agent_start') streaming = true;
+    if (rec.type === 'agent_start') { streaming = true; stopReason = null; outcome = null; }
+    if (rec.type === 'turn_end') { const r = typeof rec.stopReason === 'string' ? rec.stopReason : rec.message && typeof rec.message.stopReason === 'string' ? rec.message.stopReason : null; stopReason = r; } // RP228: only the last turn counts (a retry that succeeds ends done)
+    if (rec.type === 'agent_end') outcome = { kind: rec.aborted === true || stopReason === 'aborted' ? 'stopped' : stopReason === 'error' ? 'failed' : 'done', at: Date.now() }; // RP228: agent_settled never touches it
     emit({ kind: 'event', record: rec });
     notify();
     if (rec.type === 'agent_end' || rec.type === 'agent_settled') { ends++; refresh(); }
@@ -279,6 +283,7 @@ function createRpcClient({ command, args = [], cwd, env, spawn = cp.spawn, platf
     answerDialog,
     pendingDialogs: () => [...dialogs.values()].map(publicDialog),
     state,
+    outcome: () => (closed || !outcome ? null : { ...outcome }), // RP228
     close: () => teardown('closed'),
   };
 }

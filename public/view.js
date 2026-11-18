@@ -8,7 +8,7 @@
 }(typeof self !== 'undefined' ? self : this, () => {
   // Bump it when the client starts needing a new or changed server route. /health reports the value
   // the running server loaded at start; the page compares it with the file it just downloaded.
-  const API_VERSION = 15;
+  const API_VERSION = 16;
 
   // `health` is the parsed /health answer, or null when the request itself failed (no answer, so
   // there is nothing to warn about). Any answer without the current integer `api` is out of date:
@@ -218,7 +218,9 @@
       const row = rows.find((r) => isObject(r) && r.id === id);
       const last = row && isObject(row.lastMovement) ? row.lastMovement : {};
       const prs = ask(x.prsFor, id);
-      return { id, name: repo && typeof repo.name === 'string' ? repo.name : id, known: !!repo, state: row && isObject(row.session) ? row.session.state : undefined, at: typeof last.at === 'string' ? last.at : null, what: typeof last.what === 'string' ? last.what : '', prs: prs === undefined ? null : prs, live: ask(x.liveFor, id) };
+      const end = row && isObject(row.session) && isObject(row.session.last) ? row.session.last : null; // RP228: how its last task ended, only a well-formed one
+      const done = end && ['done', 'failed', 'stopped'].includes(end.kind) && typeof end.at === 'string' ? { last: { kind: end.kind, at: end.at } } : {};
+      return { id, ...done, name: repo && typeof repo.name === 'string' ? repo.name : id, known: !!repo, state: row && isObject(row.session) ? row.session.state : undefined, at: typeof last.at === 'string' ? last.at : null, what: typeof last.what === 'string' ? last.what : '', prs: prs === undefined ? null : prs, live: ask(x.liveFor, id) };
     });
   }
 
