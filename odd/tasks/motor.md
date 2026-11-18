@@ -29,7 +29,7 @@ Verificado en el código o en la documentación de pi 4.8 (Gentle Shell 4.8.0-1.
 
 Orden de la tabla (el de `siguiente`), primero lo que más rinde en el día a día:
 
-- [ ] **T1. RP231** — Estado fiable de la sesión (hallazgos 1 y 2).
+- [x] **T1. RP231** — Estado fiable de la sesión (hallazgos 1 y 2). Hecha el 2026-11-18, sin entregar (L6).
 - [ ] **T2. RP232** — Verificaciones del motor, sin código: `/flow-ship` por RPC, sesión libre con un subagente vivo, la presencia de 4.8 y el efecto de la variable interactiva.
 - [ ] **T3. RP233** — Comandos comprobados con `get_commands` y con la respuesta de pi (hallazgo 3).
 - [ ] **T4. RP234** — Quitar la guarda de 45 s, si RP232 confirma que ya no hace falta (hallazgo 4).
@@ -53,3 +53,4 @@ La sala (RP229, RP221, RP221b, RP244, RP222, RP223, RP225) va después de esta s
 - **L3.** Mensaje de la persona (2026-11-18), tal cual: el de S2, seguido de la pregunta sobre las imágenes (guardada en `odd/tasks/adjuntar-capturas.md`, L3).
 - **L4.** Lectura del agente de L3 y lo que se hizo. Registró las filas RP231 a RP244 y RP215b, reescribió RP215 como la parte del servidor, partió RP221 en RP221 y RP221b, pasó RP224 a Bloqueada (espera Q5 y Q15 del cuaderno de la sala) y movió las filas pendientes al final de la tabla en el orden de arriba, que es el que usa `siguiente`. Lectura del agente, no decisión de la persona: el orden pone primero el estado fiable y las verificaciones, porque varias filas se apoyan en ellos. Quedan para la persona: la variable interactiva (RP237), la configuración de MCP (RP243) y confirmar la forma de mandar imágenes (ficha de RP215, L4).
 - **L5.** La persona confirmó el 2026-11-18 que las imágenes van directo a pi (ficha de RP215, L5 y L6).
+- **L6.** RP231 hecha el 2026-11-18, sin entregar. La tomó el agente con «siguiente» tras pasar la puerta (main limpio y al día, plan fusionado en el PR #289). Cambió solo server/rpc.js: la sesión espera agent_settled antes de quedar libre, un agent_end que va a reintentar no fija desenlace, un plazo de respaldo cubre a un pi que no asienta (más largo para un reintento y en pausa durante una compactación), un cliente unido a una corrida en curso la cuenta, y un get_state fallido se repite. La verificación independiente halló tres defectos de borde y se corrigieron con prueba primero. Detalle y cifras en la fila RP231. Falta reiniciar el panel para que el servidor tome el código nuevo.

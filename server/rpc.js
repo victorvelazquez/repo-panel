@@ -46,7 +46,14 @@ function answerBody(d, a) {
   return a.value.length <= ANSWER_MAX && !CONTROLS.test(a.value) ? { value: a.value } : null;
 }
 
-function createRpcClient({ command, args = [], cwd, env, spawn = cp.spawn, platform = process.platform, kill = process.kill, startTimeoutMs = START_MS, requestTimeoutMs = 120000, onEvent = () => {}, onExit = () => {} }) {
+// RP231: how long a run that ended (agent_end, no retry) may wait for agent_settled before the client stops waiting (a pi that never sends it), and how a
+// failed get_state is asked again.
+const SETTLE_MS = 30000;
+const RETRY_FACTOR = 4; // a run that will retry waits four times longer, plus the delay pi announces
+const REFRESH_RETRIES = 3;
+const REFRESH_RETRY_MS = 1000;
+
+function createRpcClient({ command, args = [], cwd, env, spawn = cp.spawn, platform = process.platform, kill = process.kill, startTimeoutMs = START_MS, requestTimeoutMs = 120000, settleMs = SETTLE_MS, refreshRetries = REFRESH_RETRIES, refreshRetryMs = REFRESH_RETRY_MS, onEvent = () => {}, onExit = () => {} }) {
   const pending = new Map(); // id -> { type, resolve, reject, timer, ends }
   const queue = []; // commands issued before ready
   const outbox = []; // lines waiting for stdin to drain
@@ -66,12 +73,17 @@ function createRpcClient({ command, args = [], cwd, env, spawn = cp.spawn, platf
   let ends = 0;
   let stopReason = null; // RP228: how the last turn of the run ended
   let outcome = null; // RP228: { kind, at } of the last finished task
+  let unsettled = false; // RP231: a run started and pi has not said agent_settled yet
+  let compacting = false; // RP231: between compaction_start and compaction_end
+  let settleDue = false; // RP231: the fallback ran out while pi was compacting
+  let settleTimer = null;
+  let retryTimer = null;
   let startTimer = null;
   let lastState = 'starting';
   const safe = (fn, arg) => { try { fn(arg); } catch { /* a listener must not break the client */ } };
   const emit = (e) => safe(onEvent, e);
 
-  const state = () => (closed ? 'closed' : !ready ? 'starting' : dialogs.size ? 'asking' : streaming ? 'busy' : 'idle');
+  const state = () => (closed ? 'closed' : !ready ? 'starting' : dialogs.size ? 'asking' : streaming || unsettled ? 'busy' : 'idle');
   function notify() {
     const s = state();
     if (s !== lastState) { lastState = s; emit({ kind: 'state', state: s }); }
@@ -112,15 +124,38 @@ function createRpcClient({ command, args = [], cwd, env, spawn = cp.spawn, platf
     });
   }
 
-  // The agent's idea of "streaming" wins whenever a run ends.
-  function refresh() {
+  // The agent's idea of "streaming" wins whenever a run ends. RP231: a failed read is asked again a few times; when they all fail and pi already said it is done
+  // (no run waits for agent_settled), the session is free, so a lost answer never leaves it busy for ever.
+  function refresh(tries = 0) {
     if (!ready || closed) return;
     if (refreshing) { again = true; return; }
     refreshing = true;
+    clearTimeout(retryTimer);
+    let failed = false;
     send('get_state', {}, requestTimeoutMs, true)
-      .then((d) => { streaming = !!(d && d.isStreaming); })
-      .catch(() => {})
-      .then(() => { refreshing = false; notify(); if (again) { again = false; refresh(); } });
+      .then((d) => { streaming = !!(d && d.isStreaming); }, () => { failed = true; })
+      .then(() => {
+        refreshing = false;
+        if (failed && !again && !closed) {
+          if (tries < refreshRetries) { retryTimer = setTimeout(() => refresh(tries + 1), refreshRetryMs); if (retryTimer.unref) retryTimer.unref(); }
+          else if (!unsettled) streaming = false;
+        }
+        notify();
+        if (again) { again = false; refresh(); }
+      });
+  }
+  // RP231: the run is over for pi (agent_settled, or the fallback timer for a pi that never sends it).
+  function settle() {
+    clearTimeout(settleTimer);
+    settleDue = false;
+    unsettled = false;
+  }
+  // RP231: the fallback for a run that ended and never settles. While pi compacts, the end waits for compaction_end instead of freeing the session in the middle.
+  function armSettle(ms) {
+    clearTimeout(settleTimer);
+    if (!unsettled || closed) return;
+    settleTimer = setTimeout(() => { if (compacting) { settleDue = true; return; } settle(); refresh(); }, ms);
+    if (settleTimer.unref) settleTimer.unref();
   }
 
   function dropDialog(id, reason) {
@@ -182,12 +217,27 @@ function createRpcClient({ command, args = [], cwd, env, spawn = cp.spawn, platf
     if (!rec || typeof rec !== 'object' || Array.isArray(rec)) return;
     if (rec.type === 'response') return onResponse(rec);
     if (rec.type === 'extension_ui_request') return onUi(rec);
-    if (rec.type === 'agent_start') { streaming = true; stopReason = null; outcome = null; }
+    if (rec.type === 'agent_start') { streaming = true; unsettled = true; settleDue = false; clearTimeout(settleTimer); stopReason = null; outcome = null; }
     if (rec.type === 'turn_end') { const r = typeof rec.stopReason === 'string' ? rec.stopReason : rec.message && typeof rec.message.stopReason === 'string' ? rec.message.stopReason : null; stopReason = r; } // RP228: only the last turn counts (a retry that succeeds ends done)
-    if (rec.type === 'agent_end') outcome = { kind: rec.aborted === true || stopReason === 'aborted' ? 'stopped' : stopReason === 'error' ? 'failed' : 'done', at: Date.now() }; // RP228: agent_settled never touches it
+    // RP231: an agent_end that will retry is not the end of the task: no outcome, no read, the session stays busy. Any other one keeps it busy until agent_settled,
+    // with a fallback timer for a pi that never sends it (much longer for a retry, stretched by the delay pi announces).
+    const retrying = rec.type === 'agent_end' && rec.willRetry === true;
+    const kindNow = () => (rec.aborted === true || stopReason === 'aborted' ? 'stopped' : stopReason === 'error' ? 'failed' : 'done');
+    if (rec.type === 'agent_end' && !retrying) outcome = { kind: kindNow(), at: Date.now() }; // RP228
+    if (rec.type === 'agent_end') armSettle(retrying ? settleMs * RETRY_FACTOR : settleMs);
+    if (rec.type === 'auto_retry_start' && unsettled) armSettle((Number(rec.delayMs) > 0 ? Math.min(Number(rec.delayMs), 3600000) : 0) + settleMs * RETRY_FACTOR);
+    if (rec.type === 'compaction_start') compacting = true;
+    if (rec.type === 'compaction_end') { compacting = false; if (settleDue) { settleDue = false; settle(); refresh(); } }
+    if (rec.type === 'agent_settled') {
+      const wasRunning = unsettled;
+      settle();
+      // RP231: only a task whose last agent_end was a retry is decided here (given up, or stopped by hand: `aborted`); an outcome agent_end already fixed is
+      // never overwritten, and a settled with no run before it creates nothing (RP228).
+      if (wasRunning && !outcome) outcome = { kind: kindNow(), at: Date.now() };
+    }
     emit({ kind: 'event', record: rec });
     notify();
-    if (rec.type === 'agent_end' || rec.type === 'agent_settled') { ends++; refresh(); }
+    if ((rec.type === 'agent_end' && !retrying) || rec.type === 'agent_settled') { ends++; refresh(); }
     return undefined;
   }
 
@@ -218,6 +268,8 @@ function createRpcClient({ command, args = [], cwd, env, spawn = cp.spawn, platf
     if (closed) return;
     closed = true;
     clearTimeout(startTimer);
+    clearTimeout(settleTimer);
+    clearTimeout(retryTimer);
     const err = fail(FAILURES[reason] || FAILURES.exit);
     for (const entry of pending.values()) { clearTimeout(entry.timer); entry.reject(err); }
     pending.clear();
@@ -253,6 +305,7 @@ function createRpcClient({ command, args = [], cwd, env, spawn = cp.spawn, platf
         clearTimeout(startTimer);
         ready = true;
         streaming = !!(data && data.isStreaming);
+        unsettled = streaming; // RP231: a run already in progress when the client joined counts as a run that has not settled
         while (queue.length) write(queue.shift());
         notify();
         resolve(data);
