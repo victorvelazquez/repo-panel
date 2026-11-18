@@ -4,6 +4,8 @@
 // `tool_execution_end` events of the tool `subagent_run`, which the server already lets through with the tool name alone: test/rpc2-1-server.test.js pins that the arguments and the id are cut).
 // It counts the starts without an end, clears with the end of the run, an abort, a closed session or a (re)connect (what is not known is NOT «working»), and it NEVER says «Slow» (that needs activity data: RP153).
 // A subagent launched in the background ends its call at once, so it is not shown by this row. The name of the agent is not shown either (it needs the arguments: RP153, by presence).
+// RP235: the page reads the panel vocabulary; a pi event reaches it through the real translator of the server.
+const { toPanel } = require('../server/rpchost.js');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -15,7 +17,7 @@ const R = require('../public/resumen.js');
 
 const css = fs.readFileSync(path.join(__dirname, '..', 'public', 'style.css'), 'utf8').replace(/\r\n/g, '\n');
 const T0 = 1000000000000;
-const rec = (record) => ({ kind: 'event', record });
+const rec = (record) => ({ kind: 'event', record: toPanel(record) });
 const start = (toolName = 'subagent_run') => rec({ type: 'tool_execution_start', toolName });
 const end = (toolName = 'subagent_run') => rec({ type: 'tool_execution_end', toolName, isError: false, durationMs: 5 });
 const feed = (e, ...ps) => ps.reduce((acc, p, i) => V.rpcReduce(acc, p, T0 + i * 1000).entry, e);
@@ -304,5 +306,6 @@ test('p8: the page code has no way to show an agent name or free text of a tool 
   const view = lf(fs.readFileSync(path.join(__dirname, '..', 'public', 'view.js'), 'utf8'));
   const reducer = /function rpcReduce\([\s\S]*?\n  \}\n/.exec(view)[0];
   assert.doesNotMatch(reducer, /\bargs\b|toolCallId|\.agent\b|\.label\b|\.task\b/, 'the reducer never reads arguments, ids or names of agents');
-  assert.match(lf(fs.readFileSync(path.join(__dirname, 'rpc2-1-server.test.js'), 'utf8')), /tool_execution_start', toolName: 'read' \}/, 'the server test that pins the whitelist is still there');
+  // RP235: the whitelist is the translator now; its pin in rpc2-1-server expects the panel name, with the tool name only.
+  assert.match(lf(fs.readFileSync(path.join(__dirname, 'rpc2-1-server.test.js'), 'utf8')), /\{ type: 'tool_start', name: 'read' \}/, 'the server test that pins the whitelist is still there');
 });

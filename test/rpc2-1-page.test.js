@@ -2,6 +2,8 @@
 // RPC2-1 (S1, S6, S8), the live chat in the page: the real public/app.js in a vm (fake fetch, a fake event stream, no timers, no network, no pi).
 // Streaming bubble from `rpc` frames, one history reload when a run settles, Send that starts the session first, Stop, a failed send, the resync on
 // open and on every (re)connect of the stream, and the Cancel line of a pending dialog.
+// RP235: the page reads the panel vocabulary; a pi event reaches it through the real translator of the server.
+const { toPanel } = require('../server/rpchost.js');
 const test = require('node:test');
 const { appSource } = require('./pagesrc.js');
 const assert = require('node:assert/strict');
@@ -102,7 +104,7 @@ async function chatPage(extra = {}) {
 }
 const frame = (payload) => `event: rpc\ndata: ${JSON.stringify({ id: ID, ...payload })}\n\n`;
 const feed = async (page, stream, ...payloads) => { for (const p of payloads) stream.push(frame(p)); await page.tick(); };
-const rec = (record) => ({ kind: 'event', record });
+const rec = (record) => ({ kind: 'event', record: toPanel(record) });
 const delta = (i, text) => rec({ type: 'message_update', assistantMessageEvent: { type: 'text_delta', contentIndex: i, delta: text } });
 const urls = (page, prefix, method) => page.fetches.filter((f) => f.url.startsWith(prefix) && (!method || f.method === method));
 const type = (page, text) => { page.get('#msgBox').value = text; };

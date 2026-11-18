@@ -12,7 +12,8 @@ const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'rp105c-'));
 process.env.REPO_PANEL_CONFIG = path.join(scratch, 'config.json');
 test.after(() => fs.rmSync(scratch, { recursive: true, force: true, maxRetries: 5 }));
 
-const { createRpcHost } = require('../server/rpchost.js');
+// RP235: the page reads the panel vocabulary; a pi event reaches it through the real translator of the server.
+const { createRpcHost, toPanel } = require('../server/rpchost.js');
 const V = require('../public/view.js');
 const R = require('../public/resumen.js');
 
@@ -32,8 +33,8 @@ test('server: a retry start keeps its numbers and a retry end its verdict; the e
   emit({ type: 'auto_retry_start', attempt: 2, maxAttempts: 3, delayMs: 4000, errorMessage: '529 {"error":"SECRET-API-BODY"}' });
   emit({ type: 'auto_retry_end', success: false, attempt: 3, finalError: 'SECRET-FINAL', junk: 1 });
   assert.deepEqual(events(published), [
-    { type: 'auto_retry_start', attempt: 2, maxAttempts: 3, delayMs: 4000 },
-    { type: 'auto_retry_end', success: false, attempt: 3 },
+    { type: 'retry_start', attempt: 2, max: 3, delayMs: 4000 },
+    { type: 'retry_end', success: false, attempt: 3 },
   ]);
   assert.doesNotMatch(JSON.stringify(published), /SECRET|529/);
 });
@@ -42,10 +43,10 @@ test('server: a number that is not a finite number, or a verdict that is not a b
   const { published, emit } = await hostWith();
   emit({ type: 'auto_retry_start', attempt: '2', maxAttempts: null, delayMs: Infinity });
   emit({ type: 'auto_retry_end', success: 'yes', attempt: { x: 1 } });
-  assert.deepEqual(events(published), [{ type: 'auto_retry_start' }, { type: 'auto_retry_end' }]);
+  assert.deepEqual(events(published), [{ type: 'retry_start' }, { type: 'retry_end' }]);
 });
 
-const rec = (record) => ({ kind: 'event', id: '0123456789', record });
+const rec = (record) => ({ kind: 'event', id: '0123456789', record: toPanel(record) });
 const reduce = (e, record, now = 0) => V.rpcReduce(e, rec(record), now).entry;
 
 test('page: a retry start sets the note, its end clears it, and a new run, the end of a run and an exit clear it too', () => {

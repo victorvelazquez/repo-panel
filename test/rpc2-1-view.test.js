@@ -1,13 +1,15 @@
 'use strict';
 // RPC2-1 (S1, S6, S8), the pure part of the page: V.rpcEvent parses a frame of the `rpc` SSE event (total, 64 KB), V.rpcReduce
 // keeps what the chat shows of one session, V.rpcFromStatus reads GET /api/rpc/status.
+// RP235: the page reads the panel vocabulary; a pi event reaches it through the real translator of the server.
+const { toPanel } = require('../server/rpchost.js');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const V = require('../public/view.js');
 
 const ID = '0123456789';
 const frame = (payload, event = 'rpc') => ({ event, data: JSON.stringify(payload) });
-const ev = (record) => ({ id: ID, kind: 'event', record });
+const ev = (record) => ({ id: ID, kind: 'event', record: toPanel(record) });
 const delta = (contentIndex, text) => ev({ type: 'message_update', assistantMessageEvent: { type: 'text_delta', contentIndex, delta: text } });
 const run = (payloads, start) => payloads.reduce((acc, p) => { const r = V.rpcReduce(acc.entry, p, 1000); return { entry: r.entry, reloads: acc.reloads + (r.reload ? 1 : 0) }; }, { entry: start, reloads: 0 });
 

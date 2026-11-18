@@ -4,6 +4,8 @@
 // the history already has (one that comes AFTER the last message of the person: an older run never hides a new message) says the same thing, with the spaces collapsed the way the pending messages already compare.
 // When the history does not have it yet the live bubble is drawn (no gap). When the copy is hidden and the run goes on, the «working…» line takes its place, so the chat never looks stopped. Known limit, tested: two messages
 // that are legitimately identical and follow each other hide the live copy until the run ends; then the history shows both.
+// RP235: the page reads the panel vocabulary; a pi event reaches it through the real translator of the server.
+const { toPanel } = require('../server/rpchost.js');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const vm = require('node:vm');
@@ -141,7 +143,7 @@ test('n6: the known limit: two messages that are really identical and follow eac
 // ---------- the live text is the message being written, not the whole run ----------
 // MEASURED on the real stream (11 November, with the turns of this very chat): a message arrives as message_start, then (if it reasons) the reasoning at position 0, the text at position 1 and message_end. The reducer keeps the text BLOCKS BY POSITION
 // and cleared them only at the next agent_start, so the text of the message before stayed in the position the next one did not use (blocks [110] then [110, 1625]), and a text_delta is added to whatever its position already held.
-const evn = (record) => ({ kind: 'event', record });
+const evn = (record) => ({ kind: 'event', record: toPanel(record) });
 const upd = (type, contentIndex, extra = {}) => evn({ type: 'message_update', assistantMessageEvent: { type, contentIndex, ...extra } });
 const say = (index, text) => [upd('text_start', index), upd('text_delta', index, { delta: text }), upd('text_end', index, { content: text })];
 const run = (e, ...events) => events.flat().reduce((acc, p, i) => V.rpcReduce(acc, p, 1000 + i).entry, e);
@@ -236,7 +238,7 @@ async function chatPage(items) {
   page.body = () => page.get('#chatBody').html;
   return page;
 }
-const ev = (record) => ({ kind: 'event', record });
+const ev = (record) => ({ kind: 'event', record: toPanel(record) });
 const said = (text) => ev({ type: 'message_update', assistantMessageEvent: { type: 'text_end', contentIndex: 0, content: text } });
 
 test('p1: in the real page: the message the history already has and the live one are drawn ONCE while the tool runs; at the end of the run the chat is as before', async () => {

@@ -15,6 +15,8 @@ process.env.REPO_PANEL_CONFIG = path.join(scratch, 'config.json');
 process.env.REPO_PANEL_SESSIONS_DIR = sessionsBase;
 test.after(() => fs.rmSync(scratch, { recursive: true, force: true, maxRetries: 5 }));
 
+// RP235: the page reads the panel vocabulary; a pi event reaches it through the real translator of the server.
+const { toPanel } = require('../server/rpchost.js');
 const S = require('../server/sessions.js');
 const R = require('../public/resumen.js');
 const V = require('../public/view.js');
@@ -80,7 +82,7 @@ test('S2: a thinking item is drawn with a «thinking…» line, a plain one is d
   assert.doesNotMatch(bare, /working…/);
 });
 
-const rec = (r) => ({ kind: 'event', id: '0123456789', record: r });
+const rec = (r) => ({ kind: 'event', id: '0123456789', record: toPanel(r) });
 const upd = (type, contentIndex = 0, extra = {}) => rec({ type: 'message_update', assistantMessageEvent: { type, contentIndex, ...extra } });
 
 test('S2: live, thinking_start turns the flag on and thinking_end (or the first text, or a new run) turns it off; the text blocks are untouched', () => {

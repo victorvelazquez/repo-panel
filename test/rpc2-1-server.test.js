@@ -45,7 +45,7 @@ async function hostWith(over = {}, client = {}) {
 }
 const events = (published) => published.filter((p) => p.kind === 'event').map((p) => p.record);
 
-// ---------- the whitelist ----------
+// ---------- the whitelist (RP235: the translator into the panel vocabulary) ----------
 const SYSTEM = 'S'.repeat(200 * 1024);
 
 test('w1: a record that carries the system prompt never reaches the hub with it (message_start, message_end, agent_end, sections)', async () => {
@@ -53,15 +53,15 @@ test('w1: a record that carries the system prompt never reaches the hub with it 
   emit({ kind: 'event', record: { type: 'message_start', message: { role: 'system', content: [{ type: 'text', text: SYSTEM }] }, sections: [SYSTEM] } });
   emit({ kind: 'event', record: { type: 'message_end', message: { role: 'system', content: SYSTEM } } });
   emit({ kind: 'event', record: { type: 'agent_end', messages: [{ role: 'system', content: SYSTEM }, { role: 'user', content: 'hi' }] } });
-  assert.deepEqual(events(published), [{ type: 'message_start' }, { type: 'message_end' }, { type: 'agent_end' }]);
+  assert.deepEqual(events(published), [{ type: 'stream', part: 'reset' }, { type: 'other' }, { type: 'run_end' }]);
   assert.ok(JSON.stringify(published).length < 1000);
 });
 
-test('w2: tool_execution_* keep only the name, the error flag and the duration; no args and no result', async () => {
+test('w2: tool_execution_* keep only the name of the tool; no args and no result', async () => {
   const { published, emit } = await hostWith();
   emit({ kind: 'event', record: { type: 'tool_execution_start', toolName: 'read', args: { path: 'C:\\secret' }, toolCallId: 't1' } });
   emit({ kind: 'event', record: { type: 'tool_execution_end', toolName: 'read', isError: false, durationMs: 12, result: { content: 'r'.repeat(300000) }, extra: 1 } });
-  assert.deepEqual(events(published), [{ type: 'tool_execution_start', toolName: 'read' }, { type: 'tool_execution_end', toolName: 'read', isError: false, durationMs: 12 }]);
+  assert.deepEqual(events(published), [{ type: 'tool_start', name: 'read' }, { type: 'tool_end', name: 'read' }]);
 });
 
 test('w3: the streaming text and the end of a run do reach the hub', async () => {
@@ -74,24 +74,24 @@ test('w3: the streaming text and the end of a run do reach the hub', async () =>
   emit({ kind: 'event', record: { type: 'turn_end', stopReason: 'stop', message: { role: 'assistant', content: [{ type: 'text', text: 'Hello' }, { type: 'toolCall', arguments: SYSTEM }] }, toolResults: [SYSTEM] } });
   emit({ kind: 'event', record: { type: 'agent_settled', aborted: false, junk: 1 } });
   assert.deepEqual(events(published), [
-    { type: 'agent_start' },
-    { type: 'message_update', assistantMessageEvent: { type: 'text_delta', contentIndex: 1, delta: 'Hel' } },
-    { type: 'message_update', assistantMessageEvent: { type: 'text_end', contentIndex: 1, content: 'Hello' } },
-    { type: 'message_update', assistantMessageEvent: { type: 'text_end', contentIndex: 2 } },
-    { type: 'message_update', assistantMessageEvent: { type: 'thinking_delta', contentIndex: 0 } }, // only the text blocks keep their words (t4 of rpc2-1-resilience)
-    { type: 'turn_end', stopReason: 'stop', text: 'Hello' },
-    { type: 'agent_settled', aborted: false },
+    { type: 'run_start' },
+    { type: 'stream', index: 1, part: 'text', phase: 'delta', delta: 'Hel' },
+    { type: 'stream', index: 1, part: 'text', phase: 'end', content: 'Hello' },
+    { type: 'stream', index: 2, part: 'text', phase: 'end' },
+    { type: 'stream', index: 0, part: 'thinking', phase: 'delta' }, // only the text blocks keep their words (t4 of rpc2-1-resilience)
+    { type: 'other' }, // RP235: the page never used the end of a turn, so its text no longer leaves the server
+    { type: 'run_settled' },
   ]);
 });
 
-test('w4: an unknown type, a record without a type and a non-object become {type} or nothing', async () => {
+test('w4: an unknown type, a record without a type and a non-object become other, with nothing of them', async () => {
   const { published, emit } = await hostWith();
   emit({ kind: 'event', record: { type: 'queue_update', steering: [SYSTEM] } });
   emit({ kind: 'event', record: { type: 'huge', text: 'z'.repeat(400000) } });
   emit({ kind: 'event', record: { nothing: SYSTEM } });
   emit({ kind: 'event', record: 'text' });
   emit({ kind: 'event', record: null });
-  assert.deepEqual(events(published), [{ type: 'queue_update' }, { type: 'huge' }, {}, {}, {}]);
+  assert.deepEqual(events(published), [{ type: 'other' }, { type: 'other' }, { type: 'other' }, { type: 'other' }, { type: 'other' }]);
 });
 
 test('w5: state, dialog and exit still pass as they were (the dialog id travels as requestId)', async () => {
