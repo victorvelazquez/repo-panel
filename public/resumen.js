@@ -950,6 +950,8 @@
   }
   // RP236: what a message sent while the session works does: Alt+Enter queues it for the end of the run; Enter (and the Correct button) steers the agent now.
   const busyBehavior = ({ alt } = {}) => (alt ? 'followUp' : 'steer');
+  // RP236b (B2): while the session works a command (a text that starts with /) is not a correction: pi would run it at once. The reason, or '' when the text may go.
+  const steerRefusal = (text) => (typeof text === 'string' && text.trimStart().startsWith('/') ? 'Commands wait until the session is free: send it when the run ends' : '');
   // RP236: the messages waiting for the session, above the box: each with its kind and its text (escaped, on one line), and Clear queue, which puts them back in the box.
   function queueRowHtml(q) {
     const steering = q && Array.isArray(q.steering) ? q.steering.filter((t) => typeof t === 'string') : [];
@@ -1526,5 +1528,5 @@
     return `${ctx.failed ? '<div class="rs-note" role="status">⚠ Summary unavailable: showing the last data we have.</div>' : ''}<div class="rs-list">${body}</div>`;
   }
 
-  return { mergeSheetHtml, repoStatus, esc, mdHtml, settingsView, memoryChipHtml, ctxChipHtml, compactButtonHtml, legendHtml, listCount, blockWidths, columnView, membersView, ROOM_COLUMN_TABS, treeFolderPaths, fileView, COLUMN_TABS, columnDetail, chatMenuHtml, headChipsHtml, statusIconsHtml, composerState, askAllowed, actionMenu, actionButtonsHtml, composerMergeHtml, composerNote, chatHead, footButtons, busyBehavior, queueRowHtml, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, sessionCloseHtml, sessionTerminalHtml, terminalBlockHtml, recentlyActive, chatBody, quickReplies, quickOf, quickRow, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
+  return { mergeSheetHtml, repoStatus, esc, mdHtml, settingsView, memoryChipHtml, ctxChipHtml, compactButtonHtml, legendHtml, listCount, blockWidths, columnView, membersView, ROOM_COLUMN_TABS, treeFolderPaths, fileView, COLUMN_TABS, columnDetail, chatMenuHtml, headChipsHtml, statusIconsHtml, composerState, askAllowed, actionMenu, actionButtonsHtml, composerMergeHtml, composerNote, chatHead, footButtons, busyBehavior, steerRefusal, queueRowHtml, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, sessionCloseHtml, sessionTerminalHtml, terminalBlockHtml, recentlyActive, chatBody, quickReplies, quickOf, quickRow, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
 }));

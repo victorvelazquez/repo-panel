@@ -815,7 +815,7 @@
     let reload = false;
     let ctx = false; // RP139: the context of the session must be read again (a run or a compaction ended)
     if (!isObject(p)) return { entry: e, reload, ctx };
-    if (p.kind === 'state' && RPC_STATES.includes(p.state)) { e.state = p.state; if (p.state === 'busy') e.streaming = true; if (p.state !== 'busy' && p.state !== 'asking') Object.assign(e, { subs: 0, subSince: 0 }); }
+    if (p.kind === 'state' && RPC_STATES.includes(p.state)) { e.state = p.state; if (p.state === 'busy') e.streaming = true; if (p.state !== 'busy' && p.state !== 'asking') Object.assign(e, { subs: 0, subSince: 0, queue: rpcNoQueue() }); } // RP236b (S2): a free session has nothing waiting
     else if (p.kind === 'exit') Object.assign(e, { state: 'closed', blocks: [], text: '', streaming: false, thinking: false, retry: null, memory: null, ctx: null, compacting: false, asks: [], subs: 0, subSince: 0, queue: rpcNoQueue() });
     else if (p.kind === 'memory') { if (MEMORY_CATS.includes(p.memory)) e.memory = p.memory; }
     else if (p.kind === 'dialog') e.asks = rpcAsks(e.asks, rpcAskOf(p));
@@ -871,6 +871,7 @@
     if (st.state === 'closed') e.ctx = null; // RP139: a closed session has no context to report
     e.compacting = st.state !== 'closed' && st.compacting === true; // RP140: the status is the truth about a compaction in progress
     // RP233: the keys whose command the session did not load; a status without the list keeps what was known, a closed session knows none.
+    if (st.state === 'idle') e.queue = rpcNoQueue(); // RP236b (S2): a free session has nothing waiting, even if the end of its run was missed (kept apart: it must not skip `missing`)
     if (st.state === 'closed') { e.missing = []; e.queue = rpcNoQueue(); }
     else if (Array.isArray(st.missing)) e.missing = st.missing.filter((k) => typeof k === 'string' && (Object.hasOwn(CMD_TEXT, k) || k === 'flow-next'));
     e.asks = (Array.isArray(st.pendingDialogs) ? st.pendingDialogs : []).map(rpcAskOf).filter(Boolean).slice(0, 20);

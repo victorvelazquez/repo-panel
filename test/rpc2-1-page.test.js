@@ -266,11 +266,14 @@ test('p12: a failed start puts the text back, shows the message, never posts the
   assert.equal(page.get('#msgSend').disabled, false);
 });
 
-test('p13: Stop posts the abort of the repo while busy', async () => {
-  const { page } = await chatPage({ '/api/rpc/status': status('busy') });
-  page.run("ACTIONS['chat-stop']({})");
+// RP236b (S3): Stop takes the queue back first (pi would go on with it after an abort), then aborts the run of the same repo.
+test('p13: Stop posts the abort of the repo while busy, after taking its queue back', async () => {
+  const { page } = await chatPage({ '/api/rpc/status': status('busy'), '/api/rpc/clear-queue': { steering: [], followUp: [] } });
+  await page.run("ACTIONS['chat-stop']")({});
   await page.tick();
   assert.deepEqual(JSON.parse(urls(page, '/api/rpc/abort', 'POST')[0].body), { id: ID });
+  assert.deepEqual(JSON.parse(urls(page, '/api/rpc/clear-queue', 'POST')[0].body), { id: ID });
+  assert.deepEqual(page.fetches.filter((f) => f.method === 'POST' && /\/api\/rpc\/(clear-queue|abort)$/.test(f.url)).map((f) => f.url), ['/api/rpc/clear-queue', '/api/rpc/abort']);
 });
 
 test('p14: an exit frame closes the session: the label says so and the streaming text is dropped', async () => {
