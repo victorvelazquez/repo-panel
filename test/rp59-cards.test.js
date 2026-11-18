@@ -490,8 +490,8 @@ test('style: compact card rules, the list as a named container with queries by c
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
 });
 
-test('API_VERSION is still 15 and the page asks for no new route', () => {
-  assert.equal(require('../public/view.js').API_VERSION, 15);
+test('API_VERSION is now 16 and the page asks for no new route', () => {
+  assert.equal(require('../public/view.js').API_VERSION, 16);
   const src = appSource();
   assert.deepEqual([...src.matchAll(/api\('\/api\/summary[^']*'[,)]/g)].length, 1); // one request to the Summary (RP76 adds an options argument: a comma may follow the url)
 });

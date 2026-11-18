@@ -341,6 +341,6 @@ test('the controls of the bar keep their ids and prefs (RP143: the method and de
   assert.match(src, /\$\('#cleanAsColumn'\)\.checked = cleanAsColumn\(\)/);
 });
 
-test('API_VERSION is still 15', () => {
-  assert.equal(require('../public/view.js').API_VERSION, 15);
+test('API_VERSION is now 16', () => {
+  assert.equal(require('../public/view.js').API_VERSION, 16);
 });

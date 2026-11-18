@@ -283,8 +283,10 @@ function createServer(port, deps = {}) {
   if (!deps.jobsOf && typeof deps.rpcHost.startedAtOf === 'function') deps.jobsOf = (id) => jobsOf(id, deps.rpcHost.startedAtOf(id), deps.sessionsDir);
   // RP164: what the subagents of that session do, read from the presence folder next to the sessions one (shown only, never a hold); only for a session the panel started, like the jobs.
   if (!deps.subagentsOf && typeof deps.rpcHost.startedAtOf === 'function') deps.subagentsOf = (id) => (typeof deps.rpcHost.startedAtOf(id) === 'number' ? subagentsOf(id, { base: deps.sessionsDir }) : null);
+  // RP228: how the last task of a free session ended, from the host's events (memory only); an injected host with none leaves it out.
+  if (!deps.outcomeOf && typeof deps.rpcHost.outcomeOf === 'function') deps.outcomeOf = (id) => deps.rpcHost.outcomeOf(id);
   // RP78: the Summary comes from a store kept in memory (server.js starts it); injected by tests, or off with noSummaryStore. Built AFTER the host: it reads its state.
-  if (!deps.summaryStore && !deps.noSummaryStore) deps.summaryStore = createSummaryStore({ deps, now: deps.now, sessionOf: deps.sessionOf, jobsOf: deps.jobsOf, subagentsOf: deps.subagentsOf });
+  if (!deps.summaryStore && !deps.noSummaryStore) deps.summaryStore = createSummaryStore({ deps, now: deps.now, sessionOf: deps.sessionOf, jobsOf: deps.jobsOf, subagentsOf: deps.subagentsOf, outcomeOf: deps.outcomeOf });
   // RP178: tells the connected pages when a repo starts to need the person; started with the store by server.js, so a test server runs no timer.
   // RP179: push.json lives next to config.json; while a device is subscribed the notifier keeps reading with no page open.
   const pushFile = path.join(process.env.REPO_PANEL_CONFIG ? path.dirname(process.env.REPO_PANEL_CONFIG) : ROOT, 'push.json');

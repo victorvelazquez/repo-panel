@@ -29,12 +29,17 @@ const caches = new WeakMap();
 const LIVE_STATES = ['free', 'working', 'waiting'];
 const LIVE_RAW = ['idle', 'busy', 'starting', 'asking'];
 // RP164: and, for a live session too, what its subagents do (`subagents`, the closed shape of server/presence.js, only when it passes that gate); absent otherwise, so a row with none is the row of always.
-const sessionOf = (s, jobs, subagents) => {
+// RP228: and, for a free session only, how its last task ended (`last`, { kind, at }), for 15 minutes; absent otherwise.
+const LAST_MS = 15 * 60 * 1000;
+const LAST_KINDS = ['done', 'failed', 'stopped'];
+const lastOf = (outcome, now) => (outcome && LAST_KINDS.includes(outcome.kind) && Number.isFinite(outcome.at) && outcome.at <= now && now - outcome.at <= LAST_MS ? { kind: outcome.kind, at: new Date(outcome.at).toISOString() } : null);
+const sessionOf = (s, jobs, subagents, outcome, now) => {
   const state = SESSION_OF[s] || 'unknown';
   const live = LIVE_STATES.includes(state);
   const n = live && Number.isSafeInteger(jobs) && jobs > 0 ? Math.min(jobs, MAX_JOBS) : 0;
   const subs = live ? subagentsClean(subagents) : null;
-  return { state, ...(n ? { jobs: n } : {}), ...(subs ? { subagents: subs } : {}) };
+  const last = state === 'free' ? lastOf(outcome, now) : null;
+  return { state, ...(n ? { jobs: n } : {}), ...(subs ? { subagents: subs } : {}), ...(last ? { last } : {}) };
 };
 // The number a getter gives for one repo; a getter that throws is no jobs.
 function jobsFrom(getter, id) {
@@ -42,6 +47,10 @@ function jobsFrom(getter, id) {
 }
 // The presence summary a getter gives for one repo; a getter that throws is none (the gate in sessionOf decides what is worth showing).
 function subagentsFrom(getter, id) {
+  try { return getter(id); } catch { return null; }
+}
+// The outcome a getter gives for one repo; a getter that throws is none.
+function outcomeFrom(getter, id) {
   try { return getter(id); } catch { return null; }
 }
 const noProgress = { total: null, completada: null, enRevision: null, bloqueada: null, pendiente: null, enCurso: null };
@@ -112,7 +121,7 @@ function rankOf(session, failingCi, action, blocking) {
 // The row of one repo and why it needs attention (a list of reasons, empty when it does not).
 function analyse(f) {
   const { id, name, group, room } = f.repo;
-  const session = sessionOf(f.session, f.jobs, f.subagents);
+  const session = sessionOf(f.session, f.jobs, f.subagents, f.outcome, f.now);
   const error = f.error || (f.local && f.local.error) || (f.prs && f.prs.error) || null;
   const last = f.last && f.last.at ? { at: f.last.at, what: f.last.what ?? null } : { at: null, what: null };
   if (error || !f.local || !f.prs) {
@@ -167,7 +176,8 @@ async function gather(repo, ctx) {
     ]);
     const jobs = deps.jobsOf && LIVE_RAW.includes(session) ? jobsFrom(deps.jobsOf, repo.id) : 0; // RP161: only a live session can wait for a job
     const subagents = deps.subagentsOf && LIVE_RAW.includes(session) ? subagentsFrom(deps.subagentsOf, repo.id) : null; // RP164: shown, never a hold
-    return { ...f, local, prs, roadmap, state, session, jobs, subagents, last };
+    const outcome = deps.outcomeOf && session === 'idle' ? outcomeFrom(deps.outcomeOf, repo.id) : null; // RP228: only a free session shows how its last task ended
+    return { ...f, local, prs, roadmap, state, session, jobs, subagents, outcome, last };
   } catch (e) {
     return { ...f, error: e.message || 'Read failed', session: 'unknown' };
   }
@@ -230,4 +240,4 @@ function summaryFor(deps = {}, query = {}) {
   return p;
 }
 
-module.exports = { jobsFrom, subagentsFrom, LIVE_RAW, stateFrom, summarize, summaryFor, safeAnalyse, tally, loadingRow, lastMovementOf, pool };
+module.exports = { jobsFrom, subagentsFrom, outcomeFrom, LIVE_RAW, stateFrom, summarize, summaryFor, safeAnalyse, tally, loadingRow, lastMovementOf, pool };

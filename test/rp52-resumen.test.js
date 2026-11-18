@@ -445,8 +445,8 @@ test('style: only the view-specific zones hide by tab (RP61) and the tabs have a
   assert.match(css, /prefers-reduced-motion/);
 });
 
-test('API_VERSION is still 15: the page needs no new route', () => {
-  assert.equal(require('../public/view.js').API_VERSION, 15);
+test('API_VERSION is now 16: the page needs no new route', () => {
+  assert.equal(require('../public/view.js').API_VERSION, 16);
 });
 
 // ---------- visual review of RP52 (real data) ----------

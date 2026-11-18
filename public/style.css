@@ -577,7 +577,13 @@ body.tab-summary #viewbar { display: none; }
 .mb-row { display: grid; gap: 4px; min-width: 0; padding: 10px 4px; }
 .mb-row + .mb-row { border-top: 1px solid var(--line); }
 .mb-l1 { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
-.mb-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mb-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* RP228: how the last task of a free member ended: a small pill with an icon and a word, tone green, red or gray like the .ss-* chips */
+.mb-end { display: inline-flex; flex: none; align-items: center; gap: 4px; padding: 1px 7px; border: 1px solid currentColor; border-radius: 999px; font-size: 12px; line-height: 18px; }
+.mb-end svg { display: block; }
+.mb-end-done { color: var(--green); }
+.mb-end-failed { color: var(--red); }
+.mb-end-stopped { color: var(--muted); }
 .mb-l2 { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; }
 .mb-l3 { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .col-sum { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 6px 4px 8px; color: var(--muted); font-size: 12px; }

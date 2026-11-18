@@ -39,8 +39,8 @@ const lcl = (o = {}) => ({ branch: 'task', detached: false, upstream: 'origin/ta
 const sentOf = (cmd, o = {}) => ({ cmd, at: NOW - 60_000, head: 'h1', branch: 'task', files: 0, ahead: 0, ...o });
 const ASKING = 'waiting for your answer in the session';
 
-test('API_VERSION is at least the one that added the asking state and the ask field of pi-status (now 15)', () => {
-  assert.equal(view.API_VERSION, 15);
+test('API_VERSION is at least the one that added the asking state and the ask field of pi-status (now 16)', () => {
+  assert.equal(view.API_VERSION, 16);
 });
 
 test('flowVerdict: an asking session keeps the command running with a distinct label, a flag and no timeout', () => {

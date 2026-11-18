@@ -271,6 +271,11 @@
     pending: svgIcon('<circle cx="8" cy="8" r="6" stroke-dasharray="3 2.2"/>'),
     failed: svgIcon('<circle cx="8" cy="8" r="6"/><path d="M6 6l4 4M10 6l-4 4"/>'),
   };
+  const MB_END = { // RP228: how the last task of a free member ended: an icon and a word (colour is never the only signal)
+    done: { word: 'Finished', icon: ICON_CK.success, said: 'finished' },
+    failed: { word: 'Failed', icon: ICON_CK.failed, said: 'failed' },
+    stopped: { word: 'Stopped', icon: svgIcon('<circle cx="8" cy="8" r="6"/><rect x="6" y="6" width="4" height="4" rx="0.5"/>'), said: 'was stopped' },
+  };
   const CK_STATES = ['success', 'pending', 'failed'];
   const CK_WORD = { success: 'Successful', pending: 'In progress', failed: 'Failed' };
   const CK_SUM = { pending: 'pending', failed: 'failed', success: 'passed' };
@@ -316,9 +321,11 @@
       const name = `<b class="mb-name" title="${esc(m.name)}">${esc(m.name)}</b>`;
       if (m.known === false) return `<div class="mb-row" data-id="${esc(m.id)}"><div class="mb-l1">${name}</div><div class="mb-l2 rs-sub">not in the panel</div></div>`;
       const state = sessionChip({ id: m.id, session: { state: m.state } }, { liveFor: () => m.live });
+      const l = m.state === 'free' && m.last && typeof m.last === 'object' && typeof m.last.at === 'string' && Object.hasOwn(MB_END, m.last.kind) ? MB_END[m.last.kind] : null;
+      const end = l ? `<span class="mb-end mb-end-${m.last.kind}" title="The last task ${l.said} ${esc(relativeTime(m.last.at, x.now))}">${l.icon} ${l.word}</span>` : '';
       const prs = prChipOf(m.prs);
       const what = typeof m.what === 'string' && m.what.trim() ? `<div class="mb-l3 rs-sub rs-commit" title="${esc(m.what.trim())}">${esc(m.what.trim())}</div>` : '';
-      return `<div class="mb-row" data-id="${esc(m.id)}"><div class="mb-l1">${name}${state}</div><div class="mb-l2 rs-sub"><span class="rs-when">${esc(relativeTime(m.at, x.now))}</span>${prs || '<span class="rs-sub">no open PR</span>'}</div>${what}</div>`;
+      return `<div class="mb-row" data-id="${esc(m.id)}"><div class="mb-l1">${name}${state}${end}</div><div class="mb-l2 rs-sub"><span class="rs-when">${esc(relativeTime(m.at, x.now))}</span>${prs || '<span class="rs-sub">no open PR</span>'}</div>${what}</div>`;
     };
     return `<div class="mb-list" role="list">${list.map(block).join('')}</div>`;
   };
