@@ -273,11 +273,11 @@ test('B10: a successful send collapses the box; a refused one leaves it as it wa
   page.run('sendChatMessage()');
   assert.equal(S.composing, false, 'collapsed after the send');
   const { page: p2, S: S2, box: b2 } = await chatPage();
-  S2.rpc.abc = { state: 'busy' };
+  S2.rpc.abc = { state: 'asking' }; // RP236: a busy session takes the message now; asking is the state that refuses
   b2.value = 'hi';
   p2.run("ACTIONS['msg-expand']({})");
   p2.run('sendChatMessage()');
-  assert.equal(S2.composing, true, 'a refused send (the session is busy) does not collapse it');
+  assert.equal(S2.composing, true, 'a refused send (the session is asking) does not collapse it');
 });
 
 test('B11: closing the chat or opening another one collapses it, and it is not saved between chats', async () => {

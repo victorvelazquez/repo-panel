@@ -938,7 +938,25 @@
   function composerState(c, ctx = {}) {
     // RP99: with no session adopted (the list is in view) nothing can be sent: it would start and adopt a new session without telling. Open one or start a new one first.
     const reason = !c.info ? 'Loading the chat…' : !c.info.adopted ? 'Open a session or start a new one to write' : c.sending ? 'Sending…' : rpcWait(c);
-    return { canSend: !reason, reason, placeholder: reason ? (c.info && !c.info.adopted ? 'Start a session to write' : '') : 'Message…' }; // RP207: quiet; the state line and the title of Send say why it is blocked
+    // RP236: a session that works (not one that starts, asks or compacts) still takes a message: as a correction on the fly or queued for when the run ends. `canSend` keeps its meaning (a new run).
+    const canSteer = !!reason && !!c.info && !!c.info.adopted && !c.sending && !!c.rpc && c.rpc.state === 'busy' && c.rpc.compacting !== true;
+    const placeholder = canSteer ? 'Correct the agent, or queue a message for later…' : reason ? (c.info && !c.info.adopted ? 'Start a session to write' : '') : 'Message…'; // RP207: quiet; the state line and the title of Send say why it is blocked
+    return { canSend: !reason, canSteer, reason, placeholder };
+  }
+  // RP236: which round buttons the foot shows. While the session works an empty box keeps Stop; with text the box offers Correct (steer) and Queue (followUp).
+  function footButtons({ busy, canSteer, hasText } = {}) {
+    const writing = !!busy && !!canSteer && !!hasText;
+    return { send: !busy, stop: !!busy && !writing, steer: writing, queue: writing };
+  }
+  // RP236: what a message sent while the session works does: Alt+Enter queues it for the end of the run; Enter (and the Correct button) steers the agent now.
+  const busyBehavior = ({ alt } = {}) => (alt ? 'followUp' : 'steer');
+  // RP236: the messages waiting for the session, above the box: each with its kind and its text (escaped, on one line), and Clear queue, which puts them back in the box.
+  function queueRowHtml(q) {
+    const steering = q && Array.isArray(q.steering) ? q.steering.filter((t) => typeof t === 'string') : [];
+    const followUp = q && Array.isArray(q.followUp) ? q.followUp.filter((t) => typeof t === 'string') : [];
+    if (!steering.length && !followUp.length) return '';
+    const item = (kind, t) => `<li class="q-item" title="${esc(t)}"><span class="q-kind">${kind}</span> <span class="q-text">${esc(t)}</span></li>`;
+    return `<div class="q-row" role="status"><span class="q-head">Queued · ${steering.length + followUp.length}</span><ul class="q-list">${steering.map((t) => item('Correction', t)).join('')}${followUp.map((t) => item('After the run', t)).join('')}</ul><button type="button" class="q-clear" data-act="chat-unqueue">Clear queue</button></div>`;
   }
 
   // The message-box history (RP83, S3), like the prompt of pi: the texts the person sent to the session (the chat's own messages, then the
@@ -1508,5 +1526,5 @@
     return `${ctx.failed ? '<div class="rs-note" role="status">⚠ Summary unavailable: showing the last data we have.</div>' : ''}<div class="rs-list">${body}</div>`;
   }
 
-  return { mergeSheetHtml, repoStatus, esc, mdHtml, settingsView, memoryChipHtml, ctxChipHtml, compactButtonHtml, legendHtml, listCount, blockWidths, columnView, membersView, ROOM_COLUMN_TABS, treeFolderPaths, fileView, COLUMN_TABS, columnDetail, chatMenuHtml, headChipsHtml, statusIconsHtml, composerState, askAllowed, actionMenu, actionButtonsHtml, composerMergeHtml, composerNote, chatHead, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, sessionCloseHtml, sessionTerminalHtml, terminalBlockHtml, recentlyActive, chatBody, quickReplies, quickOf, quickRow, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
+  return { mergeSheetHtml, repoStatus, esc, mdHtml, settingsView, memoryChipHtml, ctxChipHtml, compactButtonHtml, legendHtml, listCount, blockWidths, columnView, membersView, ROOM_COLUMN_TABS, treeFolderPaths, fileView, COLUMN_TABS, columnDetail, chatMenuHtml, headChipsHtml, statusIconsHtml, composerState, askAllowed, actionMenu, actionButtonsHtml, composerMergeHtml, composerNote, chatHead, footButtons, busyBehavior, queueRowHtml, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, sessionCloseHtml, sessionTerminalHtml, terminalBlockHtml, recentlyActive, chatBody, quickReplies, quickOf, quickRow, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
 }));

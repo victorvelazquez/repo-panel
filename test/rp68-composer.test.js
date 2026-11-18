@@ -152,7 +152,7 @@ test('composerState: one distinct, non-empty reason per blocked case; the placeh
   };
   for (const [k, v] of Object.entries(cases)) {
     assert.ok(v.reason && typeof v.reason === 'string', `${k} has a reason`);
-    assert.equal(v.placeholder, '', `${k} has a quiet placeholder`);
+    assert.equal(v.placeholder, k === 'working' ? 'Correct the agent, or queue a message for later…' : '', `${k} has a quiet placeholder (RP236: working takes a correction)`);
   }
   assert.equal(new Set(Object.values(cases).map((v) => v.reason)).size, 5);
   assert.equal(cases.working.reason, WORKING);
@@ -297,13 +297,14 @@ test('chat-send: an empty or whitespace-only box posts nothing', async () => {
   await page.tick();
   assert.deepEqual(posts(page, '/api/rpc/prompt'), []);
 });
+// RP236: a working session takes the message as a correction (see rp75 C11b); a session that is asking is the one that still cannot receive.
 test('chat-send: a session that cannot receive posts nothing and the note shows why', async () => {
-  const { page } = await ready({ '/api/rpc/status': rpcState('busy') });
+  const { page } = await ready({ '/api/rpc/status': rpcState('asking') });
   typeIn(page, 'hello');
   await sendClick(page);
   await page.tick();
   assert.deepEqual(posts(page, '/api/rpc/prompt'), []);
-  assert.ok(page.get('#msgNote').html.includes(WORKING), page.get('#msgNote').html);
+  assert.ok(page.get('#msgNote').html.includes('pi is asking something'), page.get('#msgNote').html);
   assert.equal(page.get('#msgBox').value, 'hello');
 });
 test('chat-send: ONE prompt with the text exactly as typed; it clears the box and the note and leaves no draft', async () => {
@@ -507,12 +508,12 @@ test('keyboard: Enter sends once and is prevented; Shift+Enter and IME compositi
 });
 
 test('keyboard: Enter when the session cannot receive is prevented, posts nothing and the note shows the reason', async () => {
-  const { page } = await ready({ '/api/rpc/status': rpcState('busy') });
+  const { page } = await ready({ '/api/rpc/status': rpcState('asking') }); // RP236: a working session takes it (Enter corrects); asking still cannot
   typeIn(page, 'too soon');
   const prevented = enter(page);
   await page.tick();
   assert.equal(prevented(), 1);
   assert.deepEqual(posts(page, '/api/rpc/prompt'), []);
-  assert.ok(page.get('#msgNote').html.includes(WORKING), page.get('#msgNote').html);
+  assert.ok(page.get('#msgNote').html.includes('pi is asking something'), page.get('#msgNote').html);
   assert.equal(page.get('#msgBox').value, 'too soon');
 });

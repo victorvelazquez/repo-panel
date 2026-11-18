@@ -216,8 +216,9 @@ test('p8: Send on an idle session posts only the prompt', async () => {
   assert.deepEqual(JSON.parse(urls(page, '/api/rpc/prompt', 'POST')[0].body), { id: ID, text: 'go' });
 });
 
-test('p9: Send does nothing while the session is busy or asking, and an empty box sends nothing', async () => {
-  const busy = await chatPage({ '/api/rpc/status': status('busy') });
+// RP236: a working session takes the message as a correction (rp75 C11b); asking is the state that still sends nothing.
+test('p9: Send does nothing while the session is asking, and an empty box sends nothing', async () => {
+  const busy = await chatPage({ '/api/rpc/status': status('asking') });
   type(busy.page, 'nope');
   send(busy.page);
   await busy.page.tick();

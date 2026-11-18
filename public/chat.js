@@ -594,9 +594,8 @@ function drawChat() {
   const gm = git && git.pr ? git.merge : null; // no PR, no Merge button, no reason
   const note = gm ? V.mergeNote(gm, gm.held) : ''; // RP191 (S22): the reason of the PR, muted, where the person writes; a hold reason is shown nowhere
   $('#msgBox').placeholder = note || cs.placeholder;
-  const busy = !!(S.rpc[id] && S.rpc[id].state === 'busy');
-  $('#msgStop').hidden = !busy; // RP191: Stop takes the place of Send while the session works
-  $('#msgSend').hidden = busy;
+  footRefresh(id, cs);
+  paint($('#queueRow'), R.queueRowHtml(S.rpc[id] && S.rpc[id].queue)); // RP236: what waits for the session, above the box
   const row = S.summary && Array.isArray(S.summary.rows) ? S.summary.rows.find((r) => r.id === id) : null;
   const live = (S.rpc[id] && S.rpc[id].compacting ? 'working' : REASON_OF[S.rpc[id] && S.rpc[id].state]) || 'unknown'; // RP140: a compacting session takes no order either; RPC2b-1: the reason follows the session of the RPC host
   paint($('#chatActions'), R.actionButtonsHtml(R.actionMenu(row, { live, changes: summaryChanges(id), flow: summaryFlow(id) }), id, { sending: !!S.sending[id] }) + R.composerMergeHtml(columnGit(id, S.local[id]))); // RP175: Merge is not an item of the session menu: it does not wait for the session
@@ -693,14 +692,44 @@ function setMsgComposing(on, focus) {
   if (focus && box && box.focus) box.focus();
 }
 
+// RP191: Stop takes the place of Send while the session works. RP236: with text in the box it offers Correct and Queue instead. Also called on every keystroke (the text decides).
+function footRefresh(id = S.chat.id, cs = composerOf(id)) {
+  const box = $('#msgBox');
+  const b = R.footButtons({ busy: !!(S.rpc[id] && S.rpc[id].state === 'busy'), canSteer: cs.canSteer, hasText: !!(box && box.value.trim()) });
+  $('#msgStop').hidden = !b.stop;
+  $('#msgSend').hidden = !b.send;
+  $('#msgSteer').hidden = !b.steer;
+  $('#msgQueue').hidden = !b.queue;
+}
+
 // Send: the session is started first if needed (ensureRpcStarted), then the prompt goes. A failure puts the text back and shows the server's message; the optimistic
 // user bubble goes with it.
-async function sendChatMessage() {
+async function sendChatMessage(behavior) {
   const id = S.chat.id;
   if (!R || !id) return;
   const text = $('#msgBox').value;
   if (!text.trim()) return;
+  const cs = composerOf(id);
+  if (!cs.canSend && cs.canSteer) return steerChatText(id, text, behavior || 'steer'); // RP236: the session works: correct it now or queue for the end of the run
   return sendChatText(text, true);
+}
+// RP236: a message to a session that works. It shows in the queue row (pi tells the queue), not as a pending bubble; a failure puts the text back with the server's message.
+async function steerChatText(id, text, behavior) {
+  $('#msgBox').value = '';
+  S.composing = false;
+  fitMsgBox();
+  delete S.drafts[id];
+  delete S.notes[id];
+  delete S.recall[id];
+  draw();
+  try { await api('/api/rpc/prompt', { id, text, behavior }); } catch (e) { putBack(id, text); sayNote(id, e.message); }
+  draw();
+}
+// The text goes back into the box of its chat, before what the person already wrote again.
+function putBack(id, text) {
+  const now = S.chat.id === id ? $('#msgBox').value : S.drafts[id] || '';
+  const back = now ? `${text}\n${now}` : text;
+  if (S.chat.id === id) { $('#msgBox').value = back; fitMsgBox(); } else S.drafts[id] = back;
 }
 // RP166: the one path every message of the page takes (the box and the quick-reply buttons): canSend, the pending message, the session start and the error handling. `fromBox` clears the box and its draft.
 async function sendChatText(text, fromBox) {

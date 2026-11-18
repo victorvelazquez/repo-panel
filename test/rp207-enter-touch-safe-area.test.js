@@ -39,7 +39,8 @@ test('app.js: the Enter handler keeps the IME guards, asks the helper at the mom
   assert.match(app, /e\.key !== 'Enter' \|\| !e\.target \|\| e\.target\.id !== 'msgBox' \|\| e\.keyCode === 229\) return;/);
   assert.match(app, /V\.enterSends\(\{[^}]*composing: e\.isComposing[^}]*\}\)/);
   assert.match(app, /window\.matchMedia && window\.matchMedia\('\(pointer: coarse\)'\)\.matches/);
-  assert.match(app, /if \(!sends\) return;\n\s*e\.preventDefault\(\);\n\s*sendChatMessage\(\);/);
+  // RP236: the key also tells whether Alt was held (while the session works Alt+Enter queues).
+  assert.match(app, /if \(!sends\) return;\n\s*e\.preventDefault\(\);\n\s*sendChatMessage\(R \? R\.busyBehavior\(\{ alt: e\.altKey \}\) : undefined\);/);
 });
 
 test('index.html: the box asks the phone keyboard for a return key and keeps its title and label', () => {
@@ -69,7 +70,7 @@ test('composerState: a quiet placeholder; the reason stays as it was', () => {
   };
   for (const [k, [v, reason]] of Object.entries(blocked)) {
     assert.equal(v.canSend, false, k);
-    assert.equal(v.placeholder, '', `${k}: empty placeholder`);
+    assert.equal(v.placeholder, k === 'working' ? 'Correct the agent, or queue a message for later…' : '', `${k}: quiet placeholder (RP236: a working session takes a correction)`);
     assert.equal(v.reason, reason, `${k}: the reason is untouched`);
   }
 });

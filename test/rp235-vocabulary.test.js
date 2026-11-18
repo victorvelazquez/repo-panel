@@ -57,7 +57,7 @@ test('server: every event of pi the page uses becomes its panel name, with only 
     [{ type: 'compaction_start', reason: 'threshold' }, { type: 'compact_start', reason: 'threshold' }],
     [{ type: 'compaction_end', reason: 'weird', summary: 'SECRET' }, { type: 'compact_end' }],
     [{ type: 'turn_end', stopReason: 'stop', message: { content: [{ type: 'text', text: 'SECRET' }] } }, { type: 'other' }],
-    [{ type: 'queue_update', steering: ['SECRET'] }, { type: 'other' }],
+    [{ type: 'queue_update', steering: ['mine'] }, { type: 'queue', steering: ['mine'], followUp: [] }], // RP236: the person's own queued texts
     [{ type: 'tool_execution_update', partialResult: 'SECRET' }, { type: 'other' }],
     [{ no: 'type' }, { type: 'other' }],
   ];

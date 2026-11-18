@@ -780,7 +780,10 @@
   const RPC_BLOCKS = 64;
   const RPC_TEXT_MAX = 200000;
   // RP152: `subs` is how many subagents started and have not ended, `subSince` the moment the first one of them started (0 = none). RP235: the server tells a subagent apart (subagent_start, subagent_end).
-  const rpcBlank = () => ({ state: 'closed', text: '', blocks: [], error: '', startedAt: 0, streaming: false, thinking: false, retry: null, memory: null, ctx: null, compacting: false, asks: [], subs: 0, subSince: 0, missing: [] });
+  const rpcBlank = () => ({ state: 'closed', text: '', blocks: [], error: '', startedAt: 0, streaming: false, thinking: false, retry: null, memory: null, ctx: null, compacting: false, asks: [], subs: 0, subSince: 0, missing: [], queue: rpcNoQueue() });
+  // RP236: the messages waiting for the session, as pi told them last (the server already cut them); a value that is not a list of texts is an empty list.
+  function rpcNoQueue() { return { steering: [], followUp: [] }; }
+  const rpcTexts = (list) => (Array.isArray(list) ? list.filter((t) => typeof t === 'string').slice(0, 20).map((t) => t.slice(0, 4000)) : []);
   const SUB_MAX = 20;
   // RP152: the counter of a subagent that is working, as mm:ss (the minutes keep growing past 59). Anything that is not a duration in milliseconds reads 00:00.
   function subClock(ms) {
@@ -813,7 +816,7 @@
     let ctx = false; // RP139: the context of the session must be read again (a run or a compaction ended)
     if (!isObject(p)) return { entry: e, reload, ctx };
     if (p.kind === 'state' && RPC_STATES.includes(p.state)) { e.state = p.state; if (p.state === 'busy') e.streaming = true; if (p.state !== 'busy' && p.state !== 'asking') Object.assign(e, { subs: 0, subSince: 0 }); }
-    else if (p.kind === 'exit') Object.assign(e, { state: 'closed', blocks: [], text: '', streaming: false, thinking: false, retry: null, memory: null, ctx: null, compacting: false, asks: [], subs: 0, subSince: 0 });
+    else if (p.kind === 'exit') Object.assign(e, { state: 'closed', blocks: [], text: '', streaming: false, thinking: false, retry: null, memory: null, ctx: null, compacting: false, asks: [], subs: 0, subSince: 0, queue: rpcNoQueue() });
     else if (p.kind === 'memory') { if (MEMORY_CATS.includes(p.memory)) e.memory = p.memory; }
     else if (p.kind === 'dialog') e.asks = rpcAsks(e.asks, rpcAskOf(p));
     else if (p.kind === 'dialog-closed' && typeof p.requestId === 'string') e.asks = rpcAsks(e.asks, null, p.requestId);
@@ -822,7 +825,8 @@
       const r = p.record;
       const at = r.index;
       if (r.type === 'run_start') Object.assign(e, { blocks: [], streaming: true, thinking: false, retry: null, error: '', startedAt: now, subs: 0, subSince: 0 });
-      else if (r.type === 'run_settled') { e.streaming = false; e.thinking = false; e.retry = null; e.subs = 0; e.subSince = 0; reload = true; ctx = true; }
+      else if (r.type === 'run_settled') { e.streaming = false; e.thinking = false; e.retry = null; e.subs = 0; e.subSince = 0; e.queue = rpcNoQueue(); reload = true; ctx = true; } // RP236: settled means pi will not go on, so nothing waits any more
+      else if (r.type === 'queue') e.queue = { steering: rpcTexts(r.steering), followUp: rpcTexts(r.followUp) };
       else if (r.type === 'run_end') { ctx = true; e.subs = 0; e.subSince = 0; }
       // RP152: a subagent that starts is counted (the clock keeps the first start) and one that ends is taken out; never below zero, never above SUB_MAX.
       else if (r.type === 'subagent_start') { e.subs = Math.min(SUB_MAX, (Number.isInteger(e.subs) && e.subs > 0 ? e.subs : 0) + 1); if (!(e.subSince > 0)) e.subSince = now; }
@@ -867,7 +871,7 @@
     if (st.state === 'closed') e.ctx = null; // RP139: a closed session has no context to report
     e.compacting = st.state !== 'closed' && st.compacting === true; // RP140: the status is the truth about a compaction in progress
     // RP233: the keys whose command the session did not load; a status without the list keeps what was known, a closed session knows none.
-    if (st.state === 'closed') e.missing = [];
+    if (st.state === 'closed') { e.missing = []; e.queue = rpcNoQueue(); }
     else if (Array.isArray(st.missing)) e.missing = st.missing.filter((k) => typeof k === 'string' && (Object.hasOwn(CMD_TEXT, k) || k === 'flow-next'));
     e.asks = (Array.isArray(st.pendingDialogs) ? st.pendingDialogs : []).map(rpcAskOf).filter(Boolean).slice(0, 20);
     e.streaming = st.state === 'busy' || st.state === 'asking';

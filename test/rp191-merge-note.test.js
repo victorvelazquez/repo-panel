@@ -156,7 +156,9 @@ test('p3: a hold shows no note: a command running in the session (and a busy ses
   assert.doesNotMatch(page.get('#chatActions').html, /c-why/);
   assert.match(page.get('#chatActions').html, /title="Running /);
   const busy = await boot({ rpc: 'busy' });
-  assert.equal(box(busy), '');
+  assert.equal(box(busy), 'Correct the agent, or queue a message for later…'); // RP236: a working session takes a correction; still no merge note
+  const asking = await boot({ rpc: 'asking' });
+  assert.equal(box(asking), '');
 });
 
 test('p4: no adopted session: «Start a session to write», never the note', async () => {

@@ -218,9 +218,9 @@ test('chatHead: the id is escaped in the title and the name too; the close butto
 });
 
 // ---------- composerState unchanged (PRESERVE) ----------
-test('composerState: busy cannot send (same reason, same placeholder); idle can', () => {
-  assert.deepEqual(R.composerState({ id: 'r1', sending: false, info: adoptedInfo(), rpc: { state: 'busy' } }, { name: 'alpha' }), { canSend: false, reason: WORKING, placeholder: '' });
-  assert.deepEqual(R.composerState({ id: 'r1', sending: false, info: adoptedInfo(), rpc: { state: 'idle' } }, { name: 'alpha' }), { canSend: true, reason: '', placeholder: 'Message…' });
+test('composerState: busy cannot start a run (same reason) but takes a correction (RP236); idle can send', () => {
+  assert.deepEqual(R.composerState({ id: 'r1', sending: false, info: adoptedInfo(), rpc: { state: 'busy' } }, { name: 'alpha' }), { canSend: false, canSteer: true, reason: WORKING, placeholder: 'Correct the agent, or queue a message for later…' });
+  assert.deepEqual(R.composerState({ id: 'r1', sending: false, info: adoptedInfo(), rpc: { state: 'idle' } }, { name: 'alpha' }), { canSend: true, canSteer: false, reason: '', placeholder: 'Message…' });
 });
 // ---------- index.html ----------
 test('index.html: div#sessState.sess-state is the FIRST child of div.c-left in the bar (RP191), after textarea#msgBox; it is never hidden', () => {

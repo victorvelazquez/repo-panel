@@ -73,6 +73,7 @@
       <div id="composer" class="composer" role="group" aria-label="Message">
         <div id="termBlock" class="term-block"></div>
         <div id="quickRow" class="quick-slot"></div>
+        <div id="queueRow" class="queue-slot"></div>
         <div class="msg-field">
           <button id="msgExpand" class="msg-expand" type="button" data-act="msg-expand" aria-label="Expand the message box" aria-expanded="false" title="Expand the message box" hidden><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.5 2.5h4v4M13.5 2.5l-4.5 4.5M6.5 13.5h-4v-4M2.5 13.5l4.5-4.5"/></svg></button>
           <textarea id="msgBox" rows="1" enterkeyhint="enter" aria-label="Message to the session" title="Enter sends · Shift+Enter new line"></textarea>
@@ -81,6 +82,8 @@
           <div class="c-left"><div id="sessState" class="sess-state"></div></div>
           <span id="chatActions" class="c-actions"></span>
           <button id="msgStop" class="c-round c-stop" type="button" data-act="chat-stop" aria-label="Stop the run" title="Stop the run that is going on" hidden><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="3.5" y="3.5" width="9" height="9" rx="2" fill="currentColor"/></svg></button>
+          <button id="msgQueue" class="c-queue" type="button" data-act="chat-queue" aria-label="Queue the message for when the run ends" title="Queue it for when the run ends (Alt+Enter)" hidden>Queue</button>
+          <button id="msgSteer" class="c-round c-send" type="button" data-act="chat-steer" aria-label="Correct the agent now" title="Correct the agent on the fly (Enter)" hidden><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 13V3M3.8 7.2L8 3l4.2 4.2"/></svg></button>
           <button id="msgSend" class="c-round c-send" type="button" data-act="chat-send" aria-label="Send message"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 13V3M3.8 7.2L8 3l4.2 4.2"/></svg></button>
         </div>
         <div id="msgNote" class="rs-note" role="status"></div>
