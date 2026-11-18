@@ -177,7 +177,7 @@ async function withServer(fn) {
   const host = createRpcHost({ resolve: async () => ({ active: ACTIVE }), repoOf: findRepo, publish() {}, createClient });
   await host.start(ID);
   const port = await freePort();
-  const deps = { noSummaryStore: true, rpcHost: host, wait: NEVER, requirements: NEVER, prs: async () => ({ repo: {}, prs: [] }), guard: pi.sendGuard(() => 1_000_000) };
+  const deps = { noSummaryStore: true, rpcHost: host, wait: NEVER, requirements: NEVER, prs: async () => ({ repo: {}, prs: [] }) };
   const server = createServer(port, deps);
   await new Promise((r) => server.listen(port, '127.0.0.1', r));
   try {

@@ -1,5 +1,5 @@
 'use strict';
-// RP18 server side of POST /api/pi: the unstage key, the duplicate-send guard, and the
+// RP18 server side of POST /api/pi: the unstage key, the send lock (RP234 replaced the 45 s duplicate guard), and the
 // "keep the index empty" sentence of the orders. RPC2-2: the commands go to the session through the rpc host.
 const fs = require('node:fs');
 const os = require('node:os');
@@ -16,7 +16,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const lib = require('../lib.js');
 const { createServer } = require('../server/http.js');
-const { piSend, fixPrOrder, conditionsOrder, sendGuard } = require('../server/pi.js');
+const { piSend, fixPrOrder, conditionsOrder, sendLock } = require('../server/pi.js');
 
 test.after(() => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5 }));
 
@@ -55,44 +55,38 @@ test('flow-commit: still sends /flow-commit and the near-miss keys stay unknown'
   }
 });
 
-// ---------- the duplicate-send guard ----------
-test('guard: the same key for the same repo is refused for 45 s after a send, other keys are not', async () => {
-  let t = 1_000_000;
-  const guard = sendGuard(() => t);
-  const send = (key, h = fakeHost(), repo = REPO, extra = {}) => piSend(repo, key, h, NEVER, { guard, ...extra });
+// ---------- the send lock (RP234: no 45 s window; the lock lasts only while an order is on its way) ----------
+test('lock: once a send was answered the same key goes again at once, other keys and other repos too', async () => {
+  const lock = sendLock();
+  const send = (key, h = fakeHost(), repo = REPO, extra = {}) => piSend(repo, key, h, NEVER, { lock, ...extra });
   assert.equal((await send('flow-pr')).sent, true);
-  t += 7000;
   const again = fakeHost();
-  await refuses(send('flow-pr', again), 409, /^That command was already sent 7 s ago; wait for it to finish$/);
-  assert.deepEqual(again.sent, []);
+  assert.equal((await send('flow-pr', again)).sent, true);
+  assert.deepEqual(again.sent, ['/flow-pr']);
   assert.equal((await send('flow-commit')).sent, true); // a different key
   assert.equal((await send('flow-pr', fakeHost(), { id: 'r2', path: 'C:\dev\other' })).sent, true); // another repo
-  t += 38_000; // 45 s after the first send
-  assert.equal((await send('flow-pr')).sent, true);
 });
 
-test('guard: fix-pr and put-in-conditions are covered, and a refused send does not arm it', async () => {
-  let t = 5_000_000;
-  const guard = sendGuard(() => t);
+test('lock: fix-pr and put-in-conditions go through it, and a refused send does not take it', async () => {
+  const lock = sendLock();
   const reqs = async () => ({ available: true, results: [{ id: 'a', status: 'fail', level: 'required' }] });
-  await piSend(REPO, 'fix-pr', fakeHost(), NEVER, { guard, pr: 7, prs });
-  await refuses(piSend(REPO, 'fix-pr', fakeHost(), NEVER, { guard, pr: 7, prs }), 409, /already sent/);
-  await piSend(REPO, 'put-in-conditions', fakeHost(), reqs, { guard });
-  await refuses(piSend(REPO, 'put-in-conditions', fakeHost(), reqs, { guard }), 409, /already sent/);
-  await refuses(piSend(REPO, 'flow-base', fakeHost('busy'), NEVER, { guard }), 409, /busy/);
-  assert.equal((await piSend(REPO, 'flow-base', fakeHost(), NEVER, { guard })).sent, true);
+  assert.equal((await piSend(REPO, 'fix-pr', fakeHost(), NEVER, { lock, pr: 7, prs })).sent, true);
+  assert.equal((await piSend(REPO, 'fix-pr', fakeHost(), NEVER, { lock, pr: 7, prs })).sent, true);
+  assert.equal((await piSend(REPO, 'put-in-conditions', fakeHost(), reqs, { lock })).sent, true);
+  await refuses(piSend(REPO, 'flow-base', fakeHost('busy'), NEVER, { lock }), 409, /busy/);
+  assert.equal((await piSend(REPO, 'flow-base', fakeHost(), NEVER, { lock })).sent, true);
 });
 
-test('guard: the not-started, busy, asking and unknown-key refusals keep their messages and win over it', async () => {
-  const guard = sendGuard(() => 9_000_000);
-  await piSend(REPO, 'flow-pr', fakeHost(), NEVER, { guard });
-  await refuses(piSend(REPO, 'flow-pr', fakeHost('busy'), NEVER, { guard }), 409, /^The session is busy$/);
-  await refuses(piSend(REPO, 'flow-pr', fakeHost('closed'), NEVER, { guard }), 409, /^The session is not started$/);
-  await refuses(piSend(REPO, 'flow-pr', fakeHost('asking'), NEVER, { guard }), 409, /^The session is waiting for an answer$/);
-  await refuses(piSend(REPO, 'nope', fakeHost(), NEVER, { guard }), 400, /^Unknown command$/);
+test('lock: the not-started, busy, asking and unknown-key refusals keep their messages', async () => {
+  const lock = sendLock();
+  await piSend(REPO, 'flow-pr', fakeHost(), NEVER, { lock });
+  await refuses(piSend(REPO, 'flow-pr', fakeHost('busy'), NEVER, { lock }), 409, /^The session is busy$/);
+  await refuses(piSend(REPO, 'flow-pr', fakeHost('closed'), NEVER, { lock }), 409, /^The session is not started$/);
+  await refuses(piSend(REPO, 'flow-pr', fakeHost('asking'), NEVER, { lock }), 409, /^The session is waiting for an answer$/);
+  await refuses(piSend(REPO, 'nope', fakeHost(), NEVER, { lock }), 400, /^Unknown command$/);
 });
 
-test('guard: piSend without a guard behaves as before (repeat sends are not refused)', async () => {
+test('lock: piSend without a lock behaves as before (repeat sends are not refused)', async () => {
   await piSend(REPO, 'flow-pr', fakeHost());
   assert.equal((await piSend(REPO, 'flow-pr', fakeHost())).sent, true);
 });
@@ -121,29 +115,49 @@ async function withServer(deps, fn) {
 }
 const ID = lib.repoId(REPO_PATH);
 
-test('POST /api/pi: flow-commit-unstage goes through the route, and the second send of a key is refused with 409', async () => {
-  let t = 2_000_000;
+test('POST /api/pi: flow-commit-unstage goes through the route, and a Retry after the answer goes at once (RP234)', async () => {
   const h = fakeHost();
-  await withServer({ rpcHost: { ...h, closeAll() {} }, requirements: NEVER, prs, guard: sendGuard(() => t) }, async ({ post }) => {
+  await withServer({ rpcHost: { ...h, closeAll() {} }, requirements: NEVER, prs }, async ({ post }) => {
     const ok = await post('/api/pi', { id: ID, command: 'flow-commit-unstage' });
     assert.deepEqual([ok.status, ok.json], [200, { sent: true, confirmed: true }]);
     assert.deepEqual(h.sent, ['/flow-commit --unstage']);
-    t += 3000;
-    const dup = await post('/api/pi', { id: ID, command: 'flow-commit-unstage' });
-    assert.deepEqual([dup.status, dup.json.error], [409, 'That command was already sent 3 s ago; wait for it to finish']);
-    assert.equal(h.sent.length, 1);
+    const retry = await post('/api/pi', { id: ID, command: 'flow-commit-unstage' });
+    assert.deepEqual([retry.status, retry.json], [200, { sent: true, confirmed: true }]);
+    assert.equal(h.sent.length, 2);
     assert.equal((await post('/api/pi', { id: ID, command: 'flow-commit-unstage' }, false)).status, 401);
     assert.equal((await post('/api/pi', { id: 'nope', command: 'flow-commit-unstage' })).status, 404);
     assert.equal((await post('/api/pi', { id: ID, command: 'flow-commit --unstage' })).status, 400);
   });
 });
 
-test('POST /api/pi: each server keeps its own guard, so a second server starts with a clean slate', async () => {
+test('POST /api/pi: each server keeps its own lock, so a second server starts with a clean slate', async () => {
   for (let i = 0; i < 2; i++) {
     await withServer({ rpcHost: { ...fakeHost(), closeAll() {} }, requirements: NEVER, prs }, async ({ post }) => {
       assert.equal((await post('/api/pi', { id: ID, command: 'flow-pr' })).status, 200);
     });
   }
+});
+
+// RP234: the route passes the server's lock and its count of background jobs (the number of RP161) to piSend.
+test('POST /api/pi: two clicks at once send one order, and a delivery order waits for the background jobs of the session', async () => {
+  const h = fakeHost();
+  const gates = [];
+  const prompt = h.prompt;
+  h.prompt = async (...a) => { const r = await prompt(...a); await new Promise((ok) => gates.push(ok)); return r; };
+  let jobs = 0;
+  await withServer({ rpcHost: { ...h, closeAll() {} }, requirements: NEVER, prs, jobsOf: () => jobs }, async ({ post }) => {
+    const first = post('/api/pi', { id: ID, command: 'flow-ship' });
+    while (!gates.length) await new Promise((r) => setImmediate(r));
+    const second = await post('/api/pi', { id: ID, command: 'flow-ship' });
+    assert.deepEqual([second.status, second.json.error], [409, 'Another order is on its way to this session: wait for its answer']);
+    gates.splice(0).forEach((ok) => ok());
+    assert.equal((await first).status, 200);
+    assert.deepEqual(h.sent, ['/flow-ship']);
+    jobs = 1;
+    const held = await post('/api/pi', { id: ID, command: 'flow-pr' });
+    assert.deepEqual([held.status, held.json.error], [409, 'The session still has 1 background job running: wait for it to finish']);
+    assert.deepEqual(h.sent, ['/flow-ship']);
+  });
 });
 
 test('GET /api/pi-status: the token and the 404 still apply, tail is ignored and the answer is { state } from the host (RPC2-2)', async () => {

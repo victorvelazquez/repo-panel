@@ -16,7 +16,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const lib = require('../lib.js');
 const { createServer } = require('../server/http.js');
-const { piSend, fixPrOrder, sendGuard } = require('../server/pi.js');
+const { piSend, fixPrOrder } = require('../server/pi.js');
 
 test.after(() => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5 }));
 
@@ -150,8 +150,7 @@ test('POST /api/pi with fix-pr sends the order through the real server, and refu
   const host = { status: h.status, prompt: h.prompt, closeAll() {} };
   const failing = prOf();
   const passing = prOf({ number: 8, checks: { state: 'success', items: [] } });
-  let clock = 1_000_000;
-  await withServer({ rpcHost: host, requirements: NEVER, prs: provider(failing, passing), guard: sendGuard(() => clock) }, async ({ post }) => {
+  await withServer({ rpcHost: host, requirements: NEVER, prs: provider(failing, passing) }, async ({ post }) => {
     const ok = await post('/api/pi', { id, command: 'fix-pr', pr: 7 });
     assert.deepEqual([ok.status, ok.json], [200, { sent: true, confirmed: true }]);
     assert.deepEqual(h.sent, [fixPrOrder(failing)]);
@@ -161,8 +160,7 @@ test('POST /api/pi with fix-pr sends the order through the real server, and refu
     assert.equal((await post('/api/pi', { id: 'nope', command: 'fix-pr', pr: 7 })).status, 404);
     assert.equal((await post('/api/pi', { id, command: 'fix-pr', pr: 7 }, false)).status, 401);
     assert.equal(h.sent.length, 1);
-    // the browser cannot supply text: an extra text field is ignored (a minute later, so the duplicate guard is not involved)
-    clock += 60_000;
+    // the browser cannot supply text: an extra text field is ignored
     await post('/api/pi', { id, command: 'fix-pr', pr: 7, text: 'rm -rf /' });
     assert.deepEqual(h.sent, [fixPrOrder(failing), fixPrOrder(failing)]);
     // the fixed keys keep working through the same route, and the carry-over key sends exactly /flow-base --stash

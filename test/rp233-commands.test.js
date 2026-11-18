@@ -13,7 +13,7 @@ process.env.REPO_PANEL_CONFIG = path.join(scratch, 'config.json');
 test.after(() => fs.rmSync(scratch, { recursive: true, force: true, maxRetries: 5 }));
 
 const lib = require('../lib.js');
-const { piSend, sendGuard } = require('../server/pi.js');
+const { piSend, sendLock } = require('../server/pi.js');
 const { createRpcHost } = require('../server/rpchost.js');
 const V = require('../public/view.js');
 
@@ -32,19 +32,20 @@ test('piSend: a prompt pi started is confirmed', async () => {
   assert.deepEqual(await piSend(REPO, 'flow-ship', fakeHost()), { sent: true, confirmed: true });
 });
 
-test('piSend: a prompt an extension handled is not confirmed, and the guard gives the slot back', async () => {
-  const guard = sendGuard(() => 1000);
+test('piSend: a prompt an extension handled is not confirmed, and a Retry goes at once', async () => {
+  const lock = sendLock();
   const h = fakeHost({ answer: { disposition: 'handled' } });
-  assert.deepEqual(await piSend(REPO, 'flow-ship', h, undefined, { guard }), { sent: true, confirmed: false, disposition: 'handled' });
-  assert.deepEqual(await piSend(REPO, 'flow-ship', h, undefined, { guard }), { sent: true, confirmed: false, disposition: 'handled' });
+  assert.deepEqual(await piSend(REPO, 'flow-ship', h, undefined, { lock }), { sent: true, confirmed: false, disposition: 'handled' });
+  assert.deepEqual(await piSend(REPO, 'flow-ship', h, undefined, { lock }), { sent: true, confirmed: false, disposition: 'handled' });
   assert.deepEqual(h.sent, ['/flow-ship', '/flow-ship']);
 });
 
-test('piSend: a prompt pi queued is not confirmed, and a second click within the window is still refused', async () => {
-  const guard = sendGuard(() => 1000);
+// RP234: there is no time window any more; what holds a second order after a queued one is the state of the session (busy), which the real host reports.
+test('piSend: a prompt pi queued is not confirmed, and it frees the send lock', async () => {
+  const lock = sendLock();
   const h = fakeHost({ answer: { disposition: 'queued' } });
-  assert.deepEqual(await piSend(REPO, 'flow-pr', h, undefined, { guard }), { sent: true, confirmed: false, disposition: 'queued' });
-  await refuses(piSend(REPO, 'flow-pr', h, undefined, { guard }), 409, /already sent/);
+  assert.deepEqual(await piSend(REPO, 'flow-pr', h, undefined, { lock }), { sent: true, confirmed: false, disposition: 'queued' });
+  assert.doesNotThrow(() => { lock.take(REPO); lock.free(REPO); });
   assert.deepEqual(h.sent, ['/flow-pr']);
 });
 
@@ -55,14 +56,14 @@ test('piSend: an answer with no disposition, or one outside the closed list, sta
 });
 
 // ---------- the list of commands ----------
-test('piSend: a /flow-* command that is not loaded is refused with its name, nothing is prompted and the guard is not armed', async () => {
-  const guard = sendGuard(() => 1000);
+test('piSend: a /flow-* command that is not loaded is refused with its name, nothing is prompted and the send lock is not taken', async () => {
+  const lock = sendLock();
   const h = fakeHost({ commands: ['flow-pr', 'skill:flow-ship'] });
-  await refuses(piSend(REPO, 'flow-ship', h, undefined, { guard }), 409, /^\/flow-ship is not loaded in this session/);
-  await refuses(piSend(REPO, 'flow-ship-unstage', h, undefined, { guard }), 409, /^\/flow-ship is not loaded in this session/);
+  await refuses(piSend(REPO, 'flow-ship', h, undefined, { lock }), 409, /^\/flow-ship is not loaded in this session/);
+  await refuses(piSend(REPO, 'flow-ship-unstage', h, undefined, { lock }), 409, /^\/flow-ship is not loaded in this session/);
   assert.deepEqual(h.sent, []);
   h.commandsOf = () => [...FLOW];
-  assert.deepEqual(await piSend(REPO, 'flow-ship', h, undefined, { guard }), { sent: true, confirmed: true });
+  assert.deepEqual(await piSend(REPO, 'flow-ship', h, undefined, { lock }), { sent: true, confirmed: true });
   assert.deepEqual(h.sent, ['/flow-ship']);
 });
 

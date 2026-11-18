@@ -54,8 +54,8 @@ async function withServer(fn, { state = 'idle', started = true } = {}) {
   const port = await freePort();
   let t = 1_000_000;
   // The providers go through `cfg` so a test can swap them after the server is up.
-  const cfg = { requirements: NEVER, prs };
-  const deps = { noSummaryStore: true, rpcHost: host, wait: NEVER, requirements: (...a) => cfg.requirements(...a), prs: (...a) => cfg.prs(...a), guard: pi.sendGuard(() => t) };
+  const cfg = { requirements: NEVER, prs, jobs: 0 };
+  const deps = { noSummaryStore: true, rpcHost: host, wait: NEVER, requirements: (...a) => cfg.requirements(...a), prs: (...a) => cfg.prs(...a), jobsOf: () => cfg.jobs };
   const server = createServer(port, deps);
   await new Promise((r) => server.listen(port, '127.0.0.1', r));
   try {
@@ -120,21 +120,19 @@ test('s4: the three states that cannot take a command are refused with a fixed m
   }
 });
 
-test('s5: the duplicate guard still refuses the same key for 45 s, other keys go, and a refusal arms nothing', async () => {
-  await withServer(async ({ post, prompts, tick, cur }) => {
+test('s5: RP234: with the session free a repeat goes at once, a busy session refuses, and background jobs hold the delivery orders only', async () => {
+  await withServer(async ({ post, prompts, cur, cfg }) => {
     assert.equal((await pre(post, 'flow-pr')).status, 200);
-    tick(7000);
-    const again = await pre(post, 'flow-pr');
-    assert.deepEqual([again.status, again.json.error], [409, 'That command was already sent 7 s ago; wait for it to finish']);
-    assert.equal((await pre(post, 'flow-commit')).status, 200);
-    assert.deepEqual(prompts(), ['/flow-pr', '/flow-commit']);
+    assert.equal((await pre(post, 'flow-pr')).status, 200); // no 45 s window
     cur.state = 'busy';
-    tick(60000);
-    assert.equal((await pre(post, 'flow-base')).status, 409); // busy: refused, and it did not arm the guard
+    assert.equal((await pre(post, 'flow-base')).status, 409);
     cur.state = 'idle';
+    cfg.jobs = 2;
+    const held = await pre(post, 'flow-base');
+    assert.deepEqual([held.status, held.json.error], [409, 'The session still has 2 background jobs running: wait for them to finish']);
+    cfg.jobs = 0;
     assert.equal((await pre(post, 'flow-base')).status, 200);
-    tick(46000);
-    assert.equal((await pre(post, 'flow-pr')).status, 200);
+    assert.deepEqual(prompts(), ['/flow-pr', '/flow-pr', '/flow-base']);
   });
 });
 
@@ -151,7 +149,7 @@ test('s6: an unknown key, a bad body and a bad repo keep their old answers', asy
   });
 });
 
-test('s7: a failure of the prompt answers a fixed message and does not arm the duplicate guard', async () => {
+test('s7: a failure of the prompt answers a fixed message and frees the send lock', async () => {
   await withServer(async ({ post, prompts, host }) => {
     const ok = host.prompt;
     host.prompt = async () => { throw new Error('C:\\secret\\path exploded'); };
