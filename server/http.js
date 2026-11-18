@@ -169,6 +169,7 @@ const routes = {
   'POST /api/rpc/prompt': (q, b, d) => rpcApi(d.rpcHost).prompt(b),
   'POST /api/rpc/steer': (q, b, d) => rpcApi(d.rpcHost).steer(b),
   'POST /api/rpc/abort': (q, b, d) => rpcApi(d.rpcHost).abort(b),
+  'POST /api/rpc/clear-queue': (q, b, d) => rpcApi(d.rpcHost).clearQueue(b), // RP236
   'POST /api/rpc/dialog': (q, b, d) => rpcApi(d.rpcHost).dialog(b),
   // RPC2b-1: the state of EVERY configured repo (closed by default), from the host's memory: nothing starts and nothing is read.
   'GET /api/rpc/states': (q, b, d) => ({ states: Object.fromEntries(loadConfig().groups.flatMap((g) => g.repos).map((r) => { const id = lib.repoId(r.path); return [id, d.rpcHost.stateOf(id)]; })) }),

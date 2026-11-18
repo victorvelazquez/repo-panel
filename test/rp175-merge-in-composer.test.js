@@ -291,7 +291,7 @@ test('s2: the hint is not visible any more; the information is the title of the 
   assert.doesNotMatch(css, /(^|\n)\.hint\s*\{/);
   assert.match(/<textarea id="msgBox"[^>]*>/.exec(html)[0], /title="Enter sends · Shift\+Enter new line"/);
   assert.match(/<textarea id="msgBox"[^>]*>/.exec(html)[0], /aria-label="Message to the session"/);
-  assert.match(read('app.js'), /e\.key !== 'Enter' \|\| !e\.target \|\| e\.target\.id !== 'msgBox' \|\| e\.keyCode === 229\) return;\n[^\n]*\n\s*const sends = V && V\.enterSends \? V\.enterSends\([^\n]*\n\s*if \(!sends\) return;\n\s*e\.preventDefault\(\);\n\s*sendChatMessage\(\);/);
+  assert.match(read('app.js'), /e\.key !== 'Enter' \|\| !e\.target \|\| e\.target\.id !== 'msgBox' \|\| e\.keyCode === 229\) return;\n[^\n]*\n\s*const sends = V && V\.enterSends \? V\.enterSends\([^\n]*\n\s*if \(!sends\) return;\n\s*e\.preventDefault\(\);\n\s*sendChatMessage\(R \? R\.busyBehavior\(\{ alt: e\.altKey \}\) : undefined\);/); // RP236: Alt decides correct or queue while the session works
 });
 
 test('s3: the reason line has no style any more (RP191), the row wraps in a narrow chat, and the RP156 container query still only hides chip words', () => {

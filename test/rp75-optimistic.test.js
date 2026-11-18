@@ -504,14 +504,49 @@ test('C10: pending bubbles are kept per repo: another card hides it and coming b
   assert.ok(body(page).includes('hello team') && body(page).includes('sending…'), 'shown again');
 });
 
-test('C11: a message the composer refuses (session working) clears nothing and shows no pending bubble; the note keeps the reason', async () => {
-  const { page } = await chatPage({ '/api/rpc/status': { state: 'busy', pendingDialogs: [] } });
+// RP236: a working session takes the message now (it used to refuse it): see C11b. A session that is asking still refuses, and keeps the text.
+test('C11: a message the composer refuses (session asking) clears nothing and shows no pending bubble; the note keeps the reason', async () => {
+  const { page } = await chatPage({ '/api/rpc/status': { state: 'asking', pendingDialogs: [] } });
   typeAndSend(page);
   page.flush();
   assert.equal(sendsOf(page).length, 0);
   assert.equal(page.get('#msgBox').value, 'hello team');
   assert.ok(!body(page).includes('pending') && !body(page).includes('sending…'));
-  assert.ok(page.get('#msgNote').html.includes('The session is working: wait until it is idle, or press Stop'), page.get('#msgNote').html);
+  assert.ok(page.get('#msgNote').html.includes('pi is asking something: answer it in the card of the chat'), page.get('#msgNote').html);
+});
+
+test('C11b (RP236): with the session working, Send corrects it on the fly, Queue leaves it for the end; the box clears and no pending bubble is drawn', async () => {
+  const { page } = await chatPage({ '/api/rpc/status': { state: 'busy', pendingDialogs: [] } });
+  typeAndSend(page);
+  await page.tick();
+  page.get('#msgBox').value = 'and then this';
+  page.run("ACTIONS['chat-queue']({})");
+  await page.tick();
+  assert.deepEqual(sendsOf(page).map((f) => JSON.parse(f.body)), [{ id: 'abc', text: 'hello team', behavior: 'steer' }, { id: 'abc', text: 'and then this', behavior: 'followUp' }]);
+  assert.equal(page.get('#msgBox').value, '');
+  assert.ok(!body(page).includes('sending…'));
+});
+
+test('C11c (RP236): a correction the server refuses puts the text back with the reason', async () => {
+  const { page } = await chatPage({ '/api/rpc/status': { state: 'busy', pendingDialogs: [] }, '/api/rpc/prompt': () => Promise.resolve({ ok: false, status: 409, statusText: 'Conflict', json: async () => ({ error: 'The session is compacting its context: wait a moment' }) }) });
+  typeAndSend(page);
+  await page.tick();
+  assert.equal(page.get('#msgBox').value, 'hello team');
+  assert.ok(page.get('#msgNote').html.includes('The session is compacting its context'), page.get('#msgNote').html);
+});
+
+test('C11d (RP236): the queue pi tells is drawn above the box, and Clear queue asks the server and puts the texts back in the box', async () => {
+  const { page, S } = await chatPage({ '/api/rpc/status': { state: 'busy', pendingDialogs: [] }, '/api/rpc/clear-queue': { steering: ['fix the test'], followUp: ['then summarize'] } });
+  page.run(`applyRpc(${JSON.stringify({ id: 'abc', kind: 'event', record: { type: 'queue', steering: ['fix the test'], followUp: ['then summarize'] } })})`);
+  await page.tick();
+  assert.match(page.get('#queueRow').html, /Queued · 2[\s\S]*fix the test[\s\S]*then summarize[\s\S]*Clear queue/);
+  page.get('#msgBox').value = 'draft';
+  await page.run("ACTIONS['chat-unqueue']")({});
+  await page.tick();
+  assert.equal(page.fetches.filter((f) => f.method === 'POST' && f.url === '/api/rpc/clear-queue').length, 1);
+  assert.equal(page.get('#msgBox').value, 'fix the test\nthen summarize\ndraft');
+  assert.equal(JSON.stringify(S.rpc.abc.queue), JSON.stringify({ steering: [], followUp: [] })); // the object lives in the page vm
+  assert.equal(page.get('#queueRow').html, '');
 });
 
 test('C12: PRESERVE: one send per repo at a time (a second dispatch sends nothing), and an empty box sends nothing', async () => {

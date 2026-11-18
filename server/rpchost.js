@@ -88,7 +88,13 @@ function streamOf(r) {
   else out.part = 'other';
   return out;
 }
+// RP236: the messages waiting for the session (the person's own texts): at most QUEUE_MAX per list, each cut to QUEUE_TEXT_MAX; anything that is not a text is dropped.
+const QUEUE_MAX = 20;
+const QUEUE_TEXT_MAX = 4000;
+const texts = (list) => (Array.isArray(list) ? list.filter((t) => typeof t === 'string').slice(0, QUEUE_MAX).map((t) => t.slice(0, QUEUE_TEXT_MAX)) : []);
+const queueOf = (r) => ({ steering: texts(r && r.steering), followUp: texts(r && r.followUp) });
 const TRANSLATE = {
+  queue_update: (r) => ({ type: 'queue', ...queueOf(r) }),
   agent_start: () => ({ type: 'run_start' }),
   agent_end: () => ({ type: 'run_end' }),
   agent_settled: () => ({ type: 'run_settled' }),
@@ -306,6 +312,8 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
       return ask(running(id), 'steer', { message });
     },
     async abort(id) { repoOf(id); return ask(running(id), 'abort', {}); },
+    // RP236: takes the queued messages back (pi answers their texts, which the page puts back in the box).
+    async clearQueue(id) { repoOf(id); return queueOf(await ask(running(id), 'clear_queue', {})); },
     async answer(id, requestId, answer) {
       repoOf(id);
       const { client } = running(id);
@@ -404,6 +412,7 @@ function rpcApi(host) {
     prompt: (b) => host.prompt(idOf(bodyOf(b)), b.text, b.behavior === undefined ? {} : { behavior: b.behavior }),
     steer: (b) => host.steer(idOf(bodyOf(b)), b.text),
     abort: (b) => host.abort(idOf(bodyOf(b))),
+    clearQueue: (b) => host.clearQueue(idOf(bodyOf(b))),
     dialog: (b) => {
       const id = idOf(bodyOf(b));
       if (typeof b.requestId !== 'string' || !b.requestId || b.requestId.length > 200) throw new HttpError(400, 'Invalid request');

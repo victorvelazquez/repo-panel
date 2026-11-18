@@ -86,7 +86,7 @@ test('w3: the streaming text and the end of a run do reach the hub', async () =>
 
 test('w4: an unknown type, a record without a type and a non-object become other, with nothing of them', async () => {
   const { published, emit } = await hostWith();
-  emit({ kind: 'event', record: { type: 'queue_update', steering: [SYSTEM] } });
+  emit({ kind: 'event', record: { type: 'thinking_level_changed', level: SYSTEM } }); // RP236: queue_update is used now (it became `queue`)
   emit({ kind: 'event', record: { type: 'huge', text: 'z'.repeat(400000) } });
   emit({ kind: 'event', record: { nothing: SYSTEM } });
   emit({ kind: 'event', record: 'text' });

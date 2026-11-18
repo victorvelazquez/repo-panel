@@ -227,6 +227,20 @@ const ACTIONS = {
   },
   'chat-close': () => closeChat(),
   'chat-send': () => sendChatMessage(),
+  'chat-steer': () => sendChatMessage('steer'), // RP236
+  'chat-queue': () => sendChatMessage('followUp'), // RP236
+  // RP236: takes the queued messages back from pi and puts their texts in the box (corrections first, in their order), so nothing written is lost.
+  'chat-unqueue': async () => {
+    const id = S.chat.id;
+    if (!id) return;
+    try {
+      const q = await api('/api/rpc/clear-queue', { id });
+      const texts = [...((q && q.steering) || []), ...((q && q.followUp) || [])].filter((t) => typeof t === 'string' && t);
+      if (S.rpc[id]) S.rpc[id].queue = { steering: [], followUp: [] };
+      if (texts.length) putBack(id, texts.join('\n'));
+    } catch (e) { toast(e.message, 'bad'); }
+    draw();
+  },
   'msg-expand': () => setMsgComposing(!S.composing, true), // RP208: expand the message box over the list, or fold it back
   // RP166: a quick-reply button sends the option held in S.quick (the index is a digit, the text is never read from the element) through the message box path. It only acts while the message it was drawn for is still the
   // last one and the conditions still hold (a fresh read gives the same signature): a double click finds the pending message and does nothing.

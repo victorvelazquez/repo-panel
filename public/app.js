@@ -123,9 +123,9 @@ document.addEventListener('keydown', (e) => {
   const sends = V && V.enterSends ? V.enterSends({ shift: e.shiftKey, ctrl: e.ctrlKey, meta: e.metaKey, composing: e.isComposing, coarse }) : !e.shiftKey && !e.isComposing; // without the helper the old rule holds
   if (!sends) return;
   e.preventDefault();
-  sendChatMessage();
+  sendChatMessage(R ? R.busyBehavior({ alt: e.altKey }) : undefined); // RP236: while the session works Enter corrects it and Alt+Enter queues; free, both send
 });
-document.addEventListener('input', (e) => { if (e.target && e.target.id === 'msgBox') { delete S.recall[S.chat.id]; saveDraft(); fitMsgBox(); } else if (e.target && e.target.id === 'notesBox') notesInput(e.target.value); });
+document.addEventListener('input', (e) => { if (e.target && e.target.id === 'msgBox') { delete S.recall[S.chat.id]; saveDraft(); fitMsgBox(); footRefresh(); } else if (e.target && e.target.id === 'notesBox') notesInput(e.target.value); });
 
 // The passing list of a repo stays open (or closed) across redraws. `toggle` does not bubble, so capture it.
 document.addEventListener('toggle', (e) => {
