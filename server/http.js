@@ -18,7 +18,7 @@ const { readNotes, saveNotes } = require('./notes.js');
 const { prState, mergePr, rerunFailed } = require('./github.js');
 const { roadmapState } = require('./roadmap.js');
 const { addRepo, removeRepo, setSnoozed, setDismissed, scanFolder } = require('./repos.js');
-const { piSend, rpcPiStatus, sendGuard } = require('./pi.js');
+const { piSend, rpcPiStatus, sendLock } = require('./pi.js');
 const { readState } = require('./state.js');
 const { requirementsFor, prerequisites } = require('./requirements.js');
 const { roomsState, createRoom, removeRoom, assignRoom } = require('./rooms.js');
@@ -155,7 +155,7 @@ const routes = {
   'POST /api/rerun': (q, b) => rerunFailed(findRepo(b.id), Number(b.number)),
   'POST /api/snooze': (q, b) => setSnoozed(b.id, Number(b.number), !!b.on, !!b.wasReady),
   'POST /api/dismiss': (q, b) => setDismissed(b.id, !!b.on),
-  'POST /api/pi': (q, b, d) => piSend(findRepo(b.id), b.command, d.rpcHost, d.requirements, { pr: b.pr, prs: d.prs, guard: d.guard }),
+  'POST /api/pi': (q, b, d) => piSend(findRepo(b.id), b.command, d.rpcHost, d.requirements, { pr: b.pr, prs: d.prs, lock: d.lock, jobs: d.jobsOf }),
   // RP99: a session cannot be adopted while the repo has one live or starting (a start takes up to five minutes): it would end with the adopted session in the chat and another one running.
   'POST /api/sessions/adopt': (q, b, d) => {
     if (d.rpcHost && d.rpcHost.stateOf(b && b.id) !== 'closed') throw new HttpError(409, 'This repo has a session running: close it first');
@@ -246,10 +246,10 @@ function isPanelRunning(port) {
   });
 }
 
-// `deps` replaces what the pi routes talk to ({ wait, requirements, prs, guard, summaryStore, noSummaryStore }); tests inject fakes, the real server passes none.
+// `deps` replaces what the pi routes talk to ({ wait, requirements, prs, lock, jobsOf, summaryStore, noSummaryStore }); tests inject fakes, the real server passes none.
 function createServer(port, deps = {}) {
-  // One duplicate-send guard per server (tests inject theirs with a fake clock).
-  deps = { guard: sendGuard(), ...deps };
+  // RP234: one send lock per server (tests may inject theirs).
+  deps = { lock: sendLock(), ...deps };
   // RP201: the fingerprint of the code of the server is taken here, right after its modules were loaded; GET /api/server-state tells whether the disk has another code now (tests inject theirs).
   if (!deps.codeWatch) deps.codeWatch = createCodeWatch({ root: ROOT });
   const hostOk = new Set([`127.0.0.1:${port}`, `localhost:${port}`]);

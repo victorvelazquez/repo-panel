@@ -12,7 +12,7 @@ const assert = require('node:assert/strict');
 const lib = require('../lib.js');
 const V = require('../public/view.js');
 const R = require('../public/resumen.js');
-const { piSend, sendGuard } = require('../server/pi.js');
+const { piSend } = require('../server/pi.js');
 
 test.after(() => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5 }));
 
@@ -28,15 +28,16 @@ test('flow-next is a fixed command: exactly /flow-next, no arguments', async () 
   assert.deepEqual(h.sent, ['/flow-next']);
 });
 
-test('flow-next goes through the same guards: not started, busy, asking, and the same-key refusal', async () => {
+test('flow-next goes through the same guards: not started, busy, asking, and the background jobs of RP234', async () => {
   for (const [state, re] of [['closed', /not started/], ['busy', /busy/], ['asking', /waiting for an answer/]]) {
     const h = fakeHost(state);
     await refuses(piSend(REPO, 'flow-next', h), 409, re);
     assert.deepEqual(h.sent, []);
   }
-  const guard = sendGuard(() => 1000);
-  assert.equal((await piSend(REPO, 'flow-next', fakeHost(), undefined, { guard })).confirmed, true);
-  await refuses(piSend(REPO, 'flow-next', fakeHost(), undefined, { guard }), 409, /already sent/);
+  const h = fakeHost();
+  await refuses(piSend(REPO, 'flow-next', h, undefined, { jobs: () => 1 }), 409, /background job running/);
+  assert.deepEqual(h.sent, []);
+  assert.equal((await piSend(REPO, 'flow-next', h, undefined, { jobs: () => 0 })).confirmed, true);
 });
 
 test('an unknown key is still refused and sends nothing; flow-base keeps its text', async () => {

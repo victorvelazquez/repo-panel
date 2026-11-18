@@ -19,7 +19,7 @@ test('lib.js keeps PI_COMMANDS and none of the screen parsers', () => {
 });
 
 test('pi.js exports only what stays and sessions.js has no live scan', () => {
-  assert.deepEqual(Object.keys(require('../server/pi.js')).sort(), ['conditionsOrder', 'fixPrOrder', 'piSend', 'rpcPiStatus', 'sendGuard']);
+  assert.deepEqual(Object.keys(require('../server/pi.js')).sort(), ['conditionsOrder', 'fixPrOrder', 'piSend', 'rpcPiStatus', 'sendLock']);
   const S = require('../server/sessions.js');
   for (const k of ['liveFromSessions', 'liveOf']) assert.equal(k in S, false, k);
   assert.deepEqual(Object.keys(require('../server.js')).sort(), ['createServer', 'piSend']);

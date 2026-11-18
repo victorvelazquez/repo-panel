@@ -1,6 +1,6 @@
 'use strict';
 // Sends a fixed command to the repo's pi session over RPC (RPC2-2): the text is built here, the session must be started and idle, and the
-// same text is not accepted twice within a window (sendGuard). It fails closed: not started, busy or asking all refuse.
+// same repo takes one order at a time (sendLock, RP234). It fails closed: not started, busy or asking all refuse.
 const path = require('node:path');
 const lib = require('../lib.js');
 const { HttpError } = require('./errors.js');
@@ -11,22 +11,25 @@ const INSTALL_PATH = path.join(__dirname, '..', 'requirements', 'INSTALL.md');
 const PUT_IN_CONDITIONS = 'put-in-conditions';
 const FIX_PR = 'fix-pr';
 
-// The same command key is not accepted twice for one repo within this window after a confirmed send: a pi screen
-// that reads idle while a subagent still works would otherwise let a second /flow-pr through.
-const DUPLICATE_MS = 45 * 1000;
-
-// In-memory record of the last confirmed send per repo path and command key. The clock is injectable for tests.
-function sendGuard(now = Date.now) {
-  const last = new Map();
-  const id = (repo, key) => `${repo.path}|${key}`;
+// RP234: two orders that arrive together would both read the session free before the first reaches pi. The lock holds one repo while an order
+// is on its way and is freed as soon as pi answers (or fails): from then on the state of the session says busy, so there is no time window.
+function sendLock() {
+  const held = new Set();
   return {
-    check(repo, key) {
-      const ago = now() - (last.get(id(repo, key)) ?? -Infinity);
-      if (ago < DUPLICATE_MS) throw new HttpError(409, `That command was already sent ${Math.max(0, Math.round(ago / 1000))} s ago; wait for it to finish`);
+    take(repo) {
+      if (held.has(repo.path)) throw new HttpError(409, 'Another order is on its way to this session: wait for its answer');
+      held.add(repo.path);
     },
-    record(repo, key) { last.set(id(repo, key), now()); },
-    forget(repo, key) { last.delete(id(repo, key)); },
+    free(repo) { held.delete(repo.path); },
   };
+}
+
+// RP234: the background jobs the session still waits for (the number of RP161). A count that cannot be read is none: it blocks nothing.
+function jobsCount(jobs, id) {
+  try {
+    const n = typeof jobs === 'function' ? jobs(id) : 0;
+    return Number.isSafeInteger(n) && n > 0 ? n : 0;
+  } catch { return 0; }
 }
 
 // Appended to the orders that make a session edit files: /flow-ship and /flow-commit refuse to start when the index is not empty.
@@ -81,15 +84,15 @@ async function orderText(repo, key, requirements, extra) {
   return Object.hasOwn(lib.PI_COMMANDS, key) ? lib.PI_COMMANDS[key] : null;
 }
 
-// The fixed refusal for each session state that cannot take a command; a session that is still starting counts as busy.
 // RP233: what pi did with a prompt (data.disposition) when it did not start a run; any other answer, or none, is a start as before.
 const NOT_STARTED = ['handled', 'queued'];
 
+// The fixed refusal for each session state that cannot take a command; a session that is still starting counts as busy.
 const REFUSALS = { closed: 'The session is not started', starting: 'The session is busy', busy: 'The session is busy', asking: 'The session is waiting for an answer' };
 
-// `extra` is { pr, prs, guard }: the PR number of fix-pr, the provider of the repo's open PRs (injectable for tests) and the duplicate-send
-// guard of sendGuard (the HTTP server always passes one; without it nothing is refused as a repeat). `host` is the rpc host (status, prompt).
-async function piSend(repo, key, host, requirements = requirementsFor, { pr, prs = prState, guard = null } = {}) {
+// `extra` is { pr, prs, lock, jobs }: the PR number of fix-pr, the provider of the repo's open PRs (injectable for tests), the lock of sendLock (the HTTP
+// server always passes one; without it nothing is refused as a repeat) and the count of background jobs per repo id. `host` is the rpc host (status, prompt).
+async function piSend(repo, key, host, requirements = requirementsFor, { pr, prs = prState, lock = null, jobs = null } = {}) {
   if (typeof key !== 'string' || (key !== PUT_IN_CONDITIONS && key !== FIX_PR && !Object.hasOwn(lib.PI_COMMANDS, key))) throw new HttpError(400, 'Unknown command');
   if (key === FIX_PR && !(Number.isInteger(pr) && pr > 0)) throw new HttpError(400, 'fix-pr needs the pr number of an open pull request (a positive integer)');
   const text = await orderText(repo, key, requirements, { pr, prs });
@@ -99,14 +102,15 @@ async function piSend(repo, key, host, requirements = requirementsFor, { pr, prs
   if (Array.isArray(loaded) && !loaded.includes(name)) throw new HttpError(409, `/${name} is not loaded in this session: is flow-skills installed for pi?`);
   const { state } = await host.status(repo.id);
   if (state !== 'idle') throw new HttpError(409, REFUSALS[state] || 'The session is busy');
-  // Armed before the await so two clicks in flight cannot both pass; a refused prompt gives the slot back.
-  if (guard) { guard.check(repo, key); guard.record(repo, key); }
+  // RP234: a background subagent leaves the session free while it works; a delivery order waits for it. Put in conditions and Fix PR are not delivery.
+  const waiting = name ? jobsCount(jobs, repo.id) : 0;
+  if (waiting) throw new HttpError(409, `The session still has ${waiting} background job${waiting === 1 ? '' : 's'} running: wait for ${waiting === 1 ? 'it' : 'them'} to finish`);
+  // Taken after the last await before the prompt, so two clicks in flight cannot both pass; freed when pi answers or fails.
+  if (lock) lock.take(repo);
   let answer;
-  try { answer = await host.prompt(repo.id, text); } catch (e) { if (guard) guard.forget(repo, key); throw e instanceof HttpError ? e : new HttpError(500, 'The session failed'); }
+  try { answer = await host.prompt(repo.id, text); } catch (e) { throw e instanceof HttpError ? e : new HttpError(500, 'The session failed'); } finally { if (lock) lock.free(repo); }
   const disposition = answer && typeof answer === 'object' && NOT_STARTED.includes(answer.disposition) ? answer.disposition : null;
   if (!disposition) return { sent: true, confirmed: true };
-  // Handled: no run started, so nothing is in flight and a Retry may go at once. Queued: it runs later, so the window holds.
-  if (disposition === 'handled' && guard) guard.forget(repo, key);
   return { sent: true, confirmed: false, disposition };
 }
 
@@ -116,4 +120,4 @@ async function rpcPiStatus(repo, host) {
   return { state: state === 'starting' ? 'busy' : state };
 }
 
-module.exports = { piSend, conditionsOrder, fixPrOrder, sendGuard, rpcPiStatus };
+module.exports = { piSend, conditionsOrder, fixPrOrder, sendLock, rpcPiStatus };
