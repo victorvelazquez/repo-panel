@@ -2,6 +2,8 @@
 // RP171: a running subagent is ONE bubble at the end of the chat thread («Subagent working · NAME», a clock), and when it ends it stays as ONE result line («Subagent NAME finished · M:SS»).
 // It REPLACES the chip of the composer, the chip of the tool `subagent_run` in the thread and the grey «working…» bubbles; every datum is drawn in one place only. The name comes from the history the
 // page already reads (the `arg` of the `subagent_run` item of `toolInfo`), never from the live events (the server whitelist is untouched). It only shows: it holds no button.
+// RP235: the page reads the panel vocabulary; a pi event reaches it through the real translator of the server.
+const { toPanel } = require('../server/rpchost.js');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -264,8 +266,8 @@ async function chatPage(items) {
   await page.tick();
   return page;
 }
-const start = { kind: 'event', record: { type: 'tool_execution_start', toolName: 'subagent_run' } };
-const end = (isError = false) => ({ kind: 'event', record: { type: 'tool_execution_end', toolName: 'subagent_run', isError, durationMs: 5 } });
+const start = { kind: 'event', record: toPanel({ type: 'tool_execution_start', toolName: 'subagent_run' }) };
+const end = (isError = false) => ({ kind: 'event', record: toPanel({ type: 'tool_execution_end', toolName: 'subagent_run', isError, durationMs: 5 }) });
 
 test('p1: the page draws the bubble in the thread on a live start, takes it away on the end, and the composer row never carries a subagent chip', async () => {
   const page = await chatPage([pendingItem()]);

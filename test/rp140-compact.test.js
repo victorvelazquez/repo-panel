@@ -31,7 +31,7 @@ test.after(async () => {
 
 const lib = require('../lib.js');
 const { createServer } = require('../server/http.js');
-const { createRpcHost } = require('../server/rpchost.js');
+const { createRpcHost, toPanel } = require('../server/rpchost.js');
 const { createRpcClient } = require('../server/rpc.js');
 const { findRepo } = require('../server/config.js');
 const { createEventHub } = require('../server/events.js');
@@ -247,7 +247,7 @@ test('abuse: a compaction that runs out of time while the session no longer repo
     assert.equal(r.json.error, 'The compaction did not finish in time');
     assert.equal((await status()).json.compacting, undefined, 'the mark is clear');
     // the page is told too (the same event its own path already reads), so it does not stay on Compacting…
-    assert.equal(published.some(([, p]) => p.kind === 'event' && p.record.type === 'compaction_end'), true);
+    assert.equal(published.some(([, p]) => p.kind === 'event' && p.record.type === 'compact_end'), true);
   });
 });
 
@@ -259,7 +259,7 @@ test('abuse: a compaction that runs out of time while the session STILL compacts
     assert.equal(first.status, 504);
     assert.equal(first.json.error, 'The compaction did not finish in time');
     assert.equal((await status()).json.compacting, true, 'the session still says it compacts: the mark stays');
-    assert.equal(published.some(([, p]) => p.kind === 'event' && p.record.type === 'compaction_end'), false, 'no end is invented while it runs');
+    assert.equal(published.some(([, p]) => p.kind === 'event' && p.record.type === 'compact_end'), false, 'no end is invented while it runs');
     const second = await post({ id: ID });
     assert.equal(second.status, 409);
     assert.equal(second.json.error, 'The session is already compacting its context');
@@ -300,7 +300,7 @@ test('the mark is in the status and the stream while it lasts, and goes when it 
     await host.start(ID);
     assert.equal((await status()).json.compacting, undefined);
     const call1 = post({ id: ID });
-    await until(() => published.some(([, p]) => p.kind === 'event' && p.record.type === 'compaction_start'));
+    await until(() => published.some(([, p]) => p.kind === 'event' && p.record.type === 'compact_start'));
     const during = (await status()).json;
     assert.equal(during.compacting, true);
     assert.ok(['idle', 'busy', 'asking', 'starting', 'closed'].includes(during.state), 'no new value in the closed state machine');
@@ -332,7 +332,7 @@ test('a prompt while a manual compaction runs is refused by the server with a fi
   await withRig({ FAKE_COMPACT: 'slow' }, {}, async ({ host, post, log, published }) => {
     await host.start(ID);
     const pending = post({ id: ID });
-    await until(() => published.some(([, p]) => p.kind === 'event' && p.record.type === 'compaction_start'));
+    await until(() => published.some(([, p]) => p.kind === 'event' && p.record.type === 'compact_start'));
     await assert.rejects(host.prompt(ID, 'hello'), (e) => e.status === 409 && e.message === 'The session is compacting its context: wait a moment');
     assert.deepEqual(sent(log, 'prompt'), []);
     await pending;
@@ -396,11 +396,11 @@ test('composer: sending is refused while compacting, with the reason', () => {
   assert.equal(R.composerState(base({ state: 'idle' }), { name: 'demo' }).canSend, true);
 });
 test('record: the reducer follows compaction_start and compaction_end; the status carries the mark; an exit and a closed status clear it', () => {
-  let { entry } = V.rpcReduce(undefined, { kind: 'event', record: { type: 'compaction_start', reason: 'threshold' } });
+  let { entry } = V.rpcReduce(undefined, { kind: 'event', record: toPanel({ type: 'compaction_start', reason: 'threshold' }) });
   assert.equal(entry.compacting, true);
   ({ entry } = V.rpcReduce(entry, { kind: 'state', state: 'idle' }));
   assert.equal(entry.compacting, true, 'a state change does not end it');
-  const end = V.rpcReduce(entry, { kind: 'event', record: { type: 'compaction_end', reason: 'threshold' } });
+  const end = V.rpcReduce(entry, { kind: 'event', record: toPanel({ type: 'compaction_end', reason: 'threshold' }) });
   assert.equal(end.entry.compacting, false);
   assert.equal(end.ctx, true, 'RP139 already asks for the context at the end');
   assert.equal(V.rpcReduce(entry, { kind: 'exit' }).entry.compacting, false);
@@ -467,7 +467,8 @@ async function chatPage({ state = 'idle', status, compact = { compacted: true },
   st.groups = [{ name: 'G', repos: [{ id: ID, name: 'demo', path: 'p' }, { id: ID2, name: 'other', path: 'q' }] }];
   st.summary = { rows: [], generatedAt: 'x' };
   page.open = async (id = ID) => { page.run(`ACTIONS['chat-open']({ dataset: { id: '${id}' } })`); await page.tick(); };
-  page.rpc = async (id, kind, record) => { page.run(`applyRpc(${JSON.stringify({ id, kind, ...(record ? { record } : {}) })})`); await page.tick(); };
+  // RP235: a pi event reaches the page through the real translator of the server.
+  page.rpc = async (id, kind, record) => { page.run(`applyRpc(${JSON.stringify({ id, kind, ...(record ? { record: toPanel(record) } : {}) })})`); await page.tick(); };
   page.click = async () => { page.run("ACTIONS['compact']({ dataset: {} })"); await page.tick(); };
   page.bar = () => page.get('#sessState').html;
   page.menuBar = async () => { if (!page.run('!!S.chat.menu')) { page.run("ACTIONS['ch-menu']({ dataset: {} })"); await page.tick(); } return page.get('#chatHead').html; }; // RP195: Compact is an item of the ⋮ menu of the head, not a button of the foot

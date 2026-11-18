@@ -52,13 +52,13 @@ test('t4: thinking and tool-call deltas are not published (only the text blocks 
   emit({ type: 'toolcall_end', contentIndex: 1, toolCall: { id: 'x', name: 'write', arguments: { content: 'big' } } });
   emit({ type: 'text_delta', contentIndex: 2, delta: 'OK' });
   emit({ type: 'text_end', contentIndex: 2, content: 'OK' });
-  const got = h.published.filter((p) => p.kind === 'event').map((p) => p.record.assistantMessageEvent);
+  const got = h.published.filter((p) => p.kind === 'event').map((p) => p.record); // RP235: in the panel vocabulary
   assert.deepEqual(got, [
-    { type: 'thinking_delta', contentIndex: 0 },
-    { type: 'toolcall_delta', contentIndex: 1 },
-    { type: 'toolcall_end', contentIndex: 1 },
-    { type: 'text_delta', contentIndex: 2, delta: 'OK' },
-    { type: 'text_end', contentIndex: 2, content: 'OK' },
+    { type: 'stream', index: 0, part: 'thinking', phase: 'delta' },
+    { type: 'stream', index: 1, part: 'other' },
+    { type: 'stream', index: 1, part: 'other' },
+    { type: 'stream', index: 2, part: 'text', phase: 'delta', delta: 'OK' },
+    { type: 'stream', index: 2, part: 'text', phase: 'end', content: 'OK' },
   ]);
   assert.equal(JSON.stringify(h.published).includes('private reasoning'), false);
   assert.equal(JSON.stringify(h.published).includes('secret.txt'), false);

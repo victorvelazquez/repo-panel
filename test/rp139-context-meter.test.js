@@ -32,7 +32,7 @@ test.after(async () => {
 
 const lib = require('../lib.js');
 const { createServer } = require('../server/http.js');
-const { createRpcHost } = require('../server/rpchost.js');
+const { createRpcHost, toPanel } = require('../server/rpchost.js');
 const { createRpcClient, RpcError } = require('../server/rpc.js');
 const { findRepo } = require('../server/config.js');
 const { createEventHub } = require('../server/events.js');
@@ -170,9 +170,9 @@ test('fake pi: compaction events keep only their reason, from a closed list', as
     { type: 'compaction_end', reason: { a: 1 } },
   ];
   for (const record of records) await clients[0].request('fake_emit', { record });
-  await until(() => published.filter(([, p]) => p.kind === 'event' && /^compaction/.test(p.record.type)).length >= 4);
-  const got = published.filter(([, p]) => p.kind === 'event' && /^compaction/.test(p.record.type)).map(([, p]) => p.record);
-  assert.deepEqual(got, [{ type: 'compaction_start', reason: 'threshold' }, { type: 'compaction_end', reason: 'manual' }, { type: 'compaction_end' }, { type: 'compaction_end' }]);
+  await until(() => published.filter(([, p]) => p.kind === 'event' && /^compact_/.test(p.record.type)).length >= 4);
+  const got = published.filter(([, p]) => p.kind === 'event' && /^compact_/.test(p.record.type)).map(([, p]) => p.record);
+  assert.deepEqual(got, [{ type: 'compact_start', reason: 'threshold' }, { type: 'compact_end', reason: 'manual' }, { type: 'compact_end' }, { type: 'compact_end' }]);
   assert.doesNotMatch(JSON.stringify(published), /SECRET|img/);
 });
 
@@ -276,7 +276,7 @@ test('chip: the percent is rounded and clamped, and what is drawn is escaped', (
 });
 
 test('reducer: a run that ends and a compaction that ends ask for a new reading; nothing else does', () => {
-  const ev = (record) => V.rpcReduce({ state: 'idle' }, { kind: 'event', record }, 1).ctx;
+  const ev = (record) => V.rpcReduce({ state: 'idle' }, { kind: 'event', record: toPanel(record) }, 1).ctx; // RP235: through the translator
   assert.equal(ev({ type: 'agent_end' }), true);
   assert.equal(ev({ type: 'agent_settled' }), true);
   assert.equal(ev({ type: 'compaction_end', reason: 'manual' }), true);
@@ -348,7 +348,8 @@ async function chatPage({ state = 'idle', context = { tokens: 124000, percent: 6
   st.groups = [{ name: 'G', repos: [{ id: ID, name: 'demo', path: 'p' }, { id: ID2, name: 'other', path: 'q' }] }];
   st.summary = { rows: [], generatedAt: 'x' };
   page.open = async (id = ID) => { page.run(`ACTIONS['chat-open']({ dataset: { id: '${id}' } })`); await page.tick(); };
-  page.rpc = async (id, kind, record) => { page.run(`applyRpc(${JSON.stringify({ id, kind, ...(record ? { record } : {}) })})`); await page.tick(); };
+  // RP235: a pi event reaches the page through the real translator of the server.
+  page.rpc = async (id, kind, record) => { page.run(`applyRpc(${JSON.stringify({ id, kind, ...(record ? { record: toPanel(record) } : {}) })})`); await page.tick(); };
   return page;
 }
 

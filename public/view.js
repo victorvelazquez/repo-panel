@@ -779,9 +779,8 @@
   // the blocks in order (the index is the `contentIndex` of pi; thinking and tool blocks leave theirs empty), capped.
   const RPC_BLOCKS = 64;
   const RPC_TEXT_MAX = 200000;
-  // RP152: `subs` is how many `subagent_run` calls started and have not ended, `subSince` the moment the first one of them started (0 = none): only the tool name of the live events is read, never an argument.
+  // RP152: `subs` is how many subagents started and have not ended, `subSince` the moment the first one of them started (0 = none). RP235: the server tells a subagent apart (subagent_start, subagent_end).
   const rpcBlank = () => ({ state: 'closed', text: '', blocks: [], error: '', startedAt: 0, streaming: false, thinking: false, retry: null, memory: null, ctx: null, compacting: false, asks: [], subs: 0, subSince: 0, missing: [] });
-  const SUB_TOOL = 'subagent_run';
   const SUB_MAX = 20;
   // RP152: the counter of a subagent that is working, as mm:ss (the minutes keep growing past 59). Anything that is not a duration in milliseconds reads 00:00.
   function subClock(ms) {
@@ -819,33 +818,35 @@
     else if (p.kind === 'dialog') e.asks = rpcAsks(e.asks, rpcAskOf(p));
     else if (p.kind === 'dialog-closed' && typeof p.requestId === 'string') e.asks = rpcAsks(e.asks, null, p.requestId);
     else if (p.kind === 'event' && isObject(p.record)) {
+      // RP235: the record is in the panel's own vocabulary (server/rpchost.js, toPanel); no name of pi is read here.
       const r = p.record;
-      const a = isObject(r.assistantMessageEvent) ? r.assistantMessageEvent : {};
-      if (r.type === 'agent_start') Object.assign(e, { blocks: [], streaming: true, thinking: false, retry: null, error: '', startedAt: now, subs: 0, subSince: 0 });
-      else if (r.type === 'agent_settled') { e.streaming = false; e.thinking = false; e.retry = null; e.subs = 0; e.subSince = 0; reload = true; ctx = true; }
-      else if (r.type === 'agent_end') { ctx = true; e.subs = 0; e.subSince = 0; }
-      // RP152: a subagent_run that starts is counted (the clock keeps the first start) and one that ends is taken out; never below zero, never above SUB_MAX.
-      else if (r.type === 'tool_execution_start' && r.toolName === SUB_TOOL) { e.subs = Math.min(SUB_MAX, (Number.isInteger(e.subs) && e.subs > 0 ? e.subs : 0) + 1); if (!(e.subSince > 0)) e.subSince = now; }
-      else if (r.type === 'tool_execution_end' && r.toolName === SUB_TOOL) { e.subs = Math.max(0, (Number.isInteger(e.subs) ? e.subs : 0) - 1); if (e.subs === 0) e.subSince = 0; }
+      const at = r.index;
+      if (r.type === 'run_start') Object.assign(e, { blocks: [], streaming: true, thinking: false, retry: null, error: '', startedAt: now, subs: 0, subSince: 0 });
+      else if (r.type === 'run_settled') { e.streaming = false; e.thinking = false; e.retry = null; e.subs = 0; e.subSince = 0; reload = true; ctx = true; }
+      else if (r.type === 'run_end') { ctx = true; e.subs = 0; e.subSince = 0; }
+      // RP152: a subagent that starts is counted (the clock keeps the first start) and one that ends is taken out; never below zero, never above SUB_MAX.
+      else if (r.type === 'subagent_start') { e.subs = Math.min(SUB_MAX, (Number.isInteger(e.subs) && e.subs > 0 ? e.subs : 0) + 1); if (!(e.subSince > 0)) e.subSince = now; }
+      else if (r.type === 'subagent_end') { e.subs = Math.max(0, (Number.isInteger(e.subs) ? e.subs : 0) - 1); if (e.subs === 0) e.subSince = 0; }
       // RP140: a compaction (the person's, or one pi starts by itself) is on from its start to its end; the end also asks for the context (RP139).
-      else if (r.type === 'compaction_start') e.compacting = true;
-      else if (r.type === 'compaction_end') { e.compacting = false; ctx = true; }
+      else if (r.type === 'compact_start') e.compacting = true;
+      else if (r.type === 'compact_end') { e.compacting = false; ctx = true; }
       // RP105c: pi is retrying a failed request on its own (live only: the history keeps no record). Only valid numbers are kept.
-      else if (r.type === 'auto_retry_start') e.retry = { attempt: rpcInt(r.attempt, 1, 1000), max: rpcInt(r.maxAttempts, 1, 1000), delayMs: rpcInt(r.delayMs, 0, 3600000) };
-      else if (r.type === 'auto_retry_end') e.retry = null;
-      // RP155: every message starts with an empty live text. The blocks are kept BY POSITION inside a message and were cleared only at the next agent_start, so the text of the message before stayed in the position a later one did
-      // not use (measured on the real stream: blocks [110] then [110, 1625]) and a text_delta was added to whatever its position already held. Only the text and the reasoning flag are reset: nothing else of the entry.
-      else if (r.type === 'message_start') { e.blocks = []; e.thinking = false; }
-      else if (r.type === 'message_update' && Number.isInteger(a.contentIndex) && a.contentIndex >= 0 && a.contentIndex < RPC_BLOCKS) {
-        for (let i = e.blocks.length; i < a.contentIndex; i++) e.blocks[i] = '';
-        if (a.type === 'text_start') e.blocks[a.contentIndex] = ''; // RP155: a text block starts empty, whatever the position held
+      else if (r.type === 'retry_start') e.retry = { attempt: rpcInt(r.attempt, 1, 1000), max: rpcInt(r.max, 1, 1000), delayMs: rpcInt(r.delayMs, 0, 3600000) };
+      else if (r.type === 'retry_end') e.retry = null;
+      // RP155: every message starts with an empty live text. The blocks are kept BY POSITION inside a message and were cleared only at the next run start, so the text of the message before stayed in the position a later one did
+      // not use (measured on the real stream: blocks [110] then [110, 1625]) and a text delta was added to whatever its position already held. Only the text and the reasoning flag are reset: nothing else of the entry.
+      else if (r.type === 'stream' && r.part === 'reset') { e.blocks = []; e.thinking = false; }
+      else if (r.type === 'stream' && Number.isInteger(at) && at >= 0 && at < RPC_BLOCKS) {
+        for (let i = e.blocks.length; i < at; i++) e.blocks[i] = '';
+        const text = r.part === 'text';
+        if (text && r.phase === 'start') e.blocks[at] = ''; // RP155: a text block starts empty, whatever the position held
         // RP104: the reasoning only turns a flag on and off (the server never sends its text); the first text of the run ends it.
-        if (a.type === 'thinking_start' || a.type === 'thinking_delta') e.thinking = true;
-        else if (a.type === 'thinking_end' || (typeof a.type === 'string' && a.type.startsWith('text_'))) e.thinking = false;
-        if (a.type === 'text_delta' && typeof a.delta === 'string') e.blocks[a.contentIndex] = ((e.blocks[a.contentIndex] || '') + a.delta).slice(0, RPC_TEXT_MAX);
-        else if (a.type === 'text_end' && typeof a.content === 'string') e.blocks[a.contentIndex] = a.content;
+        if (r.part === 'thinking' && (r.phase === 'start' || r.phase === 'delta')) e.thinking = true;
+        else if ((r.part === 'thinking' && r.phase === 'end') || text) e.thinking = false;
+        if (text && r.phase === 'delta' && typeof r.delta === 'string') e.blocks[at] = ((e.blocks[at] || '') + r.delta).slice(0, RPC_TEXT_MAX);
+        else if (text && r.phase === 'end' && typeof r.content === 'string') e.blocks[at] = r.content;
       }
-      if (r.type === 'agent_start' || r.type === 'message_update' || r.type === 'message_start') e.text = rpcText(e.blocks);
+      if (r.type === 'run_start' || r.type === 'stream') e.text = rpcText(e.blocks);
     }
     return { entry: e, reload, ctx };
   }

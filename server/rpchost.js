@@ -66,40 +66,47 @@ function freshSessionId(repo, suffix) {
 const CONTENT_MAX = 8 * 1024;
 const own = (o, ...keys) => Object.fromEntries(keys.filter((k) => o[k] !== undefined).map((k) => [k, o[k]]));
 const finiteOwn = (o, ...keys) => Object.fromEntries(keys.filter((k) => Number.isFinite(o[k])).map((k) => [k, o[k]]));
-// The text of a finished assistant turn (the page needs nothing else of it).
-const turnText = (m) => (m && Array.isArray(m.content) ? m.content.filter((c) => c && c.type === 'text' && typeof c.text === 'string').map((c) => c.text).join('\n\n') : '');
 // RP139: the reason of a compaction is one of this closed list (the page reads the context again when one ends); any other value is dropped.
 const COMPACTION_REASONS = ['manual', 'threshold', 'overflow'];
 const reasonOf = (r) => (COMPACTION_REASONS.includes(r.reason) ? { reason: r.reason } : {});
-// Per type, the small fields the page uses. `message_start`, `message_end` and `agent_end` carry the whole system prompt (about 180 KB) and
-// `agent_end` every message, so nothing is copied by default: what is not listed here never leaves the server.
-const WHITELIST = {
-  message_update: (r) => {
-    const a = r.assistantMessageEvent && typeof r.assistantMessageEvent === 'object' ? r.assistantMessageEvent : null;
-    if (!a) return {};
-    const out = own(a, 'type', 'contentIndex');
-    // Only the text blocks carry their words: the thinking and the tool-call deltas keep just their `type` and `contentIndex` (RP104: the page shows «thinking…» from the type), never their words, which can be private or huge.
-    if (typeof a.type === 'string' && a.type.startsWith('text_')) {
-      if (typeof a.delta === 'string') out.delta = a.delta;
-      if (typeof a.content === 'string' && a.content.length <= CONTENT_MAX) out.content = a.content;
-    }
-    return { assistantMessageEvent: out };
-  },
-  turn_end: (r) => ({ ...own(r, 'stopReason'), text: turnText(r.message) }),
-  agent_start: (r) => own(r, 'aborted'),
-  agent_end: (r) => own(r, 'aborted'),
-  agent_settled: (r) => own(r, 'aborted'),
+// RP235: the page reads the panel's own names, never the ones of pi; this is the only place that knows both. `message_start`, `message_end` and `agent_end` carry the
+// whole system prompt (about 180 KB) and `agent_end` every message, so nothing is copied by default: only the fields listed here leave the server.
+const SUB_TOOL = 'subagent_run';
+// One delta of the assistant message: its block (`index`), what the block is (`part`: text, thinking or other) and the step (`phase`). Only a text block carries its words;
+// the thinking and the tool-call deltas never do (they can be private or huge; RP104: the page shows «thinking…» from the part alone).
+function streamOf(r) {
+  const a = r.assistantMessageEvent && typeof r.assistantMessageEvent === 'object' ? r.assistantMessageEvent : null;
+  if (!a) return { type: 'stream' };
+  const out = { type: 'stream', ...(Number.isInteger(a.contentIndex) ? { index: a.contentIndex } : {}) };
+  const kind = typeof a.type === 'string' ? a.type : '';
+  const phase = /_(start|delta|end)$/.exec(kind);
+  if (kind.startsWith('text_')) {
+    Object.assign(out, { part: 'text' }, phase ? { phase: phase[1] } : {});
+    if (typeof a.delta === 'string') out.delta = a.delta;
+    if (typeof a.content === 'string' && a.content.length <= CONTENT_MAX) out.content = a.content;
+  } else if (phase && kind === `thinking_${phase[1]}`) Object.assign(out, { part: 'thinking', phase: phase[1] });
+  else out.part = 'other';
+  return out;
+}
+const TRANSLATE = {
+  agent_start: () => ({ type: 'run_start' }),
+  agent_end: () => ({ type: 'run_end' }),
+  agent_settled: () => ({ type: 'run_settled' }),
+  message_start: () => ({ type: 'stream', part: 'reset' }),
+  message_update: streamOf,
   // RP105c: a retry that pi does on its own. Only numbers and the verdict travel; the error texts (`errorMessage`, `finalError`) can hold the raw body of an API answer.
-  auto_retry_start: (r) => finiteOwn(r, 'attempt', 'maxAttempts', 'delayMs'),
-  auto_retry_end: (r) => ({ ...finiteOwn(r, 'attempt'), ...(typeof r.success === 'boolean' ? { success: r.success } : {}) }),
-  compaction_start: reasonOf,
-  compaction_end: reasonOf,
-  tool_execution_start: (r) => own(r, 'toolName', 'isError', 'durationMs'),
-  tool_execution_end: (r) => own(r, 'toolName', 'isError', 'durationMs'),
+  auto_retry_start: (r) => { const n = finiteOwn(r, 'attempt', 'maxAttempts', 'delayMs'); return { type: 'retry_start', ...own(n, 'attempt'), ...(n.maxAttempts === undefined ? {} : { max: n.maxAttempts }), ...own(n, 'delayMs') }; },
+  auto_retry_end: (r) => ({ type: 'retry_end', ...finiteOwn(r, 'attempt'), ...(typeof r.success === 'boolean' ? { success: r.success } : {}) }),
+  compaction_start: (r) => ({ type: 'compact_start', ...reasonOf(r) }),
+  compaction_end: (r) => ({ type: 'compact_end', ...reasonOf(r) }),
+  // RP152: a subagent is told apart from the other tools here, so the page never needs the name of the tool of pi; only the name of a tool travels, never its arguments or result.
+  tool_execution_start: (r) => (r.toolName === SUB_TOOL ? { type: 'subagent_start' } : { type: 'tool_start', ...(typeof r.toolName === 'string' ? { name: r.toolName } : {}) }),
+  tool_execution_end: (r) => (r.toolName === SUB_TOOL ? { type: 'subagent_end' } : { type: 'tool_end', ...(typeof r.toolName === 'string' ? { name: r.toolName } : {}) }),
 };
-const slim = (r) => {
+// Any other event (a turn end, a queue update, a tool update…) still reaches the page as `other`, with nothing of it: the page redraws on every frame as before.
+const toPanel = (r) => {
   const rec = r && typeof r === 'object' && !Array.isArray(r) ? r : {};
-  return { ...(rec.type === undefined ? {} : { type: rec.type }), ...(WHITELIST[rec.type] || (() => ({})))(rec) };
+  return Object.hasOwn(TRANSLATE, rec.type) ? TRANSLATE[rec.type](rec) : { type: 'other' };
 };
 
 // What the host tells the page: the dialog id travels as `requestId` (the hub reserves `id` for the repo); a record is cut to its whitelist,
@@ -142,7 +149,7 @@ function wire(e) {
   if (e.kind === 'memory') return MEMORY.includes(e.memory) ? { kind: 'memory', memory: e.memory } : null;
   if (e.kind === 'dialog' || e.kind === 'dialog-closed') { const { id, ...rest } = e; return { ...rest, requestId: id }; }
   if (e.kind === 'event') {
-    const record = slim(e.record);
+    const record = toPanel(e.record);
     return { kind: 'event', record: JSON.stringify(record).length > EVENT_MAX ? { type: record.type, truncated: true } : record };
   }
   return e;
@@ -351,7 +358,7 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
       } finally {
         entry.manual = false;
         // No end event arrived (it timed out or failed): the mark goes and the page is told with the event it already reads.
-        if (entry.compacting && !keep) { entry.compacting = false; if (live.get(id) === entry) publish(id, { kind: 'event', record: { type: 'compaction_end', reason: 'manual' } }); }
+        if (entry.compacting && !keep) { entry.compacting = false; if (live.get(id) === entry) publish(id, { kind: 'event', record: { type: 'compact_end', reason: 'manual' } }); }
       }
     },
     async status(id) { repoOf(id); return statusOf(live.get(id)); },
@@ -409,4 +416,4 @@ function rpcApi(host) {
   };
 }
 
-module.exports = { createRpcHost, rpcApi, cleanText, sessionIdFor, memoryOf, MEMORY };
+module.exports = { createRpcHost, rpcApi, cleanText, sessionIdFor, memoryOf, MEMORY, toPanel };

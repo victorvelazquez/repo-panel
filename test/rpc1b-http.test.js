@@ -220,7 +220,7 @@ test('e1: an event of a session reaches the page as `event: rpc`, after the bare
     const text = frames.join('');
     assert.ok(text.startsWith('retry: 3000\n\n'));
     assert.ok(!text.includes('event: snapshot') && !text.includes('event: live'));
-    assert.ok(text.includes(`event: rpc\ndata: {"kind":"event","record":{"type":"agent_start"},"id":"${ID}"}\n\n`));
+    assert.ok(text.includes(`event: rpc\ndata: {"kind":"event","record":{"type":"run_start"},"id":"${ID}"}\n\n`));
     const dialog = text.split('\n\n').find((fr) => fr.includes('"kind":"dialog"'));
     assert.ok(dialog.startsWith('event: rpc\ndata: '));
     assert.deepEqual(JSON.parse(dialog.slice('event: rpc\ndata: '.length)), { kind: 'dialog', method: 'confirm', title: 'T', requestId: 'd1', id: ID });
