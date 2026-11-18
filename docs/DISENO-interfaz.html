@@ -1,0 +1,1050 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kletus.dev rediseño</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: documento de lectura (columna de 72ch) que se abre a lienzos anchos para las maquetas; las maquetas usan los mismos tokens que la página. */
+:root{
+  --bg:#f5f6f8; --surface:#ffffff; --surface-2:#eef1f5; --surface-3:#e4e8ee; --line:#dbe0e8; --line-2:#c9d0da;
+  --fg:#131821; --muted:#5a6473; --faint:#8a93a1;
+  --accent:#2b67e8; --accent-fg:#ffffff; --accent-soft:#e2eafc;
+  --ok:#17834a; --ok-soft:#dcf2e5; --warn:#a96a10; --warn-soft:#fbefd8; --bad:#cc3338; --bad-soft:#fbe1e2;
+  --room:#7a4bd1; --room-soft:#ece4fb; --shadow:0 1px 2px rgba(20,30,50,.06),0 8px 24px rgba(20,30,50,.08);
+  --sans:"Geist",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif; --mono:"Geist Mono",ui-monospace,"Cascadia Code",Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0c0f14; --surface:#12161d; --surface-2:#181d26; --surface-3:#202733; --line:#262e3a; --line-2:#344051;
+  --fg:#e5e9f0; --muted:#8f99a8; --faint:#667080;
+  --accent:#4d8dff; --accent-fg:#06101f; --accent-soft:#15233d;
+  --ok:#3db86f; --ok-soft:#10291c; --warn:#e3a33b; --warn-soft:#2e2210; --bad:#f2585d; --bad-soft:#331416;
+  --room:#a57cf5; --room-soft:#231a39; --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px rgba(0,0,0,.35); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0c0f14; --surface:#12161d; --surface-2:#181d26; --surface-3:#202733; --line:#262e3a; --line-2:#344051;
+  --fg:#e5e9f0; --muted:#8f99a8; --faint:#667080;
+  --accent:#4d8dff; --accent-fg:#06101f; --accent-soft:#15233d;
+  --ok:#3db86f; --ok-soft:#10291c; --warn:#e3a33b; --warn-soft:#2e2210; --bad:#f2585d; --bad-soft:#331416;
+  --room:#a57cf5; --room-soft:#231a39; --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px rgba(0,0,0,.35); color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
+.page{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:40px 80px}
+.doc{max-width:760px;margin:0 auto}
+.wide{max-width:1240px;margin:0 auto}
+h1,h2,h3,h4{text-wrap:balance;line-height:1.2;margin:0}
+h1{font-size:clamp(30px,5vw,44px);font-weight:700;letter-spacing:-.025em}
+h2{font-size:26px;font-weight:650;letter-spacing:-.015em;margin-top:72px;padding-top:16px;border-top:1px solid var(--line)}
+h3{font-size:18px;font-weight:600;margin-top:36px}
+h4{font-size:14px;font-weight:600;margin-top:20px}
+p{margin:12px 0}
+.lede{font-size:18px;color:var(--muted);max-width:62ch}
+.eyebrow{font-family:var(--mono);font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--accent)}
+.muted{color:var(--muted)}
+code,.mono{font-family:var(--mono);font-size:.88em}
+code{background:var(--surface-2);border:1px solid var(--line);border-radius:4px;padding:0 4px}
+a{color:var(--accent)}
+ul.clean{padding-left:18px;margin:8px 0} ul.clean li{margin:4px 0}
+.toc{display:flex;flex-wrap:wrap;gap:6px;margin:28px 0 0}
+.toc a{font-size:13px;text-decoration:none;color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:4px 12px}
+.toc a:hover{border-color:var(--accent)}
+.toc a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.thesis{margin-top:28px;padding:20px 22px;background:var(--surface);border:1px solid var(--line);border-radius:10px}
+.thesis strong{font-size:17px}
+/* loop */
+.loop{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:8px;margin:20px 0}
+.loop div{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:13px;line-height:1.35}
+.loop b{display:block;font-size:12px;font-family:var(--mono);color:var(--muted);font-weight:500}
+.loop .who-p{border-color:var(--warn)} .loop .who-a{border-color:var(--accent)} .loop .who-x{border-color:var(--ok)}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;border:2px solid;margin-right:6px;vertical-align:-1px}
+/* tables */
+.tbl{overflow-x:auto;margin:16px 0;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:13.5px;min-width:640px}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;font-weight:600;color:var(--muted);background:var(--surface-2)}
+tr:last-child td{border-bottom:0}
+td:first-child{font-weight:600;white-space:nowrap}
+.grade{display:inline-block;font-size:11.5px;font-weight:600;border-radius:999px;padding:1px 9px;white-space:nowrap}
+.g-ok{background:var(--ok-soft);color:var(--ok)} .g-mid{background:var(--warn-soft);color:var(--warn)} .g-bad{background:var(--bad-soft);color:var(--bad)}
+.imp{font-family:var(--mono);font-size:11.5px;font-weight:500;white-space:nowrap}
+.tag-new{font-size:11px;font-weight:600;color:var(--room);background:var(--room-soft);border-radius:4px;padding:0 6px;margin-left:4px}
+.tag-rp{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:0 5px;margin-left:4px;white-space:nowrap}
+/* proposal cards */
+.props{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;margin:18px 0}
+.prop{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px 18px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.prop h4{margin:0;font-size:15px}
+.prop p{margin:0;font-size:13.5px;color:var(--muted)}
+.prop .meta{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:4px}
+.principles{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin:16px 0}
+.principles div{border-left:3px solid var(--accent);padding:4px 0 4px 14px;font-size:14px}
+.principles b{display:block}
+/* mockup canvas */
+.canvas{margin:22px 0 8px;overflow-x:auto;padding:20px;background:var(--surface-2);border:1px solid var(--line);border-radius:12px}
+.cap{font-size:13px;color:var(--muted);margin:6px 0 0}
+.notes{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px 24px;margin:14px 0;font-size:13.5px}
+.notes div{min-width:0}
+.notes b{display:block;font-size:13px}
+.num{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;background:var(--accent);color:var(--accent-fg);font-size:11px;font-weight:700;margin-right:6px;font-family:var(--mono)}
+
+/* ===== the app ===== */
+.app{font-size:13px;line-height:1.45;color:var(--fg);background:var(--bg);border:1px solid var(--line-2);border-radius:10px;overflow:hidden;box-shadow:var(--shadow);position:relative}
+.app *{min-width:0}
+.desk{width:1200px;height:760px;display:grid;grid-template-columns:56px 300px 1fr 340px}
+.rail{background:var(--surface);border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;padding:10px 0;gap:4px}
+.logo{font-weight:700;font-size:18px;margin-bottom:10px;letter-spacing:-.04em}.logo span{color:var(--accent)}
+.ri{width:40px;height:40px;border-radius:8px;display:grid;place-items:center;color:var(--muted);position:relative}
+.ri svg{width:20px;height:20px}
+.ri.on{background:var(--accent-soft);color:var(--accent)}
+.ri .bd{position:absolute;top:3px;right:2px;min-width:16px;height:16px;border-radius:8px;background:var(--warn);color:#1b1205;font-size:10px;font-weight:700;display:grid;place-items:center;padding:0 4px}
+.rail .sp{flex:1}
+.ring{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-size:9.5px;font-family:var(--mono);background:conic-gradient(var(--ok) calc(var(--p)*1%),var(--surface-3) 0)}
+.ring i{width:24px;height:24px;border-radius:50%;background:var(--surface);display:grid;place-items:center;font-style:normal}
+.col{display:flex;flex-direction:column;border-right:1px solid var(--line);background:var(--surface);overflow:hidden}
+.colh{height:48px;display:flex;align-items:center;gap:8px;padding:0 12px;border-bottom:1px solid var(--line);flex:none}
+.colh .t{font-weight:600;font-size:13px}
+.search{flex:1;height:30px;border:1px solid var(--line);border-radius:6px;background:var(--surface-2);display:flex;align-items:center;gap:6px;padding:0 8px;color:var(--faint);font-size:12px}
+.kbd{font-family:var(--mono);font-size:10.5px;border:1px solid var(--line-2);border-bottom-width:2px;border-radius:4px;padding:0 4px;color:var(--muted);background:var(--surface)}
+.ib{width:30px;height:30px;border-radius:6px;display:grid;place-items:center;color:var(--muted);border:1px solid transparent}
+.ib svg{width:16px;height:16px}
+.seg{display:flex;gap:2px;padding:8px 12px 6px;flex:none}
+.seg span{font-size:11.5px;padding:3px 8px;border-radius:5px;color:var(--muted)}
+.seg span.on{background:var(--surface-3);color:var(--fg);font-weight:500}
+.grp{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--faint);padding:10px 14px 4px;display:flex;justify-content:space-between}
+.row{display:grid;grid-template-columns:14px 1fr auto;gap:4px 8px;padding:8px 12px 8px 14px;border-left:2px solid transparent;align-items:start}
+.row.sel{background:var(--accent-soft);border-left-color:var(--accent)}
+.row .nm{font-weight:600;display:flex;gap:6px;align-items:baseline;white-space:nowrap;overflow:hidden}
+.row .br{font-family:var(--mono);font-size:11px;color:var(--faint);font-weight:400}
+.row .ln{grid-column:2/4;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .tm{font-size:11px;color:var(--faint);font-family:var(--mono)}
+.row .pp{grid-column:2/4}
+/* status glyphs */
+.st{width:10px;height:10px;margin-top:4px;display:inline-block;flex:none}
+.st.work{border-radius:50%;border:2px solid var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.st.ask{background:var(--warn);transform:rotate(45deg);width:9px;height:9px;border-radius:1px}
+.st.fail{width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:10px solid var(--bad);margin-top:3px}
+.st.ready{border-radius:50%;background:var(--ok)}
+.st.idle{border-radius:50%;border:2px solid var(--line-2)}
+.st.room{border-radius:3px;background:var(--room)}
+/* mini pipeline */
+.mp{display:flex;gap:3px;margin-top:5px}
+.mp i{height:4px;flex:1;border-radius:2px;background:var(--surface-3)}
+.mp i.d{background:var(--ok)} .mp i.a{background:var(--accent)} .mp i.w{background:var(--warn)} .mp i.f{background:var(--bad)}
+.act{font-size:11.5px;font-weight:600;border-radius:6px;padding:3px 9px;border:1px solid var(--line-2);background:var(--surface);color:var(--fg);white-space:nowrap}
+.act.p{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.act.ok{background:var(--ok);border-color:var(--ok);color:#04160c}
+.act.warn{background:var(--warn-soft);border-color:var(--warn);color:var(--warn)}
+.act.bad{background:var(--bad-soft);border-color:var(--bad);color:var(--bad)}
+.act.gh{border-color:transparent;background:transparent;color:var(--muted)}
+/* session pane */
+.sess{display:flex;flex-direction:column;background:var(--bg);overflow:hidden;border-right:1px solid var(--line)}
+.sh{background:var(--surface);border-bottom:1px solid var(--line);padding:10px 16px 0;flex:none}
+.sh .top{display:flex;align-items:center;gap:10px}
+.sh .ttl{font-size:15px;font-weight:650}
+.chip{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;border:1px solid var(--line);border-radius:999px;padding:1px 8px;color:var(--muted);background:var(--surface);white-space:nowrap}
+.chip b{color:var(--fg);font-weight:600}
+.chip.room{color:var(--room);border-color:var(--room-soft);background:var(--room-soft)}
+.pipe{display:flex;align-items:center;margin:10px 0 0;padding-bottom:10px;gap:0}
+.stp{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--faint);white-space:nowrap}
+.stp .dot{width:16px;height:16px;border-radius:50%;border:1.5px solid var(--line-2);display:grid;place-items:center;font-size:9px}
+.stp.d{color:var(--muted)} .stp.d .dot{background:var(--ok);border-color:var(--ok);color:#04160c}
+.stp.a{color:var(--fg);font-weight:600} .stp.a .dot{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);background:var(--surface)}
+.stp.a .dot::after{content:"";width:6px;height:6px;border-radius:50%;background:var(--accent)}
+.stp.f .dot{border-color:var(--bad);background:var(--bad);color:#fff}
+.stp.w .dot{border-color:var(--warn);background:var(--warn);color:#1b1205}
+.bar{flex:1;height:1.5px;background:var(--line-2);margin:0 6px;min-width:10px}
+.bar.d{background:var(--ok)}
+.pipe .nx{margin-left:12px}
+.thread{flex:1;overflow:hidden;padding:16px 20px;display:flex;flex-direction:column;gap:12px}
+.msg{max-width:92%}
+.msg .who{font-size:11px;color:var(--faint);margin-bottom:3px;font-family:var(--mono)}
+.msg .bd{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.msg.me{align-self:flex-end}
+.msg.me .bd{background:var(--accent-soft);border-color:transparent}
+.msg ul{margin:6px 0 0;padding-left:18px}
+.tools{display:flex;flex-direction:column;gap:0;border:1px solid var(--line);border-radius:8px;background:var(--surface);font-size:12px;overflow:hidden}
+.tools .th{display:flex;gap:8px;align-items:center;padding:6px 10px;color:var(--muted)}
+.tools .tl{display:grid;grid-template-columns:14px 70px 1fr auto;gap:8px;padding:4px 10px;border-top:1px solid var(--line);font-family:var(--mono);font-size:11.5px}
+.tools .tl .ok{color:var(--ok)} .tools .tl .run{color:var(--accent)}
+.tools .tl .a{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.subs{margin:0 16px;border:1px solid var(--line);border-bottom:0;border-radius:10px 10px 0 0;background:var(--surface);font-size:12px;flex:none}
+.subs .h{display:flex;align-items:center;gap:8px;padding:6px 12px;color:var(--muted)}
+.subs .s{display:grid;grid-template-columns:10px 130px 1fr auto;gap:8px;align-items:center;padding:5px 12px;border-top:1px solid var(--line)}
+.subs .s .k{font-family:var(--mono);font-size:11px;color:var(--faint)}
+.subs .s .st{margin-top:0}
+.comp{margin:0 16px 14px;border:1px solid var(--line-2);border-radius:10px;background:var(--surface);flex:none;box-shadow:var(--shadow)}
+.queue{display:flex;gap:6px;flex-wrap:wrap;padding:8px 10px 0}
+.qi{font-size:11.5px;background:var(--surface-2);border:1px dashed var(--line-2);border-radius:6px;padding:2px 8px;color:var(--muted)}
+.att{display:flex;gap:8px;padding:8px 10px 0}
+.thumb{width:54px;height:40px;border-radius:6px;border:1px solid var(--line);background:linear-gradient(135deg,var(--surface-3),var(--accent-soft));position:relative}
+.thumb::after{content:"PNG";position:absolute;bottom:2px;left:4px;font-size:8.5px;font-family:var(--mono);color:var(--muted)}
+.ta{padding:10px 12px;color:var(--faint);min-height:42px}
+.cbar{display:flex;align-items:center;gap:6px;padding:6px 8px;border-top:1px solid var(--line)}
+.cbar .sp{flex:1}
+.mode{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;font-size:11px}
+.mode span{padding:2px 8px;color:var(--muted)} .mode span.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.send{width:30px;height:30px;border-radius:8px;background:var(--accent);color:var(--accent-fg);display:grid;place-items:center}
+.stop{width:30px;height:30px;border-radius:8px;border:1px solid var(--line-2);display:grid;place-items:center;color:var(--fg)}
+.stop i{width:10px;height:10px;background:currentColor;border-radius:2px}
+/* inspector */
+.insp{display:flex;flex-direction:column;background:var(--surface);overflow:hidden}
+.tabs{display:flex;gap:2px;padding:0 8px;border-bottom:1px solid var(--line);height:48px;align-items:flex-end;flex:none}
+.tab{padding:8px 9px;font-size:12px;color:var(--muted);border-bottom:2px solid transparent;display:flex;gap:5px;align-items:center;white-space:nowrap}
+.tab.on{color:var(--fg);border-bottom-color:var(--accent);font-weight:600}
+.tab .n{font-size:10px;background:var(--surface-3);border-radius:8px;padding:0 5px;color:var(--muted)}
+.ib2{padding:14px;display:flex;flex-direction:column;gap:12px;overflow:hidden}
+.card{border:1px solid var(--line);border-radius:8px;padding:12px;background:var(--surface)}
+.card .k{font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--faint);margin-bottom:2px}
+.kv{display:grid;grid-template-columns:86px 1fr;gap:4px 8px;font-size:12px}
+.kv dt{color:var(--faint)} .kv dd{margin:0}
+.tl2{display:flex;flex-direction:column}
+.tl2 div{display:grid;grid-template-columns:14px 52px 1fr;gap:6px;padding:4px 0;font-size:12px;align-items:start}
+.tl2 .id{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.prog{height:6px;border-radius:3px;background:var(--surface-3);display:flex;overflow:hidden;margin:6px 0}
+.prog i{display:block;height:100%}
+/* diff */
+.diff{font-family:var(--mono);font-size:11.5px;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.diff .fh{display:flex;justify-content:space-between;padding:6px 10px;background:var(--surface-2);border-bottom:1px solid var(--line);font-size:11.5px}
+.dl{display:grid;grid-template-columns:34px 1fr;white-space:pre;overflow:hidden}
+.dl span:first-child{color:var(--faint);text-align:right;padding-right:8px;user-select:none}
+.dl.add{background:var(--ok-soft)} .dl.del{background:var(--bad-soft)}
+.cmt{margin:6px 10px 8px 42px;border:1px solid var(--accent);border-radius:8px;background:var(--surface);font-family:var(--sans);font-size:12px;padding:8px 10px}
+.cmt .f{display:flex;gap:6px;justify-content:flex-end;margin-top:6px}
+.revbar{display:flex;align-items:center;gap:8px;padding:10px 14px;border-top:1px solid var(--line);background:var(--surface-2);margin-top:auto;flex:none}
+/* checks */
+.ck{display:grid;grid-template-columns:16px 1fr auto;gap:8px;padding:6px 0;border-top:1px solid var(--line);font-size:12px;align-items:center}
+.ck:first-child{border-top:0}
+.ico-ok{color:var(--ok);font-weight:700} .ico-bad{color:var(--bad);font-weight:700} .ico-run{color:var(--accent)}
+.log{font-family:var(--mono);font-size:11px;background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:8px 10px;white-space:pre;overflow:hidden;color:var(--muted)}
+.log b{color:var(--bad);font-weight:500}
+/* inbox */
+.inbox{width:1200px;height:640px;display:grid;grid-template-columns:56px 1fr}
+.ibx{background:var(--bg);overflow:hidden;display:flex;flex-direction:column}
+.ibx .hd{height:56px;display:flex;align-items:center;gap:12px;padding:0 24px;border-bottom:1px solid var(--line);background:var(--surface)}
+.ibx .hd h5{margin:0;font-size:16px;font-weight:650}
+.ibx .body{padding:16px 24px;display:grid;grid-template-columns:1fr 300px;gap:24px;overflow:hidden}
+.it{display:grid;grid-template-columns:14px 1fr auto;gap:4px 12px;padding:12px 14px;background:var(--surface);border:1px solid var(--line);border-radius:8px;align-items:start}
+.it+.it{margin-top:6px}
+.it .r{font-weight:600}
+.it .r .br{font-family:var(--mono);font-weight:400;font-size:11px;color:var(--faint);margin-left:6px}
+.it .q{grid-column:2/3;color:var(--fg)}
+.it .why{grid-column:2/3;color:var(--muted);font-size:12px}
+.it .acts{grid-row:1/4;grid-column:3;display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end;max-width:320px}
+.it .opts{grid-column:2/4;display:flex;gap:6px;margin-top:6px}
+.it.focus{border-color:var(--warn);box-shadow:0 0 0 3px var(--warn-soft)}
+.ghd{display:flex;align-items:baseline;gap:8px;margin:14px 0 8px;font-size:12px;font-weight:600}
+.ghd:first-child{margin-top:0}
+.ghd .c{color:var(--faint);font-weight:400}
+.side h6{margin:0 0 8px;font-size:12px;font-weight:600}
+.feed div{display:grid;grid-template-columns:44px 1fr;gap:8px;font-size:12px;padding:5px 0;border-top:1px solid var(--line)}
+.feed .t{font-family:var(--mono);font-size:11px;color:var(--faint)}
+/* palette */
+.pal{position:absolute;left:50%;top:70px;transform:translateX(-50%);width:560px;background:var(--surface);border:1px solid var(--line-2);border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.35)}
+.pal .in{padding:12px 14px;border-bottom:1px solid var(--line);font-size:14px;display:flex;gap:8px;align-items:center}
+.pal .in b{font-weight:500}
+.pal .sec{font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--faint);padding:8px 14px 2px}
+.pal .o{display:grid;grid-template-columns:22px 1fr auto;gap:8px;padding:7px 14px;font-size:13px;align-items:center}
+.pal .o.on{background:var(--accent-soft)}
+.pal .o .d{color:var(--muted);font-size:12px}
+.scrim{position:absolute;inset:0;background:rgba(5,8,12,.45)}
+/* room */
+.roomv{width:1200px;height:700px;display:grid;grid-template-columns:56px 1fr 360px}
+.rmain{background:var(--bg);display:flex;flex-direction:column;overflow:hidden;border-right:1px solid var(--line)}
+.rhead{background:var(--surface);border-bottom:1px solid var(--line);padding:14px 20px;display:flex;gap:16px;align-items:center}
+.rhead h5{margin:0;font-size:17px;font-weight:650}
+.mile{display:flex;gap:10px;align-items:center;font-size:12px;color:var(--muted)}
+.mile .bar2{width:160px;height:6px;border-radius:3px;background:var(--surface-3);overflow:hidden}
+.mile .bar2 i{display:block;height:100%;width:62%;background:var(--room)}
+.mtab{width:100%;border-collapse:collapse;font-size:12.5px;min-width:0}
+.mtab th{background:transparent;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--faint);font-weight:500;padding:8px 10px}
+.mtab td{padding:9px 10px;border-bottom:1px solid var(--line);font-weight:400;white-space:nowrap}
+.mtab td:first-child{font-weight:600}
+.mtab .mp{width:120px;margin:0}
+.orders{display:flex;flex-direction:column;gap:8px}
+.ord{border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:var(--surface);font-size:12px}
+.ord.pending{border-color:var(--room);box-shadow:0 0 0 3px var(--room-soft)}
+.ord .l1{display:flex;gap:6px;align-items:center;font-weight:600;font-size:12.5px}
+.ord .l2{color:var(--muted);margin:4px 0 8px}
+.ord .f{display:flex;gap:6px}
+.sw{width:30px;height:17px;border-radius:9px;background:var(--ok);position:relative;flex:none}
+.sw::after{content:"";position:absolute;right:2px;top:2px;width:13px;height:13px;border-radius:50%;background:#fff}
+/* health */
+.health{width:1200px;height:560px;display:grid;grid-template-columns:56px 1fr}
+.hb{background:var(--bg);padding:20px 24px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;align-content:start;overflow:hidden}
+.hb .card h6{margin:0 0 8px;font-size:13px;font-weight:600;display:flex;justify-content:space-between}
+.li{display:grid;grid-template-columns:16px 1fr auto;gap:8px;font-size:12px;padding:5px 0;border-top:1px solid var(--line);align-items:center}
+.li:first-of-type{border-top:0}
+.spark{height:36px;display:flex;align-items:flex-end;gap:2px;margin-top:6px}
+.spark i{flex:1;background:var(--accent-soft);border-top:2px solid var(--accent);border-radius:1px}
+/* phones */
+.phones{display:flex;gap:28px;width:max-content}
+.phone{width:300px;height:620px;border-radius:34px;border:8px solid var(--fg);background:var(--bg);overflow:hidden;display:flex;flex-direction:column;position:relative;font-size:12.5px}
+.phone .sb{height:26px;flex:none;display:flex;justify-content:space-between;padding:6px 20px 0;font-size:11px;font-weight:600}
+.phone .ph{padding:6px 14px 10px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--line);background:var(--surface);flex:none}
+.phone .ph b{font-size:15px}
+.phone .pc{flex:1;overflow:hidden;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.phone .nav{height:62px;flex:none;border-top:1px solid var(--line);background:var(--surface);display:grid;grid-template-columns:repeat(4,1fr);padding-bottom:8px}
+.phone .nav div{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:10px;color:var(--muted);position:relative}
+.phone .nav div.on{color:var(--accent)}
+.phone .nav svg{width:20px;height:20px}
+.phone .nav .bd{position:absolute;top:6px;left:56%;min-width:15px;height:15px;border-radius:8px;background:var(--warn);color:#1b1205;font-size:9.5px;font-weight:700;display:grid;place-items:center;padding:0 3px}
+.sheet{position:absolute;left:0;right:0;bottom:0;height:62%;background:var(--surface);border-radius:16px 16px 0 0;border-top:1px solid var(--line-2);box-shadow:0 -10px 30px rgba(0,0,0,.25);display:flex;flex-direction:column}
+.grab{width:36px;height:4px;border-radius:2px;background:var(--line-2);margin:8px auto 4px}
+/* components sheet */
+.comps{width:1100px;display:grid;grid-template-columns:repeat(3,1fr);gap:14px;font-size:13px}
+.comps .card h6{margin:0 0 10px;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.ask{border:1px solid var(--warn);border-radius:10px;background:var(--surface);overflow:hidden}
+.ask .h{background:var(--warn-soft);color:var(--warn);padding:6px 12px;font-size:11.5px;font-weight:600;display:flex;gap:6px;align-items:center}
+.ask .b{padding:10px 12px}
+.ask .f{display:flex;gap:6px;padding:0 12px 12px;flex-wrap:wrap}
+.toast{display:flex;gap:10px;align-items:center;background:var(--fg);color:var(--bg);border-radius:8px;padding:9px 12px;font-size:12.5px}
+.toast .u{margin-left:auto;font-weight:600;color:var(--accent-soft)}
+.modal{border:1px solid var(--line-2);border-radius:12px;background:var(--surface);box-shadow:var(--shadow);padding:16px}
+.modal .f{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+.stack{display:flex;flex-direction:column;gap:8px}
+.pills{display:flex;flex-wrap:wrap;gap:6px}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;border-radius:999px;padding:2px 10px 2px 8px;border:1px solid var(--line)}
+.pill .st{margin-top:0}
+/* stages */
+.stages{display:flex;flex-direction:column;gap:10px;margin:18px 0}
+.stage{display:grid;grid-template-columns:64px 1fr;gap:16px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.stage .e{font-family:var(--mono);font-size:22px;font-weight:500;color:var(--accent)}
+.stage h4{margin:0 0 4px;font-size:15px}
+.stage p{margin:0;font-size:13.5px;color:var(--muted)}
+@media (max-width:600px){.stage{grid-template-columns:1fr;gap:4px}.ibx .body{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:no-preference){.st.work{animation:pulse 2s ease-in-out infinite}@keyframes pulse{50%{box-shadow:0 0 0 5px var(--accent-soft)}}}
+.cb{display:inline-block;width:13px;height:13px;border:1.5px solid var(--line-2);border-radius:3px;vertical-align:-2px;background:var(--surface)}
+.cb.on{background:var(--accent);border-color:var(--accent);box-shadow:inset 0 0 0 2px var(--surface)}
+.cb.no{opacity:.35}
+.gtag{font-size:10.5px;border-radius:4px;padding:1px 6px;font-weight:600;white-space:nowrap}
+.gtag.m{background:var(--ok-soft,rgba(46,160,67,.15));color:var(--ok)} .gtag.g{background:var(--surface-3);color:var(--muted)} .gtag.u{background:var(--warn-soft);color:var(--warn)} .gtag.l{background:var(--accent-soft);color:var(--accent)}
+.risk{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;margin:16px 0}
+.risk .card h4{margin:0 0 6px;font-size:14px}
+.risk .card p{margin:0;font-size:13px}
+.verdict{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;margin-bottom:4px}
+.verdict.y{color:var(--ok)} .verdict.w{color:var(--warn)}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-inbox" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13h5l1.5 3h5L16 13h5"/><path d="M5 5h14l2 8v6H3v-6z"/></symbol>
+  <symbol id="i-repos" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/></symbol>
+  <symbol id="i-room" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="3"/><circle cx="16" cy="8" r="3"/><circle cx="12" cy="16" r="3"/></symbol>
+  <symbol id="i-act" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-7 4 14 3-7h4"/></symbol>
+  <symbol id="i-health" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/></symbol>
+  <symbol id="i-set" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4-4"/></symbol>
+  <symbol id="i-clip" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11l-8.5 8.5a5 5 0 0 1-7-7L14 4a3.5 3.5 0 0 1 5 5l-8.5 8.5a2 2 0 0 1-3-3L15 7"/></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></symbol>
+  <symbol id="i-panel" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></symbol>
+</svg>
+
+<div class="page">
+<header class="doc">
+  <div class="eyebrow">Kletus.dev · análisis de producto y rediseño · 18 nov 2026</div>
+  <h1 style="margin-top:10px">Un puesto de control para trabajar con agentes en muchos repos</h1>
+  <p class="lede">Qué es la app, qué hace bien hoy, qué le falta y cómo debería verse y funcionar si la diseñáramos de cero con todo lo que sabemos.</p>
+  <nav class="toc" aria-label="Secciones">
+    <a href="#objetivo">1 · Objetivo</a><a href="#hoy">2 · Lo que tiene</a><a href="#falta">3 · Lo que falta</a><a href="#principios">4 · Principios</a><a href="#arquitectura">5 · Arquitectura</a><a href="#estados">6 · Estados</a><a href="#pantallas">7 · Pantallas</a><a href="#movil">8 · Teléfono</a><a href="#componentes">9 · Componentes</a><a href="#detalles">10 · Detalles</a><a href="#etapas">11 · Etapas</a><a href="#limpieza">12 · Ramas, worktrees y sesiones</a>
+  </nav>
+</header>
+
+<section class="doc" id="objetivo">
+  <h2>1 · Para qué sirve, en serio</h2>
+  <p>Leyendo el código, el README, las 273 filas del roadmap y usando la app, la conclusión es esta: <strong>Kletus.dev no es un tablero de Git. Es el lugar desde donde una persona dirige a varios agentes que programan en paralelo</strong>, cada uno en su repo, y se asegura de que el trabajo llegue a <code>main</code> sin perder el control.</p>
+  <p>El README lo dice en una línea: la app contesta <em>"what is left for me to do?"</em>. Y la regla del proyecto lo completa: los agentes implementan, la persona revisa y entrega. Todo el diseño tiene que girar alrededor de ese reparto.</p>
+  <h3>El ciclo que la app acompaña, todos los días</h3>
+  <div class="loop">
+    <div class="who-a"><b>1 · TAREA</b>Una fila del roadmap, tomada con <code>/flow-next</code></div>
+    <div class="who-a"><b>2 · CÓDIGO</b>El agente implementa en su sesión de pi</div>
+    <div class="who-p"><b>3 · DECIDIR</b>El agente pregunta; la persona contesta</div>
+    <div class="who-p"><b>4 · REVISAR</b>La persona mira el diff y pide cambios</div>
+    <div class="who-p"><b>5 · ENTREGAR</b><code>/flow-ship</code>: commit + PR</div>
+    <div class="who-x"><b>6 · CI</b>Los checks corren; si fallan, a arreglar</div>
+    <div class="who-p"><b>7 · FUSIONAR</b>Merge con un clic</div>
+    <div class="who-a"><b>8 · BASE</b><code>/flow-base</code> y vuelta a 1</div>
+  </div>
+  <div class="legend"><span><i style="border-color:var(--accent)"></i>lo hace el agente</span><span><i style="border-color:var(--warn)"></i>lo hace la persona</span><span><i style="border-color:var(--ok)"></i>lo hace el alojamiento (GitHub)</span></div>
+  <p>Fijate dónde está el valor: <strong>la persona es el cuello de botella</strong>. Con 15 repos y varios agentes trabajando, el tiempo se pierde en los pasos ámbar: enterarse de que alguien preguntó algo, encontrar qué repo está listo para entregar, ver por qué falló el CI. La app gana cuando acorta el tiempo entre "un agente necesita algo" y "la persona lo resolvió".</p>
+  <div class="thesis"><strong>La tesis del rediseño.</strong> Hoy la app está organizada por <em>repo</em> (una tarjeta por repo, y adentro buscás qué pasa). El rediseño la organiza por <em>decisión</em>: primero lo que te espera a vos, con el botón para resolverlo ahí mismo; después el detalle de cada repo. El ciclo de 8 pasos se vuelve visible en cada repo como una línea de entrega.</div>
+  <h3>Cómo te ayuda en el día a día</h3>
+  <ul class="clean">
+    <li><strong>Un solo lugar</strong> en vez de una terminal por repo, GitHub en otra pestaña y el roadmap en el editor.</li>
+    <li><strong>Saber sin mirar</strong>: notificaciones y push al teléfono cuando un agente pregunta, falla el CI o hay algo para fusionar.</li>
+    <li><strong>Un clic por paso</strong>: <code>/flow-next</code>, <code>/flow-ship</code>, Merge, <code>/flow-base</code> salen de la tarjeta, con las guardas que evitan mandar dos veces.</li>
+    <li><strong>Orden</strong>: el roadmap es la única fuente de tareas y Conformidad verifica que cada repo siga el padrón.</li>
+    <li><strong>Coordinación</strong>: las salas agrupan repos de un mismo producto (UPEN) con un agente que mira el conjunto.</li>
+  </ul>
+</section>
+
+<section class="doc" id="hoy">
+  <h2>2 · Lo que la app ya tiene y hace</h2>
+  <p>Inventario completo por módulo, con mi valoración. "Sólido" quiere decir que funciona bien y se mantiene en el rediseño (cambia la forma, no el fondo).</p>
+</section>
+<div class="wide"><div class="tbl"><table>
+  <thead><tr><th>Módulo</th><th>Qué hace hoy</th><th>Valoración</th><th>Lo que le pesa</th></tr></thead>
+  <tbody>
+  <tr><td>Lista de repos</td><td>Una tarjeta por repo: rama, último commit, chip de sesión (8 estados), cambios, PR y CI, conflictos, tamaño, barra de progreso del roadmap, próxima tarea y <strong>una</strong> acción principal (Merge, /flow-next, /flow-ship, /flow-base, Open). Grupos plegables, alcance por sala, búsqueda con <code>/</code>, "Working now".</td><td><span class="grade g-ok">Sólido</span></td><td>Tarjetas altas (6 líneas): entran 5 repos por pantalla. Ordenada por grupo, no por urgencia. Los motivos de un botón apagado solo están en un tooltip (no existe en el teléfono).</td></tr>
+  <tr><td>Chat con la sesión</td><td>pi por RPC, una sesión por repo y por sala. Markdown, chips de herramientas, pensamiento, reintentos con cuenta regresiva, compactar, abortar, historial con ↑, borradores por repo, respuestas rápidas, elegir o adoptar sesión, línea para abrirla en una terminal.</td><td><span class="grade g-ok">Sólido</span></td><td>No se puede escribir mientras trabaja. Sin imágenes. Herramientas cortadas a 12. Subagentes como una sola burbuja con reloj.</td></tr>
+  <tr><td>Preguntas del agente</td><td>Tarjetas para confirm, select, input y editor. Defensa contra texto cortado o caracteres invisibles (los muestra como ⟦U+XXXX⟧ y no deja aprobar).</td><td><span class="grade g-ok">Sólido</span></td><td>Solo aparecen dentro del chat del repo: si estás en otro repo, te enterás por notificación.</td></tr>
+  <tr><td>Columna del repo</td><td>Tareas (agrupadas por estado, con progreso), Cambios (árbol y diff unificado o lado a lado con resaltado), Estado (PR, checks, re-run), Archivos (visor), Notas (<code>.panel/notas.md</code> con conflicto).</td><td><span class="grade g-mid">Mejorable</span></td><td>El diff es de solo lectura: revisás pero no podés responder sobre una línea. Estado no muestra el log del check que falló. La pestaña elegida no se vuelve a elegir sola.</td></tr>
+  <tr><td>Entrega y fusión</td><td>Comandos /flow-* con guarda de duplicado y verificación con <code>get_commands</code> (RP233). Merge fijado al SHA, método del repo, borrar rama, /flow-base automático después. Re-run de checks fallidos; <code>fix-pr</code> en el servidor.</td><td><span class="grade g-ok">Sólido</span></td><td>En escritorio Merge no pide confirmación (en el teléfono sí). El botón muestra el método de Ajustes, no el del repo (RP227).</td></tr>
+  <tr><td>Salas</td><td>Tarjeta de sala, chat en la carpeta de la sala, pestaña Proyectos (sesión, cómo terminó la última tarea, PR y CI de cada miembro), requisitos de sala.</td><td><span class="grade g-bad">Débil</span></td><td>Es de solo lectura. Toda la coordinación (órdenes, autoridad, informe, despertar) está en RP221–RP229 y RP244 sin hacer.</td></tr>
+  <tr><td>Conformidad</td><td>Prerrequisitos de la máquina (git, gh, pi), elección del pi, 15 requisitos por repo y 4 por sala del padrón 1.4, botón "Put in conditions", problemas del roadmap.</td><td><span class="grade g-ok">Sólido</span></td><td>El nombre no dice para qué sirve. Mezcla la salud de la máquina con la de los repos.</td></tr>
+  <tr><td>Ajustes</td><td>Resultado de herramientas al clic, pi a usar, método de merge, borrar rama, 5 tipos de notificación, sonido, push, diff, columna "clean". Indica si se guarda en config.json o en el navegador.</td><td><span class="grade g-mid">Mejorable</span></td><td>Solo una clave vive en el servidor. Dos filas "Planned" apagadas (RP109, RP110). No hay tema claro, densidad ni atajos.</td></tr>
+  <tr><td>Consumo de Claude</td><td>Ventanas de 5 h y 7 días con marca de ritmo, aviso a 70 % y 90 %, anillos en el teléfono, popover con la hora de reinicio.</td><td><span class="grade g-ok">Sólido</span></td><td>No hay consumo por sesión (tokens, costo): el servidor ya puede leerlo (RP239).</td></tr>
+  <tr><td>Avisos</td><td>Toasts, sonido, notificación del sistema y Web Push sin dependencias (el push no lleva texto; el service worker lo busca). Se silencian con la página enfocada.</td><td><span class="grade g-ok">Sólido</span></td><td>No queda registro: si te perdiste la notificación, no hay bandeja donde verla.</td></tr>
+  <tr><td>Teléfono, PWA y remoto</td><td>Una pantalla a la vez, barra inferior, hoja para Merge, objetivos de 44 px, <code>--vvh</code> para el teclado de iOS, instalable, acceso por Tailscale con login firmado.</td><td><span class="grade g-ok">Sólido</span></td><td>Sin modo offline. La barra inferior desaparece en el chat y hay que volver con la flecha.</td></tr>
+  <tr><td>Operación</td><td>Bandeja de Windows con punto de estado, reiniciar panel o bandeja, autoarranque, aviso de "servidor más viejo que el disco", aviso "Not updating", <code>/api/perf</code>.</td><td><span class="grade g-ok">Sólido</span></td><td>Para reiniciar hay que ir a la bandeja; la página avisa pero no ofrece el botón. Las métricas de <code>/api/perf</code> no se ven en ningún lado.</td></tr>
+  <tr><td>Tablero "Work"</td><td>Kanban viejo (Needs attention, Changes, Committed, PRs, Merged), cola "Go work on", posponer PR, menú ⋯ de la tarjeta (asignar a sala, quitar repo).</td><td><span class="grade g-bad">Débil</span></td><td>Está oculto pero se sigue dibujando. Tiene funciones que no existen en otro lado (asignar a sala, quitar repo, posponer). Duplica vocabulario.</td></tr>
+  </tbody>
+</table></div></div>
+
+<section class="doc">
+  <h3>Deuda que afecta a la interfaz</h3>
+  <ul class="clean">
+    <li><strong>Archivos gigantes</strong>: <code>resumen.js</code> (1512 líneas) mezcla tarjetas, chat, diálogos, ajustes, tareas y diff. <code>style.css</code> tiene parches con números de RP.</li>
+    <li><strong>Tres buscadores</strong> (barra vieja, cabecera de la lista y el enlace de Conformidad, que filtra el tablero oculto).</li>
+    <li><strong>Cinco <code>confirm()</code> nativos</strong> mezclados con una hoja propia para Merge.</li>
+    <li><strong>Palabras en español</strong> dentro de una interfaz en inglés (<code>En revisión</code>, <code>Pendiente</code>, <code>notas.md</code>) y tres nombres para lo mismo (Sessions, Summary, Resumen).</li>
+    <li><strong>Accesibilidad</strong>: la tarjeta es un <code>article</code> clickeable con un botón adentro (la barra de progreso), el menú ⋯ no se recorre con flechas, el chat anuncia en vivo cada segundo.</li>
+    <li><strong>Solo tema oscuro</strong>, sin <code>prefers-color-scheme</code>.</li>
+  </ul>
+</section>
+
+<section class="doc" id="falta">
+  <h2>3 · Lo que le falta y lo que hay que mejorar</h2>
+  <p>Ordenado por cuánto acelera el día a día. <span class="tag-new">Nuevo</span> es una propuesta mía que no está en el roadmap; los números <span class="tag-rp">RPxxx</span> son filas que ya existen y que el rediseño absorbe.</p>
+</section>
+<div class="wide"><div class="props">
+  <div class="prop"><h4>Bandeja "For you"</h4><p>Una sola cola con todo lo que espera a la persona: preguntas de agentes, CI rojo, PR para fusionar, trabajo listo para entregar, repos que pueden arrancar. Cada ítem trae su botón y las preguntas se contestan <em>ahí</em>, sin abrir el chat. Queda un registro de lo resuelto.</p><div class="meta"><span class="imp" style="color:var(--bad)">IMPACTO ALTO</span><span class="tag-new">Nuevo</span></div></div>
+  <div class="prop"><h4>Línea de entrega por repo</h4><p>Los 8 pasos del ciclo como un stepper en la cabecera de cada sesión y en miniatura en cada fila de la lista. Reemplaza media docena de chips sueltos y deja claro en qué paso está cada repo y cuál es el próximo botón.</p><div class="meta"><span class="imp" style="color:var(--bad)">IMPACTO ALTO</span><span class="tag-new">Nuevo</span></div></div>
+  <div class="prop"><h4>Revisión con comentarios al agente</h4><p>El diff deja comentar una línea o un rango. Los comentarios se juntan y se mandan a la sesión en un solo mensaje ("Request changes"), o se aprueba y se pasa a <code>/flow-ship</code>. Es <strong>el</strong> trabajo de la persona y hoy se hace leyendo y tipeando a mano.</p><div class="meta"><span class="imp" style="color:var(--bad)">IMPACTO ALTO</span><span class="tag-new">Nuevo</span></div></div>
+  <div class="prop"><h4>Escribir mientras trabaja</h4><p>El compositor nunca se bloquea: "Steer now" corrige el rumbo en el momento, "Queue" lo deja para después, y la cola se ve encima del cuadro y se puede borrar.</p><div class="meta"><span class="imp" style="color:var(--bad)">IMPACTO ALTO</span><span class="tag-rp">RP236</span><span class="tag-rp">RP239</span></div></div>
+  <div class="prop"><h4>Imágenes en el chat</h4><p>Pegar, arrastrar o adjuntar capturas; se achican en el navegador, se ven como miniaturas antes de mandar y quedan marcadas en el historial.</p><div class="meta"><span class="imp" style="color:var(--bad)">IMPACTO ALTO</span><span class="tag-rp">RP215</span><span class="tag-rp">RP215b</span><span class="tag-rp">RP240</span></div></div>
+  <div class="prop"><h4>Subagentes en vivo</h4><p>Una bandeja fija sobre el compositor: cada subagente con su tipo, minutos, herramienta en curso y cantidad de pasos; se despliega para ver su hilo.</p><div class="meta"><span class="imp" style="color:var(--warn)">IMPACTO MEDIO-ALTO</span><span class="tag-rp">RP241</span><span class="tag-rp">RP242</span></div></div>
+  <div class="prop"><h4>CI con el log a la vista</h4><p>La pestaña PR & CI muestra el tramo del log que falló y un botón "Fix CI" que manda <code>fix-pr</code> a la sesión (el servidor ya lo tiene). Merge con confirmación y el método real del repo.</p><div class="meta"><span class="imp" style="color:var(--warn)">IMPACTO MEDIO-ALTO</span><span class="tag-rp">RP227</span><span class="tag-new">Nuevo</span></div></div>
+  <div class="prop"><h4>Sala como centro de coordinación</h4><p>Hito con fecha, tabla de miembros con su línea de entrega, órdenes que la sala propone y la persona aprueba con un clic, registro de órdenes, pausa y tope diario a la vista.</p><div class="meta"><span class="imp" style="color:var(--warn)">IMPACTO ALTO, RIESGO ALTO</span><span class="tag-rp">RP221–RP225</span><span class="tag-rp">RP229</span><span class="tag-rp">RP244</span></div></div>
+  <div class="prop"><h4>Paleta de comandos <span class="kbd">Ctrl K</span></h4><p>Ir a un repo, mandar un comando a la sesión abierta, fusionar, abrir un archivo, cambiar de tema. Con autocompletado de los comandos que pi tiene cargados.</p><div class="meta"><span class="imp" style="color:var(--warn)">IMPACTO MEDIO</span><span class="tag-new">Nuevo</span></div></div>
+  <div class="prop"><h4>Actividad del día</h4><p>Una línea de tiempo de lo que pasó: tareas tomadas, entregas, fusiones, CI fallidos. Con "Copy standup" que arma el resumen de ayer y hoy.</p><div class="meta"><span class="imp" style="color:var(--warn)">IMPACTO MEDIO</span><span class="tag-new">Nuevo</span></div></div>
+  <div class="prop"><h4>Costo y contexto por sesión</h4><p>En la cabecera de la sesión: contexto usado, tokens y costo de la sesión, al lado del consumo global de 5 h y 7 días.</p><div class="meta"><span class="imp" style="color:var(--warn)">IMPACTO MEDIO</span><span class="tag-rp">RP239</span></div></div>
+  <div class="prop"><h4>Captura rápida de tarea</h4><p>"New task" en cualquier repo: escribís la idea y la app se la pide a la sesión para que agregue la fila al roadmap con sus campos. Respeta la regla: la fila la escribe el agente, en el diff de su unidad.</p><div class="meta"><span class="imp" style="color:var(--warn)">IMPACTO MEDIO</span><span class="tag-new">Nuevo</span></div></div>
+  <div class="prop"><h4>Selector de sesión con búsqueda</h4><p>Buscar en las conversaciones pasadas de un repo ("¿qué dijo el agente sobre el merge?"), pasar a otra sesión en un paso ("Switch to") y mandar las viejas a una papelera con Undo, viendo cuánto pesa cada una.</p><div class="meta"><span class="imp" style="color:var(--warn)">IMPACTO MEDIO</span><span class="tag-new">Nuevo</span><span class="tag-rp">UI7e–UI7g</span></div></div>
+  <div class="prop"><h4>Ramas, stashes y worktrees a la vista</h4><p>Una pestaña Git por repo: qué ramas ya están fusionadas (también con squash), cuáles quedaron sin uso, stashes olvidados que traban la puerta de árbol limpio, worktrees para quitar. Y "Clean up" en un clic después de cada merge.</p><div class="meta"><span class="imp" style="color:var(--warn)">IMPACTO MEDIO</span><span class="tag-new">Nuevo</span><span class="tag-rp">UI7a–UI7d</span><span class="tag-rp">UI7h</span></div></div>
+  <div class="prop"><h4>Salud del sistema en una pantalla</h4><p>Conformidad + máquina + servidor: prerrequisitos, repos fuera de padrón, servidor desactualizado con botón "Restart", tiempos de <code>/api/perf</code>, estado del push y del acceso remoto. Más la limpieza: peso de las sesiones por repo y procesos pi huérfanos (E8).</p><div class="meta"><span class="imp" style="color:var(--muted)">IMPACTO MEDIO-BAJO</span><span class="tag-new">Nuevo</span></div></div>
+  <div class="prop"><h4>Tema claro, densidad y atajos</h4><p>Tema claro y oscuro con sistema, densidad cómoda o compacta, hoja de atajos con <span class="kbd">?</span>.</p><div class="meta"><span class="imp" style="color:var(--muted)">IMPACTO BAJO-MEDIO</span><span class="tag-new">Nuevo</span></div></div>
+  <div class="prop"><h4>MCP en las sesiones</h4><p>Ver qué servidores MCP tiene cada sesión y su estado en el menú de la sesión. Depende de tu decisión y de rotar la clave de Figma.</p><div class="meta"><span class="imp" style="color:var(--muted)">DECISIÓN TUYA</span><span class="tag-rp">RP243</span></div></div>
+</div></div>
+<section class="doc">
+  <p><strong>Y lo que hay que sacar</strong>: el tablero "Work" oculto (pasando sus tres funciones únicas, asignar a sala, quitar repo y posponer PR, al menú de la fila), los <code>confirm()</code> nativos, los buscadores duplicados y las dos filas "Planned" de Ajustes, que prometen algo que no está.</p>
+</section>
+
+<section class="doc" id="principios">
+  <h2>4 · Principios del rediseño</h2>
+  <div class="principles">
+    <div><b>Decisión antes que dato</b>Lo primero que ves es lo que te espera, con su botón. El detalle está a un clic.</div>
+    <div><b>Un próximo paso por repo</b>Siempre hay una sola acción principal y se ve igual en todos lados: lista, cabecera, bandeja.</div>
+    <div><b>Estado por forma, no solo por color</b>Cada estado tiene forma, color y palabra. Se distingue en gris y para daltónicos.</div>
+    <div><b>Nunca bloquear la escritura</b>El compositor siempre acepta texto; lo que cambia es qué pasa al mandarlo.</div>
+    <div><b>Todo explicado sin hover</b>Un botón apagado dice por qué en el propio botón o debajo; nada importante vive en un tooltip.</div>
+    <div><b>Teclado primero, táctil igual</b>Todo se alcanza con teclado y <span class="kbd">Ctrl K</span>; todo funciona con el pulgar en el teléfono.</div>
+  </div>
+</section>
+
+<section class="doc" id="arquitectura">
+  <h2>5 · Arquitectura de la información</h2>
+  <p>Hoy hay tres pestañas arriba (Sessions, Conformity, Settings) y una cuarta escondida. Propongo un <strong>riel de navegación</strong> a la izquierda con seis destinos, ordenados por frecuencia de uso:</p>
+</section>
+<div class="wide"><div class="tbl"><table>
+  <thead><tr><th>Destino</th><th>Qué contesta</th><th>Contenido</th><th>Reemplaza a</th></tr></thead>
+  <tbody>
+    <tr><td>For you <span class="muted">(G I)</span></td><td>¿Qué me espera ahora?</td><td>Cola de decisiones agrupada (Decide now · Ready to ship · Can start), actividad reciente al costado</td><td>Notificaciones sueltas, cola "Go work on" del tablero oculto</td></tr>
+    <tr><td>Repos <span class="muted">(G R)</span></td><td>¿Cómo está cada repo y qué hace su agente?</td><td>Lista · sesión · inspector (las tres columnas de hoy, rehechas). Inspector: Task, Review, PR &amp; CI, Files, Notes, Git</td><td>Sessions</td></tr>
+    <tr><td>Rooms <span class="muted">(G M)</span></td><td>¿Cómo va el producto que coordina varios repos?</td><td>Hito, miembros con su línea de entrega, chat de la sala, órdenes propuestas y registro</td><td>Tarjeta de sala + pestaña Projects</td></tr>
+    <tr><td>Activity <span class="muted">(G A)</span></td><td>¿Qué pasó hoy y ayer?</td><td>Línea de tiempo filtrable por repo y por tipo, copia para standup</td><td>Nada (nuevo)</td></tr>
+    <tr><td>Health <span class="muted">(G H)</span></td><td>¿Está todo en condiciones?</td><td>Máquina, servidor, repos fuera de padrón, salas, push, remoto, y limpieza (peso de sesiones, procesos huérfanos, ramas y stashes de todos los repos)</td><td>Conformity + avisos sueltos</td></tr>
+    <tr><td>Settings <span class="muted">(G ,)</span></td><td>¿Cómo quiero que funcione?</td><td>Ajustes agrupados, cada uno con dónde se guarda</td><td>Settings</td></tr>
+  </tbody>
+</table></div></div>
+<section class="doc">
+  <p>Abajo del riel quedan los dos anillos de consumo (5 h y 7 días) y el estado del servidor: un punto que se vuelve un botón "Restart" cuando el código del disco es más nuevo.</p>
+  <p>Las rutas siguen siendo enlaces: <code>#/inbox</code>, <code>#/repo/&lt;id&gt;/(chat|review|ci|files|notes|task|git)</code>, <code>#/room/&lt;id&gt;</code>, <code>#/activity</code>, <code>#/health</code>, <code>#/settings</code>. El botón Atrás del navegador y del teléfono recorre pantallas, como hoy.</p>
+</section>
+
+<section class="doc" id="estados">
+  <h2>6 · Un solo modelo de estados</h2>
+  <p>Hoy hay 8 estados de sesión, 6 del roadmap, los del CI y los de <code>.panel/state.json</code>, cada uno con su chip. El rediseño los proyecta en <strong>seis estados de repo</strong>, que son los que se ven en la lista y la bandeja. El detalle fino queda en la cabecera de la sesión.</p>
+</section>
+<div class="wide"><div class="tbl"><table>
+  <thead><tr><th>Estado</th><th>Forma</th><th>Cuándo</th><th>Acción principal</th><th>Orden en la lista</th></tr></thead>
+  <tbody>
+    <tr><td>Needs you</td><td><span class="pill"><span class="st ask"></span>rombo ámbar</span></td><td>Pregunta pendiente, <code>needs-input</code>, acción manual</td><td>Answer / Open</td><td>1</td></tr>
+    <tr><td>Failing</td><td><span class="pill"><span class="st fail"></span>triángulo rojo</span></td><td>CI rojo, conflicto, error de sesión, tarea fallida</td><td>Fix CI / Open</td><td>2</td></tr>
+    <tr><td>Ready</td><td><span class="pill"><span class="st ready"></span>círculo verde</span></td><td><code>ready-to-commit</code>, PR verde para fusionar</td><td>Review / Ship / Merge</td><td>3</td></tr>
+    <tr><td>Working</td><td><span class="pill"><span class="st work"></span>anillo azul que late</span></td><td>La sesión trabaja, compacta, reintenta, o el CI corre</td><td>Stop (en el chat)</td><td>4</td></tr>
+    <tr><td>Idle</td><td><span class="pill"><span class="st idle"></span>círculo vacío</span></td><td>Libre, con o sin tarea siguiente</td><td>Start next / Sync base</td><td>5</td></tr>
+    <tr><td>Room</td><td><span class="pill"><span class="st room"></span>cuadrado violeta</span></td><td>Marca de tipo, no de estado: una sala lleva además el peor estado de sus miembros</td><td>Open room</td><td>fijada arriba</td></tr>
+  </tbody>
+</table></div></div>
+
+<section class="wide" id="pantallas">
+  <div class="doc"><h2>7 · Pantallas</h2>
+  <p>Maquetas a tamaño real con datos de hoy. Todas usan los mismos tokens de color y tipografía que esta página, así que también se ven en tema claro u oscuro según tu sistema. En el teléfono se desplazan de costado.</p>
+  <h3 id="p-repos">7.1 · Repos: lista, sesión e inspector</h3>
+  <p>La pantalla donde pasás el día. Tres columnas como hoy, pero cada una con un trabajo claro.</p></div>
+
+  <div class="canvas"><div class="app desk">
+    <nav class="rail">
+      <div class="logo">K<span>.</span></div>
+      <div class="ri"><svg><use href="#i-inbox"/></svg><span class="bd">4</span></div>
+      <div class="ri on"><svg><use href="#i-repos"/></svg></div>
+      <div class="ri"><svg><use href="#i-room"/></svg></div>
+      <div class="ri"><svg><use href="#i-act"/></svg></div>
+      <div class="ri"><svg><use href="#i-health"/></svg></div>
+      <div class="sp"></div>
+      <div class="ring" style="--p:35" title="5h"><i>35</i></div>
+      <div class="ring" style="--p:61"><i>61</i></div>
+      <div class="ri"><svg><use href="#i-set"/></svg></div>
+    </nav>
+
+    <div class="col">
+      <div class="colh"><div class="search"><svg width="13" height="13"><use href="#i-search"/></svg>Filter repos<span style="margin-left:auto" class="kbd">/</span></div><div class="ib"><svg><use href="#i-plus"/></svg></div></div>
+      <div class="seg"><span class="on">All 15</span><span>Needs you 2</span><span>Working 3</span><span>UPEN</span></div>
+      <div class="row"><span class="st room"></span><div class="nm">UPEN <span class="br">6 repos</span></div><span class="tm">14d</span><div class="ln">1 needs you · 2 working · demo in 4 days</div></div>
+      <div class="grp"><span>Needs you</span><span>2</span></div>
+      <div class="row"><span class="st ask"></span><div class="nm">upen-chat <span class="br">develop</span></div><span class="act warn">Answer</span><div class="ln">Asks: delete the 3 old branches?</div><div class="pp mp"><i class="d"></i><i class="w"></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+      <div class="row"><span class="st fail"></span><div class="nm">CROSS.BackofficeApi <span class="br">dev</span></div><span class="act bad">Fix CI</span><div class="ln">PR #241 · 2 checks failed · build, test</div><div class="pp mp"><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="f"></i><i></i><i></i></div></div>
+      <div class="grp"><span>Ready</span><span>2</span></div>
+      <div class="row"><span class="st ready"></span><div class="nm">upen-core <span class="br">develop</span></div><span class="act ok">Merge #36</span><div class="ln">E07a · checks green · squash</div><div class="pp mp"><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="a"></i><i></i></div></div>
+      <div class="row"><span class="st ready"></span><div class="nm">upen-erp <span class="br">develop</span></div><span class="act">Review</span><div class="ln">B6b2 · 230 files · +8218 −35 · agent says ready</div><div class="pp mp"><i class="d"></i><i class="d"></i><i class="d"></i><i class="a"></i><i></i><i></i><i></i><i></i></div></div>
+      <div class="grp"><span>Working</span><span>3</span></div>
+      <div class="row sel"><span class="st work"></span><div class="nm">repo-panel <span class="br">main</span></div><span class="tm">2m</span><div class="ln">RP234 · editing server/pi.js</div><div class="pp mp"><i class="d"></i><i class="a"></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+      <div class="row"><span class="st work"></span><div class="nm">flow-skills <span class="br">main</span></div><span class="tm">6m</span><div class="ln">2 subagents · running tests</div><div class="pp mp"><i class="d"></i><i class="a"></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+      <div class="grp"><span>Idle</span><span>8</span></div>
+      <div class="row"><span class="st idle"></span><div class="nm">upen-brand <span class="br">develop</span></div><span class="act gh">Start M2c</span><div class="ln">Next: M2c — Guía de uso</div></div>
+    </div>
+
+    <main class="sess">
+      <div class="sh">
+        <div class="top">
+          <span class="ttl">repo-panel</span><span class="chip mono">main</span><span class="chip">ctx <b>42%</b></span><span class="chip"><b>$1.84</b> · 61k tok</span>
+          <span style="flex:1"></span><span class="chip"><span class="st work" style="margin:0;width:8px;height:8px"></span>Working · 2:14</span><div class="ib"><svg><use href="#i-more"/></svg></div>
+        </div>
+        <div class="pipe">
+          <div class="stp d"><span class="dot">✓</span>Task</div><span class="bar d"></span>
+          <div class="stp a"><span class="dot"></span>Code</div><span class="bar"></span>
+          <div class="stp"><span class="dot"></span>Review</div><span class="bar"></span>
+          <div class="stp"><span class="dot"></span>Ship</div><span class="bar"></span>
+          <div class="stp"><span class="dot"></span>CI</div><span class="bar"></span>
+          <div class="stp"><span class="dot"></span>Merge</div><span class="bar"></span>
+          <div class="stp"><span class="dot"></span>Base</div>
+          <span class="act gh nx">RP234 →</span>
+        </div>
+      </div>
+      <div class="thread">
+        <div class="msg me"><div class="who">You · 15:31</div><div class="bd">siguiente</div></div>
+        <div class="msg"><div class="who">agent · 15:31</div><div class="bd">Tomo <b>RP234</b>: reemplazar la guarda de 45 s por una negativa del servidor mientras la sesión tenga trabajos en segundo plano. Empiezo por las pruebas.</div></div>
+        <div class="tools">
+          <div class="th"><span class="ico-ok">✓</span>6 tools · 14 s<span style="margin-left:auto">Show all</span></div>
+          <div class="tl"><span class="ok">✓</span><span>read</span><span class="a">server/pi.js</span><span>0.1s</span></div>
+          <div class="tl"><span class="ok">✓</span><span>write</span><span class="a">test/rp234-background-guard.test.js · +96</span><span>0.2s</span></div>
+          <div class="tl"><span class="run">●</span><span>bash</span><span class="a">node --test test/rp234-background-guard.test.js</span><span>4s</span></div>
+        </div>
+      </div>
+      <div class="subs">
+        <div class="h"><span class="st work" style="margin:0"></span><b style="color:var(--fg)">2 subagents</b> working<span style="margin-left:auto">Hide</span></div>
+        <div class="s"><span class="st work"></span><span>gentle-ai-explore</span><span class="k">grep · step 7 · server/jobs.js</span><span class="k">1:12</span></div>
+        <div class="s"><span class="st ready"></span><span>gentle-ai-verify</span><span class="k">done · 18 steps</span><span class="k">0:48</span></div>
+      </div>
+      <div class="comp">
+        <div class="queue"><span class="qi">Queued · "después corré la suite completa"</span><span class="qi">✕ clear</span></div>
+        <div class="att"><span class="thumb"></span></div>
+        <div class="ta">Also check the case with a retry in flight…</div>
+        <div class="cbar">
+          <div class="ib"><svg><use href="#i-clip"/></svg></div><span class="chip mono">/</span><span class="chip mono">@file</span>
+          <span class="sp"></span>
+          <div class="mode"><span class="on">Steer now</span><span>Queue</span></div>
+          <div class="stop"><i></i></div><div class="send"><svg width="16" height="16"><use href="#i-up"/></svg></div>
+        </div>
+      </div>
+    </main>
+
+    <aside class="insp">
+      <div class="tabs"><span class="tab on">Task</span><span class="tab">Review <span class="n">3</span></span><span class="tab">PR &amp; CI</span><span class="tab">Files</span><span class="tab">Notes</span><span class="tab">Git</span></div>
+      <div class="ib2">
+        <div class="card">
+          <div class="k">In progress · RP234</div>
+          <div style="font-weight:600;margin-bottom:8px">Reemplazar la guarda de 45 s por una negativa del servidor</div>
+          <dl class="kv"><dt>Delivers</dt><dd>409 while the session has background jobs</dd><dt>You'll see</dt><dd>/flow-ship refused with the reason, no 45 s wait</dd><dt>Depends</dt><dd><span class="mono">RP232 ✓</span></dd><dt>Spec</dt><dd><a href="#pantallas">odd/tasks/motor.md</a></dd></dl>
+        </div>
+        <div>
+          <div style="display:flex;justify-content:space-between;font-size:12px"><b>Roadmap</b><span class="muted mono">247 / 273</span></div>
+          <div class="prog"><i style="width:90%;background:var(--ok)"></i><i style="width:1%;background:var(--accent)"></i><i style="width:3%;background:var(--bad)"></i></div>
+          <div class="tl2">
+            <div><span class="st idle" style="margin-top:3px"></span><span class="id">RP235</span><span>Own vocabulary between server and page</span></div>
+            <div><span class="st idle" style="margin-top:3px"></span><span class="id">RP236</span><span>Type while the session works</span></div>
+            <div><span class="st idle" style="margin-top:3px"></span><span class="id">RP237</span><span>Real buttons for questions <span class="chip" style="padding:0 6px">your call</span></span></div>
+            <div><span class="st idle" style="margin-top:3px"></span><span class="id">RP238</span><span>Orderly close of a session</span></div>
+            <div><span class="st fail" style="margin-top:2px"></span><span class="id">RP224</span><span class="muted">Blocked · waits for Q5 and Q15</span></div>
+          </div>
+        </div>
+        <div class="act gh" style="align-self:flex-start;padding-left:0">+ New task</div>
+      </div>
+    </aside>
+  </div></div>
+  <div class="notes">
+    <div><b><span class="num">1</span>Riel</b>Seis destinos con insignia de pendientes, anillos de consumo y punto del servidor abajo. 56 px, siempre visible en escritorio.</div>
+    <div><b><span class="num">2</span>Lista</b>Filas de 2 líneas (60 px) en vez de tarjetas de 6: entran 12 repos. Agrupadas por estado, no por grupo; la sala va fijada arriba con el resumen de sus miembros. La segunda línea dice <em>qué está pasando</em> en palabras. La mini línea de entrega abajo. La acción principal a la derecha; en las filas Idle aparece con el foco o el hover.</div>
+    <div><b><span class="num">3</span>Cabecera de la sesión</b>Nombre, rama, contexto, costo y estado vivo con reloj. Debajo, la línea de entrega completa: cada paso es clickeable (Review abre la pestaña Review, CI abre PR &amp; CI) y al final el ID de la tarea.</div>
+    <div><b><span class="num">4</span>Hilo</b>Las herramientas se agrupan por turno ("6 tools · 14 s") y se despliegan. La que corre muestra un punto azul. Sin tope de 12: se ve el resumen y el detalle a pedido.</div>
+    <div><b><span class="num">5</span>Bandeja de subagentes</b>Fija sobre el compositor mientras haya alguno vivo: tipo, herramienta y paso en curso, archivo, reloj. Al terminar queda 30 s en verde y se va.</div>
+    <div><b><span class="num">6</span>Compositor</b>Siempre activo. Cola visible arriba, adjuntos como miniaturas, <span class="kbd">/</span> abre los comandos que pi tiene cargados, <span class="kbd">@</span> busca archivos. Mientras trabaja: "Steer now" o "Queue", y Stop al lado de Send.</div>
+    <div><b><span class="num">7</span>Inspector</b>Task (la fila completa con lo que entrega y cómo se verifica, más el roadmap), Review (diff con comentarios, con el número de archivos), PR &amp; CI, Files y Notes. Se elige solo según el paso: Code → Task, Ready → Review, CI → PR &amp; CI.</div>
+    <div><b><span class="num">8</span>New task</b>Abre un cuadro corto: la idea en una línea y "Ask the agent to add it". Se manda a la sesión como pedido de fila.</div>
+  </div>
+
+  <div class="doc"><h3 id="p-foryou">7.2 · For you: la bandeja de decisiones</h3>
+  <p>La pantalla de inicio. Responde a "¿qué me toca?" en un vistazo y deja resolver la mayoría sin abrir nada. <span class="kbd">J</span>/<span class="kbd">K</span> recorren, <span class="kbd">Enter</span> hace la acción principal, <span class="kbd">O</span> abre el repo, <span class="kbd">1</span>–<span class="kbd">9</span> eligen una opción de una pregunta.</p></div>
+  <div class="canvas"><div class="app inbox">
+    <nav class="rail">
+      <div class="logo">K<span>.</span></div>
+      <div class="ri on"><svg><use href="#i-inbox"/></svg><span class="bd">4</span></div>
+      <div class="ri"><svg><use href="#i-repos"/></svg></div><div class="ri"><svg><use href="#i-room"/></svg></div><div class="ri"><svg><use href="#i-act"/></svg></div><div class="ri"><svg><use href="#i-health"/></svg></div>
+      <div class="sp"></div><div class="ring" style="--p:35"><i>35</i></div><div class="ring" style="--p:61"><i>61</i></div><div class="ri"><svg><use href="#i-set"/></svg></div>
+    </nav>
+    <div class="ibx">
+      <div class="hd"><h5>For you</h5><span class="chip"><b>4</b> to decide</span><span class="chip">3 can start</span><span style="flex:1"></span><span class="seg" style="padding:0"><span class="on">All</span><span>UPEN</span><span>Tools</span><span>H2O</span></span></div>
+      <div class="body">
+        <div>
+          <div class="ghd">Decide now <span class="c">2</span></div>
+          <div class="it focus"><span class="st ask"></span><div class="r">upen-chat<span class="br">develop · T004</span></div><div class="acts"><span class="act gh">Open chat</span></div>
+            <div class="q">Las ramas <span class="mono">feat/chat-o1</span>, <span class="mono">feat/chat-o2</span> y <span class="mono">fix/ws-timeout</span> ya están fusionadas. ¿Las borro?</div>
+            <div class="why">Asked 3 min ago · select</div>
+            <div class="opts"><span class="act p"><span class="kbd" style="border-color:transparent;background:transparent;color:inherit">1</span> Delete all 3</span><span class="act"><span class="kbd">2</span> Keep them</span><span class="act gh">Cancel</span></div></div>
+          <div class="it"><span class="st fail"></span><div class="r">CROSS.BackofficeApi<span class="br">PR #241</span></div><div class="acts"><span class="act gh">View log</span><span class="act bad">Fix CI</span></div>
+            <div class="q">2 checks failed: <span class="mono">build</span>, <span class="mono">test</span></div><div class="why">error CS0246: type 'OutboxEvent' not found · 12 min ago</div></div>
+          <div class="ghd">Ready to ship <span class="c">2</span></div>
+          <div class="it"><span class="st ready"></span><div class="r">upen-core<span class="br">PR #36 · E07a</span></div><div class="acts"><span class="act ok">Merge · squash</span></div><div class="q">Portal: API para habilitar un producto</div><div class="why">All 7 checks green · mergeable · +412 −38</div></div>
+          <div class="it"><span class="st ready"></span><div class="r">upen-erp<span class="br">develop · B6b2</span></div><div class="acts"><span class="act">Review</span><span class="act p">/flow-ship</span></div><div class="q">Profesionales: servicios vinculados y foto</div><div class="why">Agent says ready to commit · 230 files · +8218 −35 · over the 600-line cap</div></div>
+          <div class="ghd">Can start <span class="c">3</span></div>
+          <div class="it"><span class="st idle"></span><div class="r">upen-brand<span class="br">M2c</span></div><div class="acts"><span class="act">/flow-next</span></div><div class="q">Guía de uso</div></div>
+        </div>
+        <div class="side">
+          <h6>Recently resolved</h6>
+          <div class="feed">
+            <div><span class="t">15:24</span><span>Merged <b>#292</b> repo-panel · RP233</span></div>
+            <div><span class="t">15:02</span><span>Answered upen-ceo · "Recortar el alcance"</span></div>
+            <div><span class="t">14:40</span><span>/flow-ship sent to repo-panel</span></div>
+            <div><span class="t">14:12</span><span>CI fixed · CROSS.BackofficeFront #239</span></div>
+          </div>
+          <h6 style="margin-top:18px">Snoozed</h6>
+          <div class="feed"><div><span class="t">2h</span><span>upen-pages · PR #10 waiting for legal review</span></div></div>
+        </div>
+      </div>
+    </div>
+  </div></div>
+  <div class="notes">
+    <div><b>Las preguntas se contestan acá</b>La tarjeta trae las mismas opciones que el diálogo del chat, con las mismas defensas (texto cortado o invisible: no deja aprobar y manda al chat).</div>
+    <div><b>El motivo siempre visible</b>La segunda línea gris dice por qué el ítem está ahí y desde cuándo: no hace falta hover.</div>
+    <div><b>Snooze</b>Cada ítem se puede posponer 1 h, hasta mañana o hasta que cambie (reemplaza el 💤 del tablero viejo).</div>
+    <div><b>Avisos del tamaño</b>Si la entrega pasa el tope de 600 líneas, la bandeja lo dice antes de que mandes <code>/flow-ship</code>.</div>
+  </div>
+
+  <div class="doc"><h3 id="p-review">7.3 · Review y PR &amp; CI en el inspector</h3>
+  <p>Las dos pestañas que convierten la revisión en una conversación con el agente.</p></div>
+  <div class="canvas"><div style="display:flex;gap:20px;width:max-content">
+    <div class="app" style="width:520px;height:600px;display:flex;flex-direction:column">
+      <div class="tabs"><span class="tab">Task</span><span class="tab on">Review <span class="n">3</span></span><span class="tab">PR &amp; CI</span><span class="tab">Files</span><span class="tab">Notes</span><span class="tab">Git</span></div>
+      <div class="ib2" style="flex:1">
+        <div style="display:flex;gap:8px;align-items:center;font-size:12px"><b>3 files</b><span style="color:var(--ok)" class="mono">+142</span><span style="color:var(--bad)" class="mono">−18</span><span style="flex:1"></span><span class="seg" style="padding:0"><span class="on">Unified</span><span>Split</span></span></div>
+        <div class="diff">
+          <div class="fh"><span>server/pi.js</span><span class="muted">+24 −9 · ✓ viewed</span></div>
+          <div class="dl"><span>97</span><span>  const guard = recent.get(key);</span></div>
+          <div class="dl del"><span>98</span><span>- if (guard &amp;&amp; now - guard &lt; 45000) return busy();</span></div>
+          <div class="dl add"><span>98</span><span>+ const jobs = await backgroundJobs(sid);</span></div>
+          <div class="dl add"><span>99</span><span>+ if (jobs.running &gt; 0) return refuse(409, 'background');</span></div>
+          <div class="cmt"><b>You</b> · line 99<br>Que el motivo diga cuántos trabajos y cuáles, así la persona sabe cuánto esperar.<div class="f"><span class="act gh">Delete</span><span class="act">Edit</span></div></div>
+          <div class="dl"><span>100</span><span>  return send(cmd);</span></div>
+        </div>
+        <div class="diff"><div class="fh"><span>test/rp234-background-guard.test.js</span><span class="muted">+96 · new</span></div></div>
+        <div class="diff"><div class="fh"><span>docs/ROADMAP.md</span><span class="muted">+22 −9</span></div></div>
+      </div>
+      <div class="revbar"><span class="chip"><b>1</b> comment</span><span style="flex:1"></span><span class="act">Request changes</span><span class="act p">Approve &amp; /flow-ship</span></div>
+    </div>
+    <div class="app" style="width:420px;height:600px;display:flex;flex-direction:column">
+      <div class="tabs"><span class="tab">Task</span><span class="tab">Review</span><span class="tab on">PR &amp; CI</span><span class="tab">Files</span><span class="tab">Notes</span><span class="tab">Git</span></div>
+      <div class="ib2">
+        <div><div style="display:flex;gap:6px;align-items:center"><b style="font-size:14px">#241</b><span>Outbox: publish integration events</span></div>
+        <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap"><span class="chip mono">feat/outbox → dev</span><span class="chip">+380 −41</span><span class="chip">review required</span></div></div>
+        <div class="card">
+          <div class="ck"><span class="ico-bad">✗</span><span>build <span class="muted">· 1m 12s</span></span><span class="act gh">↗</span></div>
+          <div class="ck"><span class="ico-bad">✗</span><span>test <span class="muted">· skipped by build</span></span><span class="act gh">↗</span></div>
+          <div class="ck"><span class="ico-ok">✓</span><span>lint</span><span></span></div>
+          <div class="ck"><span class="ico-ok">✓</span><span>codeql</span><span></span></div>
+        </div>
+        <div class="log">  Restore complete (2.1s)
+  Build started…
+<b>OutboxPublisher.cs(14,17): error CS0246:</b>
+<b>  The type 'OutboxEvent' could not be found</b>
+  Build FAILED. 1 error, 0 warnings</div>
+        <div style="display:flex;gap:6px"><span class="act bad">Fix CI</span><span class="act">Re-run failed</span><span class="act gh">Full log ↗</span></div>
+        <div class="card" style="background:var(--surface-2)"><div class="k">Merge</div><div style="font-size:12px">Blocked: 2 checks failed. The repo allows <b>squash</b> and <b>merge</b>; it deletes branches on its own.</div></div>
+      </div>
+    </div>
+  </div></div>
+  <div class="notes">
+    <div><b>Comentar es seleccionar</b>Clic en un número de línea (o arrastrar un rango) abre el comentario. Se juntan y viajan en <em>un</em> mensaje a la sesión, con archivo y líneas.</div>
+    <div><b>Visto por archivo</b>Cada archivo se marca "viewed" y se pliega; el contador de la pestaña baja.</div>
+    <div><b>Aprobar lleva a entregar</b>"Approve &amp; /flow-ship" es la acción natural del paso Review; si hay comentarios, la principal pasa a ser "Request changes".</div>
+    <div><b>El log que importa</b>Solo el tramo con el error (las líneas alrededor de <code>error</code> o <code>FAILED</code>) y el enlace al log completo.</div>
+  </div>
+
+  <div class="doc"><h3 id="p-rooms">7.4 · Rooms: la sala como sala de control</h3>
+  <p>Hoy la sala es un chat y una lista de solo lectura. Rediseñada, es donde se coordina un producto: qué falta para el hito, quién está trabajando, y qué órdenes propone el agente de la sala para que vos las apruebes.</p></div>
+  <div class="canvas"><div class="app roomv">
+    <nav class="rail"><div class="logo">K<span>.</span></div><div class="ri"><svg><use href="#i-inbox"/></svg><span class="bd">4</span></div><div class="ri"><svg><use href="#i-repos"/></svg></div><div class="ri on"><svg><use href="#i-room"/></svg></div><div class="ri"><svg><use href="#i-act"/></svg></div><div class="ri"><svg><use href="#i-health"/></svg></div><div class="sp"></div></nav>
+    <div class="rmain">
+      <div class="rhead"><span class="st room" style="margin:0"></span><h5>UPEN</h5><span class="chip room">room · upen-ceo</span><span style="flex:1"></span><div class="mile"><span>Demo · 22 Nov</span><span class="bar2"><i></i></span><b style="color:var(--fg)">4 days</b></div></div>
+      <div style="padding:16px 20px;overflow:hidden">
+        <table class="mtab">
+          <thead><tr><th>Project</th><th>State</th><th>Delivery</th><th>Now</th><th>PR</th><th></th></tr></thead>
+          <tbody>
+            <tr><td>upen-core</td><td><span class="st ready" style="margin:0"></span> Ready</td><td><div class="mp"><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="a"></i><i></i></div></td><td>E07a · checks green</td><td class="mono">#36</td><td><span class="act ok">Merge</span></td></tr>
+            <tr><td>upen-erp</td><td><span class="st ready" style="margin:0"></span> Ready</td><td><div class="mp"><i class="d"></i><i class="d"></i><i class="d"></i><i class="a"></i><i></i><i></i><i></i><i></i></div></td><td>B6b2 · to review</td><td class="muted">—</td><td><span class="act">Review</span></td></tr>
+            <tr><td>upen-chat</td><td><span class="st ask" style="margin:0 2px"></span> Needs you</td><td><div class="mp"><i class="d"></i><i class="w"></i><i></i><i></i><i></i><i></i><i></i><i></i></div></td><td>T004 · asks a question</td><td class="muted">—</td><td><span class="act warn">Answer</span></td></tr>
+            <tr><td>upen-brand</td><td><span class="st idle" style="margin:0"></span> Idle</td><td><div class="mp"></div></td><td>Next M2c</td><td class="muted">—</td><td><span class="act gh">Start</span></td></tr>
+            <tr><td>upen-pages</td><td><span class="st idle" style="margin:0"></span> Idle</td><td><div class="mp"></div></td><td>Next P1b · Finished 12 min ago</td><td class="muted">—</td><td><span class="act gh">Start</span></td></tr>
+            <tr><td>upen-web</td><td><span class="st idle" style="margin:0"></span> Idle</td><td><div class="mp"></div></td><td>W4 · waits for legal review</td><td class="muted">—</td><td></td></tr>
+          </tbody>
+        </table>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px">
+          <div class="card"><div class="k">Critical path to the demo</div><div style="font-size:12px;line-height:1.7">core E07a → erp B6b2 → web W4 (legal) → <b>demo</b><br><span class="muted">W4 has no date: it is the risk.</span></div></div>
+          <div class="card"><div class="k">Room chat</div><div style="font-size:12px" class="muted">upen-ceo · 15:02</div><div style="font-size:12px">Propongo entregar erp B6b2 hoy y dejar W4 para después de la demo.</div><div class="act gh" style="padding-left:0;margin-top:6px;display:inline-block">Open chat →</div></div>
+        </div>
+      </div>
+    </div>
+    <aside class="insp">
+      <div class="tabs"><span class="tab on">Orders <span class="n">1</span></span><span class="tab">Log</span><span class="tab">Setup</span></div>
+      <div class="ib2">
+        <div style="display:flex;align-items:center;gap:8px;font-size:12px"><span class="sw"></span><b>Room can propose</b><span style="flex:1"></span><span class="muted mono">2 / 10 today</span></div>
+        <div class="orders">
+          <div class="ord pending"><div class="l1"><span class="st room" style="margin:0"></span>/flow-ship → upen-erp</div><div class="l2">Class A17 · reason: "B6b2 verified by verify agent, demo path". Proposed 2 min ago.</div><div class="f"><span class="act p">Approve</span><span class="act">Reject</span><span class="act gh">Why?</span></div></div>
+          <div class="ord"><div class="l1"><span class="ico-ok">✓</span>/flow-base → upen-pages</div><div class="l2" style="margin-bottom:0">Auto after merge · task marked "Auto: sí" · 14:51</div></div>
+          <div class="ord"><div class="l1"><span class="ico-bad">✗</span>/flow-next → upen-web</div><div class="l2" style="margin-bottom:0">Rejected by you · 13:20</div></div>
+        </div>
+        <div class="card" style="background:var(--surface-2);font-size:12px"><b>Pause all room orders</b><br><span class="muted">Stops every order from this room at once. Nothing already sent is undone.</span><div style="margin-top:8px"><span class="act">Pause</span></div></div>
+      </div>
+    </aside>
+  </div></div>
+  <div class="notes">
+    <div><b>Tabla de miembros</b>Las mismas seis formas de estado y la mini línea de entrega que la lista; cada fila tiene su acción, igual que en For you.</div>
+    <div><b>Órdenes con aprobación</b>La orden propuesta (RP222, RP244) muestra clase de autoridad, motivo y miembro. Aprobar es un clic; "Why?" abre el mensaje de la sala que la originó.</div>
+    <div><b>Seguridad a la vista</b>Interruptor, tope diario y pausa de RP221 siempre visibles arriba de las órdenes, no escondidos en Ajustes.</div>
+    <div><b>Log</b>El registro append-only de RP221 como pestaña: cada orden con origen, hora, resultado y quién la aprobó.</div>
+  </div>
+
+  <div class="doc"><h3 id="p-palette-health">7.5 · Paleta de comandos y Health</h3></div>
+  <div class="canvas"><div style="display:flex;gap:20px;width:max-content;align-items:flex-start">
+    <div class="app" style="width:620px;height:430px">
+      <div style="position:absolute;inset:0;background:var(--bg)"></div><div class="scrim"></div>
+      <div class="pal">
+        <div class="in"><svg width="16" height="16"><use href="#i-search"/></svg><b>merge</b><span class="muted">|</span><span style="flex:1"></span><span class="kbd">Esc</span></div>
+        <div class="sec">Actions</div>
+        <div class="o on"><span class="st ready" style="margin:0"></span><span>Merge <b>upen-core #36</b> · squash</span><span class="d">Enter</span></div>
+        <div class="o"><span class="st fail" style="margin:0 1px"></span><span>Fix CI in <b>CROSS.BackofficeApi #241</b></span><span class="d"></span></div>
+        <div class="sec">Send to repo-panel session</div>
+        <div class="o"><span class="mono">/</span><span>/flow-ship <span class="d">deliver the current unit</span></span><span class="d"></span></div>
+        <div class="o"><span class="mono">/</span><span>/flow-base <span class="d">return to main, up to date</span></span><span class="d"></span></div>
+        <div class="sec">Go to</div>
+        <div class="o"><span class="mono">↗</span><span>Settings › Delivery › Merge method</span><span class="d">G ,</span></div>
+      </div>
+    </div>
+    <div class="app" style="width:560px;height:430px;padding:16px;background:var(--bg);display:grid;grid-template-columns:1fr 1fr;gap:12px;align-content:start">
+      <div class="card" style="grid-column:1/3;display:flex;align-items:center;gap:10px;border-color:var(--warn);background:var(--warn-soft)"><span class="st ask" style="margin:0 3px"></span><div style="flex:1;font-size:12px"><b>The server runs older code than the disk</b><br>RP233 changed server/pi.js. 1 session is working: restart when it's free.</div><span class="act">Restart when free</span></div>
+      <div class="card"><div style="font-weight:600;font-size:13px;margin-bottom:6px">This machine</div>
+        <div class="li"><span class="ico-ok">✓</span><span>git 2.51</span><span></span></div><div class="li"><span class="ico-ok">✓</span><span>gh · github.com</span><span></span></div><div class="li"><span class="ico-ok">✓</span><span>Gentle Shell 4.8.0</span><span class="muted">pi</span></div><div class="li"><span class="ico-ok">✓</span><span>Push · 2 devices</span><span></span></div></div>
+      <div class="card"><div style="font-weight:600;font-size:13px;margin-bottom:6px;display:flex;justify-content:space-between">Repos <span class="muted" style="font-weight:400">14 / 15 ok</span></div>
+        <div class="li"><span class="ico-bad">✗</span><span>pi-usage-audit<br><span class="muted">roadmap-header missing</span></span><span class="act">Fix</span></div><div class="li"><span class="ico-ok">✓</span><span>Room UPEN · 4 / 4</span><span></span></div></div>
+      <div class="card" style="grid-column:1/3"><div style="font-weight:600;font-size:13px;display:flex;justify-content:space-between">Server response time <span class="muted mono" style="font-weight:400">p95 · last hour</span></div>
+        <div class="spark"><i style="height:30%"></i><i style="height:42%"></i><i style="height:35%"></i><i style="height:80%"></i><i style="height:38%"></i><i style="height:33%"></i><i style="height:45%"></i><i style="height:40%"></i><i style="height:36%"></i><i style="height:62%"></i><i style="height:34%"></i><i style="height:31%"></i><i style="height:39%"></i><i style="height:44%"></i><i style="height:37%"></i><i style="height:33%"></i></div>
+        <div class="muted" style="font-size:11.5px;margin-top:4px">/api/rooms is the slowest route (p95 9.8 s): 10 git commands per read (RP230).</div></div>
+    </div>
+  </div></div>
+  <div class="notes">
+    <div><b>Ctrl K en todas partes</b>Mezcla acciones (con su repo), comandos para la sesión abierta y destinos. Lo que hace hoy un clic en una tarjeta, se hace sin mouse.</div>
+    <div><b>Health reúne los avisos</b>El banner rojo de hoy pasa a ser un ítem de Health con botón; "Restart when free" espera a que ninguna sesión trabaje (las sesiones viven en el proceso del panel).</div>
+  </div>
+</section>
+
+<section class="wide" id="movil">
+  <div class="doc"><h2>8 · Teléfono</h2>
+  <p>El teléfono es para <strong>decidir</strong>, no para revisar 230 archivos. Por eso la pantalla de inicio es For you, y la barra inferior no desaparece nunca fuera del chat.</p></div>
+  <div class="canvas"><div class="phones">
+    <div class="phone">
+      <div class="sb"><span>15:34</span><span>●●● ▮</span></div>
+      <div class="ph"><b>For you</b><span class="chip"><b>4</b></span><span style="flex:1"></span><div class="ring" style="--p:35;width:26px;height:26px"><i style="width:20px;height:20px;font-size:8.5px">35</i></div></div>
+      <div class="pc">
+        <div class="ghd">Decide now <span class="c">2</span></div>
+        <div class="it focus" style="grid-template-columns:12px 1fr;padding:10px"><span class="st ask"></span><div class="r">upen-chat</div><div class="q" style="font-size:12px">¿Borro las 3 ramas fusionadas?</div><div class="opts" style="grid-column:1/3"><span class="act p" style="flex:1;text-align:center;padding:8px">Delete all 3</span><span class="act" style="flex:1;text-align:center;padding:8px">Keep</span></div></div>
+        <div class="it" style="grid-template-columns:12px 1fr auto;padding:10px"><span class="st fail"></span><div class="r">BackofficeApi</div><span class="act bad" style="padding:6px 10px">Fix CI</span><div class="why">#241 · build failed</div></div>
+        <div class="ghd">Ready to ship <span class="c">2</span></div>
+        <div class="it" style="grid-template-columns:12px 1fr auto;padding:10px"><span class="st ready"></span><div class="r">upen-core</div><span class="act ok" style="padding:6px 10px">Merge</span><div class="why">#36 · 7 checks green</div></div>
+      </div>
+      <div class="nav"><div class="on"><svg><use href="#i-inbox"/></svg>For you<span class="bd">4</span></div><div><svg><use href="#i-repos"/></svg>Repos</div><div><svg><use href="#i-room"/></svg>Rooms</div><div><svg><use href="#i-more"/></svg>More</div></div>
+    </div>
+    <div class="phone">
+      <div class="sb"><span>15:34</span><span>●●● ▮</span></div>
+      <div class="ph"><svg width="20" height="20"><use href="#i-back"/></svg><div style="flex:1"><b>repo-panel</b><div class="mp" style="margin-top:4px"><i class="d"></i><i class="a"></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div><svg width="20" height="20"><use href="#i-panel"/></svg><svg width="20" height="20"><use href="#i-more"/></svg></div>
+      <div class="pc">
+        <div class="msg"><div class="who">agent · 15:31</div><div class="bd" style="font-size:12px">Tomo <b>RP234</b>. Empiezo por las pruebas.</div></div>
+        <div class="tools"><div class="th"><span class="run" style="color:var(--accent)">●</span>6 tools · bash running</div></div>
+        <div style="flex:1"></div>
+        <div class="subs" style="margin:0;border-radius:10px;border-bottom:1px solid var(--line)"><div class="h"><span class="st work" style="margin:0"></span><b style="color:var(--fg)">2 subagents</b><span style="margin-left:auto" class="mono">1:12</span></div></div>
+      </div>
+      <div class="comp" style="margin:0 8px 10px">
+        <div class="queue"><span class="qi">Queued · 1</span></div>
+        <div class="ta" style="min-height:34px">Message…</div>
+        <div class="cbar"><div class="ib"><svg><use href="#i-clip"/></svg></div><span class="sp"></span><div class="mode"><span class="on">Steer</span><span>Queue</span></div><div class="stop"><i></i></div><div class="send"><svg width="16" height="16"><use href="#i-up"/></svg></div></div>
+      </div>
+    </div>
+    <div class="phone">
+      <div class="sb"><span>15:34</span><span>●●● ▮</span></div>
+      <div class="ph"><svg width="20" height="20"><use href="#i-back"/></svg><b style="flex:1">repo-panel</b></div>
+      <div class="pc" style="opacity:.35"><div class="msg"><div class="bd">…</div></div></div>
+      <div class="sheet">
+        <div class="grab"></div>
+        <div class="tabs" style="height:38px"><span class="tab on" style="padding:8px 6px">Task</span><span class="tab" style="padding:8px 6px">Review</span><span class="tab" style="padding:8px 6px">PR &amp; CI</span><span class="tab" style="padding:8px 6px">Files</span><span class="tab" style="padding:8px 6px">Notes</span></div>
+        <div class="ib2"><div class="card"><div class="k">In progress · RP234</div><b style="font-size:13px">Reemplazar la guarda de 45 s</b><dl class="kv" style="margin-top:8px"><dt>You'll see</dt><dd>/flow-ship refused with the reason</dd><dt>Depends</dt><dd class="mono">RP232 ✓</dd></dl></div>
+        <div style="font-size:12px;display:flex;justify-content:space-between"><b>Roadmap</b><span class="muted mono">247 / 273</span></div><div class="prog"><i style="width:90%;background:var(--ok)"></i></div></div>
+      </div>
+    </div>
+  </div></div>
+  <div class="notes">
+    <div><b>Inicio en For you</b>Cada ítem con botones de 44 px de alto; las opciones de una pregunta ocupan todo el ancho.</div>
+    <div><b>Chat a pantalla completa</b>La línea de entrega en miniatura bajo el nombre; la bandeja de subagentes plegada en una línea; el compositor con los mismos modos.</div>
+    <div><b>Inspector como hoja</b>El botón de panel abre una hoja que se arrastra (62 % o pantalla completa) con las mismas pestañas. Se cierra deslizando hacia abajo o con Atrás.</div>
+    <div><b>More</b>Activity, Health y Settings, más los anillos de consumo grandes.</div>
+  </div>
+</section>
+
+<section class="wide" id="componentes">
+  <div class="doc"><h2>9 · Componentes</h2>
+  <p>Una sola familia de piezas para toda la app. Hoy cada pantalla tiene su versión de chip, menú y confirmación; esta es la lista cerrada.</p></div>
+  <div class="canvas"><div class="comps">
+    <div class="card"><h6>Estado de repo</h6><div class="pills"><span class="pill"><span class="st ask"></span>Needs you</span><span class="pill"><span class="st fail"></span>Failing</span><span class="pill"><span class="st ready"></span>Ready</span><span class="pill"><span class="st work"></span>Working</span><span class="pill"><span class="st idle"></span>Idle</span><span class="pill"><span class="st room"></span>Room</span></div></div>
+    <div class="card"><h6>Botones</h6><div class="pills"><span class="act p">Primary</span><span class="act">Secondary</span><span class="act ok">Merge</span><span class="act bad">Fix CI</span><span class="act warn">Answer</span><span class="act gh">Ghost</span></div><div class="muted" style="font-size:12px;margin-top:8px">Apagado: el botón dice el motivo debajo, nunca solo en un tooltip. "Merge #36 · waiting for 2 checks".</div></div>
+    <div class="card"><h6>Línea de entrega</h6><div class="pipe" style="margin:0;padding:0"><div class="stp d"><span class="dot">✓</span></div><span class="bar d"></span><div class="stp d"><span class="dot">✓</span></div><span class="bar d"></span><div class="stp d"><span class="dot">✓</span></div><span class="bar d"></span><div class="stp d"><span class="dot">✓</span></div><span class="bar d"></span><div class="stp f"><span class="dot">!</span>CI</div><span class="bar"></span><div class="stp"><span class="dot"></span></div><span class="bar"></span><div class="stp"><span class="dot"></span></div></div><div class="mp" style="margin-top:12px"><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="f"></i><i></i><i></i><i></i></div><div class="muted" style="font-size:12px;margin-top:6px">Completa (cabecera) y mini (filas). Siete pasos visibles; "Decidir" es un estado, no un paso.</div></div>
+    <div class="ask"><div class="h"><span class="st ask" style="margin:0"></span>The agent asks you · select</div><div class="b">Las ramas viejas ya están fusionadas. ¿Las borro?</div><div class="f"><span class="act p">1 · Delete all 3</span><span class="act">2 · Keep</span><span class="act gh">Cancel</span></div></div>
+    <div class="modal"><b>Merge #36 into develop?</b><div class="muted" style="font-size:12.5px;margin-top:6px">Squash · the repo deletes the branch on its own. After merging, /flow-base goes to the upen-core session.</div><div class="f"><span class="act gh">Cancel</span><span class="act ok">Merge</span></div></div>
+    <div class="stack"><div class="toast"><span class="ico-ok" style="color:var(--ok)">✓</span>Merged #36 · /flow-base sent<span class="u">Undo send</span></div><div class="toast"><span style="color:var(--bad)">✗</span>/flow-ship refused: 2 background jobs<span class="u">Details</span></div></div>
+    <div class="card"><h6>Fila de subagente</h6><div class="subs" style="margin:0;border-radius:8px;border-bottom:1px solid var(--line)"><div class="s" style="border-top:0"><span class="st work"></span><span>gentle-ai-explore</span><span class="k">grep · step 7</span><span class="k">1:12</span></div></div></div>
+    <div class="card"><h6>Herramienta</h6><div class="tools"><div class="tl" style="border-top:0"><span class="ok">✓</span><span>edit</span><span class="a">server/pi.js · +24 −9</span><span>0.2s</span></div><div class="tl"><span style="color:var(--bad)">✗</span><span>bash</span><span class="a">npm test · exit 1</span><span>8s</span></div></div></div>
+    <div class="card"><h6>Medidores</h6><div style="display:flex;gap:14px;align-items:center"><div class="ring" style="--p:35"><i>35</i></div><div class="ring" style="--p:61"><i>61</i></div><span class="chip">ctx <b>42%</b></span><span class="chip"><b>$1.84</b></span></div><div class="muted" style="font-size:12px;margin-top:8px">Anillo ámbar a 70 %, rojo a 90 %, con el número adentro.</div></div>
+    <div class="card"><h6>Selección múltiple</h6><div style="font-size:12px;display:grid;gap:6px"><div><span class="cb on"></span> feat/rp236 <span class="gtag m">merged</span></div><div><span class="cb"></span> fix/ci-crlf <span class="gtag u">unpushed</span></div><div><span class="cb no"></span> main <span class="gtag l">base</span> <span class="muted">· can't</span></div></div><div class="muted" style="font-size:11.5px;margin-top:6px">Sin casilla cuando no se puede, con el porqué en la fila. Shift-clic marca un rango.</div></div>
+    <div class="modal"><b>Delete fix/ci-crlf?</b><div class="muted" style="font-size:12.5px;margin-top:6px">It has 3 commits nobody else has. They will be lost. Type the branch name to confirm.</div><div class="search" style="margin-top:8px"><span class="mono">fix/ci-crl|</span></div><div class="f"><span class="act gh">Cancel</span><span class="act bad" style="opacity:.5">Delete</span></div></div>
+  </div></div>
+</section>
+
+<section class="doc" id="detalles">
+  <h2>10 · Los detalles que hacen la diferencia</h2>
+  <h3>Tipografía y espacio</h3>
+  <ul class="clean">
+    <li>Una sans de interfaz (Geist o la del sistema) a 13 px de base y una mono para ramas, IDs, rutas y números. Escala cerrada: 11 · 12 · 13 · 15 · 17 · 22.</li>
+    <li>Cuadrícula de 4 px. Filas de lista de 60 px en densidad cómoda, 44 px en compacta.</li>
+    <li>Números con <code>tabular-nums</code> para que relojes y contadores no bailen.</li>
+  </ul>
+  <h3>Color</h3>
+  <ul class="clean">
+    <li>Azul Kletus como acento (el de ".dev" del logo) solo para foco, selección y la acción primaria.</li>
+    <li>Ámbar, rojo y verde reservados para estado; violeta solo para salas. Nunca color decorativo.</li>
+    <li>Tema oscuro y claro definidos como tokens, con "System" por defecto.</li>
+  </ul>
+  <h3>Movimiento</h3>
+  <ul class="clean">
+    <li>Solo tres animaciones: el anillo que late de Working, la entrada de un ítem nuevo en For you y la hoja del teléfono. Todo se apaga con <code>prefers-reduced-motion</code>.</li>
+    <li>Los repintados no mueven el scroll ni roban el foco (lo que ya cuidan RP181–RP183, sin parches por pantalla).</li>
+  </ul>
+  <h3>Teclado</h3>
+  <div class="tbl"><table style="min-width:0">
+    <thead><tr><th>Tecla</th><th>Hace</th></tr></thead>
+    <tbody>
+      <tr><td><span class="kbd">Ctrl K</span></td><td>Paleta de comandos</td></tr>
+      <tr><td><span class="kbd">G</span> + <span class="kbd">I R M A H ,</span></td><td>Ir a For you, Repos, Rooms, Activity, Health, Settings</td></tr>
+      <tr><td><span class="kbd">J</span> <span class="kbd">K</span></td><td>Siguiente o anterior en la lista o la bandeja</td></tr>
+      <tr><td><span class="kbd">Enter</span></td><td>Acción principal del ítem</td></tr>
+      <tr><td><span class="kbd">/</span></td><td>Filtrar · en el compositor, comandos de pi</td></tr>
+      <tr><td><span class="kbd">C</span></td><td>Foco en el compositor</td></tr>
+      <tr><td><span class="kbd">1</span>–<span class="kbd">6</span></td><td>Pestañas del inspector · opciones de una pregunta</td></tr>
+      <tr><td><span class="kbd">Ctrl .</span></td><td>Stop</td></tr>
+      <tr><td><span class="kbd">?</span></td><td>Hoja de atajos</td></tr>
+    </tbody>
+  </table></div>
+  <h3>Accesibilidad</h3>
+  <ul class="clean">
+    <li>Cada fila es un enlace (al repo) con su acción como botón hermano, no anidado.</li>
+    <li>Pestañas y menús con flechas, Home y End, en todos lados.</li>
+    <li>La región en vivo del chat anuncia el fin de un turno y las preguntas, no cada segundo del reloj.</li>
+    <li>Contraste AA en los dos temas; los estados se distinguen por forma además de color.</li>
+  </ul>
+  <h3>Texto</h3>
+  <ul class="clean">
+    <li>Interfaz toda en inglés (decidido el 18 nov 2026), sin palabras sueltas en español: el servidor traduce los estados del roadmap (<code>En revisión</code> → In review) y <code>.panel/notas.md</code> se muestra como Notes.</li>
+    <li>Un nombre por cosa: Repos (no Sessions ni Summary), Health (no Conformity), Inspector (no column).</li>
+    <li>Los errores dicen qué pasó y qué hacer: "/flow-ship refused: 2 background jobs are running. It will be possible when they finish (about 1 min)."</li>
+  </ul>
+</section>
+
+<section class="doc" id="etapas">
+  <h2>11 · Cómo llevarlo a la app, por etapas</h2>
+  <p>Un rediseño completo no entra en una unidad de 450 líneas. Lo parto en etapas que se pueden usar apenas se fusionan. Y hay una decisión de orden importante: <strong>conviene terminar primero la serie del motor RP234–RP240</strong>, sobre todo RP235 (el vocabulario propio entre servidor y página), porque la nueva interfaz tiene que leer ese vocabulario y no los nombres de pi. Si rediseñamos antes, rehacemos el trabajo.</p>
+  <div class="stages">
+    <div class="stage"><div class="e">E0</div><div><h4>Cimientos</h4><p>Tokens de color y tipo con tema claro, componentes base (botón, estado, chip, menú, modal propio en vez de <code>confirm()</code>, toast), partir <code>resumen.js</code> por pantalla, sacar el tablero Work (pasando asignar a sala, quitar repo y posponer al menú de la fila).</p></div></div>
+    <div class="stage"><div class="e">E1</div><div><h4>Riel, lista y línea de entrega</h4><p>El riel con sus destinos, la lista de filas compactas agrupadas por estado, el modelo de seis estados, la línea de entrega en la cabecera y en las filas, el inspector con la pestaña Task.</p></div></div>
+    <div class="stage"><div class="e">E2</div><div><h4>For you</h4><p>La bandeja con preguntas contestables, posponer y "recently resolved". Necesita que el servidor guarde los eventos resueltos (hoy el notificador no deja registro).</p></div></div>
+    <div class="stage"><div class="e">E3</div><div><h4>Sesión</h4><p>Compositor con steer y cola (RP236), imágenes (RP215, RP215b, RP240), herramientas agrupadas, bandeja de subagentes (RP241, RP242), costo y contexto (RP239), autocompletado de comandos.</p></div></div>
+    <div class="stage"><div class="e">E4</div><div><h4>Review y PR &amp; CI</h4><p>Comentarios en el diff que viajan a la sesión, "Approve &amp; /flow-ship", log del check fallido, Fix CI, Merge con confirmación y método real (RP227).</p></div></div>
+    <div class="stage"><div class="e">E5</div><div><h4>Rooms</h4><p>Hito, tabla de miembros, órdenes con aprobación, log, pausa y tope. Va junto con RP221–RP225, RP229 y RP244, que tienen verificación independiente por riesgo alto.</p></div></div>
+    <div class="stage"><div class="e">E6</div><div><h4>Ctrl K, Activity, Health y teléfono</h4><p>Paleta de comandos, línea de tiempo con copia para standup, Health con Restart y tiempos, ajuste fino de la versión de teléfono, hoja de atajos.</p></div></div>
+    <div class="stage"><div class="e">E7</div><div><h4>Ramas, stashes, worktrees y sesiones</h4><p>La sexta pestaña del inspector, Git (ramas, stashes y worktrees: ver y quitar), borrar ramas con guardas, el selector de sesión de la cabecera con "Switch to" y una papelera que se puede deshacer, y "Clean up" después del merge en PR &amp; CI. Va después de E1, E3 y E4, porque se apoya en el inspector, la cabecera de la sesión y la pestaña PR &amp; CI. Detalle en la <a href="#limpieza">sección 12</a>.</p></div></div>
+    <div class="stage"><div class="e">E8</div><div><h4>Housekeeping en Health</h4><p>Tres tarjetas nuevas dentro de la grilla de Health (de E6): cuánto pesan las sesiones de cada repo, procesos pi huérfanos con "End process", y la que suma ramas, stashes y worktrees de todos los repos. Crear worktrees queda <strong>fuera del plan</strong> por ahora (decidido el 18 nov 2026).</p></div></div>
+  </div>
+  <p>En el roadmap, las filas de la etapa E<i>n</i> se llaman <code>UI<i>n</i><i>letra</i></code> (por ejemplo E1 → UI1a, UI1b…), y su ficha es <code>odd/tasks/interfaz.md</code>. Esta página vive en el repo como <code>docs/DISENO-interfaz.html</code>, y cada fila enlaza la maqueta que la define.</p>
+  <p>Cada etapa son varias filas del roadmap de menos de 450 líneas, y cada pantalla nueva la aprobás mirándola, como dice la regla. Las maquetas de esta página sirven de referencia para esa aprobación.</p>
+</section>
+
+<section class="wide" id="limpieza">
+  <div class="doc"><h2>12 · Ramas, worktrees y sesiones</h2>
+  <p>Con muchas tareas por día se acumula basura: ramas de PR ya fusionados, sesiones de pi de 25 MB que nadie va a reabrir, stashes olvidados que hacen fallar la puerta de "árbol limpio". Hoy eso se limpia a mano en la terminal. La propuesta es una pestaña <strong>Git</strong> en el inspector de cada repo, una lista de <strong>Sessions</strong>, y una tarjeta <strong>Housekeeping</strong> en Health que suma todo, de todos los repos.</p>
+  <h3 id="p-where">12.0 · Dónde vive cada cosa (sin mover nada de lo aprobado)</h3>
+  <p>Nada de esto agrega un destino al riel ni cambia las tres columnas de Repos. Cada pieza entra en un lugar que ya existe:</p>
+  <div class="tbl"><table style="min-width:0">
+    <thead><tr><th>Pieza</th><th>Dónde va</th><th>Qué cambia de lo aprobado</th></tr></thead>
+    <tbody>
+      <tr><td>Ramas, stashes, worktrees</td><td>Pestaña <b>Git</b> del inspector, la sexta, después de Notes. "Manage branches…" abre una hoja sobre la columna de la sesión; <span class="kbd">Esc</span> la cierra y la sesión sigue corriendo atrás.</td><td>Una pestaña más; los atajos pasan de <span class="kbd">1</span>–<span class="kbd">5</span> a <span class="kbd">1</span>–<span class="kbd">6</span>. Ruta nueva <code>#/repo/&lt;id&gt;/git</code>.</td></tr>
+      <tr><td>Sesiones: lista, Switch to, papelera</td><td>El <b>selector de sesión</b> en la cabecera de la sesión (el nombre de la sesión con ▾). Es la misma pieza que la propuesta "Historial de sesiones con búsqueda" de la sección 3: se juntan.</td><td>Nada: esa pieza ya estaba propuesta; ahora suma tamaño, Switch to y papelera.</td></tr>
+      <tr><td>Clean up después del merge</td><td>Pestaña <b>PR &amp; CI</b> una vez fusionado el PR, y el toast del merge ("Merged #36 · Clean up").</td><td>Un botón más en lugares que ya existen.</td></tr>
+      <tr><td>Peso de sesiones, procesos huérfanos, resumen de limpieza</td><td>Tres tarjetas nuevas dentro de la grilla de <b>Health</b> (sección 7.5).</td><td>Health suma tarjetas; no cambia su forma.</td></tr>
+      <tr><td>Teléfono</td><td>Solo Clean up (un botón, desde For you o PR &amp; CI) y leer Health. Borrar en lote, solo en la compu.</td><td>Nada: el teléfono sigue siendo para decidir.</td></tr>
+    </tbody>
+  </table></div>
+  <p><strong>Lo que ya hay:</strong> el servidor ya lee las ramas locales y su seguimiento (<code>for-each-ref</code> en <code>server/local.js</code> y <code>server/roadmap.js</code>, con detección de ramas <code>[gone]</code>), ya lista las sesiones de cada carpeta (<code>listSessions</code> en <code>server/sessions.js</code>, solo las 20 últimas) y el fetcher ya entiende worktrees (agrupa por el git dir común). O sea: <strong>leer es barato; lo que cuesta es borrar sin romper nada.</strong></p></div>
+
+  <div class="canvas"><div class="app roomv">
+    <nav class="rail"><div class="logo">K<span>.</span></div><div class="ri"><svg><use href="#i-inbox"/></svg><span class="bd">4</span></div><div class="ri on"><svg><use href="#i-repos"/></svg></div><div class="ri"><svg><use href="#i-room"/></svg></div><div class="ri"><svg><use href="#i-act"/></svg></div><div class="ri"><svg><use href="#i-health"/></svg></div><div class="sp"></div></nav>
+    <div class="rmain">
+      <div class="rhead"><h5>Branches</h5><span class="chip">repo-panel · main up to date</span><span style="flex:1"></span><span class="muted" style="font-size:12px">The session keeps running behind this sheet</span><span class="kbd">Esc</span></div>
+      <div style="padding:14px 20px;overflow:hidden">
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;font-size:12px"><span class="act p">Select merged (9)</span><span class="act">Select unused &gt; 30 days (3)</span><span style="flex:1"></span><span class="muted">10 selected</span><span class="act bad">Delete 10 branches…</span></div>
+        <table class="mtab">
+          <thead><tr><th></th><th>Branch</th><th>State</th><th>Why</th><th>Last commit</th><th></th></tr></thead>
+          <tbody>
+            <tr><td><span class="cb no"></span></td><td>main</td><td><span class="gtag l">base</span></td><td class="muted">base branch · never deleted</td><td class="muted">2 h ago</td><td></td></tr>
+            <tr><td><span class="cb no"></span></td><td>feat/rp237-question-buttons</td><td><span class="gtag l">checked out</span></td><td class="muted">in worktree ../repo-panel-worktrees/rp237</td><td class="muted">12 min ago</td><td></td></tr>
+            <tr><td><span class="cb on"></span></td><td>feat/rp236-steer-queue</td><td><span class="gtag m">merged</span></td><td class="muted">PR #295 merged (squash) · remote gone</td><td class="muted">3 h ago</td><td><span class="act gh">PR ↗</span></td></tr>
+            <tr><td><span class="cb on"></span></td><td>feat/rp235-vocabulary</td><td><span class="gtag m">merged</span></td><td class="muted">PR #294 merged (squash) · remote gone</td><td class="muted">5 h ago</td><td><span class="act gh">PR ↗</span></td></tr>
+            <tr><td><span class="cb on"></span></td><td>spike/old-board</td><td><span class="gtag g">unused</span></td><td class="muted">no remote · no PR · 41 days</td><td class="muted">Oct 8</td><td><span class="act gh">Log</span></td></tr>
+            <tr><td><span class="cb"></span></td><td>fix/ci-crlf</td><td><span class="gtag u">unpushed</span></td><td class="muted">3 commits nobody else has</td><td class="muted">Nov 2</td><td><span class="act gh">Log</span></td></tr>
+            <tr><td><span class="cb no"></span></td><td>feat/rp234-refuse-busy</td><td><span class="gtag l">open PR</span></td><td class="muted">PR #296 open · CI running</td><td class="muted">20 min ago</td><td><span class="act gh">PR ↗</span></td></tr>
+          </tbody>
+        </table>
+        <div class="card" style="margin-top:14px;font-size:12px;background:var(--surface-2)"><b>Why "merged" is not what git says.</b> This repo merges with squash, so <span class="mono">git branch --merged</span> never lists these branches. The panel counts a branch as merged when its PR on GitHub is merged <i>and</i> its tip is that PR's head. Only then it uses <span class="mono">git branch -D</span>.</div>
+      </div>
+    </div>
+    <aside class="insp">
+      <div class="tabs"><span class="tab">Task</span><span class="tab">Review</span><span class="tab">PR &amp; CI</span><span class="tab">Files</span><span class="tab">Notes</span><span class="tab on">Git <span class="n">3</span></span></div>
+      <div class="ib2">
+        <div class="card"><div class="k">Worktrees</div>
+          <div class="li"><span class="ico-ok">●</span><span>repo-panel <span class="muted">· main</span><br><span class="muted mono">main checkout</span></span><span></span></div>
+          <div class="li"><span class="ico-run">◌</span><span>rp237 <span class="muted">· feat/rp237…</span><br><span class="muted">session working · 2 changed files</span></span><span class="act gh">Open</span></div>
+          <div class="li"><span class="muted">○</span><span>rp229 <span class="muted">· branch merged</span><br><span class="muted">clean · no session</span></span><span class="act">Remove</span></div>
+          <div style="margin-top:8px;display:flex;gap:6px"><span class="act">Prune missing (1)</span></div></div>
+        <div class="card"><div class="k">Stashes</div>
+          <div class="li"><span class="muted">≡</span><span>stash@{0} <span class="muted">· on feat/rp233</span><br><span class="muted">2 files · Nov 14</span></span><span><span class="act gh">Show</span><span class="act">Drop</span></span></div></div>
+        <div class="card"><div class="k">Branches · 14</div>
+          <div class="li"><span class="gtag m" style="padding:0 4px">9</span><span>merged, safe to delete</span><span></span></div>
+          <div class="li"><span class="gtag g" style="padding:0 4px">3</span><span>unused for 30+ days</span><span></span></div>
+          <div class="li"><span class="gtag u" style="padding:0 4px">1</span><span>with unpushed commits</span><span></span></div>
+          <div style="margin-top:8px"><span class="act p">Manage branches…</span></div></div>
+      </div>
+    </aside>
+  </div></div>
+  <div class="notes">
+    <div><b>Las casillas dicen qué se puede</b>Una rama base, una rama abierta en otro worktree o con PR abierto no tiene casilla: no se puede borrar, y la columna Why dice por qué. Nunca un botón que falla después.</div>
+    <div><b>Selecciones de un clic</b>"Select merged" y "Select unused" marcan solo lo seguro. Las ramas con commits sin pushear nunca se marcan solas; para borrarlas hay que escribir el nombre de la rama en el diálogo.</div>
+    <div><b>Hoja, no pantalla nueva</b>La tabla de ramas es una hoja que tapa la columna de la sesión mientras la usás. La lista de repos y el inspector quedan donde estaban.</div>
+    <div><b>Cambiar de sesión en un paso</b>Hoy se puede, pero en dos pasos: "Close session" (RP98) y después elegir otra de la lista, porque el servidor rechaza adoptar con una sesión viva (409, RP99). "Switch to" hace las dos cosas: cierra la actual (si está trabajando, pregunta primero, porque cerrar la detiene) y abre la elegida con su historial.</div>
+    <div><b>Sesiones a la papelera, no al vacío</b>Las sesiones son archivos de Gentle Shell. El panel las mueve a una carpeta de papelera propia, con "Undo" y vaciado automático a los 30 días. La sesión adoptada o la que está trabajando no tienen casilla.</div>
+    <div><b>Housekeeping en Health</b>Una tarjeta suma todos los repos ("23 merged branches in 9 repos · 41 old sessions, 380 MB · 2 forgotten stashes") con un botón que abre cada lista ya filtrada.</div>
+  </div>
+
+  <div class="doc"><h3 id="p-session-picker">Selector de sesión (cabecera de la sesión)</h3></div>
+  <div class="canvas"><div class="app" style="width:460px;padding:0;background:var(--bg)">
+    <div class="rhead" style="padding:10px 14px"><b style="font-size:14px">repo-panel</b><span class="chip mono">panel-repo-panel-5f78 ▾</span><span style="flex:1"></span></div>
+    <div style="margin:8px 14px 14px;border:1px solid var(--line-2);border-radius:8px;background:var(--surface);padding:10px;box-shadow:var(--shadow)">
+      <div class="search" style="margin-bottom:8px"><svg width="13" height="13"><use href="#i-search"/></svg>Search past sessions</div>
+      <div class="li"><span class="ico-ok">●</span><span>panel-repo-panel-5f78 <span class="muted">· current · 31 MB</span><br><span class="muted">free · last message 4 min ago</span></span><span class="act">Close</span></div>
+      <div class="li"><span class="cb on"></span><span>rp231 run <span class="muted">· 24 MB</span><br><span class="muted">"/flow-next RP231" · 6 h ago</span></span><span class="act">Switch to</span></div>
+      <div class="li"><span class="cb on"></span><span>rp232 probe <span class="muted">· 3 MB</span><br><span class="muted">"This is a test of…" · 9 h ago</span></span><span class="act">Switch to</span></div>
+      <div class="li"><span class="cb"></span><span>rp229 rooms <span class="muted">· 18 MB</span><br><span class="muted">"/flow-next RP229" · Nov 12</span></span><span class="act">Switch to</span></div>
+      <div style="margin-top:8px;display:flex;gap:6px;align-items:center"><span class="act">Older than 14 days (31)</span><span style="flex:1"></span><span class="act warn">Move 2 to trash</span></div>
+      <div class="muted" style="font-size:11px;margin-top:6px">38 sessions · 412 MB · Trash keeps them 30 days</div>
+    </div>
+  </div></div>
+
+  <div class="doc"><h3>12.1 · ¿Es factible? Mi evaluación, idea por idea</h3>
+  <div class="risk">
+    <div class="card"><div class="verdict y">Sí · esfuerzo bajo a medio</div><h4>Ramas locales: ver y borrar</h4><p>Leer ya está. La trampa es el <strong>squash</strong>: git no ve esas ramas como fusionadas, así que <code>git branch -d</code> se niega y la tentación es usar <code>-D</code> a ciegas. La regla: <code>-D</code> solo con evidencia (PR fusionado en GitHub y la punta de la rama igual a la cabeza de ese PR). Nunca la rama base, la actual, una rama abierta en un worktree ni una con PR abierto. Ramas remotas: <strong>no</strong> se borran desde acá (es publicar; ya lo hace el merge con "delete branch").</p></div>
+    <div class="card"><div class="verdict y">Sí · esfuerzo medio</div><h4>Sesiones: ver y eliminar</h4><p>La lista ya existe (hoy corta en 20). Falta tamaño, fecha, primer mensaje y paginación. Borrar es tocar archivos de otra herramienta: por eso papelera y no borrado duro, nunca la sesión adoptada ni una viva en el host RPC, y la ruta validada contra la carpeta de sesiones (un <code>id</code> con <code>..</code> no puede salir de ahí). Lleva verificación independiente: es borrado de datos.</p></div>
+    <div class="card"><div class="verdict y">Sí, solo ver y quitar · esfuerzo bajo</div><h4>Worktrees</h4><p><code>git worktree list --porcelain</code> para ver, <code>git worktree remove</code> para quitar (git se niega si tiene cambios: el panel no fuerza nunca) y <code>prune</code> para los que ya no existen en disco. Sirve también para los worktrees que crean otras herramientas, como Claude Code. <strong>Crear</strong> worktrees queda fuera del plan: choca con <code>/flow-base</code> (git no deja hacer checkout de <code>main</code> en un worktree mientras está abierta en otro) y con el modelo de una sesión por repo.</p></div>
+    <div class="card"><div class="verdict y">Sí · esfuerzo bajo</div><h4>Cambiar de sesión</h4><p>Ya existen las piezas: <code>/api/rpc/close</code> cierra y suelta la sesión, <code>/api/sessions/adopt</code> adopta otra de la lista y <code>rpc/start</code> la arranca con su <code>--session-id</code>. Falta juntarlas en un "Switch to" que haga las tres en orden, en el servidor, y que no deje el repo sin sesión si la elegida no arranca.</p></div>
+  </div>
+  <p><strong>Plan decidido (18 nov 2026):</strong> E7 completa (ramas, stashes, worktrees ver y quitar, cambiar de sesión, papelera de sesiones, Clean up) después de E1, que es la etapa que dibuja el inspector. E8 suma Housekeeping en Health. Crear worktrees, para más adelante.</p></div>
+
+  <div class="doc"><h3>12.2 · Agregados (aprobados)</h3>
+  <ul>
+    <li><strong>Stashes</strong> (ya en la maqueta): ver, mostrar el diff y descartar. Un stash olvidado hoy bloquea la puerta "árbol limpio y sin stash", y no se ve en ningún lado del panel. Descartar pide confirmación con el nombre del stash: no se puede deshacer.</li>
+    <li><strong>"Clean up" después del merge:</strong> cuando un PR se fusiona, la fila ofrece en un clic borrar la rama local, quitar su worktree si está limpio y mandar sus sesiones a la papelera. El diálogo muestra la lista de lo que va a hacer antes de hacerlo.</li>
+    <li><strong>Cuánto pesan las sesiones</strong> de cada repo, en Health: total por repo, la más grande y cuántas pasan de 14 días, con un botón que abre la lista ya filtrada.</li>
+    <li><strong>Procesos pi huérfanos</strong> en Health: procesos <code>--mode rpc</code> con un id de sesión del panel (<code>panel-…</code> o <code>sala-…</code>) que el host RPC no conoce (por ejemplo, de un panel que se cayó). "End process" corta solo esos y su árbol; nunca un pi que abriste vos en una terminal.</li>
+  </ul></div>
+
+  <div class="canvas"><div class="app" style="width:560px;padding:16px;background:var(--bg);display:grid;grid-template-columns:1fr 1fr;gap:12px;align-content:start">
+    <div class="card" style="grid-column:1/3"><div style="font-weight:600;font-size:13px;margin-bottom:6px;display:flex;justify-content:space-between">Housekeeping <span class="muted" style="font-weight:400">all repos</span></div>
+      <div class="li"><span class="muted">⑂</span><span>23 merged branches in 9 repos</span><span class="act">Review</span></div>
+      <div class="li"><span class="muted">≡</span><span>2 forgotten stashes <span class="muted">· repo-panel, upen-erp</span></span><span class="act">Review</span></div>
+      <div class="li"><span class="muted">▢</span><span>1 worktree missing on disk</span><span class="act">Prune</span></div></div>
+    <div class="card"><div style="font-weight:600;font-size:13px;margin-bottom:6px">Session storage <span class="muted mono" style="font-weight:400">1.2 GB</span></div>
+      <div class="li"><span></span><span>repo-panel<br><span class="muted">38 · largest 31 MB</span></span><span class="mono">412 MB</span></div>
+      <div class="li"><span></span><span>upen-erp<br><span class="muted">22 · 17 older than 14 d</span></span><span class="mono">298 MB</span></div>
+      <div class="li"><span></span><span>room UPEN<br><span class="muted">9</span></span><span class="mono">104 MB</span></div></div>
+    <div class="card" style="border-color:var(--warn)"><div style="font-weight:600;font-size:13px;margin-bottom:6px">Orphan pi processes</div>
+      <div class="li"><span class="ico-bad">!</span><span>panel-upen-web-1c2d<br><span class="muted">PID 18432 · 3 h · not in this panel</span></span><span class="act bad">End</span></div>
+      <div class="muted" style="font-size:11px;margin-top:6px">Only panel-started sessions are listed. A pi you opened in a terminal never shows here.</div></div>
+  </div></div>
+
+  <div class="doc"><h3 id="p-rows">12.3 · Filas propuestas para el roadmap</h3>
+  <table class="mtab" style="margin-top:8px">
+    <thead><tr><th>Fila</th><th>Entrega</th><th>Depende de</th><th>Riesgo</th></tr></thead>
+    <tbody>
+      <tr><td>UI7a</td><td>Lista de ramas con su estado y su porqué (servidor, solo lectura) + pestaña Git</td><td>E1</td><td>Bajo</td></tr>
+      <tr><td>UI7b</td><td>Borrar ramas seleccionadas con las guardas (squash, worktree, PR abierto, sin pushear)</td><td>UI7a</td><td>Alto · verificación independiente</td></tr>
+      <tr><td>UI7c</td><td>Stashes: ver, diff, descartar</td><td>UI7a</td><td>Medio</td></tr>
+      <tr><td>UI7d</td><td>Worktrees: ver, quitar los limpios y prune</td><td>UI7a</td><td>Medio</td></tr>
+      <tr><td>UI7e</td><td>Selector de sesión con tamaño, fecha, primer mensaje, búsqueda y paginación</td><td>E3</td><td>Bajo</td></tr>
+      <tr><td>UI7f</td><td>"Switch to": cerrar la actual y abrir otra de la lista en un paso</td><td>UI7e · RP238</td><td>Medio · concurrencia</td></tr>
+      <tr><td>UI7g</td><td>Sesiones a la papelera, Undo y vaciado a 30 días</td><td>UI7e</td><td>Alto · verificación independiente</td></tr>
+      <tr><td>UI7h</td><td>"Clean up" después del merge, en PR &amp; CI y en el toast del merge</td><td>UI7b, UI7d, UI7g, E4</td><td>Medio</td></tr>
+      <tr><td>UI8a</td><td>Housekeeping en Health y peso de las sesiones por repo</td><td>UI7c, UI7e, E6</td><td>Bajo</td></tr>
+      <tr><td>UI8b</td><td>Procesos pi huérfanos y "End process"</td><td>E6</td><td>Alto · verificación independiente</td></tr>
+    </tbody>
+  </table>
+  <p class="muted" style="font-size:13px">Cada fila va estimada bajo 450 líneas de código. Las de borrado llevan una prueba que reproduzca el abuso (un id de sesión con <code>..</code>, una rama abierta en otro worktree, una rama squash cuya punta no es la del PR).</p></div>
+</section>
+</div>
+</body>
+</html>
