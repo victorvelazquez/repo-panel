@@ -41,8 +41,8 @@ Orden de la tabla (el de `siguiente`), primero lo que más rinde en el día a d�
 - [ ] **T9. RP239** — Detener corta también un reintento, y costo y tokens junto al contexto.
 - [ ] **T10. RP240** — Un historial que aguanta imágenes (hallazgo 9).
 - [ ] **T11. RP215 y RP215b** — Imágenes en el chat: el servidor y la pantalla (ficha `odd/tasks/adjuntar-capturas.md`).
-- [ ] **T12. RP241** — Subagentes dentro del chat (hallazgo 10).
-- [ ] **T13. RP242** — Subagentes en vivo (hallazgo 8, después de RP237 y RP241).
+- [ ] **T12. RP241** — Subagentes dentro del chat (hallazgo 10). Bloqueada desde el 2026-11-18: absorbida por UI3e, la bandeja de subagentes del rediseño (`odd/tasks/interfaz.md`, L4).
+- [ ] **T13. RP242** — Subagentes en vivo (hallazgo 8, después de RP237 y UI3e, que absorbió RP241).
 - [ ] **T14. RP243** — MCP en las sesiones del panel: configuración de la persona (hallazgo 11).
 
 La sala (RP229, RP221, RP221b, RP244, RP222, RP223, RP225) va después de esta serie, reordenada en `odd/tasks/salas.md` (L86 y L87).
