@@ -82,6 +82,9 @@ async function orderText(repo, key, requirements, extra) {
 }
 
 // The fixed refusal for each session state that cannot take a command; a session that is still starting counts as busy.
+// RP233: what pi did with a prompt (data.disposition) when it did not start a run; any other answer, or none, is a start as before.
+const NOT_STARTED = ['handled', 'queued'];
+
 const REFUSALS = { closed: 'The session is not started', starting: 'The session is busy', busy: 'The session is busy', asking: 'The session is waiting for an answer' };
 
 // `extra` is { pr, prs, guard }: the PR number of fix-pr, the provider of the repo's open PRs (injectable for tests) and the duplicate-send
@@ -90,12 +93,21 @@ async function piSend(repo, key, host, requirements = requirementsFor, { pr, prs
   if (typeof key !== 'string' || (key !== PUT_IN_CONDITIONS && key !== FIX_PR && !Object.hasOwn(lib.PI_COMMANDS, key))) throw new HttpError(400, 'Unknown command');
   if (key === FIX_PR && !(Number.isInteger(pr) && pr > 0)) throw new HttpError(400, 'fix-pr needs the pr number of an open pull request (a positive integer)');
   const text = await orderText(repo, key, requirements, { pr, prs });
+  // RP233: a fixed command the session did not load would reach the model as plain chat. An unknown list (null) blocks nothing.
+  const name = lib.piCommandName(key);
+  const loaded = name && typeof host.commandsOf === 'function' ? host.commandsOf(repo.id) : null;
+  if (Array.isArray(loaded) && !loaded.includes(name)) throw new HttpError(409, `/${name} is not loaded in this session: is flow-skills installed for pi?`);
   const { state } = await host.status(repo.id);
   if (state !== 'idle') throw new HttpError(409, REFUSALS[state] || 'The session is busy');
   // Armed before the await so two clicks in flight cannot both pass; a refused prompt gives the slot back.
   if (guard) { guard.check(repo, key); guard.record(repo, key); }
-  try { await host.prompt(repo.id, text); } catch (e) { if (guard) guard.forget(repo, key); throw e instanceof HttpError ? e : new HttpError(500, 'The session failed'); }
-  return { sent: true, confirmed: true };
+  let answer;
+  try { answer = await host.prompt(repo.id, text); } catch (e) { if (guard) guard.forget(repo, key); throw e instanceof HttpError ? e : new HttpError(500, 'The session failed'); }
+  const disposition = answer && typeof answer === 'object' && NOT_STARTED.includes(answer.disposition) ? answer.disposition : null;
+  if (!disposition) return { sent: true, confirmed: true };
+  // Handled: no run started, so nothing is in flight and a Retry may go at once. Queued: it runs later, so the window holds.
+  if (disposition === 'handled' && guard) guard.forget(repo, key);
+  return { sent: true, confirmed: false, disposition };
 }
 
 // The session state for the commit verdict and the buttons, from the host: closed | idle | busy | asking (starting reads as busy).

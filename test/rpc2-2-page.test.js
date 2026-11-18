@@ -226,3 +226,26 @@ test('g12: the chat Send and the flow buttons share one start helper (the explic
   assert.equal((app.match(/await ensureRpcStarted\(/g) || []).length, 3, 'chat Send, flow button, put-in-conditions');
   assert.equal((app.match(/api\('\/api\/rpc\/start'/g) || []).length, 2, 'the helper and the Start button');
 });
+
+// RP233: what pi did with the prompt reaches the page. A prompt pi handled started no run, so no verdict is followed and the toast says so; a queued one is followed.
+test('rp233: a click that pi handled starts no verdict and says so; a queued one is followed and says it is queued', async () => {
+  const handled = await pagePlus({ '/api/pi': { sent: true, confirmed: false, disposition: 'handled' } }, 'idle');
+  await click(handled.page, 'flow-pr');
+  assert.equal(handled.S.sent[ID], undefined);
+  assert.ok(toasts(handled.page).includes('The session handled /flow-pr without starting a run: check the session'), toasts(handled.page).join(' | '));
+  const fix = await pagePlus({ '/api/pi': { sent: true, confirmed: false, disposition: 'handled' } }, 'idle');
+  await click(fix.page, 'fix-pr', { pr: '7' });
+  assert.equal(fix.S.sent[ID], undefined, 'a command with no Git verdict is not followed either');
+  const queued = await pagePlus({ '/api/pi': { sent: true, confirmed: false, disposition: 'queued' } }, 'idle');
+  await click(queued.page, 'flow-pr');
+  assert.equal(queued.S.sent[ID].cmd, 'flow-pr');
+  assert.ok(toasts(queued.page).includes('The session queued /flow-pr: it runs when the current work ends'), toasts(queued.page).join(' | '));
+});
+
+test('rp233: the commit button of the card is off with the reason when the status of the session says /flow-ship is not loaded', async () => {
+  const { page } = await pagePlus({}, 'idle');
+  page.run(`S.rpc['${ID}'] = V.rpcFromStatus(S.rpc['${ID}'], { state: 'idle', pendingDialogs: [], missing: ['flow-ship'] })`);
+  assert.deepEqual(buttons(page), [{ cmd: 'flow-ship', label: '/flow-ship', disabled: true, reason: '/flow-ship is not loaded in this session' }]);
+  page.run(`S.rpc['${ID}'] = V.rpcFromStatus(S.rpc['${ID}'], { state: 'idle', pendingDialogs: [], missing: [] })`);
+  assert.deepEqual(buttons(page), [{ cmd: 'flow-ship', label: '/flow-ship' }]);
+});

@@ -397,12 +397,13 @@ const ACTIONS = {
       const judged = JUDGED_CMDS.includes(cmd);
       const before = judged ? await api(`/api/local?id=${id}`).catch(() => null) : null;
       const d = await api('/api/pi', pr ? { id, command: cmd, pr: Number(pr) } : { id, command: cmd });
-      if (judged && before && !before.error && d.sent) {
+      if (judged && before && !before.error && d.sent && d.disposition !== 'handled') { // RP233: a prompt pi handled started no run: there is nothing to judge
         setFact('local', id, before);
         startSent(id, { cmd, at: Date.now(), head: before.head ?? null, branch: before.branch ?? null, files: before.files.length, ahead: before.ahead || 0 });
-      } else if (!judged && d.sent) startSent(id, { cmd, at: Date.now() });
+      } else if (!judged && d.sent && d.disposition !== 'handled') startSent(id, { cmd, at: Date.now() });
       const what = cmd === 'fix-pr' ? `the fix order for #${pr}` : cmd === 'flow-base-stash' ? '/flow-base --stash' : cmd === 'flow-ship-unstage' ? '/flow-ship --unstage' : `/${cmd}`;
-      toast(d.confirmed ? `Sent ${what} to the session` : `Sent ${what}, not confirmed: check the session`, d.confirmed ? 'ok' : '');
+      const note = V.sentToast(what, d);
+      toast(note.text, note.tone);
     } catch (e) { toast(e.message, 'bad'); } finally {
       delete S.sending[id];
       el.disabled = false;
@@ -451,7 +452,8 @@ const ACTIONS = {
       if (rpcNeedsStart(id)) await ensureRpcStarted(id);
       const d = await api('/api/pi', { id, command: 'put-in-conditions' });
       if (d.sent) startSent(id, { cmd: 'put-in-conditions', at: Date.now() });
-      toast(d.confirmed ? 'Sent the put-in-conditions order to the session' : 'Sent the put-in-conditions order, not confirmed: check the session', d.confirmed ? 'ok' : '');
+      const note = V.sentToast('the put-in-conditions order', d);
+      toast(note.text, note.tone);
     } catch (e) { toast(e.message, 'bad'); } finally {
       delete S.sending[id];
       draw();

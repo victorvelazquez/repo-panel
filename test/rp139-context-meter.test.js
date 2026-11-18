@@ -2,6 +2,8 @@
 // RP139 (S28): the chat shows the percentage of the CONTEXT WINDOW the session uses, next to the state of the session and the memory chip. Read-only: it changes no setting of pi.
 // The server asks the session for `get_session_stats` and answers ONLY { tokens, percent, window } (finite non-negative numbers or null); the page asks when a chat opens, when a run
 // ends and when a compaction ends, never on a timer. Fake clients and a fake fetch, plus the fake pi of test/fixtures/fake-pi-rpc.js for the real client.
+// RP233: every start asks pi for its commands once, before anything else; the requests below come after it.
+const START = ['get_commands', {}];
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -126,7 +128,7 @@ test('the host asks get_session_stats with no argument and nothing else', async 
   const { host, made } = await hostWith(stats({ tokens: 1, contextWindow: 10, percent: 10 }));
   await host.start(ID);
   await host.context(ID);
-  assert.deepEqual(made[0].reqs, [['get_session_stats', {}]]);
+  assert.deepEqual(made[0].reqs, [START, ['get_session_stats', {}]]);
 });
 
 // ---------- the real client against the fake pi ----------
@@ -202,7 +204,7 @@ test('http: the route needs the token and the host check, and does nothing witho
     assert.equal((await call(port, URL_OF(ID))).status, 401);
     assert.equal((await call(port, URL_OF(ID), { token: 'wrong' })).status, 401);
     assert.equal((await call(port, URL_OF(ID), { token, host: 'evil.example:80' })).status, 403);
-    assert.deepEqual(made[0].reqs, [], 'nothing was asked of the session');
+    assert.deepEqual(made[0].reqs, [START], 'nothing but the commands of the start was asked of the session');
   });
 });
 test('http: an id that is missing, empty or longer than 100 characters is 400; an unknown repo is 404; no session is 409', async () => {

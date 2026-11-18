@@ -1,6 +1,8 @@
 'use strict';
 // RPC1b (S1, S2): server/rpchost.js, one pi session per repo inside the panel process. The client is a fake (the real one is tested in
 // rpc1b-client.test.js), so nothing is spawned here.
+// RP233: every start asks pi for its commands once, before anything else; the requests below come after it.
+const START = ['get_commands', {}];
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { createRpcHost, sessionIdFor } = require('../server/rpchost.js');
@@ -198,7 +200,7 @@ test('h11: behavior is only steer or followUp; steer and abort have their own co
   await host.prompt(a, 'x', { behavior: 'steer' });
   await host.prompt(a, 'x', { behavior: 'followUp' });
   await host.prompt(a, 'x', {});
-  assert.deepEqual(c.reqs, [['prompt', { message: 'x', streamingBehavior: 'steer' }], ['prompt', { message: 'x', streamingBehavior: 'followUp' }], ['prompt', { message: 'x' }]]);
+  assert.deepEqual(c.reqs, [START, ['prompt', { message: 'x', streamingBehavior: 'steer' }], ['prompt', { message: 'x', streamingBehavior: 'followUp' }], ['prompt', { message: 'x' }]]);
   c.reqs.length = 0;
   for (const bad of ['Steer', 'queue', '', 5, null, {}]) await CODE(() => host.prompt(a, 'x', { behavior: bad }));
   assert.deepEqual(c.reqs, []);
