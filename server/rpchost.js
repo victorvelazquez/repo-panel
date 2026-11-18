@@ -93,6 +93,11 @@ const QUEUE_MAX = 20;
 const QUEUE_TEXT_MAX = 4000;
 const texts = (list) => (Array.isArray(list) ? list.filter((t) => typeof t === 'string').slice(0, QUEUE_MAX).map((t) => t.slice(0, QUEUE_TEXT_MAX)) : []);
 const queueOf = (r) => ({ steering: texts(r && r.steering), followUp: texts(r && r.followUp) });
+// RP236b (B1): what clear_queue gives back goes into the box, and pi has already dropped it: every text, whole. Only what is not a text is left out.
+const allTexts = (list) => (Array.isArray(list) ? list.filter((t) => typeof t === 'string') : []);
+const clearedOf = (r) => ({ steering: allTexts(r && r.steering), followUp: allTexts(r && r.followUp) });
+// RP236b (B2): pi runs an extension command sent by prompt at once, even during a run; while the session works a command waits for it to be free.
+const COMMAND_WAITS = 'Commands wait until the session is free: send it when the run ends';
 const TRANSLATE = {
   queue_update: (r) => ({ type: 'queue', ...queueOf(r) }),
   agent_start: () => ({ type: 'run_start' }),
@@ -302,6 +307,7 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
       repoOf(id);
       if (behavior !== undefined && !BEHAVIORS.includes(behavior)) throw new HttpError(400, 'behavior must be steer or followUp');
       const message = cleanText(value);
+      if (behavior && message.startsWith('/')) throw new HttpError(409, COMMAND_WAITS);
       const entry = running(id);
       if (entry.compacting) throw new HttpError(409, 'The session is compacting its context: wait a moment'); // pi would refuse it too
       return ask(entry, 'prompt', { message, ...(behavior ? { streamingBehavior: behavior } : {}) });
@@ -313,7 +319,7 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
     },
     async abort(id) { repoOf(id); return ask(running(id), 'abort', {}); },
     // RP236: takes the queued messages back (pi answers their texts, which the page puts back in the box).
-    async clearQueue(id) { repoOf(id); return queueOf(await ask(running(id), 'clear_queue', {})); },
+    async clearQueue(id) { repoOf(id); return clearedOf(await ask(running(id), 'clear_queue', {})); },
     async answer(id, requestId, answer) {
       repoOf(id);
       const { client } = running(id);

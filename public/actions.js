@@ -275,10 +275,19 @@ const ACTIONS = {
     }
     draw();
   },
+  // RP236b (S3): pi goes on with the queued messages after an abort, so the queue is taken back first (as pi's docs advise) and its texts return to the box. A Clear queue that fails
+  // never keeps Stop from stopping.
   'chat-stop': async () => {
     const id = S.chat.id;
     if (!id) return;
+    try {
+      const q = await api('/api/rpc/clear-queue', { id });
+      const texts = [...((q && q.steering) || []), ...((q && q.followUp) || [])].filter((t) => typeof t === 'string' && t);
+      if (S.rpc[id]) S.rpc[id].queue = { steering: [], followUp: [] };
+      if (texts.length) putBack(id, texts.join('\n'));
+    } catch { /* the run is stopped anyway */ }
     try { await api('/api/rpc/abort', { id }); } catch (e) { toast(e.message, 'bad'); }
+    draw();
   },
   // RPC2-3: answer a dialog pi is waiting for. The answer is built HERE from the dialog the page holds (S.rpc), never from the text of the button: the
   // click names the request and the kind, the option is the one at that index and the typed text is read from the card's own field. Posted ONCE: the

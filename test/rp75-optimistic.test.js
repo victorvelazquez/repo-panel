@@ -535,6 +535,36 @@ test('C11c (RP236): a correction the server refuses puts the text back with the 
   assert.ok(page.get('#msgNote').html.includes('The session is compacting its context'), page.get('#msgNote').html);
 });
 
+test('C11e (RP236b, B2): with the session working, a command typed in the box is not sent; it stays there with the reason', async () => {
+  const { page } = await chatPage({ '/api/rpc/status': { state: 'busy', pendingDialogs: [] } });
+  for (const act of ["ACTIONS['chat-send']({})", "ACTIONS['chat-queue']({})"]) {
+    page.get('#msgBox').value = '/flow-ship';
+    page.run(act);
+    await page.tick();
+    assert.equal(page.get('#msgBox').value, '/flow-ship', act);
+  }
+  assert.equal(sendsOf(page).length, 0);
+  assert.ok(page.get('#msgNote').html.includes('Commands wait until the session is free'), page.get('#msgNote').html);
+});
+
+test('C11f (RP236b, S3): Stop asks clear_queue BEFORE abort and puts the queued texts back in the box', async () => {
+  const { page } = await chatPage({ '/api/rpc/status': { state: 'busy', pendingDialogs: [] }, '/api/rpc/clear-queue': { steering: ['fix it'], followUp: ['later'] }, '/api/rpc/abort': {} });
+  page.get('#msgBox').value = '';
+  await page.run("ACTIONS['chat-stop']")({});
+  await page.tick();
+  const order = page.fetches.filter((f) => f.method === 'POST' && (f.url === '/api/rpc/clear-queue' || f.url === '/api/rpc/abort')).map((f) => f.url);
+  assert.deepEqual(order, ['/api/rpc/clear-queue', '/api/rpc/abort']);
+  assert.equal(page.get('#msgBox').value, 'fix it\nlater');
+});
+
+test('C11g (RP236b, S3): a Clear queue that fails still stops the run', async () => {
+  const fail = () => Promise.resolve({ ok: false, status: 409, statusText: 'Conflict', json: async () => ({ error: 'nope' }) });
+  const { page } = await chatPage({ '/api/rpc/status': { state: 'busy', pendingDialogs: [] }, '/api/rpc/clear-queue': fail, '/api/rpc/abort': {} });
+  await page.run("ACTIONS['chat-stop']")({});
+  await page.tick();
+  assert.equal(page.fetches.filter((f) => f.method === 'POST' && f.url === '/api/rpc/abort').length, 1);
+});
+
 test('C11d (RP236): the queue pi tells is drawn above the box, and Clear queue asks the server and puts the texts back in the box', async () => {
   const { page, S } = await chatPage({ '/api/rpc/status': { state: 'busy', pendingDialogs: [] }, '/api/rpc/clear-queue': { steering: ['fix the test'], followUp: ['then summarize'] } });
   page.run(`applyRpc(${JSON.stringify({ id: 'abc', kind: 'event', record: { type: 'queue', steering: ['fix the test'], followUp: ['then summarize'] } })})`);

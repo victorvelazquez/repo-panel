@@ -710,7 +710,11 @@ async function sendChatMessage(behavior) {
   const text = $('#msgBox').value;
   if (!text.trim()) return;
   const cs = composerOf(id);
-  if (!cs.canSend && cs.canSteer) return steerChatText(id, text, behavior || 'steer'); // RP236: the session works: correct it now or queue for the end of the run
+  if (!cs.canSend && cs.canSteer) {
+    const refused = R.steerRefusal(text); // RP236b (B2): a command waits for the session to be free; the text stays in the box
+    if (refused) { sayNote(id, refused); draw(); return; }
+    return steerChatText(id, text, behavior || 'steer'); // RP236: the session works: correct it now or queue for the end of the run
+  }
   return sendChatText(text, true);
 }
 // RP236: a message to a session that works. It shows in the queue row (pi tells the queue), not as a pending bubble; a failure puts the text back with the server's message.
