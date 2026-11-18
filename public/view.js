@@ -524,6 +524,11 @@
   // /flow-ship --unstage instead of /flow-ship (the index must be empty). Neither branch button shows while a
   // bare `verdict: 'running'` is passed or when the repo needs manual action.
   function flowButtons(local, prInfo, stateData, ctx = {}) {
+    // RP233: `missing` holds the keys whose command the live session did not load: their button is off with that reason, whatever else holds it.
+    if (Array.isArray(ctx.missing) && ctx.missing.length) {
+      const { missing, ...rest } = ctx;
+      return flowButtons(local, prInfo, stateData, rest).map((b) => (missing.includes(b.cmd) ? { ...b, disabled: true, reason: notLoaded(b.cmd) } : b));
+    }
     if (ctx.running) {
       const { running, ...rest } = ctx;
       const reason = runningReason(running);
@@ -660,6 +665,15 @@
   // The GitHub-like color of the progress line of each command (the pending CI chip is always yellow).
   const RUN_COLOR = { 'flow-ship': 'blue', 'flow-ship-unstage': 'blue', 'flow-commit': 'blue', 'flow-commit-unstage': 'blue', 'flow-pr': 'green', 'flow-base': 'purple', 'flow-base-stash': 'purple', 'fix-pr': 'orange' };
   const runColor = (cmd) => RUN_COLOR[cmd] || 'gray';
+  // RP233: the reason of a button whose command is not loaded names the command alone (/flow-ship, also for /flow-ship --unstage).
+  const notLoaded = (cmd) => `${(CMD_TEXT[cmd] || `/${cmd}`).split(' ')[0]} is not loaded in this session`;
+  // RP233: the toast after POST /api/pi says "sent" only for a confirmed send; a prompt pi handled or queued says so instead.
+  function sentToast(what, d) {
+    if (d && d.confirmed) return { text: `Sent ${what} to the session`, tone: 'ok' };
+    if (d && d.disposition === 'handled') return { text: `The session handled ${what} without starting a run: check the session`, tone: '' };
+    if (d && d.disposition === 'queued') return { text: `The session queued ${what}: it runs when the current work ends`, tone: '' };
+    return { text: `Sent ${what}, not confirmed: check the session`, tone: '' };
+  }
   const CMD_TEXT = { 'flow-ship': '/flow-ship', 'flow-ship-unstage': '/flow-ship --unstage', 'flow-commit': '/flow-commit', 'flow-commit-unstage': '/flow-commit --unstage', 'flow-pr': '/flow-pr', 'flow-base': '/flow-base', 'flow-base-stash': '/flow-base --stash' };
   // The pseudo-verdict of a command whose order is still being sent to the session: it behaves as a running one, with
   // the label the real running verdict shows for that command.
@@ -766,7 +780,7 @@
   const RPC_BLOCKS = 64;
   const RPC_TEXT_MAX = 200000;
   // RP152: `subs` is how many `subagent_run` calls started and have not ended, `subSince` the moment the first one of them started (0 = none): only the tool name of the live events is read, never an argument.
-  const rpcBlank = () => ({ state: 'closed', text: '', blocks: [], error: '', startedAt: 0, streaming: false, thinking: false, retry: null, memory: null, ctx: null, compacting: false, asks: [], subs: 0, subSince: 0 });
+  const rpcBlank = () => ({ state: 'closed', text: '', blocks: [], error: '', startedAt: 0, streaming: false, thinking: false, retry: null, memory: null, ctx: null, compacting: false, asks: [], subs: 0, subSince: 0, missing: [] });
   const SUB_TOOL = 'subagent_run';
   const SUB_MAX = 20;
   // RP152: the counter of a subagent that is working, as mm:ss (the minutes keep growing past 59). Anything that is not a duration in milliseconds reads 00:00.
@@ -851,6 +865,9 @@
     e.memory = MEMORY_CATS.includes(st.memory) ? st.memory : st.state === 'closed' ? null : e.memory; // RP110b: a closed session has no memory to report
     if (st.state === 'closed') e.ctx = null; // RP139: a closed session has no context to report
     e.compacting = st.state !== 'closed' && st.compacting === true; // RP140: the status is the truth about a compaction in progress
+    // RP233: the keys whose command the session did not load; a status without the list keeps what was known, a closed session knows none.
+    if (st.state === 'closed') e.missing = [];
+    else if (Array.isArray(st.missing)) e.missing = st.missing.filter((k) => typeof k === 'string' && (Object.hasOwn(CMD_TEXT, k) || k === 'flow-next'));
     e.asks = (Array.isArray(st.pendingDialogs) ? st.pendingDialogs : []).map(rpcAskOf).filter(Boolean).slice(0, 20);
     e.streaming = st.state === 'busy' || st.state === 'asking';
     if (!e.streaming) Object.assign(e, { blocks: [], text: '', thinking: false, retry: null });
@@ -1184,5 +1201,5 @@
     const rows = Math.max(1, Math.round((sc - pd) / ln));
     return { height: Math.min(Math.max(sc, one), cap), scrolls: sc - cap > 1, rows, expandable: rows > 4 };
   };
-  return { boxFit, enterSends, STALLED_MS, stalledNow, jobsHold, deliveryHold, tasksPollDue, TASKS_REFRESH_MS, mergeWhy, mergeNote, screenOf, bandOf, NARROW_BELOW, DUO_BELOW, parseAddress, addressOf, ADDRESS_ZONES, subClock, columnTabFor, conformityTabLabel, repoModel, changeChips, prChip, ciOf, idleChip, conflictChip, sizeChip, RepoCard, stateLineHidden, usageView, usageHtml, ringGeometry, usageRemaining, boardApply, boardWait, chatCachePut, chatCacheGet, rpcWithContext, chatFromCache, API_VERSION, mergeButton, rerunButton, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, dirtyRepos, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, taskPrs, matchesUnitId, isOutdated, conformityView, reqFold, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, parseSse, rpcEvent, rpcReduce, rpcFromStatus, eventsPlan, eventsRetryMs, eventsStale, projectRepos, roomOfFolder, roomMembers, columnTabOf, mergeRooms };
+  return { boxFit, enterSends, STALLED_MS, stalledNow, jobsHold, deliveryHold, tasksPollDue, TASKS_REFRESH_MS, mergeWhy, mergeNote, screenOf, bandOf, NARROW_BELOW, DUO_BELOW, parseAddress, addressOf, ADDRESS_ZONES, subClock, columnTabFor, conformityTabLabel, repoModel, changeChips, prChip, ciOf, idleChip, conflictChip, sizeChip, RepoCard, stateLineHidden, usageView, usageHtml, ringGeometry, usageRemaining, boardApply, boardWait, chatCachePut, chatCacheGet, rpcWithContext, chatFromCache, API_VERSION, mergeButton, rerunButton, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, dirtyRepos, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, sentToast, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, taskPrs, matchesUnitId, isOutdated, conformityView, reqFold, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, parseSse, rpcEvent, rpcReduce, rpcFromStatus, eventsPlan, eventsRetryMs, eventsStale, projectRepos, roomOfFolder, roomMembers, columnTabOf, mergeRooms };
 }));

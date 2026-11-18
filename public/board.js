@@ -309,7 +309,7 @@ function flowFor(r, l, p, verdict) {
   const hides = commitVerdict === 'attention' && verdict.cmd.startsWith('flow-ship') ? null : commitVerdict;
   const running = verdict && verdict.state === 'running' ? { cmd: verdict.cmd, label: verdict.label } : null;
   const retry = commitVerdict === 'attention';
-  return V ? V.flowButtons(l, p, S.state[r.id], { override, verdict: hides, running, retry, session: sessionOf(r.id), jobs: jobsOfRepo(r.id) }) : (l.files || []).length > 0 ? [{ cmd: 'flow-ship', label: '/flow-ship' }] : [];
+  return V ? V.flowButtons(l, p, S.state[r.id], { override, verdict: hides, running, retry, session: sessionOf(r.id), jobs: jobsOfRepo(r.id), missing: (S.rpc[r.id] && S.rpc[r.id].missing) || [] }) : (l.files || []).length > 0 ? [{ cmd: 'flow-ship', label: '/flow-ship' }] : [];
 }
 
 function repoCard(r, attn = false, verdict = null) {

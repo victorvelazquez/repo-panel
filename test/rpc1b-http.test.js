@@ -1,6 +1,8 @@
 'use strict';
 // RPC1b (S1, S2): the /api/rpc routes and the `rpc` SSE event. The host is the real createRpcHost over a fake client, so no program is
 // started; the config file is a scratch one. Abuse tests: no token, unknown repo, bad bodies, and browser fields that must change nothing.
+// RP233: every start asks pi for its commands once, before anything else; the requests below come after it.
+const START = ['get_commands', {}];
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -130,7 +132,7 @@ test('a4: start answers the status; prompt, steer and abort reach the session of
     assert.deepEqual(p.json, { disposition: 'started' });
     assert.equal((await post('steer', { id: ID, text: 'left' })).status, 200);
     assert.equal((await post('abort', { id: ID })).status, 200);
-    assert.deepEqual(made[0].reqs, [['prompt', { message: 'hi\nthere', streamingBehavior: 'followUp' }], ['steer', { message: 'left' }], ['abort', {}]]);
+    assert.deepEqual(made[0].reqs, [START, ['prompt', { message: 'hi\nthere', streamingBehavior: 'followUp' }], ['steer', { message: 'left' }], ['abort', {}]]);
     const g = await get(`/api/rpc/status?id=${ID}`);
     assert.deepEqual(g.json, { state: 'idle', pendingDialogs: [], sessionId: `panel-my-repo-${ID.slice(0, 8)}` });
     for (const k of ['command', 'cwd', 'agentDir', 'gentle-shell.exe']) assert.equal(g.body.includes(k), false, k);
@@ -145,7 +147,7 @@ test('a5: prompt refuses an empty text, a text over 20000 characters and a `!` s
       assert.equal(r.status, 400);
       assert.equal(r.body.includes('xxxx'), false);
     }
-    assert.deepEqual(made[0].reqs, []);
+    assert.deepEqual(made[0].reqs, [START]);
   });
 });
 
@@ -156,7 +158,7 @@ test('a6: behavior outside steer and followUp is 400', async () => {
       const r = await post('prompt', { id: ID, text: 'x', behavior });
       assert.equal(r.status, 400, JSON.stringify(behavior));
     }
-    assert.deepEqual(made[0].reqs, []);
+    assert.deepEqual(made[0].reqs, [START]);
   });
 });
 
@@ -200,7 +202,7 @@ test('a9: no route takes a command, cwd, path, args or env from the browser', as
     await post('prompt', { id: ID, text: 'x', ...evil });
     await post('steer', { id: ID, text: 'x', ...evil });
     await post('abort', { id: ID, ...evil });
-    assert.deepEqual(made[0].reqs, [['prompt', { message: 'x' }], ['steer', { message: 'x' }], ['abort', {}]]);
+    assert.deepEqual(made[0].reqs, [START, ['prompt', { message: 'x' }], ['steer', { message: 'x' }], ['abort', {}]]);
     assert.equal(made.length, 1);
   });
 });

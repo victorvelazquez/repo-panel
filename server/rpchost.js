@@ -9,6 +9,15 @@ const { HttpError } = require('./errors.js');
 const { loadConfig } = require('./config.js');
 const { runtimeEnv } = require('./piruntime.js');
 const { createRpcClient, RpcError } = require('./rpc.js');
+const lib = require('../lib.js');
+
+// RP233: the names of the commands pi loaded (get_commands), or null when the answer is not a list. Only string names count.
+function commandNames(data) {
+  const list = data && typeof data === 'object' ? data.commands : null;
+  return Array.isArray(list) ? list.filter((c) => c && typeof c === 'object' && typeof c.name === 'string').map((c) => c.name) : null;
+}
+// The /flow-* keys whose command is not among `names`.
+const missingOf = (names) => Object.keys(lib.PI_COMMANDS).filter((key) => !names.includes(lib.piCommandName(key)));
 
 const TEXT_MAX = 20000;
 const ANSWER_MAX = 4000;
@@ -139,13 +148,13 @@ function wire(e) {
   return e;
 }
 
-function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClient, max = 6, adoptedOf = (id) => (loadConfig().sessions || {})[id], adopt = () => {}, env = process.env, contextMs = 10000, compactMs = 600000, suffix = () => crypto.randomBytes(3).toString('hex') }) {
+function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClient, max = 6, adoptedOf = (id) => (loadConfig().sessions || {})[id], adopt = () => {}, env = process.env, contextMs = 10000, commandsMs = 5000, compactMs = 600000, suffix = () => crypto.randomBytes(3).toString('hex') }) {
   const live = new Map(); // repo id -> { client, sessionId, ready }
 
   const closedStatus = { state: 'closed', pendingDialogs: [], sessionId: null };
   // A pending dialog is named `requestId` here as in the SSE `dialog` event.
   const statusOf = (entry) => (entry && entry.client
-    ? { state: entry.client.state(), pendingDialogs: entry.client.pendingDialogs().map(({ id, ...rest }) => ({ requestId: id, ...rest })), sessionId: entry.sessionId, ...(entry.memory ? { memory: entry.memory } : {}), ...(entry.compacting ? { compacting: true } : {}) }
+    ? { state: entry.client.state(), pendingDialogs: entry.client.pendingDialogs().map(({ id, ...rest }) => ({ requestId: id, ...rest })), sessionId: entry.sessionId, ...(entry.memory ? { memory: entry.memory } : {}), ...(entry.compacting ? { compacting: true } : {}), ...(entry.commands ? { missing: missingOf(entry.commands) } : {}) }
     : closedStatus);
   const running = (id) => {
     const entry = live.get(id);
@@ -195,6 +204,14 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
       throw e && e.message === 'The session did not start in time' ? new HttpError(504, 'The session did not start in time') : new HttpError(502, 'The session could not be started');
     }
     if (entry.closed) throw new HttpError(409, SESSION_CLOSED); // the client answered but the session was closed meanwhile
+    entry.commands = await loadCommands(entry);
+  }
+
+  // RP233: asked once per start; a failure, a malformed answer or no answer within commandsMs leaves the list unknown (null), which blocks nothing.
+  async function loadCommands(entry) {
+    let timer;
+    const late = new Promise((resolve) => { timer = setTimeout(() => resolve(null), commandsMs); });
+    try { return await Promise.race([Promise.resolve().then(() => entry.client.request('get_commands', {})).then(commandNames, () => null), late]); } finally { clearTimeout(timer); }
   }
 
   // RP99: `fresh` starts a NEW session with its own id. It is only for a repo with no session: a live one or an adopted one (live or not) is 409, and nothing is created.
@@ -266,6 +283,8 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
     stateOf,
     startedAtOf,
     outcomeOf,
+    // RP233: the command names the live session of a repo loaded, or null (no live session, still starting, or the list is unknown). Memory only.
+    commandsOf(id) { const entry = live.get(id); return entry && entry.up === true && !entry.closed && Array.isArray(entry.commands) ? [...entry.commands] : null; },
     async prompt(id, value, { behavior } = {}) {
       repoOf(id);
       if (behavior !== undefined && !BEHAVIORS.includes(behavior)) throw new HttpError(400, 'behavior must be steer or followUp');

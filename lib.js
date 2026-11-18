@@ -453,6 +453,8 @@ function conformityReport(entries) {
 // ---------- pi commands ----------
 // The only texts the browser can ask the panel to send to a pi session (it sends the key, never the text).
 const PI_COMMANDS = { 'flow-ship': '/flow-ship', 'flow-ship-unstage': '/flow-ship --unstage', 'flow-commit': '/flow-commit', 'flow-commit-unstage': '/flow-commit --unstage', 'flow-pr': '/flow-pr', 'flow-base': '/flow-base', 'flow-base-stash': '/flow-base --stash', 'flow-next': '/flow-next' };
+// RP233: the name pi lists for the command of a key (`/flow-ship --unstage` is the command flow-ship), or null for a key that is not a fixed command.
+const piCommandName = (key) => (Object.hasOwn(PI_COMMANDS, key) ? PI_COMMANDS[key].split(' ')[0].slice(1) : null);
 
 // RP226: the merge method to send. A method is allowed unless its flag is exactly false (unknown flags use the requested one); null when the repo allows none.
 function pickMergeMethod(requested, allowed) {
@@ -463,7 +465,7 @@ function pickMergeMethod(requested, allowed) {
 }
 
 module.exports = {
-  PI_COMMANDS, pickMergeMethod,
+  PI_COMMANDS, piCommandName, pickMergeMethod,
   repoId, parseStatus, parseNumstat, parseGoneBranches, parseBaseBranch, staleBranch, statusLetter,
   summarizeChecks, blockedReason, enrichPr, encodeRef, parseRoadmap, safeRelPath, roadmapSummary,
   matchesUnitId, deriveUnitStates, nextUnit, workQueue, QUEUE_RANK, conformityReport, RM_REQUIRED,
