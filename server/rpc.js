@@ -173,7 +173,8 @@ function createRpcClient({ command, args = [], cwd, env, spawn = cp.spawn, platf
     // RP110b: of all the notices, only the status of the MEMORY plugin (the key `engram`) is kept, and only its tail: the plugin ends it with the part that tells the state (`· ready`, `· offline`), so a
     // long project name must not push that part out. It is not a dialog: it needs no answer and does not change the state. The host reduces it to a category; the text never goes further.
     if (rec.method === 'setStatus') {
-      if (rec.statusKey === 'engram') emit({ kind: 'status', key: 'engram', text: typeof rec.statusText === 'string' ? rec.statusText.slice(-STATUS_MAX) : '' });
+      // RP245c: the permission mode of Gentle Shell (`gentle:mode`) is kept the same way; its `gentle:yolo` badge is not needed (the mode says it all).
+      if (rec.statusKey === 'engram' || rec.statusKey === 'gentle:mode') emit({ kind: 'status', key: rec.statusKey, text: typeof rec.statusText === 'string' ? rec.statusText.slice(-STATUS_MAX) : '' });
       return;
     }
     // The other notices (setWidget, notify...) need no answer and are dropped; only the four dialog methods block the agent.

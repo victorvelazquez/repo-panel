@@ -765,7 +765,9 @@
   const EVENT_MAX = 64 * 1024;
   const isObject = (x) => !!x && typeof x === 'object' && !Array.isArray(x);
   // RPC2-1 (S1): the `rpc` event carries what one pi session does ({ id, kind, ... }; the id is a repo id). Frames over EVENT_MAX are dropped.
-  const RPC_KINDS = ['event', 'state', 'dialog', 'dialog-closed', 'exit', 'memory'];
+  const RPC_KINDS = ['event', 'state', 'dialog', 'dialog-closed', 'exit', 'memory', 'mode'];
+  // RP245c: the permission mode of a session, from a closed list; anything else is ignored.
+  const MODE_CATS = ['normal', 'auto', 'yolo', 'super-yolo'];
   // RP110b: the category of the memory plugin of a session, from a closed list; anything else is ignored.
   const MEMORY_CATS = ['ready', 'offline', 'disabled', 'error'];
   const RPC_STATES = ['starting', 'idle', 'busy', 'asking', 'closed'];
@@ -780,7 +782,7 @@
   const RPC_BLOCKS = 64;
   const RPC_TEXT_MAX = 200000;
   // RP152: `subs` is how many subagents started and have not ended, `subSince` the moment the first one of them started (0 = none). RP235: the server tells a subagent apart (subagent_start, subagent_end).
-  const rpcBlank = () => ({ state: 'closed', text: '', blocks: [], error: '', startedAt: 0, streaming: false, thinking: false, retry: null, memory: null, ctx: null, compacting: false, asks: [], subs: 0, subSince: 0, missing: [], queue: rpcNoQueue(), bash: null });
+  const rpcBlank = () => ({ state: 'closed', text: '', blocks: [], error: '', startedAt: 0, streaming: false, thinking: false, retry: null, memory: null, mode: null, ctx: null, compacting: false, asks: [], subs: 0, subSince: 0, missing: [], queue: rpcNoQueue(), bash: null });
   // RP245b: the shell command the person ran with ! or !! ({ command, exclude, output, running, exitCode?, cancelled?, truncated?, open? }); its live output is capped, keeping its end.
   const BASH_OUT_MAX = 1000000;
   // RP252: the running command a status reports, or null.
@@ -828,8 +830,9 @@
     let ctx = false; // RP139: the context of the session must be read again (a run or a compaction ended)
     if (!isObject(p)) return { entry: e, reload, ctx };
     if (p.kind === 'state' && RPC_STATES.includes(p.state)) { e.state = p.state; if (p.state === 'busy') e.streaming = true; if (p.state !== 'busy' && p.state !== 'asking') Object.assign(e, { subs: 0, subSince: 0, queue: rpcNoQueue() }); } // RP236b (S2): a free session has nothing waiting
-    else if (p.kind === 'exit') Object.assign(e, { state: 'closed', blocks: [], text: '', streaming: false, thinking: false, retry: null, memory: null, ctx: null, compacting: false, asks: [], subs: 0, subSince: 0, queue: rpcNoQueue(), bash: null });
+    else if (p.kind === 'exit') Object.assign(e, { state: 'closed', blocks: [], text: '', streaming: false, thinking: false, retry: null, memory: null, mode: null, ctx: null, compacting: false, asks: [], subs: 0, subSince: 0, queue: rpcNoQueue(), bash: null });
     else if (p.kind === 'memory') { if (MEMORY_CATS.includes(p.memory)) e.memory = p.memory; }
+    else if (p.kind === 'mode') { if (MODE_CATS.includes(p.mode)) e.mode = p.mode; } // RP245c
     else if (p.kind === 'dialog') e.asks = rpcAsks(e.asks, rpcAskOf(p));
     else if (p.kind === 'dialog-closed' && typeof p.requestId === 'string') e.asks = rpcAsks(e.asks, null, p.requestId);
     else if (p.kind === 'event' && isObject(p.record)) {
@@ -884,6 +887,7 @@
     if (!isObject(st) || !RPC_STATES.includes(st.state)) return e;
     e.state = st.state;
     e.memory = MEMORY_CATS.includes(st.memory) ? st.memory : st.state === 'closed' ? null : e.memory; // RP110b: a closed session has no memory to report
+    e.mode = MODE_CATS.includes(st.mode) ? st.mode : st.state === 'closed' ? null : (MODE_CATS.includes(e.mode) ? e.mode : null); // RP245c: likewise for the permission mode
     if (st.state === 'closed') e.ctx = null; // RP139: a closed session has no context to report
     e.compacting = st.state !== 'closed' && st.compacting === true; // RP140: the status is the truth about a compaction in progress
     // RP233: the keys whose command the session did not load; a status without the list keeps what was known, a closed session knows none.
