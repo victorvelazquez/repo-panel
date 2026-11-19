@@ -23,7 +23,7 @@ const FAILURES = { timeout: 'The session did not start in time', error: 'The ses
 class RpcError extends Error { constructor(message) { super(message); this.name = 'RpcError'; } }
 const fail = (message) => new RpcError(message);
 const text = (v, max) => (typeof v === 'string' ? v.slice(0, max) : '');
-// What the page may see of a dialog (RPC2-3): the caps below; anything cut sets `truncated`, and the page then offers no way to approve it.
+// What the page may see of a dialog (RPC2-3): the caps below; anything cut sets `truncated`; the page notes it (RP245: it no longer blocks the answer, as in the terminal).
 const TITLE_MAX = 300;
 const MESSAGE_MAX = 4000;
 const OPTIONS_MAX = 20;
@@ -184,7 +184,8 @@ function createRpcClient({ command, args = [], cwd, env, spawn = cp.spawn, platf
     const options = raw.map((o) => text(o, OPTION_MAX));
     const d = {
       id: rec.id, method: rec.method, title: text(rec.title, TITLE_MAX), message: text(rec.message, MESSAGE_MAX), options,
-      sure: options.filter((o, i) => o === raw[i]),
+      // RP245: an option is sure when it was not cut AND no cut option shows the same text (otherwise the person may have meant the cut one).
+      sure: options.filter((o, i) => o === raw[i] && !options.some((p, j) => p === o && p !== raw[j])),
       truncated: over(rec.title, TITLE_MAX) || over(rec.message, MESSAGE_MAX) || (Array.isArray(rec.options) && rec.options.length > OPTIONS_MAX) || raw.some((o) => over(o, OPTION_MAX)),
       expiresAt: wait ? Date.now() + wait : null, timer: null,
     };

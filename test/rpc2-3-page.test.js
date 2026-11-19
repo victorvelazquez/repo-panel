@@ -137,18 +137,19 @@ test('q2: Deny posts {id, requestId, confirmed:false} ONCE; the card locks at th
   assert.deepEqual(posts(page), [{ id: ID, requestId: 'd1', confirmed: false }]);
 });
 
-test('q3: Allow posts confirmed:true only when the dialog may be approved; a truncated or empty one posts nothing even if the action is called', async () => {
+// RP245 (parity with the terminal, decided by the person): a truncated, empty or cut dialog can be approved too; the card shows Allow with the note.
+test('q3: Allow posts confirmed:true, also for a truncated, empty or cut dialog (RP245), which shows the note', async () => {
   const ok = await chatPage({ '/api/rpc/status': asking(dialog()) });
   click(ok.page, 'allow');
   await ok.page.tick();
   assert.deepEqual(posts(ok.page), [{ id: ID, requestId: 'd1', confirmed: true }]);
   for (const over of [{ truncated: true }, { message: '' }, { message: 'git push…' }]) {
-    const bad = await chatPage({ '/api/rpc/status': asking(dialog(over)) });
-    assert.doesNotMatch(body(bad.page), /data-kind="allow"/);
-    click(bad.page, 'allow');
-    await bad.page.tick();
-    assert.deepEqual(posts(bad.page), [], JSON.stringify(over));
-    assert.equal(bad.S.askBusy.d1, undefined);
+    const cut = await chatPage({ '/api/rpc/status': asking(dialog(over)) });
+    assert.match(body(cut.page), /data-kind="allow"/, JSON.stringify(over));
+    assert.match(body(cut.page), /The text is cut or has hidden characters/, JSON.stringify(over));
+    click(cut.page, 'allow');
+    await cut.page.tick();
+    assert.deepEqual(posts(cut.page), [{ id: ID, requestId: 'd1', confirmed: true }], JSON.stringify(over));
   }
 });
 
@@ -167,15 +168,14 @@ test('q4: a select posts the option at that index (read from the page state, not
   assert.deepEqual(posts(b.page), [{ id: ID, requestId: 'd1', cancelled: true }]);
 });
 
-test('q4b: an option of a select that may not be answered posts nothing even if the action is called (truncated, or Allow behind an invisible)', async () => {
+// RP245: an option of a truncated or hidden select is answered too, with the option at that index of the dialog the page holds (never the button text).
+test('q4b: an option of a truncated or hidden select posts the option at that index (RP245)', async () => {
   for (const over of [{ title: 'Allow it?', truncated: true }, { title: '​Allow it?', message: '' }, { title: 'Pick', truncated: true }, { title: 'Pick', options: ['Y​es', 'No'] }]) {
     const p = await chatPage({ '/api/rpc/status': asking(dialog({ method: 'select', message: '', options: ['Yes', 'No'], ...over })) });
-    click(p.page, 'option', { index: '0' });
+    click(p.page, 'option', { index: '0', value: 'forged' });
     await p.page.tick();
-    assert.deepEqual(posts(p.page), [], JSON.stringify(over));
-    click(p.page, 'cancel');
-    await p.page.tick();
-    assert.deepEqual(posts(p.page), [{ id: ID, requestId: 'd1', cancelled: true }], 'Cancel still works');
+    const first = (over.options || ['Yes'])[0];
+    assert.deepEqual(posts(p.page), [{ id: ID, requestId: 'd1', value: first }], JSON.stringify(over));
   }
 });
 

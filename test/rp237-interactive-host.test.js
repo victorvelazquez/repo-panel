@@ -104,14 +104,15 @@ test('the card of the new shape: the question, the command whole, every option i
   const labels = [...html.matchAll(/data-kind="option" data-index="(\d)"[^>]*>([^<]*)</g)].map((m) => [Number(m[1]), m[2]]);
   assert.deepEqual(labels, [[0, 'Allow once'], [1, 'Allow for this session'], [2, 'Always allow git push'], [3, 'Deny']]);
   assert.match(html, /class="ask-btn ask-negative"[^>]*data-kind="option" data-index="3"/);
-  assert.doesNotMatch(html, /answer it in the terminal/);
+  assert.doesNotMatch(html, /The text is cut or has hidden characters/, 'a whole command has no note');
 });
 
 // Found by the second independent verification: Gentle Shell also cuts the preview at its START («…») when the guarded action is far into the command.
-test('a preview cut at its START («…» prefix) only offers Cancel, in the new shape and in a confirm', () => {
+// RP245: such a preview still counts as cut (askAllowed false and the note), but its options are offered, as in the terminal.
+test('a preview cut at its START («…» prefix) counts as cut and shows the note, in the new shape and in a confirm', () => {
   const d = { ...PUSH, title: 'Allow guarded git push?\n…cd /a/long/path && npm run build && git push origin HEAD' };
   assert.equal(R.askAllowed(d), false);
-  assert.doesNotMatch(R.askCard(d, 'abc', false), /data-kind="option"/);
+  assert.match(R.askCard(d, 'abc', false), /data-kind="option"[\s\S]*The text is cut or has hidden characters/);
   const c = { requestId: 'd9', method: 'confirm', title: 'Allow guarded git push?', message: '… && git push origin HEAD', options: [], expiresAt: null, truncated: false };
   assert.equal(R.askAllowed(c), false);
 });
@@ -155,11 +156,13 @@ test('pi\'s duplicate-name forms (/gentle:yolo:1) are refused too, by the server
   assert.deepEqual(sent(), []);
 });
 
-test('the new shape still only refuses when the command is cut or has a hidden character', () => {
+test('the new shape with a cut or hidden command counts as not whole and shows the note, with every option (RP245)', () => {
   for (const title of ['Allow guarded git push?\ngit push origin \u2026', 'Allow guarded git push?\ngit push\u200b origin HEAD', 'Allow guarded git push?\n   ']) {
     const d = { ...PUSH, title };
     assert.equal(R.askAllowed(d), false, JSON.stringify(title));
-    assert.doesNotMatch(R.askCard(d, 'abc', false), /data-kind="option"/, JSON.stringify(title));
+    const html = R.askCard(d, 'abc', false);
+    assert.equal((html.match(/data-kind="option"/g) || []).length, 4, JSON.stringify(title));
+    assert.match(html, /The text is cut or has hidden characters/, JSON.stringify(title));
   }
 });
 

@@ -1295,14 +1295,17 @@
   const quickRow = (q) => (!q ? '' : `<div class="qr-row" role="group" aria-label="Quick replies">${q.reply ? '<button type="button" class="qr qr-reply" data-act="quick-focus">Reply</button>' : q.options.map((o, i) => `<button type="button" class="qr" data-act="quick-reply" data-i="${i}">${esc(o)}</button>`).join('')}</div>`);
 
   // What the live session adds under the history: the answer being written (escaped like every message) and one card per dialog pi waits for (RPC2-3).
-  // The card is how the person answers a PERMISSION, so: everything is escaped, the message (the FULL command) is shown whole, Deny comes first, and
-  // the Allow of a confirm (or an option of an «Allow…» select) is NOT offered when the text may be cut or is not shown (RP81): then only the
-  // refusing answers remain. The confirm has no «Allow always»; an «Allow…» select offers the options the session sends, in its order (RP237: the person chose parity
+  // The card is how the person answers a PERMISSION, so: everything is escaped, the message is shown as the session sends it, Deny comes first, and
+  // (RP245, parity with the terminal) a text that may be cut or is not wholly visible is still answerable: the card adds a note instead of refusing (RP81 refused). The confirm has no «Allow always»; an «Allow…» select offers the options the session sends, in its order (RP237: the person chose parity
   // with the terminal). No key answers; every answer is a click.
-  const CUT_NOTE = 'The command is cut or not shown: answer it in the terminal';
+  // RP245 (parity with the terminal, decided by the person): a cut or hidden text no longer blocks the answer; the card says so and keeps showing hidden characters.
+  const CUT_NOTE = 'The text is cut or has hidden characters: it is the same preview the terminal shows';
+  // An option the server cut cannot be answered (the session expects its whole text): in a truncated dialog, one at the 200-character cap is taken as cut.
+  const OPTION_CUT = 'This option is cut: answer it in the terminal';
+  const optionCut = (d, o) => !!d && d.truncated === true && typeof o === 'string' && o.length >= 200;
   // Only what the person can SEE counts: letters, numbers, punctuation, symbols, spaces and spacing marks, plus LF and TAB. Everything else (controls, zero-width,
   // bidi, combining marks and variation selectors, unassigned and private-use characters) is hidden: a whitelist by category, so no list of "bad characters"
-  // has to be complete. A hidden character is SHOWN as a marker (⟦U+200B⟧) and a text that has one is never approved: what is read is not what the agent
+  // has to be complete. A hidden character is SHOWN as a marker (⟦U+200B⟧) and a text that has one gets the note: what is read is not exactly what the agent
   // runs. The blank fillers are letters or symbols by category and are listed on their own.
   const HIDDEN = /[^\p{L}\p{N}\p{P}\p{S} \p{Mc}\n\t]|[\u115f\u1160\u3164\uffa0\u2800\u{1d159}\ufffc]/gu;
   const hasHidden = (t) => typeof t === 'string' && t.search(HIDDEN) >= 0;
@@ -1310,7 +1313,7 @@
   // «Allow…» read through invisibles and width (NFKC): a title that only looks different is still a permission.
   const allowTitle = (d) => d.method === 'select' && /^\s*allow/i.test(String(d.title == null ? '' : d.title).normalize('NFKC').replace(HIDDEN, ''));
   // The text is whole when it has something visible, no hidden character, and does not end in an ellipsis or dots (also the lookalikes and spaced dots:
-  // «. . .»). A command that really ends in «..» is refused too: the safe answer is to read it in the terminal.
+  // «. . .»). A command that really ends in «..» gets the note too.
   function wholeText(m) {
     if (typeof m !== 'string' || hasHidden(m)) return false;
     const t = m.replace(/[\s\p{Mc}]+/gu, '');
@@ -1325,7 +1328,7 @@
     const at = d.title.indexOf('\n');
     return at < 0 ? d : { ...d, title: d.title.slice(0, at), message: d.title.slice(at + 1) };
   }
-  // Whether the card may offer an approval. A confirm needs the server not to have cut it and the whole text. A select is never answerable when it is cut or
+  // Whether the text is whole and visible (RP245: this only decides the note, it no longer withholds an approval). A confirm needs the server not to have cut it and the whole text. A select is never answerable when it is cut or
   // shows hidden characters; an «Allow…» select also needs the whole text; any other select is a plain question.
   function askAllowed(raw) {
     const d = askShape(raw);
@@ -1340,12 +1343,12 @@
   function askCard(raw, repo, busy) {
     const d = askShape(raw);
     const at = `data-act="rpc-answer" data-id="${esc(repo)}" data-request="${esc(d.requestId)}"`;
-    const btn = (label, extra, tone) => `<button type="button" class="ask-btn ask-${tone}" ${at} ${extra}${busy ? ' disabled' : ''}>${esc(label)}</button>`;
+    const btn = (label, extra, tone, off) => `<button type="button" class="ask-btn ask-${tone}" ${at} ${extra}${off ? ` title="${OPTION_CUT}"` : ''}${busy || off ? ' disabled' : ''}>${esc(label)}</button>`;
     const ok = askAllowed(d);
     const field = d.method === 'editor' ? '<textarea class="ask-field" rows="5" maxlength="4000"></textarea>' : '<input type="text" class="ask-field" maxlength="4000">';
     let controls;
-    if (d.method === 'confirm') controls = btn('Deny', 'data-kind="deny"', 'negative') + (ok ? btn('Allow', 'data-kind="allow"', 'affirmative') : '');
-    else if (d.method === 'select') controls = (ok ? (Array.isArray(d.options) ? d.options : []).map((o, i) => btn(visible(o), `data-kind="option" data-index="${i}"`, /^\s*deny\s*$/i.test(String(o)) ? 'negative' : 'affirmative')).join('') : '') + btn('Cancel', 'data-kind="cancel"', 'negative');
+    if (d.method === 'confirm') controls = btn('Deny', 'data-kind="deny"', 'negative') + btn('Allow', 'data-kind="allow"', 'affirmative');
+    else if (d.method === 'select') controls = ((Array.isArray(d.options) ? d.options : []).map((o, i) => btn(visible(o), `data-kind="option" data-index="${i}"`, /^\s*deny\s*$/i.test(String(o)) ? 'negative' : 'affirmative', optionCut(d, o))).join('')) + btn('Cancel', 'data-kind="cancel"', 'negative');
     else controls = field + btn('Send', 'data-kind="send"', 'affirmative') + btn('Cancel', 'data-kind="cancel"', 'negative');
     return `<div class="ch-ask" role="alert"><div class="ch-ask-title">${esc(visible(d.title) || 'The session is asking')}</div>${d.message ? `<pre class="ch-ask-text">${esc(visible(d.message))}</pre>` : ''}<div class="ch-ask-btns">${controls}</div>${ok ? '' : `<div class="ch-ask-warn" role="status">${CUT_NOTE}</div>`}</div>`;
   }
@@ -1542,5 +1545,5 @@
     return `${ctx.failed ? '<div class="rs-note" role="status">⚠ Summary unavailable: showing the last data we have.</div>' : ''}<div class="rs-list">${body}</div>`;
   }
 
-  return { mergeSheetHtml, repoStatus, esc, mdHtml, settingsView, memoryChipHtml, ctxChipHtml, compactButtonHtml, legendHtml, listCount, blockWidths, columnView, membersView, ROOM_COLUMN_TABS, treeFolderPaths, fileView, COLUMN_TABS, columnDetail, chatMenuHtml, headChipsHtml, statusIconsHtml, composerState, askAllowed, askCard, actionMenu, actionButtonsHtml, composerMergeHtml, composerNote, chatHead, footButtons, busyBehavior, steerRefusal, panelRefusal, queueRowHtml, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, sessionCloseHtml, sessionTerminalHtml, terminalBlockHtml, recentlyActive, chatBody, quickReplies, quickOf, quickRow, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
+  return { mergeSheetHtml, repoStatus, esc, mdHtml, settingsView, memoryChipHtml, ctxChipHtml, compactButtonHtml, legendHtml, listCount, blockWidths, columnView, membersView, ROOM_COLUMN_TABS, treeFolderPaths, fileView, COLUMN_TABS, columnDetail, chatMenuHtml, headChipsHtml, statusIconsHtml, composerState, askAllowed, askCard, actionMenu, actionButtonsHtml, composerMergeHtml, composerNote, chatHead, optionCut, footButtons, busyBehavior, steerRefusal, panelRefusal, queueRowHtml, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, sessionCloseHtml, sessionTerminalHtml, terminalBlockHtml, recentlyActive, chatBody, quickReplies, quickOf, quickRow, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
 }));

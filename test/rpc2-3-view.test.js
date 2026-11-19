@@ -58,11 +58,12 @@ test('k1: a confirm shows the title and the FULL message in a pre block, Deny fi
   assert.match(buttons(html)[0], /data-act="rpc-answer"/);
 });
 
-test('k2: no Allow when truncated, when the message is empty or blank, or when it ends with an ellipsis; Deny stays and a note says to use the terminal', () => {
-  const NOTE = /The command is cut or not shown: answer it in the terminal/;
+// RP245 (parity with the terminal, decided by the person): a cut, empty or blank text no longer blocks Allow; Deny still comes first and the note says the text is cut.
+test('k2: truncated, empty, blank or ellipsis-ended text: Deny then Allow, with the note that the text is cut', () => {
+  const NOTE = /The text is cut or has hidden characters: it is the same preview the terminal shows/;
   for (const over of [{ truncated: true }, { message: '' }, { message: '   \n' }, { message: 'git push origin…' }, { message: 'git push origin...' }, { message: 'git push origin … \n' }]) {
     const html = card(dlg(over));
-    assert.deepEqual(labels(html), ['Deny'], JSON.stringify(over));
+    assert.deepEqual(labels(html), ['Deny', 'Allow'], JSON.stringify(over));
     assert.match(html, NOTE);
   }
   assert.doesNotMatch(card(dlg()), NOTE);
@@ -81,15 +82,15 @@ test('k3: the title and the message are escaped (img onerror, </pre>, quotes) an
   assert.ok(long.includes('x'.repeat(3999) + 'y</pre>'), 'the whole text is in the card');
 });
 
-test('k4: a select has one escaped button per option in order plus Cancel; an Allow… select without a safe message offers only Cancel', () => {
+test('k4: a select has one escaped button per option in order plus Cancel; an Allow… select without a safe message offers them too, with the note (RP245)', () => {
   const html = card(dlg({ method: 'select', title: 'Pick', message: '', options: ['b <i>one</i>', 'a', 'c"d'] }));
   assert.deepEqual(labels(html), ['b &lt;i&gt;one&lt;/i&gt;', 'a', 'c&quot;d', 'Cancel']);
   assert.deepEqual(buttons(html).map((b) => (/data-index="(\d)"/.exec(b) || [])[1]), ['0', '1', '2', undefined]);
   assert.doesNotMatch(html, /<i>/);
   for (const over of [{ message: '' }, { truncated: true }, { message: 'sudo rm…' }]) {
     const h = card(dlg({ method: 'select', title: 'Allow recognized data-loss command?', options: ['Yes', 'No'], ...over }));
-    assert.deepEqual(labels(h), ['Cancel'], JSON.stringify(over));
-    assert.match(h, /The command is cut or not shown: answer it in the terminal/);
+    assert.deepEqual(labels(h), ['Yes', 'No', 'Cancel'], JSON.stringify(over));
+    assert.match(h, /The text is cut or has hidden characters: it is the same preview the terminal shows/);
   }
   assert.deepEqual(labels(card(dlg({ method: 'select', title: 'Allow it?', message: 'git push', options: ['Yes', 'No'] }))), ['Yes', 'No', 'Cancel']);
 });
@@ -124,10 +125,16 @@ test('k7: askAllowed is the one rule: confirm and Allow-titled select need a who
 });
 
 // ---------- found by the independent verification: a command that is not really visible, or whose cut is disguised ----------
-test('k8: no Allow when the command is not visible, has hidden characters or its cut is disguised; Deny stays', () => {
+// RP245: these texts still count as not whole (askAllowed false, the note shows), but they no longer block Allow.
+test('k8: a command that is not visible, has hidden characters or a disguised cut: Deny then Allow, with the note', () => {
   const hidden = ['\x01', '\u200b', '\u00ad', '\u3164', '\u2800', '\u202e', 'ls \u202e-fr', 'ls\u200bfoo', 'ls\u2028foo'];
   const cut = ['ls \u2025', 'ls \u22ef', 'ls \ufe19', 'ls \u2026\u200b', 'ls ...\u202c', 'ls ..', 'ls . . .', 'ls\u2026 \n'];
-  for (const message of [...hidden, ...cut, '   ', '\n\t ']) assert.deepEqual(labels(card(dlg({ message }))), ['Deny'], JSON.stringify(message));
+  for (const message of [...hidden, ...cut, '   ', '\n\t ']) {
+    const html = card(dlg({ message }));
+    assert.deepEqual(labels(html), ['Deny', 'Allow'], JSON.stringify(message));
+    assert.equal(R.askAllowed(dlg({ message })), false, JSON.stringify(message));
+    assert.match(html, /The text is cut or has hidden characters/, JSON.stringify(message));
+  }
   assert.deepEqual(labels(card(dlg({ message: 'git push origin HEAD' }))), ['Deny', 'Allow'], 'a plain command keeps both');
   assert.deepEqual(labels(card(dlg({ message: 'git log --oneline\ngit status' }))), ['Deny', 'Allow'], 'a multi-line command is fine');
 });
@@ -137,7 +144,7 @@ test('k9: the hidden characters of the title, the message and the options are SH
   assert.ok(html.includes('\u27e6U+202E\u27e7') && html.includes('\u27e6U+200B\u27e7'), 'markers present');
   assert.equal(/[\u202e\u200b]/.test(html), false, 'no raw hidden character reaches the page');
   const sel = card(dlg({ method: 'select', title: 'Pick', message: '', options: ['a\u202eb', 'ok'] }));
-  assert.deepEqual(labels(sel), ['Cancel'], 'a select with a hidden character in an option offers no option at all');
+  assert.deepEqual(labels(sel), ['a\u27e6U+202E\u27e7b', 'ok', 'Cancel'], 'RP245: a select with a hidden character in an option offers it, shown with its marker');
   assert.equal(/\u202e/.test(sel), false, 'and no raw hidden character reaches the page');
   assert.ok(card(dlg({ message: 'a\nb\tc' })).includes('a\nb\tc'), 'LF and TAB stay as they are');
 });
@@ -160,7 +167,7 @@ test('k12: glyph-less symbols, odd spaces, a mark after an ellipsis and lookalik
   assert.doesNotThrow(() => card(dlg({ method: 'select', title: 'Pick', message: '', options: undefined })));
 });
 
-test('k10: a select is never answerable when it is truncated or has hidden characters, and an Allow-like title is read through invisibles and width', () => {
+test('k10: a truncated or hidden select is not whole (RP245: it gets the note, not a refusal), and an Allow-like title is read through invisibles and width', () => {
   const sel = (over) => dlg({ method: 'select', title: 'Pick one', message: '', options: ['Yes', 'No'], ...over });
   assert.equal(R.askAllowed(sel({ truncated: true })), false, 'any truncated select');
   assert.equal(R.askAllowed(sel({ options: ['Y\u200bes', 'No'] })), false, 'a hidden character in an option');
@@ -169,5 +176,5 @@ test('k10: a select is never answerable when it is truncated or has hidden chara
   assert.equal(R.askAllowed(sel({ title: '\uff21llow it' })), false, 'full-width A, no message');
   assert.equal(R.askAllowed(sel({ title: '\uff21llow it', message: 'git push' })), true, 'with the whole command it may be answered');
   assert.equal(R.askAllowed(sel()), true, 'a plain select');
-  assert.deepEqual(labels(card(sel({ title: '\u200bAllow it', truncated: true }))), ['Cancel']);
+  assert.deepEqual(labels(card(sel({ title: '\u200bAllow it', truncated: true }))), ['Yes', 'No', 'Cancel'], 'RP245: offered, with the note');
 });

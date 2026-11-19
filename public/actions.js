@@ -299,8 +299,9 @@ const ACTIONS = {
     let answer = null;
     if (kind === 'cancel') answer = { cancelled: true };
     else if (kind === 'deny' && ask.method === 'confirm') answer = { confirmed: false };
-    else if (kind === 'allow' && ask.method === 'confirm' && R.askAllowed(ask)) answer = { confirmed: true };
-    else if (kind === 'option' && ask.method === 'select' && R.askAllowed(ask) && typeof ask.options[Number(el.dataset.index)] === 'string') answer = { value: ask.options[Number(el.dataset.index)] };
+    // RP245: a cut or hidden text no longer blocks the answer (parity with the terminal); the card says so. The option is still the one at that index of the dialog held here.
+    else if (kind === 'allow' && ask.method === 'confirm') answer = { confirmed: true };
+    else if (kind === 'option' && ask.method === 'select' && typeof ask.options[Number(el.dataset.index)] === 'string' && !R.optionCut(ask, ask.options[Number(el.dataset.index)])) answer = { value: ask.options[Number(el.dataset.index)] };
     else if (kind === 'send' && (ask.method === 'input' || ask.method === 'editor')) {
       const box = typeof el.closest === 'function' ? el.closest('.ch-ask') : null;
       const field = box && box.querySelector('.ask-field');
