@@ -360,7 +360,7 @@ test('C9: a failed send puts the option back in the box (the message box handlin
 });
 
 test('C10: the Reply button: only for a trailing question with no options, under the same conditions, and it only focuses', async () => {
-  const q = { '/api/chat': histOf(item('user', 'go'), ASSISTANT('Done.\n\n¿Querés que lo suba?')) };
+  const q = { '/api/chat': histOf(item('user', 'go'), ASSISTANT('Done.\n\n¿Qué preferís que haga ahora?')) };
   const { page } = await chatPage(q);
   assert.equal(buttons(page), 0);
   assert.match(slot(page), /<button type="button" class="qr qr-reply" data-act="quick-focus">Reply<\/button>/);
@@ -426,4 +426,31 @@ test('C13: the look: small outlined buttons that wrap, with a visible focus, and
   assert.match(css, /\.qr\s*\{[^}]*overflow-wrap:\s*anywhere/);
   const h = R.chatBody({ id: 'abc', info: ADOPTED, hist: histOf(item('user', 'go'), ASSISTANT()), rpc: { state: 'idle', asks: [] } }, {});
   assert.ok(!/pi session|pi screen|Gentle Shell/i.test(h));
+});
+
+// ---------- RP246: Yes and No for a yes/no question written as text ----------
+test('RP246: yesNoOf: a trailing yes/no question gets the two words in its language; an open question, an either-or or no question gets null', () => {
+  assert.deepEqual(R.yesNoOf('Listo.\n\n¿Los arreglo en la rama del PR #299?'), ['Sí', 'No']);
+  assert.deepEqual(R.yesNoOf('Done.\n\nShould I push it?'), ['Yes', 'No']);
+  assert.deepEqual(R.yesNoOf('**¿Querés que siga?**'), ['Sí', 'No']);
+  assert.deepEqual(R.yesNoOf('Te parece bien que lo suba?'), ['Sí', 'No'], 'castellano sin ¿');
+  for (const t of ['¿Qué preferís?', '¿Cómo lo hago?', '¿Por qué falló?', '¿Cuál de las dos?', 'What do you think?', 'Which one?', 'Why not?',
+    '¿Lo arreglo en la rama o en main?', 'Should I fix it here or in main?', 'Done.', '', 'Dale?\n```js\nx?', '- ¿Lo subo?', '> ¿Lo subo?', 7, null]) assert.equal(R.yesNoOf(t), null, String(t));
+});
+
+test('RP246: the row draws Yes and No first and keeps Reply; a listed-options row is unchanged', async () => {
+  const yn = R.quickRow({ sig: 's', options: ['Sí', 'No'], reply: true });
+  assert.match(yn, /data-act="quick-reply" data-i="0">Sí<\/button><button type="button" class="qr" data-act="quick-reply" data-i="1">No<\/button><button type="button" class="qr qr-reply" data-act="quick-focus">Reply<\/button>/);
+  assert.doesNotMatch(R.quickRow({ sig: 's', options: ['a', 'b'], reply: false }), /qr-reply/);
+});
+
+test('RP246: in the chat a yes/no question shows Sí and No with Reply, and a click sends exactly that word once', async () => {
+  const { page } = await chatPage({ '/api/chat': histOf(item('user', 'go'), ASSISTANT('Listo.\n\n¿Los arreglo en la rama del PR #299?')) });
+  assert.equal(buttons(page), 2);
+  assert.equal(count(slot(page), 'qr-reply'), 1);
+  click(page, '0');
+  await page.tick();
+  assert.equal(sendsOf(page).length, 1);
+  assert.match(JSON.stringify(sendsOf(page)[0]), /S\u00ed|Sí/);
+  assert.doesNotMatch(JSON.stringify(sendsOf(page)[0]), /PR #299/);
 });
