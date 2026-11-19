@@ -431,6 +431,19 @@
     return `<span class="mem ${cls}" title="${esc(title)}"><i class="mem-ic" aria-hidden="true">${MEMORY_ICON[r.memory]}</i> <span class="mem-word">${word}</span></span>`; // RP156: the memory chip gets an icon too
   };
 
+  // RP245c: the permission mode of the session, only when it asks less than normal (auto, yolo, super-yolo): silence in the normal mode, as with the memory.
+  const MODE_CHIP = {
+    auto: ['mem-warn', 'The session runs in auto mode: it asks fewer permission questions'],
+    yolo: ['mem-bad', 'The session runs in yolo mode: only destructive actions still ask'],
+    'super-yolo': ['mem-bad', 'The session runs in super-yolo mode: it asks no permission questions'],
+  };
+  const modeChipHtml = (c) => {
+    const r = c && c.rpc && typeof c.rpc === 'object' ? c.rpc : null;
+    if (!r || r.state === 'closed' || typeof r.mode !== 'string' || !Object.hasOwn(MODE_CHIP, r.mode)) return '';
+    const [cls, title] = MODE_CHIP[r.mode];
+    return `<span class="mem mode ${cls}" title="${esc(title)}" aria-label="${esc(title)}"><i class="mem-ic" aria-hidden="true">⚡</i> <span class="mem-word">${r.mode}</span></span>`;
+  };
+
   // RP139: the share of the context window the session uses, as a chip next to the memory one. c.rpc.ctx holds three validated numbers (V.rpcWithContext); unknown (null) reads `ctx —`, never 0.
   // Quiet below 70%, warning from 70%, strong warning from 90%: icon + number + words in the help, never colour alone. Nothing is drawn while the session is closed or starting, or before the first reading.
   const kTokens = (n) => (n >= 1000 ? `${Math.round(n / 1000)}k` : String(n));
@@ -453,12 +466,12 @@
     return `<span class="mem ctx${l.cls ? ` ${l.cls}` : ''}" title="${esc(l.title)}"><i class="mem-ic" aria-hidden="true">${ctxIcon(l.kind, l.p)}</i> <span class="mem-word">ctx </span>${l.p}%</span>`;
   };
   // RP197: the chips of the head of the chat. Silence when all is well: the context (once read), the memory only when it is not ready, the checks only while they run or fail (ciOf is null on green).
-  const headChipsHtml = (c, ci) => ctxChipHtml(c) + memoryChipHtml(c, { quiet: true }) + ciLabel(ci, { head: true });
+  const headChipsHtml = (c, ci) => modeChipHtml(c) + ctxChipHtml(c) + memoryChipHtml(c, { quiet: true }) + ciLabel(ci, { head: true }); // RP245c: the mode first, it changes what the session may do
   // RP198: row 2 of the phone head, in a fixed order: ↑N (only when ahead > 0), the context, then the alerts (the memory when it is not ready, the checks while they run or fail). With 4 pieces the row is `ch-tight`:
   // the stylesheet drops the words of the alerts (icon + number stay); with fewer it drops them only when the central block is narrow (a container query). '' when there is nothing to say.
   const aheadChipHtml = (n) => (n > 0 ? `<span class="ch-up" title="${n} ${n === 1 ? 'commit' : 'commits'} ahead" aria-label="${n} ${n === 1 ? 'commit' : 'commits'} ahead">${svgIcon('<path d="M8 13V3M4 7l4-4 4 4"/>', 13)}${n}</span>` : '');
   const phoneInfoHtml = (c, ci, ahead) => {
-    const pieces = [aheadChipHtml(ahead), c ? ctxChipHtml(c) : '', c ? memoryChipHtml(c, { quiet: true, phone: true }) : '', ciLabel(ci, { phone: true })].filter(Boolean);
+    const pieces = [aheadChipHtml(ahead), c ? modeChipHtml(c) : '', c ? ctxChipHtml(c) : '', c ? memoryChipHtml(c, { quiet: true, phone: true }) : '', ciLabel(ci, { phone: true })].filter(Boolean);
     return pieces.length ? `<span class="ch-info${pieces.length > 3 ? ' ch-tight' : ''}">${pieces.join('')}</span>` : '';
   };
   // RP197: the states as ICONS with no text, side by side, for the top of the ⋮ menu: the memory (also when it is ready), the context and the checks of the PR. Each has its name (aria-label and tooltip, the same words) and a tone.
@@ -1568,5 +1581,5 @@
     return `${ctx.failed ? '<div class="rs-note" role="status">⚠ Summary unavailable: showing the last data we have.</div>' : ''}<div class="rs-list">${body}</div>`;
   }
 
-  return { mergeSheetHtml, repoStatus, esc, mdHtml, settingsView, memoryChipHtml, ctxChipHtml, compactButtonHtml, legendHtml, listCount, blockWidths, columnView, membersView, ROOM_COLUMN_TABS, treeFolderPaths, fileView, COLUMN_TABS, columnDetail, chatMenuHtml, headChipsHtml, statusIconsHtml, composerState, askAllowed, askCard, actionMenu, actionButtonsHtml, composerMergeHtml, composerNote, chatHead, optionCut, footButtons, busyBehavior, bashOf, shellHtml, SHELL_WAITS, steerRefusal, panelRefusal, queueRowHtml, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, sessionCloseHtml, sessionTerminalHtml, terminalBlockHtml, recentlyActive, chatBody, quickReplies, quickOf, quickRow, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
+  return { mergeSheetHtml, repoStatus, esc, mdHtml, settingsView, memoryChipHtml, modeChipHtml, ctxChipHtml, compactButtonHtml, legendHtml, listCount, blockWidths, columnView, membersView, ROOM_COLUMN_TABS, treeFolderPaths, fileView, COLUMN_TABS, columnDetail, chatMenuHtml, headChipsHtml, statusIconsHtml, composerState, askAllowed, askCard, actionMenu, actionButtonsHtml, composerMergeHtml, composerNote, chatHead, optionCut, footButtons, busyBehavior, bashOf, shellHtml, SHELL_WAITS, steerRefusal, panelRefusal, queueRowHtml, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, sessionCloseHtml, sessionTerminalHtml, terminalBlockHtml, recentlyActive, chatBody, quickReplies, quickOf, quickRow, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
 }));

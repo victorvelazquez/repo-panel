@@ -154,6 +154,15 @@ function memoryOf(text) {
   return m[1].toLowerCase() === 'ready' ? 'ready' : m[1].toLowerCase() === 'offline' ? 'offline' : 'error';
 }
 
+// RP245c: what the page may know of the permission mode of a session: ONE category of this closed list. Gentle Shell writes `Permissions: <MODE>` in its notice `gentle:mode`
+// (at the start of the session and on every change); any other text is null and never changes what is known.
+const MODES = ['normal', 'auto', 'yolo', 'super-yolo'];
+function modeOf(text) {
+  if (typeof text !== 'string') return null;
+  const m = /^permissions: (normal|auto|yolo|super-yolo)$/i.exec(text.replace(/\s+/g, ' ').trim());
+  return m ? m[1].toLowerCase() : null;
+}
+
 // RP139: what the page may know of the context window of a session: three numbers, every one finite and not negative or null. Nothing else of the answer (no text, no other field) is kept.
 // A window that is not a positive integer makes the whole answer unknown; `tokens` and `percent` are null right after a compaction and stay null (never 0).
 const CONTEXT_NONE = { tokens: null, window: null, percent: null };
@@ -188,7 +197,7 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
   const closedStatus = { state: 'closed', pendingDialogs: [], sessionId: null };
   // A pending dialog is named `requestId` here as in the SSE `dialog` event.
   const statusOf = (entry) => (entry && entry.client
-    ? { state: entry.client.state(), pendingDialogs: entry.client.pendingDialogs().map(({ id, ...rest }) => ({ requestId: id, ...rest })), sessionId: entry.sessionId, ...(entry.memory ? { memory: entry.memory } : {}), ...(entry.compacting ? { compacting: true } : {}), ...(entry.bash ? { bash: { ...entry.bash, running: true } } : {}), ...(entry.commands ? { missing: missingOf(entry.commands) } : {}) }
+    ? { state: entry.client.state(), pendingDialogs: entry.client.pendingDialogs().map(({ id, ...rest }) => ({ requestId: id, ...rest })), sessionId: entry.sessionId, ...(entry.memory ? { memory: entry.memory } : {}), ...(entry.mode ? { mode: entry.mode } : {}), ...(entry.compacting ? { compacting: true } : {}), ...(entry.bash ? { bash: { ...entry.bash, running: true } } : {}), ...(entry.commands ? { missing: missingOf(entry.commands) } : {}) }
     : closedStatus);
   const running = (id) => {
     const entry = live.get(id);
@@ -227,6 +236,8 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
         if (e && e.kind === 'status') { // RP110b: only the notice of THIS session counts (an old client's is not the new one's), and only a change of category is published
           const cat = e.key === 'engram' && live.get(id) === entry ? memoryOf(e.text) : null;
           if (cat && cat !== entry.memory) { entry.memory = cat; publish(id, { kind: 'memory', memory: cat }); }
+          const mode = e.key === 'gentle:mode' && live.get(id) === entry ? modeOf(e.text) : null; // RP245c
+          if (mode && mode !== entry.mode) { entry.mode = mode; publish(id, { kind: 'mode', mode }); }
           return;
         }
         const w = wire(e);
@@ -486,4 +497,4 @@ function rpcApi(host) {
   };
 }
 
-module.exports = { createRpcHost, rpcApi, cleanText, sessionIdFor, memoryOf, MEMORY, toPanel };
+module.exports = { createRpcHost, rpcApi, cleanText, sessionIdFor, memoryOf, MEMORY, modeOf, MODES, toPanel };
