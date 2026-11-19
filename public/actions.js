@@ -228,6 +228,18 @@ const ACTIONS = {
   'chat-close': () => closeChat(),
   'chat-send': () => sendChatMessage(),
   'chat-steer': () => sendChatMessage('steer'), // RP236
+  // RP245b: Stop of the running shell command of the open chat (pi's abort_bash); its answer then closes the bubble as cancelled.
+  'shell-stop': async () => {
+    const id = S.chat.id;
+    if (!id) return;
+    try { await api('/api/rpc/abort-bash', { id }); } catch (e) { toast(e.message, 'bad'); }
+  },
+  // RP245b: folds or unfolds the output of the last shell command of the open chat.
+  'shell-toggle': () => {
+    const r = S.chat.id && S.rpc[S.chat.id];
+    if (r && r.bash) r.bash = { ...r.bash, open: r.bash.open !== true };
+    draw();
+  },
   'chat-queue': () => sendChatMessage('followUp'), // RP236
   // RP236: takes the queued messages back from pi and puts their texts in the box (corrections first, in their order), so nothing written is lost.
   'chat-unqueue': async () => {

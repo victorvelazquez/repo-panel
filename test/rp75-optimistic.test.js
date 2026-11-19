@@ -577,6 +577,96 @@ test('C11h (RP237): a permission command of Gentle Shell is not sent from the bo
   }
 });
 
+test('C11i (RP245b): !command with the session free goes to /api/rpc/bash, never as a prompt; the box clears and the bubble ends with the exit code', async () => {
+  const { page, S } = await chatPage({ '/api/rpc/status': { state: 'idle', pendingDialogs: [] }, '/api/rpc/bash': { output: 'ok\n', exitCode: 0, cancelled: false, truncated: false } });
+  page.get('#msgBox').value = '!git status';
+  page.run("ACTIONS['chat-send']({})");
+  await page.tick();
+  const posts = page.fetches.filter((f) => f.method === 'POST' && f.url === '/api/rpc/bash').map((f) => JSON.parse(f.body));
+  assert.deepEqual(posts, [{ id: 'abc', text: '!git status' }]);
+  assert.equal(sendsOf(page).length, 0, 'never a prompt');
+  assert.equal(page.get('#msgBox').value, '');
+  assert.equal(S.rpc.abc.bash.running, false);
+  assert.equal(S.rpc.abc.bash.exitCode, 0);
+  assert.match(body(page), /\$ git status[\s\S]*Exit code 0/);
+});
+
+test('C11j (RP245b): with the session working a shell command waits in the box with the reason; a refused one puts the text back', async () => {
+  const busy = await chatPage({ '/api/rpc/status': { state: 'busy', pendingDialogs: [] } });
+  busy.page.get('#msgBox').value = '!!ls';
+  busy.page.run("ACTIONS['chat-send']({})");
+  await busy.page.tick();
+  assert.equal(busy.page.fetches.filter((f) => f.url === '/api/rpc/bash' || f.url === '/api/rpc/prompt').length, 0);
+  assert.equal(busy.page.get('#msgBox').value, '!!ls');
+  assert.ok(busy.page.get('#msgNote').html.includes('Shell commands wait until the session is free'), busy.page.get('#msgNote').html);
+  const fail = () => Promise.resolve({ ok: false, status: 409, statusText: 'Conflict', json: async () => ({ error: 'A shell command is already running in this session' }) });
+  const refused = await chatPage({ '/api/rpc/status': { state: 'idle', pendingDialogs: [] }, '/api/rpc/bash': fail });
+  refused.page.get('#msgBox').value = '!ls';
+  refused.page.run("ACTIONS['chat-send']({})");
+  await refused.page.tick();
+  assert.equal(refused.page.get('#msgBox').value, '!ls');
+  assert.ok(refused.page.get('#msgNote').html.includes('already running'));
+  assert.equal(refused.S.rpc.abc.bash, null);
+});
+
+// Found by the independent verification: a refused second command wiped the live bubble of the one still running.
+test('C11l (RP245b): a second ! while one runs is not sent; the running bubble keeps its output and the text stays in the box', async () => {
+  const { page, S } = await chatPage({ '/api/rpc/status': { state: 'idle', pendingDialogs: [] } });
+  S.rpc.abc.bash = { command: 'long', exclude: false, output: 'A1\n', running: true };
+  page.get('#msgBox').value = '!second';
+  page.run("ACTIONS['chat-send']({})");
+  await page.tick();
+  assert.equal(page.fetches.filter((f) => f.url === '/api/rpc/bash').length, 0);
+  assert.equal(S.rpc.abc.bash.command, 'long');
+  assert.equal(S.rpc.abc.bash.output, 'A1\n');
+  assert.equal(page.get('#msgBox').value, '!second');
+  assert.ok(page.get('#msgNote').html.includes('A shell command is already running'), page.get('#msgNote').html);
+});
+
+test('C11m (RP245b): a bare ! is not sent anywhere and says to write a command; Stop posts abort-bash for the open repo', async () => {
+  const { page, S } = await chatPage({ '/api/rpc/status': { state: 'idle', pendingDialogs: [] }, '/api/rpc/abort-bash': { ok: true } });
+  page.get('#msgBox').value = '  !! ';
+  page.run("ACTIONS['chat-send']({})");
+  await page.tick();
+  assert.equal(page.fetches.filter((f) => f.url === '/api/rpc/bash' || f.url === '/api/rpc/prompt').length, 0);
+  assert.ok(page.get('#msgNote').html.includes('Write a command after ! or !!'), page.get('#msgNote').html);
+  S.rpc.abc.bash = { command: 'sleep 99', exclude: false, output: '', running: true };
+  await page.run("ACTIONS['shell-stop']")({});
+  await page.tick();
+  assert.deepEqual(page.fetches.filter((f) => f.method === 'POST' && f.url === '/api/rpc/abort-bash').map((f) => JSON.parse(f.body)), [{ id: 'abc' }]);
+});
+
+// Found by the independent re-check: the page gave up on a shell command after the 70 s of an ordinary POST, wiping the bubble and its Stop.
+test('C11n (RP245b): the page waits for a shell command as long as the server; a command the server stopped keeps its bubble, closed', async () => {
+  const { page, S } = await chatPage({ '/api/rpc/status': { state: 'idle', pendingDialogs: [] } });
+  page.run("globalThis.__calls = []; globalThis.__orig = api; api = (url, body, opts) => { __calls.push({ url, ms: opts && opts.timeoutMs }); return url === '/api/rpc/bash' ? new Promise(() => {}) : __orig(url, body, opts); };");
+  page.get('#msgBox').value = '!npm test';
+  page.run("ACTIONS['chat-send']({})");
+  await page.tick();
+  const call = page.run('__calls').find((c) => c.url === '/api/rpc/bash');
+  assert.ok(call && call.ms >= 30 * 60 * 1000, `the bash request waits at least 30 minutes: ${call && call.ms}`);
+  assert.equal(S.rpc.abc.bash.running, true);
+  page.run("api = (url, body, opts) => url === '/api/rpc/bash' ? Promise.reject(new Error('The shell command ran longer than 30 minutes and was stopped')) : __orig(url, body, opts);");
+  S.rpc.abc.bash = null;
+  page.get('#msgBox').value = '!sleep 9999';
+  page.run("ACTIONS['chat-send']({})");
+  await page.tick();
+  assert.deepEqual([S.rpc.abc.bash.running, S.rpc.abc.bash.cancelled], [false, true], 'closed as stopped, not wiped');
+  assert.equal(page.get('#msgBox').value, '', 'the text does not come back: the command did run');
+  assert.ok(page.get('#msgNote').html.includes('ran longer than 30 minutes'));
+});
+
+test('C11k (RP245b): Show all unfolds a long finished output and folds it back', async () => {
+  const { page, S } = await chatPage({ '/api/rpc/status': { state: 'idle', pendingDialogs: [] } });
+  S.rpc.abc.bash = { command: 'seq 30', exclude: false, output: Array.from({ length: 30 }, (_, i) => `n${i + 1}`).join('\n'), running: false, exitCode: 0 };
+  page.run('draw()');
+  page.flush();
+  assert.match(body(page), />Show all 30 lines</);
+  page.run("ACTIONS['shell-toggle']({})");
+  page.flush();
+  assert.match(body(page), />Show the last 20 lines</);
+});
+
 test('C11d (RP236): the queue pi tells is drawn above the box, and Clear queue asks the server and puts the texts back in the box', async () => {
   const { page, S } = await chatPage({ '/api/rpc/status': { state: 'busy', pendingDialogs: [] }, '/api/rpc/clear-queue': { steering: ['fix the test'], followUp: ['then summarize'] } });
   page.run(`applyRpc(${JSON.stringify({ id: 'abc', kind: 'event', record: { type: 'queue', steering: ['fix the test'], followUp: ['then summarize'] } })})`);

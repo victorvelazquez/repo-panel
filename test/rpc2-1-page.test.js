@@ -244,14 +244,15 @@ test('p10: a second click while the first send is in flight posts nothing more',
   await page.tick();
 });
 
+// RP245b: a text that starts with ! is a shell command now (it goes to /api/rpc/bash); a plain text shows the same rule for a failed prompt.
 test('p11: a failed prompt puts the text back in the box and shows the server message', async () => {
-  const { page } = await chatPage({ '/api/rpc/status': status('idle'), '/api/rpc/prompt': () => fail(400, { error: 'Messages that start with ! run a shell command; type those in the terminal' }) });
-  type(page, '!ls');
+  const { page } = await chatPage({ '/api/rpc/status': status('idle'), '/api/rpc/prompt': () => fail(400, { error: 'The message is longer than 20000 characters' }) });
+  type(page, 'hello there');
   send(page);
   await page.tick();
-  assert.equal(page.get('#msgBox').value, '!ls');
-  assert.match(note(page), /Messages that start with ! run a shell command/);
-  assert.doesNotMatch(body(page), /!ls/, 'the optimistic bubble is gone');
+  assert.equal(page.get('#msgBox').value, 'hello there');
+  assert.match(note(page), /The message is longer than 20000 characters/);
+  assert.doesNotMatch(body(page), /hello there/, 'the optimistic bubble is gone');
 });
 
 test('p12: a failed start puts the text back, shows the message, never posts the prompt and leaves the session not started', async () => {

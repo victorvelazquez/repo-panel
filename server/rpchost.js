@@ -36,7 +36,7 @@ function cleanText(value) {
   const clean = value.replace(/\r\n?/g, '\n').replace(CONTROLS, '').trim();
   if (!clean) throw new HttpError(400, 'Write something to send');
   if (clean.length > TEXT_MAX) throw new HttpError(400, `The message is longer than ${TEXT_MAX} characters`);
-  if (clean.startsWith('!')) throw new HttpError(400, 'Messages that start with ! run a shell command; type those in the terminal');
+  if (clean.startsWith('!')) throw new HttpError(400, 'Messages that start with ! run a shell command: send them from the chat box'); // RP245b: they go to bash(), never to prompt
   return clean;
 }
 
@@ -98,6 +98,12 @@ const allTexts = (list) => (Array.isArray(list) ? list.filter((t) => typeof t ==
 const clearedOf = (r) => ({ steering: allTexts(r && r.steering), followUp: allTexts(r && r.followUp) });
 // RP236b (B2): pi runs an extension command sent by prompt at once, even during a run; while the session works a command waits for it to be free.
 const COMMAND_WAITS = 'Commands wait until the session is free: send it when the run ends';
+// RP245b: a shell command (! or !!) waits for a free session too; it may run long, so it waits longer than an ordinary request.
+const SHELL_WAITS = 'Shell commands wait until the session is free: send it when the run ends';
+const SHELL_MAX = TEXT_MAX;
+const SHELL_MS = 30 * 60 * 1000;
+// The abort sent after that wait is short, so the 409 reaches the page (which waits one minute more) even when pi does not answer it.
+const SHELL_ABORT_MS = 15000;
 // RP237 (option (a), decided by the person): with GENTLE_SHELL_INTERACTIVE_HOST=1 these commands can change the runtime's permission mode (even super-yolo, saved for new
 // sessions) and its configuration, and the panel would not show it. They stay in the terminal: refused here whatever the way the text comes in.
 // pi names a command registered twice `name:1`, `name:2`: those forms are the same command.
@@ -106,6 +112,8 @@ const NOT_HERE = 'Permission and configuration commands (/gentle:desktop, /gentl
 const panelOnly = (message) => { if (PANEL_BLOCKED.test(message)) throw new HttpError(409, NOT_HERE); return message; };
 const TRANSLATE = {
   queue_update: (r) => ({ type: 'queue', ...queueOf(r) }),
+  // RP245b: one chunk of the output of a shell command the person ran with ! or !! (only one runs at a time per session).
+  bash_execution_update: (r) => ({ type: 'bash_output', ...(typeof r.delta === 'string' ? { delta: r.delta } : {}) }),
   agent_start: () => ({ type: 'run_start' }),
   agent_end: () => ({ type: 'run_end' }),
   agent_settled: () => ({ type: 'run_settled' }),
@@ -186,12 +194,13 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
     return entry;
   };
   // A failed command is a fixed message: RpcError texts are fixed already, anything else is hidden.
-  const ask = async (entry, type, fields) => {
-    try { return await entry.client.request(type, fields); } catch (e) {
+  const ask = async (entry, type, fields, opts) => {
+    try { return await entry.client.request(type, fields, ...(opts ? [opts] : [])); } catch (e) {
       if (e instanceof RpcError) throw new HttpError(409, e.message);
       throw new HttpError(500, 'The session failed');
     }
   };
+  const askLong = (entry, type, fields) => ask(entry, type, fields, { timeoutMs: SHELL_MS });
 
   // closeAll bumps the epoch: a start that was waiting for the runtime when it ran must not create a client nobody owns (found by the independent verification).
   let epoch = 0;
@@ -324,6 +333,33 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
       return ask(running(id), 'steer', { message });
     },
     async abort(id) { repoOf(id); return ask(running(id), 'abort', {}); },
+    // RP245b (parity with the terminal): `!command` runs it in the folder of the session with pi's bash order and its output goes to the conversation; `!!command`
+    // keeps the output from the model (excludeFromContext). It waits for a free session, like a command with /, and only one runs at a time.
+    async bash(id, value) {
+      repoOf(id);
+      const text = typeof value === 'string' ? value.replace(/\r\n?/g, '\n').trim() : value;
+      if (typeof text !== 'string') throw new HttpError(400, 'The text must be a string');
+      const m = /^(!!?)([\s\S]*)$/.exec(text);
+      if (!m) throw new HttpError(400, 'A shell command starts with ! or !!');
+      const command = m[2].trim();
+      if (!command) throw new HttpError(400, 'Write a command after ! or !!');
+      if (command.length > SHELL_MAX) throw new HttpError(400, `The command is longer than ${SHELL_MAX} characters`);
+      const entry = running(id);
+      if (entry.compacting) throw new HttpError(409, 'The session is compacting its context: wait a moment');
+      if (entry.bashing) throw new HttpError(409, 'A shell command is already running in this session');
+      if (!entry.up || entry.client.state() !== 'idle') throw new HttpError(409, SHELL_WAITS);
+      entry.bashing = true;
+      try { return await askLong(entry, 'bash', { command, excludeFromContext: m[1] === '!!' }); } catch (e) {
+        // Past the wait the panel stops waiting; it also stops the command in pi, so a later one never runs alongside it.
+        if (e instanceof HttpError && e.message === 'The agent did not answer in time') {
+          try { await entry.client.request('abort_bash', {}, { timeoutMs: SHELL_ABORT_MS }); } catch { /* the session may be gone */ }
+          throw new HttpError(409, 'The shell command ran longer than 30 minutes and was stopped');
+        }
+        throw e;
+      } finally { entry.bashing = false; }
+    },
+    // RP245b: Stop of a running shell command (pi's abort_bash; its answer then says cancelled).
+    async abortBash(id) { repoOf(id); await ask(running(id), 'abort_bash', {}); return { ok: true }; },
     // RP236: takes the queued messages back (pi answers their texts, which the page puts back in the box).
     async clearQueue(id) { repoOf(id); return clearedOf(await ask(running(id), 'clear_queue', {})); },
     async answer(id, requestId, answer) {
@@ -425,6 +461,8 @@ function rpcApi(host) {
     steer: (b) => host.steer(idOf(bodyOf(b)), b.text),
     abort: (b) => host.abort(idOf(bodyOf(b))),
     clearQueue: (b) => host.clearQueue(idOf(bodyOf(b))),
+    bash: (b) => host.bash(idOf(bodyOf(b)), b.text),
+    abortBash: (b) => host.abortBash(idOf(bodyOf(b))),
     dialog: (b) => {
       const id = idOf(bodyOf(b));
       if (typeof b.requestId !== 'string' || !b.requestId || b.requestId.length > 200) throw new HttpError(400, 'Invalid request');

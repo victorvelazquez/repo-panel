@@ -170,6 +170,8 @@ const routes = {
   'POST /api/rpc/steer': (q, b, d) => rpcApi(d.rpcHost).steer(b),
   'POST /api/rpc/abort': (q, b, d) => rpcApi(d.rpcHost).abort(b),
   'POST /api/rpc/clear-queue': (q, b, d) => rpcApi(d.rpcHost).clearQueue(b), // RP236
+  'POST /api/rpc/bash': (q, b, d) => rpcApi(d.rpcHost).bash(b), // RP245b: ! and !! from the chat
+  'POST /api/rpc/abort-bash': (q, b, d) => rpcApi(d.rpcHost).abortBash(b), // RP245b: Stop of a running shell command
   'POST /api/rpc/dialog': (q, b, d) => rpcApi(d.rpcHost).dialog(b),
   // RPC2b-1: the state of EVERY configured repo (closed by default), from the host's memory: nothing starts and nothing is read.
   'GET /api/rpc/states': (q, b, d) => ({ states: Object.fromEntries(loadConfig().groups.flatMap((g) => g.repos).map((r) => { const id = lib.repoId(r.path); return [id, d.rpcHost.stateOf(id)]; })) }),

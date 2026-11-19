@@ -223,7 +223,7 @@ test('g11: state events of a repo with no command sent change nothing but S.rpc'
 test('g12: the chat Send and the flow buttons share one start helper (the explicit Start button keeps its own call)', () => {
   const app = appSource();
   assert.match(app, /async function ensureRpcStarted\(/);
-  assert.equal((app.match(/await ensureRpcStarted\(/g) || []).length, 3, 'chat Send, flow button, put-in-conditions');
+  assert.equal((app.match(/await ensureRpcStarted\(/g) || []).length, 4, 'chat Send, flow button, put-in-conditions, and a shell command (RP245b)');
   assert.equal((app.match(/api\('\/api\/rpc\/start'/g) || []).length, 2, 'the helper and the Start button');
 });
 
