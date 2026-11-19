@@ -1312,6 +1312,19 @@
       rest = rest.slice(sep[0].length);
     }
   }
+  // RP246: a last line that is a yes/no question (it ends with «?», does not start with an asking word and offers no either-or) gets the two words in its
+  // language: Sí/No when it has «¿» or a Spanish word, else Yes/No. An open question or one that offers alternatives keeps only Reply; null when it is not one.
+  const QR_OPEN = /^(?:qu[eé]|c[oó]mo|cu[aá]l(?:es)?|cu[aá]ndo|d[oó]nde|ad[oó]nde|por ?qu[eé]|para qu[eé]|qui[eé]n(?:es)?|cu[aá]nt[oa]s?|what|how|which|why|when|where|who(?:m|se)?)(?![\p{L}\p{N}])/iu;
+  const QR_EITHER = /\s(?:o|u|or)\s/i;
+  const QR_ES = /[¿ñáéíóú]|(?<![\p{L}])(?:que|lo|la|los|las|te|me|se|sigo|quer[eé]s|parece|est[aá]|hago|subo|arreglo|dale|bien|esto|eso|ahora)(?![\p{L}])/iu;
+  function yesNoOf(text) {
+    const l = qrLine(text);
+    if (!l || !/\?$/.test(l)) return null;
+    const at = l.lastIndexOf('¿');
+    const q = (at >= 0 ? l.slice(at + 1) : l).replace(/^[\s"'«(*_]+/, '');
+    if (!q || QR_OPEN.test(q) || QR_EITHER.test(q)) return null;
+    return at >= 0 || QR_ES.test(q) ? ['Sí', 'No'] : ['Yes', 'No'];
+  }
   // What sits under the LAST message of the chat: { sig, options, reply } or null. Only when that message is the assistant's, whole (never cut), the last item of the chat, and the session is idle with no real dialog and
   // no message of this page pending. `sig` identifies THAT message (its place and a hash of its end): the click compares it with a fresh read, so a message that changed since the draw gets no send.
   function quickOf(c) {
@@ -1321,14 +1334,15 @@
     if (!it || it.role !== 'assistant' || typeof it.text !== 'string' || !it.text || (it.cut !== undefined && it.cut !== null)) return null;
     if (!c.info || !c.info.adoptedFound || !r || r.state !== 'idle' || r.compacting === true || (Array.isArray(r.asks) ? r.asks.length : r.asks) || (Array.isArray(c.pending) ? c.pending.length : c.pending)) return null;
     if (!composerState(c).canSend) return null;
-    const options = quickReplies(it.text);
-    const reply = !options.length && /\?$/.test(qrLine(it.text));
+    const listed = quickReplies(it.text);
+    const options = listed.length ? listed : yesNoOf(it.text) || []; // RP246: Yes and No for a yes/no question, sent as written
+    const reply = !listed.length && /\?$/.test(qrLine(it.text));
     if (!options.length && !reply) return null;
     let h = 5381;
     for (const ch of it.text.slice(-2000)) h = ((h * 33) ^ ch.codePointAt(0)) >>> 0;
     return { sig: `${items.length - 1}:${it.text.length}:${h}`, options, reply };
   }
-  const quickRow = (q) => (!q ? '' : `<div class="qr-row" role="group" aria-label="Quick replies">${q.reply ? '<button type="button" class="qr qr-reply" data-act="quick-focus">Reply</button>' : q.options.map((o, i) => `<button type="button" class="qr" data-act="quick-reply" data-i="${i}">${esc(o)}</button>`).join('')}</div>`);
+  const quickRow = (q) => (!q ? '' : `<div class="qr-row" role="group" aria-label="Quick replies">${q.options.map((o, i) => `<button type="button" class="qr" data-act="quick-reply" data-i="${i}">${esc(o)}</button>`).join('')}${q.reply ? '<button type="button" class="qr qr-reply" data-act="quick-focus">Reply</button>' : ''}</div>`);
 
   // What the live session adds under the history: the answer being written (escaped like every message) and one card per dialog pi waits for (RPC2-3).
   // The card is how the person answers a PERMISSION, so: everything is escaped, the message is shown as the session sends it, Deny comes first, and
@@ -1581,5 +1595,5 @@
     return `${ctx.failed ? '<div class="rs-note" role="status">⚠ Summary unavailable: showing the last data we have.</div>' : ''}<div class="rs-list">${body}</div>`;
   }
 
-  return { mergeSheetHtml, repoStatus, esc, mdHtml, settingsView, memoryChipHtml, modeChipHtml, ctxChipHtml, compactButtonHtml, legendHtml, listCount, blockWidths, columnView, membersView, ROOM_COLUMN_TABS, treeFolderPaths, fileView, COLUMN_TABS, columnDetail, chatMenuHtml, headChipsHtml, statusIconsHtml, composerState, askAllowed, askCard, actionMenu, actionButtonsHtml, composerMergeHtml, composerNote, chatHead, optionCut, footButtons, busyBehavior, bashOf, shellHtml, SHELL_WAITS, steerRefusal, panelRefusal, queueRowHtml, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, sessionCloseHtml, sessionTerminalHtml, terminalBlockHtml, recentlyActive, chatBody, quickReplies, quickOf, quickRow, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
+  return { yesNoOf, mergeSheetHtml, repoStatus, esc, mdHtml, settingsView, memoryChipHtml, modeChipHtml, ctxChipHtml, compactButtonHtml, legendHtml, listCount, blockWidths, columnView, membersView, ROOM_COLUMN_TABS, treeFolderPaths, fileView, COLUMN_TABS, columnDetail, chatMenuHtml, headChipsHtml, statusIconsHtml, composerState, askAllowed, askCard, actionMenu, actionButtonsHtml, composerMergeHtml, composerNote, chatHead, optionCut, footButtons, busyBehavior, bashOf, shellHtml, SHELL_WAITS, steerRefusal, panelRefusal, queueRowHtml, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, sessionCloseHtml, sessionTerminalHtml, terminalBlockHtml, recentlyActive, chatBody, quickReplies, quickOf, quickRow, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
 }));
