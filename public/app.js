@@ -38,7 +38,7 @@ const S = {
   timeouts: { get: 25000, post: 70000 },
   tasks: {}, tasksOpenDone: false, tasksMore: false, tasksFold: {}, changes: {}, files: {}, filesOpen: {}, fileData: {}, pad: {},
   lh: { search: false, menu: false, focus: false }, // RP121: the header of the repos column (search box open, filter menu open, focus the box on the next draw)
-  chat: { id: null, seq: 0 }, chatCache: {}, drafts: {}, recall: {}, notes: {}, askBusy: {}, quick: null, composing: false, chatResults: Object.create(null), rpc: {},
+  chat: { id: null, seq: 0 }, chatCache: {}, drafts: {}, recall: {}, notes: {}, askBusy: {}, quick: null, composing: false, chatResults: Object.create(null), shellOpen: Object.create(null), rpc: {},
 };
 S.tab = 'summary'; // the page always opens on Sessions (RP188); a saved 'work' preference is ignored on load
 S.backTab = S.tab; // the tab Conformity returns to (it is never saved as the preference)

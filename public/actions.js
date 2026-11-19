@@ -235,7 +235,15 @@ const ACTIONS = {
     try { await api('/api/rpc/abort-bash', { id }); } catch (e) { toast(e.message, 'bad'); }
   },
   // RP245b: folds or unfolds the output of the last shell command of the open chat.
-  'shell-toggle': () => {
+  // RP252: a run of the history (data-shell, the id of its entry) keeps its fold in S.shellOpen, so a new read of the history does not close it.
+  'shell-toggle': (el) => {
+    const key = el && el.dataset ? el.dataset.shell : '';
+    if (key && S.chat.id) {
+      const open = S.shellOpen[S.chat.id] || [];
+      S.shellOpen[S.chat.id] = open.includes(key) ? open.filter((k) => k !== key) : [...open, key].slice(-50);
+      draw();
+      return;
+    }
     const r = S.chat.id && S.rpc[S.chat.id];
     if (r && r.bash) r.bash = { ...r.bash, open: r.bash.open !== true };
     draw();

@@ -966,10 +966,11 @@
     const fold = b.running !== true && lines.length > SHELL_LINES;
     const shown = fold && b.open !== true ? lines.slice(-SHELL_LINES) : lines;
     const stop = b.running === true ? '<button type="button" class="sh-toggle sh-stop" data-act="shell-stop">Stop</button>' : '';
-    const toggle = fold ? `<button type="button" class="sh-toggle" data-act="shell-toggle">${b.open === true ? `Show the last ${SHELL_LINES} lines` : `Show all ${lines.length} lines`}</button>` : '';
+    const key = typeof b.key === 'string' && b.key ? ` data-shell="${esc(b.key)}"` : ''; // RP252: a run of the history names its entry
+    const toggle = fold ? `<button type="button" class="sh-toggle" data-act="shell-toggle"${key}>${b.open === true ? `Show the last ${SHELL_LINES} lines` : `Show all ${lines.length} lines`}</button>` : '';
     const end = b.running === true ? 'Running…' : b.cancelled === true ? 'Cancelled' : Number.isInteger(b.exitCode) ? `Exit code ${b.exitCode}` : 'Finished';
-    const notes = [end, ...(b.exclude === true ? ['Not sent to the model'] : []), ...(b.truncated === true ? ['The output was cut'] : [])].join(' · ');
-    return `<div class="m shell${b.running === true ? ' running' : ''}" role="status"><div class="sh-cmd mono">$ ${esc(b.command)}</div>${shown.length ? `<pre class="sh-out">${esc(shown.join('\n'))}</pre>` : ''}<div class="sh-foot"><span>${notes}</span>${stop}${toggle}</div></div>`;
+    const notes = [end, ...(b.exclude === true ? ['Not sent to the model'] : []), ...(b.truncated === true ? ['The output was cut'] : []), ...(Number.isSafeInteger(b.cut) && b.cut > 0 ? [`${b.cut} earlier characters are not shown`] : [])].join(' · ');
+    return `<div class="m shell${b.running === true ? ' running' : ''}"${key ? '' : ' role="status"'}><div class="sh-cmd mono">$ ${esc(b.command)}</div>${shown.length ? `<pre class="sh-out">${esc(shown.join('\n'))}</pre>` : ''}<div class="sh-foot"><span>${notes}</span>${stop}${toggle}</div></div>`;
   }
   // RP236b (B2): while the session works a command (a text that starts with /) is not a correction: pi would run it at once. The reason, or '' when the text may go.
   // RP237: the permission and configuration commands of the runtime stay in the terminal (the server refuses them too); the text stays in the box with the reason.
@@ -1234,6 +1235,7 @@
   const stopNote = (it) => (Object.hasOwn(STOP_NOTES, it.stop) ? `<div class="m stopnote ${it.stop}">${STOP_NOTES[it.stop]}</div>` : '');
   const bubble = (it, who, rx) => {
     const time = hhmm(it.at);
+    if (it.role === 'system' && it.kind === 'shell') return shellHtml({ ...it, running: false, open: rx.open.includes(it.id), ...(typeof it.id === 'string' ? { key: it.id } : {}) }); // RP252: a ! or !! run the session file keeps
     if (it.role === 'system') return it.kind === 'compaction' ? `<div class="sysnote">↻ Context compacted${time ? ` · ${time}` : ''}</div>` : '';
     if (it.role === 'assistant' && !it.text) return `${thoughtLine(it)}${toolsLine(it.tools, it.toolInfo, rx)}${stopNote(it)}`; // RP171: no «working…» here: the tail of the thread is the one place that says the session works
     return `${thoughtLine(it)}${toolsLine(it.tools || [], it.toolInfo, rx)}<div class="m${it.role === 'user' ? ' me' : ''}"><span class="who">${esc(it.role === 'user' ? 'You' : who)}${time ? ` · ${time}` : ''}</span>${mdHtml(it.text)}${cutNote(it)}</div>${stopNote(it)}`;
@@ -1487,7 +1489,7 @@
     const who = info.adopted.name || info.adopted.id;
     if (!info.adoptedFound) return `${note}<div class="ch-state" role="status"><p>The session is loading. The history appears with its first message.</p></div>${pendingHtml(c.pending, [])}${rpcTail(c, who, [], ctx.now)}`;
     const items = c.hist && Array.isArray(c.hist.items) ? c.hist.items : []; // RP155: a history that is not a list reads as empty
-    const rx = { allow: !!c.hist && c.hist.results === true, map: c.results && typeof c.results === 'object' ? c.results : {}, id: c.id };
+    const rx = { allow: !!c.hist && c.hist.results === true, map: c.results && typeof c.results === 'object' ? c.results : {}, id: c.id, open: c.shellOpen && Array.isArray(c.shellOpen[c.id]) ? c.shellOpen[c.id] : [] };
     const pending = pendingHtml(c.pending, items);
     return `${note}${c.hist && c.hist.truncated ? '<div class="rs-sub ch-older">Older messages are not shown</div>' : ''}${items.map((it) => bubble(it, who, rx)).join('') || (pending ? '' : '<div class="empty">No messages yet.</div>')}${pending}${rpcTail(c, who, items, ctx.now)}`;
   }

@@ -18,7 +18,7 @@ function applyRpc(p) {
     if (seen) applyPiState(p.id, seen);
   }
   if (reload && S.chat.id === p.id) settled(p.id);
-  else if (reload) Object.assign(entry, { blocks: [], text: '' }); // nobody is looking: the history will have it
+  else if (reload) Object.assign(entry, { blocks: [], text: '', ...(entry.bash && entry.bash.running !== true ? { bash: null } : {}) }); // nobody is looking: the history will have it (RP252: a finished shell run too)
   draw();
 }
 // A run ended: the persisted messages (read ONCE) replace the streaming bubble, and the pending ones the history has now go with it.
@@ -26,6 +26,7 @@ async function settled(id) {
   await loadChat(id);
   const e = S.rpc[id];
   if (e && !e.streaming) Object.assign(e, { blocks: [], text: '' });
+  if (e && V.shellInHistory(e.bash, S.chat.hist && S.chat.hist.items)) e.bash = null; // RP252: the finished shell run is in the history now: its live bubble goes
   S.pending[id] = (S.pending[id] || []).filter((p) => p.state === 'sending');
   draw();
 }
@@ -45,7 +46,11 @@ async function loadContext(id) {
   if (again) loadContext(id);
 }
 async function rpcSync(id) {
-  try { S.rpc[id] = V.rpcFromStatus(S.rpc[id], await api(`/api/rpc/status?id=${encodeURIComponent(id)}`)); draw(); loadContext(id); } catch { if (!S.rpc[id]) S.rpc[id] = V.rpcFromStatus(undefined, null); } // the stream keeps it up to date; with no answer at all it reads as not started, never stuck on unknown
+  try {
+    const ran = !!(S.rpc[id] && S.rpc[id].bash && S.rpc[id].bash.running === true);
+    S.rpc[id] = V.rpcFromStatus(S.rpc[id], await api(`/api/rpc/status?id=${encodeURIComponent(id)}`)); draw(); loadContext(id);
+    if (ran && !S.rpc[id].bash && S.chat.id === id) settled(id); // RP252: a run whose end was missed (a reconnect) is read from the history
+  } catch { if (!S.rpc[id]) S.rpc[id] = V.rpcFromStatus(undefined, null); } // the stream keeps it up to date; with no answer at all it reads as not started, never stuck on unknown
 }
 // The open chat and the repos that have something going on; a closed one has nothing to read (rpcSeed already tells it).
 const rpcSyncAll = () => new Set([S.chat.id, ...Object.keys(S.rpc).filter((id) => S.rpc[id].state !== 'closed')].filter((id) => id && !String(id).startsWith('room:'))).forEach(rpcSync);
