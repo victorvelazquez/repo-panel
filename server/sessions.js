@@ -141,6 +141,19 @@ const blocksOf = (m, type) => (Array.isArray(m.content) ? m.content.filter((c) =
 // RP106b: the id of a tool call (it links a chip to its result) and the switch of config.json that lets the page ask for the text of a result. Off by default.
 const CALL_ID = /^[A-Za-z0-9_.:-]{1,80}$/;
 const resultsOn = () => (loadConfig().chat || {}).showResults === true;
+// RP252: a finished ! or !! run as pi writes it (`bashExecution`): its command, the END of its output (`cut`: how many earlier characters were left out), exit code
+// (null when it was stopped), and whether it was cancelled, cut by pi, or kept from the model. The person ran it and saw it live, so its output is shown as it is.
+const SHELL_HISTORY_MAX = 20000;
+const ENTRY_ID = /^[A-Za-z0-9_-]{1,40}$/;
+function shellItem(m, entryId, at) {
+  if (typeof m.command !== 'string') return null;
+  const out = typeof m.output === 'string' ? cleanText(m.output) : '';
+  const cut = Math.max(0, out.length - SHELL_HISTORY_MAX);
+  return {
+    role: 'system', kind: 'shell', ...(typeof entryId === 'string' && ENTRY_ID.test(entryId) ? { id: entryId } : {}), command: clean(m.command).trim().slice(0, 2000), output: out.slice(cut),
+    exitCode: Number.isSafeInteger(m.exitCode) ? m.exitCode : null, cancelled: m.cancelled === true, truncated: m.truncated === true, exclude: m.excludeFromContext === true, at, tools: [], ...(cut ? { cut } : {}),
+  };
+}
 
 function readChat(folder, sessionId, { base = baseDir(), limit = CHAT_DEFAULT, key = null, results = false } = {}) {
   const none = { key, sessionId, found: false, items: [], truncated: false, updatedAt: null };
@@ -164,6 +177,7 @@ function readChat(folder, sessionId, { base = baseDir(), limit = CHAT_DEFAULT, k
       const m = entry && entry.type === 'message' && entry.message;
       if (!m || typeof m !== 'object') continue;
       const at = isoOf(m.timestamp ?? entry.timestamp);
+      if (m.role === 'bashExecution') { const sh = shellItem(m, entry.id, at); if (sh) items.push(sh); continue; } // RP252: a command the person ran with ! or !!
       const { text: body, cut } = capped(blocksOf(m, 'text').filter((c) => typeof c.text === 'string').map((c) => c.text).join(BLOCK_GAP));
       if (m.role === 'toolResult') {
         const chip = typeof m.toolCallId === 'string' ? infoById.get(m.toolCallId) : undefined;
@@ -319,4 +333,4 @@ function adoptIfNone(key, sid) {
   return true;
 }
 
-module.exports = { linesOf, readChunk, CHAT_WINDOW, isSessionFile, baseDir, sessionsDirFor, listSessions, readChat, chatState, chatResult, sessionKeyFor, sessionsState, adoptSession, releaseSession, adoptIfNone, SESSION_ID };
+module.exports = { SHELL_HISTORY_MAX, linesOf, readChunk, CHAT_WINDOW, isSessionFile, baseDir, sessionsDirFor, listSessions, readChat, chatState, chatResult, sessionKeyFor, sessionsState, adoptSession, releaseSession, adoptIfNone, SESSION_ID };

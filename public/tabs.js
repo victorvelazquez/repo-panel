@@ -363,7 +363,7 @@ const summaryShown = () => (S.summary && Array.isArray(S.summary.rows)
 // The chat as the label and the body see it: the pending messages and the live session (S.rpc) of the open repo.
 function chatView() {
   const id = S.chat.id;
-  return { ...S.chat, pending: S.pending[id], askBusy: S.askBusy, results: S.chatResults, rpc: S.rpc[id] };
+  return { ...S.chat, pending: S.pending[id], askBusy: S.askBusy, results: S.chatResults, shellOpen: S.shellOpen, rpc: S.rpc[id] };
 }
 
 // RP121: the header of the repos column (the filters of the Summary): the count, Working now and the ⋮ menu (RP189: the search icon, the legend, Needs attention and the strip of chips are gone). The state is the shared one; the inputs are

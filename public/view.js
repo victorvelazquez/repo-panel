@@ -783,6 +783,16 @@
   const rpcBlank = () => ({ state: 'closed', text: '', blocks: [], error: '', startedAt: 0, streaming: false, thinking: false, retry: null, memory: null, ctx: null, compacting: false, asks: [], subs: 0, subSince: 0, missing: [], queue: rpcNoQueue(), bash: null });
   // RP245b: the shell command the person ran with ! or !! ({ command, exclude, output, running, exitCode?, cancelled?, truncated?, open? }); its live output is capped, keeping its end.
   const BASH_OUT_MAX = 1000000;
+  // RP252: the running command a status reports, or null.
+  const runningShell = (b) => (isObject(b) && b.running === true && typeof b.command === 'string'
+    ? { command: b.command, exclude: b.exclude === true, output: typeof b.output === 'string' ? b.output.slice(-BASH_OUT_MAX) : '', running: true, since: Number.isSafeInteger(b.since) ? b.since : 0 }
+    : null);
+  // RP252: whether the history already holds this finished run (same command, written after it started; 2 s of slack for the clocks), so its live bubble can go.
+  function shellInHistory(b, items) {
+    if (!isObject(b) || b.running === true || !Array.isArray(items)) return false;
+    const since = Number.isSafeInteger(b.since) ? b.since : 0;
+    return items.some((it) => isObject(it) && it.kind === 'shell' && it.command === b.command && Date.parse(it.at) >= since - 2000);
+  }
   // RP236: the messages waiting for the session, as pi told them last (the server already cut them); a value that is not a list of texts is an empty list.
   function rpcNoQueue() { return { steering: [], followUp: [] }; }
   const rpcTexts = (list) => (Array.isArray(list) ? list.filter((t) => typeof t === 'string').slice(0, 20).map((t) => t.slice(0, 4000)) : []);
@@ -829,6 +839,9 @@
       if (r.type === 'run_start') Object.assign(e, { blocks: [], streaming: true, thinking: false, retry: null, error: '', startedAt: now, subs: 0, subSince: 0 });
       else if (r.type === 'run_settled') { e.streaming = false; e.thinking = false; e.retry = null; e.subs = 0; e.subSince = 0; e.queue = rpcNoQueue(); reload = true; ctx = true; } // RP236: settled means pi will not go on, so nothing waits any more
       else if (r.type === 'queue') e.queue = { steering: rpcTexts(r.steering), followUp: rpcTexts(r.followUp) };
+      // RP252: a command started from another tab (or before a reload) opens its bubble here; its end closes it and reads the history once, where its run is kept.
+      else if (r.type === 'bash_start') { if (typeof r.command === 'string' && !(isObject(e.bash) && e.bash.running === true)) e.bash = { command: r.command, exclude: r.exclude === true, output: '', running: true, since: Number.isSafeInteger(r.since) ? r.since : 0 }; }
+      else if (r.type === 'bash_end') { if (isObject(e.bash)) e.bash = { ...e.bash, running: false }; reload = true; }
       else if (r.type === 'bash_output') { if (isObject(e.bash) && e.bash.running === true && typeof r.delta === 'string') e.bash = { ...e.bash, output: (String(e.bash.output || '') + r.delta).slice(-BASH_OUT_MAX) }; }
       else if (r.type === 'run_end') { ctx = true; e.subs = 0; e.subSince = 0; }
       // RP152: a subagent that starts is counted (the clock keeps the first start) and one that ends is taken out; never below zero, never above SUB_MAX.
@@ -877,6 +890,12 @@
     if (st.state === 'idle') e.queue = rpcNoQueue(); // RP236b (S2): a free session has nothing waiting, even if the end of its run was missed (kept apart: it must not skip `missing`)
     if (st.state === 'closed') { e.missing = []; e.queue = rpcNoQueue(); e.bash = null; }
     else if (Array.isArray(st.missing)) e.missing = st.missing.filter((k) => typeof k === 'string' && (Object.hasOwn(CMD_TEXT, k) || k === 'flow-next'));
+    // RP252: the status is the truth about a running shell command: it rebuilds the bubble (a reload, another tab) and its absence ends a running one. The bubble of the
+    // tab that sent it (`own`) is ended only by its own answer: a start answer or a status read sent before the server took the command does not report it yet.
+    const sh = st.state === 'closed' ? null : runningShell(st.bash);
+    const was = isObject(e.bash) ? e.bash : null;
+    if (sh) e.bash = { ...sh, ...(was && was.open === true ? { open: true } : {}), ...(was && was.own === true && was.running === true && was.command === sh.command ? { own: true } : {}) }; // only this tab's running command stays its own
+    else if (was && was.running === true && was.own !== true) e.bash = null;
     e.asks = (Array.isArray(st.pendingDialogs) ? st.pendingDialogs : []).map(rpcAskOf).filter(Boolean).slice(0, 20);
     e.streaming = st.state === 'busy' || st.state === 'asking';
     if (!e.streaming) Object.assign(e, { blocks: [], text: '', thinking: false, retry: null });
@@ -1210,5 +1229,5 @@
     const rows = Math.max(1, Math.round((sc - pd) / ln));
     return { height: Math.min(Math.max(sc, one), cap), scrolls: sc - cap > 1, rows, expandable: rows > 4 };
   };
-  return { boxFit, enterSends, STALLED_MS, stalledNow, jobsHold, deliveryHold, tasksPollDue, TASKS_REFRESH_MS, mergeWhy, mergeNote, screenOf, bandOf, NARROW_BELOW, DUO_BELOW, parseAddress, addressOf, ADDRESS_ZONES, subClock, columnTabFor, conformityTabLabel, repoModel, changeChips, prChip, ciOf, idleChip, conflictChip, sizeChip, RepoCard, stateLineHidden, usageView, usageHtml, ringGeometry, usageRemaining, boardApply, boardWait, chatCachePut, chatCacheGet, rpcWithContext, chatFromCache, API_VERSION, mergeButton, rerunButton, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, dirtyRepos, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, sentToast, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, taskPrs, matchesUnitId, isOutdated, conformityView, reqFold, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, parseSse, rpcEvent, rpcReduce, rpcFromStatus, eventsPlan, eventsRetryMs, eventsStale, projectRepos, roomOfFolder, roomMembers, columnTabOf, mergeRooms };
+  return { boxFit, enterSends, STALLED_MS, stalledNow, jobsHold, deliveryHold, tasksPollDue, TASKS_REFRESH_MS, mergeWhy, mergeNote, screenOf, bandOf, NARROW_BELOW, DUO_BELOW, parseAddress, addressOf, ADDRESS_ZONES, subClock, columnTabFor, conformityTabLabel, repoModel, changeChips, prChip, ciOf, idleChip, conflictChip, sizeChip, RepoCard, stateLineHidden, usageView, usageHtml, ringGeometry, usageRemaining, boardApply, boardWait, chatCachePut, chatCacheGet, rpcWithContext, chatFromCache, API_VERSION, mergeButton, rerunButton, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, dirtyRepos, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, sentToast, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, taskPrs, matchesUnitId, isOutdated, conformityView, reqFold, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, parseSse, rpcEvent, rpcReduce, rpcFromStatus, shellInHistory, eventsPlan, eventsRetryMs, eventsStale, projectRepos, roomOfFolder, roomMembers, columnTabOf, mergeRooms };
 }));

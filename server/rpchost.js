@@ -104,6 +104,8 @@ const SHELL_MAX = TEXT_MAX;
 const SHELL_MS = 30 * 60 * 1000;
 // The abort sent after that wait is short, so the 409 reaches the page (which waits one minute more) even when pi does not answer it.
 const SHELL_ABORT_MS = 15000;
+// RP252: how much of the output of the running command the status keeps (its end).
+const SHELL_KEEP = 200000;
 // RP237 (option (a), decided by the person): with GENTLE_SHELL_INTERACTIVE_HOST=1 these commands can change the runtime's permission mode (even super-yolo, saved for new
 // sessions) and its configuration, and the panel would not show it. They stay in the terminal: refused here whatever the way the text comes in.
 // pi names a command registered twice `name:1`, `name:2`: those forms are the same command.
@@ -186,7 +188,7 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
   const closedStatus = { state: 'closed', pendingDialogs: [], sessionId: null };
   // A pending dialog is named `requestId` here as in the SSE `dialog` event.
   const statusOf = (entry) => (entry && entry.client
-    ? { state: entry.client.state(), pendingDialogs: entry.client.pendingDialogs().map(({ id, ...rest }) => ({ requestId: id, ...rest })), sessionId: entry.sessionId, ...(entry.memory ? { memory: entry.memory } : {}), ...(entry.compacting ? { compacting: true } : {}), ...(entry.commands ? { missing: missingOf(entry.commands) } : {}) }
+    ? { state: entry.client.state(), pendingDialogs: entry.client.pendingDialogs().map(({ id, ...rest }) => ({ requestId: id, ...rest })), sessionId: entry.sessionId, ...(entry.memory ? { memory: entry.memory } : {}), ...(entry.compacting ? { compacting: true } : {}), ...(entry.bash ? { bash: { ...entry.bash, running: true } } : {}), ...(entry.commands ? { missing: missingOf(entry.commands) } : {}) }
     : closedStatus);
   const running = (id) => {
     const entry = live.get(id);
@@ -220,6 +222,8 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
       onEvent: (e) => {
         // RP140: the compaction mark follows the events of THIS session, so one that pi starts by itself (threshold, overflow) shows too.
         if (e && e.kind === 'event' && e.record && live.get(id) === entry && (e.record.type === 'compaction_start' || e.record.type === 'compaction_end')) entry.compacting = e.record.type === 'compaction_start';
+        // RP252: the output of the running shell command is kept too (its end), so a reload or another tab shows it from the status.
+        if (e && e.kind === 'event' && e.record && e.record.type === 'bash_execution_update' && entry.bash && typeof e.record.delta === 'string') entry.bash.output = (entry.bash.output + e.record.delta).slice(-SHELL_KEEP);
         if (e && e.kind === 'status') { // RP110b: only the notice of THIS session counts (an old client's is not the new one's), and only a change of category is published
           const cat = e.key === 'engram' && live.get(id) === entry ? memoryOf(e.text) : null;
           if (cat && cat !== entry.memory) { entry.memory = cat; publish(id, { kind: 'memory', memory: cat }); }
@@ -349,6 +353,9 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
       if (entry.bashing) throw new HttpError(409, 'A shell command is already running in this session');
       if (!entry.up || entry.client.state() !== 'idle') throw new HttpError(409, SHELL_WAITS);
       entry.bashing = true;
+      // RP252: the running command is in the status and every tab hears its start and its end (its finished run is then read from the session file).
+      entry.bash = { command, exclude: m[1] === '!!', output: '', since: Date.now() };
+      publish(id, { kind: 'event', record: { type: 'bash_start', command, exclude: entry.bash.exclude, since: entry.bash.since } });
       try { return await askLong(entry, 'bash', { command, excludeFromContext: m[1] === '!!' }); } catch (e) {
         // Past the wait the panel stops waiting; it also stops the command in pi, so a later one never runs alongside it.
         if (e instanceof HttpError && e.message === 'The agent did not answer in time') {
@@ -356,7 +363,11 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
           throw new HttpError(409, 'The shell command ran longer than 30 minutes and was stopped');
         }
         throw e;
-      } finally { entry.bashing = false; }
+      } finally {
+        entry.bashing = false;
+        entry.bash = null;
+        if (live.get(id) === entry) publish(id, { kind: 'event', record: { type: 'bash_end' } });
+      }
     },
     // RP245b: Stop of a running shell command (pi's abort_bash; its answer then says cancelled).
     async abortBash(id) { repoOf(id); await ask(running(id), 'abort_bash', {}); return { ok: true }; },

@@ -142,7 +142,8 @@ test('page: the live output is added to the running command, capped; nothing is 
   assert.equal(V.rpcReduce(null, rec({ type: 'bash_execution_update', delta: 'x' })).entry.bash, null);
   assert.equal(V.rpcReduce(e, { kind: 'exit' }).entry.bash, null);
   assert.equal(V.rpcFromStatus(e, { state: 'closed', pendingDialogs: [] }).bash, null);
-  assert.equal(V.rpcFromStatus(e, { state: 'idle', pendingDialogs: [] }).bash.output, 'a\nb\n', 'a status read keeps it');
+  assert.equal(V.rpcFromStatus(e, { state: 'idle', pendingDialogs: [], bash: { command: 'ls', exclude: false, output: 'a\nb\n', running: true } }).bash.output, 'a\nb\n', 'a status read that reports it keeps it');
+  assert.equal(V.rpcFromStatus(e, { state: 'idle', pendingDialogs: [] }).bash, null, 'RP252: a status with no command running ends it');
 });
 
 test('page: the shell bubble shows the command, the output escaped and the result; a long one is folded to its last 20 lines', () => {

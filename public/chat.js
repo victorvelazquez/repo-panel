@@ -747,21 +747,23 @@ async function runShell(id, text, shell) {
   delete S.drafts[id];
   delete S.notes[id];
   delete S.recall[id];
-  setRpc(id, { bash: { command: shell.command, exclude: shell.exclude, output: '', running: true } });
+  const since = Date.now();
+  setRpc(id, { bash: { command: shell.command, exclude: shell.exclude, output: '', running: true, since, own: true } }); // RP252: `own`: only this answer ends it, never a status
   draw();
   try {
     if (rpcNeedsStart(id)) await ensureRpcStarted(id);
     const r = await api('/api/rpc/bash', { id, text }, { timeoutMs: SHELL_WAIT_MS }); // the server waits up to 30 minutes; an ordinary POST gives up at 70 s
     const b = S.rpc[id] && S.rpc[id].bash;
     const out = b && b.output ? b.output : r && typeof r.output === 'string' ? r.output : '';
-    setRpc(id, { bash: { ...(b || { command: shell.command, exclude: shell.exclude }), output: out, running: false, exitCode: r && Number.isInteger(r.exitCode) ? r.exitCode : null, cancelled: !!(r && r.cancelled === true), truncated: !!(r && r.truncated === true) } });
+    setRpc(id, { bash: { ...(b || { command: shell.command, exclude: shell.exclude, since }), output: out, running: false, exitCode: r && Number.isInteger(r.exitCode) ? r.exitCode : null, cancelled: !!(r && r.cancelled === true), truncated: !!(r && r.truncated === true) } });
   } catch (e) {
     const b = S.rpc[id] && S.rpc[id].bash;
-    if (b && /^The shell command ran longer than/.test(String(e.message))) setRpc(id, { bash: { ...b, running: false, cancelled: true } }); // it did run: keep its output, closed
+    if (/^The shell command ran longer than/.test(String(e.message))) { if (b) setRpc(id, { bash: { ...b, running: false, cancelled: true } }); } // it did run: keep its output, closed (RP252: or already in the history); never back in the box
     else { setRpc(id, { bash: null }); putBack(id, text); }
     sayNote(id, e.message);
   }
   draw();
+  if (S.rpc[id] && S.rpc[id].bash && S.rpc[id].bash.running !== true && S.chat.id === id) settled(id); // RP252: the run is in the session file now: the history shows it and the live bubble goes
 }
 const SHELL_WAIT_MS = 31 * 60 * 1000; // RP245b: a minute more than the server's 30, so its own answer arrives first
 // The text goes back into the box of its chat, before what the person already wrote again.
