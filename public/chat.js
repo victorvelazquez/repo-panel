@@ -712,6 +712,13 @@ async function sendChatMessage(behavior) {
   const blocked = R.panelRefusal(text); // RP237: a permission command of Gentle Shell stays in the terminal; the text stays in the box
   if (blocked) { sayNote(id, blocked); draw(); return; }
   const cs = composerOf(id);
+  const shell = R.bashOf(text); // RP245b: ! and !! run a shell command in the folder of the session; it waits for a free session, like a command with /
+  if (!shell && /^!/.test(text.trim())) { sayNote(id, 'Write a command after ! or !!'); draw(); return; }
+  if (shell && S.rpc[id] && S.rpc[id].bash && S.rpc[id].bash.running === true) { sayNote(id, 'A shell command is already running in this session'); draw(); return; } // the running bubble stays as it is
+  if (shell) {
+    if (!cs.canSend) { sayNote(id, cs.canSteer ? R.SHELL_WAITS : cs.reason); draw(); return; }
+    return runShell(id, text, shell);
+  }
   if (!cs.canSend && cs.canSteer) {
     const refused = R.steerRefusal(text); // RP236b (B2): a command waits for the session to be free; the text stays in the box
     if (refused) { sayNote(id, refused); draw(); return; }
@@ -731,6 +738,32 @@ async function steerChatText(id, text, behavior) {
   try { await api('/api/rpc/prompt', { id, text, behavior }); } catch (e) { putBack(id, text); sayNote(id, e.message); }
   draw();
 }
+// RP245b: the command runs with pi's bash order; its output streams into S.rpc[id].bash (bash_output events) and the answer closes it with the exit code.
+// A refusal puts the text back with the server's reason and leaves no bubble.
+async function runShell(id, text, shell) {
+  $('#msgBox').value = '';
+  S.composing = false;
+  fitMsgBox();
+  delete S.drafts[id];
+  delete S.notes[id];
+  delete S.recall[id];
+  setRpc(id, { bash: { command: shell.command, exclude: shell.exclude, output: '', running: true } });
+  draw();
+  try {
+    if (rpcNeedsStart(id)) await ensureRpcStarted(id);
+    const r = await api('/api/rpc/bash', { id, text }, { timeoutMs: SHELL_WAIT_MS }); // the server waits up to 30 minutes; an ordinary POST gives up at 70 s
+    const b = S.rpc[id] && S.rpc[id].bash;
+    const out = b && b.output ? b.output : r && typeof r.output === 'string' ? r.output : '';
+    setRpc(id, { bash: { ...(b || { command: shell.command, exclude: shell.exclude }), output: out, running: false, exitCode: r && Number.isInteger(r.exitCode) ? r.exitCode : null, cancelled: !!(r && r.cancelled === true), truncated: !!(r && r.truncated === true) } });
+  } catch (e) {
+    const b = S.rpc[id] && S.rpc[id].bash;
+    if (b && /^The shell command ran longer than/.test(String(e.message))) setRpc(id, { bash: { ...b, running: false, cancelled: true } }); // it did run: keep its output, closed
+    else { setRpc(id, { bash: null }); putBack(id, text); }
+    sayNote(id, e.message);
+  }
+  draw();
+}
+const SHELL_WAIT_MS = 31 * 60 * 1000; // RP245b: a minute more than the server's 30, so its own answer arrives first
 // The text goes back into the box of its chat, before what the person already wrote again.
 function putBack(id, text) {
   const now = S.chat.id === id ? $('#msgBox').value : S.drafts[id] || '';

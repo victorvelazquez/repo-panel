@@ -950,6 +950,27 @@
   }
   // RP236: what a message sent while the session works does: Alt+Enter queues it for the end of the run; Enter (and the Correct button) steers the agent now.
   const busyBehavior = ({ alt } = {}) => (alt ? 'followUp' : 'steer');
+  // RP245b: a message that starts with ! (or !!: its output is not sent to the model) is a shell command; null when it is not one or has no command.
+  function bashOf(text) {
+    const m = typeof text === 'string' ? /^(!!?)([\s\S]*)$/.exec(text.trim()) : null;
+    const command = m ? m[2].trim() : '';
+    return command ? { command, exclude: m[1] === '!!' } : null;
+  }
+  const SHELL_WAITS = 'Shell commands wait until the session is free: send it when the run ends';
+  // RP245b: the bubble of the shell command, live while it runs; a long finished output is folded to its last SHELL_LINES lines with a button to see all of it.
+  const SHELL_LINES = 20;
+  function shellHtml(b) {
+    if (!b || typeof b !== 'object' || typeof b.command !== 'string') return '';
+    const out = String(b.output || '').replace(/\n$/, '');
+    const lines = out ? out.split('\n') : [];
+    const fold = b.running !== true && lines.length > SHELL_LINES;
+    const shown = fold && b.open !== true ? lines.slice(-SHELL_LINES) : lines;
+    const stop = b.running === true ? '<button type="button" class="sh-toggle sh-stop" data-act="shell-stop">Stop</button>' : '';
+    const toggle = fold ? `<button type="button" class="sh-toggle" data-act="shell-toggle">${b.open === true ? `Show the last ${SHELL_LINES} lines` : `Show all ${lines.length} lines`}</button>` : '';
+    const end = b.running === true ? 'Running…' : b.cancelled === true ? 'Cancelled' : Number.isInteger(b.exitCode) ? `Exit code ${b.exitCode}` : 'Finished';
+    const notes = [end, ...(b.exclude === true ? ['Not sent to the model'] : []), ...(b.truncated === true ? ['The output was cut'] : [])].join(' · ');
+    return `<div class="m shell${b.running === true ? ' running' : ''}" role="status"><div class="sh-cmd mono">$ ${esc(b.command)}</div>${shown.length ? `<pre class="sh-out">${esc(shown.join('\n'))}</pre>` : ''}<div class="sh-foot"><span>${notes}</span>${stop}${toggle}</div></div>`;
+  }
   // RP236b (B2): while the session works a command (a text that starts with /) is not a correction: pi would run it at once. The reason, or '' when the text may go.
   // RP237: the permission and configuration commands of the runtime stay in the terminal (the server refuses them too); the text stays in the box with the reason.
   const panelRefusal = (text) => (typeof text === 'string' && /^\/gentle:(desktop|mode|yolo)(?::\d+)?(?![\w:-])/i.test(text.trim()) ? 'Permission and configuration commands (/gentle:desktop, /gentle:mode, /gentle:yolo) are not available from the panel: use the terminal' : '');
@@ -1328,8 +1349,8 @@
     const at = d.title.indexOf('\n');
     return at < 0 ? d : { ...d, title: d.title.slice(0, at), message: d.title.slice(at + 1) };
   }
-  // Whether the text is whole and visible (RP245: this only decides the note, it no longer withholds an approval). A confirm needs the server not to have cut it and the whole text. A select is never answerable when it is cut or
-  // shows hidden characters; an «Allow…» select also needs the whole text; any other select is a plain question.
+  // Whether the text is whole and visible (RP245: this only decides the note, it no longer withholds an approval). A confirm needs the server not to have cut it and the whole text. A select that is cut or
+  // shows hidden characters gets the note (it is still answerable); an «Allow…» select also needs the whole text for no note; any other select is a plain question.
   function askAllowed(raw) {
     const d = askShape(raw);
     if (!d || typeof d !== 'object') return false;
@@ -1371,7 +1392,7 @@
     const sub = subBubbleHtml(r, items, now); // RP171: while a subagent runs its bubble replaces the generic «working…» (never both)
     const streaming = (hasLive ? `<div class="m streaming"><span class="who">${esc(who)}</span>${mdHtml(r.text)}</div>` : '') + (sub || (!hasLive && r.streaming && !retry ? `<div class="m working">${r.thinking ? 'thinking…' : 'working…'}</div>` : '')) + retry;
     const asks = (Array.isArray(r.asks) ? r.asks : []).filter((d) => d && typeof d.requestId === 'string').map((d) => askCard(d, c.id, !!(c.askBusy && c.askBusy[d.requestId]))).join('');
-    return streaming + asks;
+    return shellHtml(r.bash) + streaming + asks; // RP245b: the shell command the person ran, live
   }
 
   // RP100 (S5, S7): pi does not lock its session files, so the panel cannot see that a session is open in a terminal. The hint it has is the last write of the session file (`updatedAt`): written to less
@@ -1545,5 +1566,5 @@
     return `${ctx.failed ? '<div class="rs-note" role="status">⚠ Summary unavailable: showing the last data we have.</div>' : ''}<div class="rs-list">${body}</div>`;
   }
 
-  return { mergeSheetHtml, repoStatus, esc, mdHtml, settingsView, memoryChipHtml, ctxChipHtml, compactButtonHtml, legendHtml, listCount, blockWidths, columnView, membersView, ROOM_COLUMN_TABS, treeFolderPaths, fileView, COLUMN_TABS, columnDetail, chatMenuHtml, headChipsHtml, statusIconsHtml, composerState, askAllowed, askCard, actionMenu, actionButtonsHtml, composerMergeHtml, composerNote, chatHead, optionCut, footButtons, busyBehavior, steerRefusal, panelRefusal, queueRowHtml, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, sessionCloseHtml, sessionTerminalHtml, terminalBlockHtml, recentlyActive, chatBody, quickReplies, quickOf, quickRow, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
+  return { mergeSheetHtml, repoStatus, esc, mdHtml, settingsView, memoryChipHtml, ctxChipHtml, compactButtonHtml, legendHtml, listCount, blockWidths, columnView, membersView, ROOM_COLUMN_TABS, treeFolderPaths, fileView, COLUMN_TABS, columnDetail, chatMenuHtml, headChipsHtml, statusIconsHtml, composerState, askAllowed, askCard, actionMenu, actionButtonsHtml, composerMergeHtml, composerNote, chatHead, optionCut, footButtons, busyBehavior, bashOf, shellHtml, SHELL_WAITS, steerRefusal, panelRefusal, queueRowHtml, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, sessionCloseHtml, sessionTerminalHtml, terminalBlockHtml, recentlyActive, chatBody, quickReplies, quickOf, quickRow, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
 }));

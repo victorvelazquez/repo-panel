@@ -34,7 +34,7 @@ const CONTROLS = /[\x00-\x08\x0b-\x1f\x7f-\x9f]/;
 const over = (v, max) => typeof v === 'string' && v.length > max;
 
 // The body for the agent, or null: the shape must fit the METHOD of the dialog, with no extra key. A select value must be strictly one of
-// the options the page was shown (never any other string); `d.sure` holds the options that were not cut.
+// the options the page was shown (never any other string); `d.sure` holds the options that were not cut and that no cut option shows the same (RP245).
 function answerBody(d, a) {
   if (!a || typeof a !== 'object' || Array.isArray(a)) return null;
   const keys = Object.keys(a);

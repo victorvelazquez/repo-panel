@@ -997,6 +997,13 @@ button.c-round { flex: none; align-self: flex-end; display: inline-flex; align-i
 .ch-ask-text mark.ask-sel { background: rgba(210, 153, 34, .28); color: inherit; border-radius: 3px; padding: 0 2px; }
 .qr-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; min-width: 0; }
 /* RP236: the messages waiting for the session, above the box: one line each, the kind muted, Clear queue at the end. */
+/* RP245b: the shell command run with ! or !!, live in the thread. */
+.m.shell { border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; margin: 6px 0; font-size: 12px; min-width: 0; }
+.sh-cmd { color: var(--muted); overflow-wrap: anywhere; }
+.sh-out { margin: 4px 0; max-height: 50vh; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; }
+.sh-foot { display: flex; gap: 8px; align-items: center; justify-content: space-between; color: var(--muted); }
+.sh-toggle { font-size: 12px; padding: 2px 10px; border: 1px solid var(--line); border-radius: 12px; background: transparent; color: var(--text); cursor: pointer; }
+@media (pointer: coarse) { .sh-toggle { min-height: 44px; } }
 .q-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 4px 0 8px; padding: 6px 8px; border: 1px dashed var(--line); border-radius: 8px; font-size: 12px; min-width: 0; }
 .q-head { color: var(--muted); font-weight: 600; }
 .q-list { flex: 1 1 100%; order: 3; list-style: none; margin: 0; padding: 0; min-width: 0; }
