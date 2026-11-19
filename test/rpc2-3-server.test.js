@@ -158,6 +158,19 @@ test('c1: an uncut dialog carries exactly requestId, method, title, message, opt
   assert.equal(ev.id, 'q1');
 });
 
+// RP245 (found by its independent verification): since a truncated select now offers its options, an option the server cut must never be answered, not even when its
+// first 200 characters are the same as another, whole option: the person meant the cut one, and the session would get the other.
+test('c2b: a cut option is refused and nothing is written, also when another option has the same first 200 characters; a whole option still goes', async (t) => {
+  const cutOnly = await asking(t, { ...SELECT, options: ['A'.repeat(250), 'No'] });
+  assert.equal(cutOnly.client.answerDialog('q1', { value: 'A'.repeat(200) }), false);
+  assert.equal(cutOnly.client.pendingDialogs().length, 1, 'the dialog stays pending');
+  assert.equal(cutOnly.child.sent().filter((m) => m.type === 'extension_ui_response').length, 0, 'nothing reaches the agent');
+  assert.equal(cutOnly.client.answerDialog('q1', { value: 'No' }), true, 'a whole option still goes');
+  const twin = await asking(t, { ...SELECT, options: ['x'.repeat(200) + ' --force', 'x'.repeat(200)] });
+  assert.equal(twin.client.answerDialog('q1', { value: 'x'.repeat(200) }), false, 'the shown text is ambiguous: refused');
+  assert.equal(twin.child.sent().filter((m) => m.type === 'extension_ui_response').length, 0);
+});
+
 test('c2: a title over 300, a message over 4000, more than 20 options or an option over 200 is cut and flagged truncated:true', async (t) => {
   const cases = [
     [{ ...CONFIRM, title: 'T'.repeat(301) }, (d) => d.title.length === 300],
