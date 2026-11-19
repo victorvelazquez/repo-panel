@@ -98,13 +98,15 @@ test('server: Stop sends pi\'s abort_bash; a repo with no session is refused', a
 
 test('server: a command that runs past the wait is stopped in pi too, and the slot is free again', async () => {
   const sent = [];
+  const waits = {};
   let first = true;
   const createClient = () => ({ start: async () => ({}), answerDialog: () => false, pendingDialogs: () => [], state: () => 'idle', close() {},
-    request: async (t) => { sent.push(t); if (t === 'bash' && first) { first = false; throw new RpcError('The agent did not answer in time'); } return t === 'bash' ? { output: '', exitCode: 0 } : {}; } });
+    request: async (t, f, o) => { sent.push(t); waits[t] = o && o.timeoutMs; if (t === 'bash' && first) { first = false; throw new RpcError('The agent did not answer in time'); } return t === 'bash' ? { output: '', exitCode: 0 } : {}; } });
   const h = createRpcHost({ resolve: async () => ({ active: ACTIVE }), repoOf: (id) => ({ id, path: 'C:\\r' }), publish() {}, createClient, adoptedOf: () => null });
   await h.start('aaa');
   await refuses(rpcApi(h).bash({ id: 'aaa', text: '!sleep 9999' }), 409, /^The shell command ran longer than 30 minutes and was stopped$/);
   assert.deepEqual(sent.filter((t) => t !== 'get_commands'), ['bash', 'abort_bash']);
+  assert.ok(waits.abort_bash > 0 && waits.abort_bash <= 20000, `the abort after the wait is short, so the 409 reaches the page before it gives up: ${waits.abort_bash}`);
   assert.deepEqual(await rpcApi(h).bash({ id: 'aaa', text: '!ls' }), { output: '', exitCode: 0 });
 });
 

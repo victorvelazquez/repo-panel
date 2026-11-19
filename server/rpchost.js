@@ -102,6 +102,8 @@ const COMMAND_WAITS = 'Commands wait until the session is free: send it when the
 const SHELL_WAITS = 'Shell commands wait until the session is free: send it when the run ends';
 const SHELL_MAX = TEXT_MAX;
 const SHELL_MS = 30 * 60 * 1000;
+// The abort sent after that wait is short, so the 409 reaches the page (which waits one minute more) even when pi does not answer it.
+const SHELL_ABORT_MS = 15000;
 // RP237 (option (a), decided by the person): with GENTLE_SHELL_INTERACTIVE_HOST=1 these commands can change the runtime's permission mode (even super-yolo, saved for new
 // sessions) and its configuration, and the panel would not show it. They stay in the terminal: refused here whatever the way the text comes in.
 // pi names a command registered twice `name:1`, `name:2`: those forms are the same command.
@@ -350,7 +352,7 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
       try { return await askLong(entry, 'bash', { command, excludeFromContext: m[1] === '!!' }); } catch (e) {
         // Past the wait the panel stops waiting; it also stops the command in pi, so a later one never runs alongside it.
         if (e instanceof HttpError && e.message === 'The agent did not answer in time') {
-          try { await entry.client.request('abort_bash', {}); } catch { /* the session may be gone */ }
+          try { await entry.client.request('abort_bash', {}, { timeoutMs: SHELL_ABORT_MS }); } catch { /* the session may be gone */ }
           throw new HttpError(409, 'The shell command ran longer than 30 minutes and was stopped');
         }
         throw e;
