@@ -952,7 +952,7 @@
   const busyBehavior = ({ alt } = {}) => (alt ? 'followUp' : 'steer');
   // RP236b (B2): while the session works a command (a text that starts with /) is not a correction: pi would run it at once. The reason, or '' when the text may go.
   // RP237: the permission and configuration commands of the runtime stay in the terminal (the server refuses them too); the text stays in the box with the reason.
-  const panelRefusal = (text) => (typeof text === 'string' && /^\/gentle:(desktop|mode|yolo)(?![\w:-])/i.test(text.trim()) ? 'Permission and configuration commands (/gentle:desktop, /gentle:mode, /gentle:yolo) are not available from the panel: use the terminal' : '');
+  const panelRefusal = (text) => (typeof text === 'string' && /^\/gentle:(desktop|mode|yolo)(?::\d+)?(?![\w:-])/i.test(text.trim()) ? 'Permission and configuration commands (/gentle:desktop, /gentle:mode, /gentle:yolo) are not available from the panel: use the terminal' : '');
   const steerRefusal = (text) => (typeof text === 'string' && text.trimStart().startsWith('/') ? 'Commands wait until the session is free: send it when the run ends' : '');
   // RP236: the messages waiting for the session, above the box: each with its kind and its text (escaped, on one line), and Clear queue, which puts them back in the box.
   function queueRowHtml(q) {
@@ -1297,7 +1297,8 @@
   // What the live session adds under the history: the answer being written (escaped like every message) and one card per dialog pi waits for (RPC2-3).
   // The card is how the person answers a PERMISSION, so: everything is escaped, the message (the FULL command) is shown whole, Deny comes first, and
   // the Allow of a confirm (or an option of an «Allow…» select) is NOT offered when the text may be cut or is not shown (RP81): then only the
-  // refusing answers remain. There is no «Allow always» and no key that answers; every answer is a click.
+  // refusing answers remain. The confirm has no «Allow always»; an «Allow…» select offers the options the session sends, in its order (RP237: the person chose parity
+  // with the terminal). No key answers; every answer is a click.
   const CUT_NOTE = 'The command is cut or not shown: answer it in the terminal';
   // Only what the person can SEE counts: letters, numbers, punctuation, symbols, spaces and spacing marks, plus LF and TAB. Everything else (controls, zero-width,
   // bidi, combining marks and variation selectors, unassigned and private-use characters) is hidden: a whitelist by category, so no list of "bad characters"
@@ -1313,7 +1314,8 @@
   function wholeText(m) {
     if (typeof m !== 'string' || hasHidden(m)) return false;
     const t = m.replace(/[\s\p{Mc}]+/gu, '');
-    return t !== '' && !/[\u2026\u2025\u22ef\ufe19\u22ee\u205d\u2d48\u1365]$|[.\uff0e\u2024\u3002\u00b7]{2,}$/u.test(t);
+    // RP237: a preview can also be cut at its START (Gentle Shell adds a leading «…» when the guarded action is far into the command).
+    return t !== '' && !/[\u2026\u2025\u22ef\ufe19\u22ee\u205d\u2d48\u1365]$|[.\uff0e\u2024\u3002\u00b7]{2,}$/u.test(t) && !/^(?:[\u2026\u2025\u22ef\ufe19\u22ee\u205d\u2d48\u1365]|[.\uff0e\u2024\u3002\u00b7]{2,})/u.test(t);
   }
   // RP237: with the interactive variable Gentle Shell asks a guarded command as an «Allow…» select whose title carries the command preview on its second line and has no
   // message. Read that way, the first line is the question and the rest is the command, so the same rules apply as to a confirm's message.

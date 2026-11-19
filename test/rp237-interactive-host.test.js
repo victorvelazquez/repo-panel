@@ -107,6 +107,28 @@ test('the card of the new shape: the question, the command whole, every option i
   assert.doesNotMatch(html, /answer it in the terminal/);
 });
 
+// Found by the second independent verification: Gentle Shell also cuts the preview at its START («…») when the guarded action is far into the command.
+test('a preview cut at its START («…» prefix) only offers Cancel, in the new shape and in a confirm', () => {
+  const d = { ...PUSH, title: 'Allow guarded git push?\n…cd /a/long/path && npm run build && git push origin HEAD' };
+  assert.equal(R.askAllowed(d), false);
+  assert.doesNotMatch(R.askCard(d, 'abc', false), /data-kind="option"/);
+  const c = { requestId: 'd9', method: 'confirm', title: 'Allow guarded git push?', message: '… && git push origin HEAD', options: [], expiresAt: null, truncated: false };
+  assert.equal(R.askAllowed(c), false);
+});
+
+test('pi\'s duplicate-name forms (/gentle:yolo:1) are refused too, by the server and the page', async () => {
+  const { host, sent } = hostFor(GS);
+  await host.start('r');
+  const api = rpcApi(host);
+  for (const text of ['/gentle:yolo:1', '/gentle:mode:2 super-yolo', '/gentle:desktop:1 {}', '/GENTLE:YOLO:12']) {
+    await assert.rejects(api.prompt({ id: 'r', text }), (e) => e.status === 409 && e.message === NOT_HERE, text);
+    await assert.rejects(api.steer({ id: 'r', text }), (e) => e.status === 409, text);
+    assert.equal(R.panelRefusal(text), NOT_HERE, text);
+  }
+  for (const text of ['/gentle:yolo:x', '/gentle:yolo:']) assert.equal(R.panelRefusal(text), '', text);
+  assert.deepEqual(sent(), []);
+});
+
 test('the new shape still only refuses when the command is cut or has a hidden character', () => {
   for (const title of ['Allow guarded git push?\ngit push origin \u2026', 'Allow guarded git push?\ngit push\u200b origin HEAD', 'Allow guarded git push?\n   ']) {
     const d = { ...PUSH, title };

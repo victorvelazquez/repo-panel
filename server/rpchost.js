@@ -100,7 +100,8 @@ const clearedOf = (r) => ({ steering: allTexts(r && r.steering), followUp: allTe
 const COMMAND_WAITS = 'Commands wait until the session is free: send it when the run ends';
 // RP237 (option (a), decided by the person): with GENTLE_SHELL_INTERACTIVE_HOST=1 these commands can change the runtime's permission mode (even super-yolo, saved for new
 // sessions) and its configuration, and the panel would not show it. They stay in the terminal: refused here whatever the way the text comes in.
-const PANEL_BLOCKED = /^\/gentle:(desktop|mode|yolo)(?![\w:-])/i;
+// pi names a command registered twice `name:1`, `name:2`: those forms are the same command.
+const PANEL_BLOCKED = /^\/gentle:(desktop|mode|yolo)(?::\d+)?(?![\w:-])/i;
 const NOT_HERE = 'Permission and configuration commands (/gentle:desktop, /gentle:mode, /gentle:yolo) are not available from the panel: use the terminal';
 const panelOnly = (message) => { if (PANEL_BLOCKED.test(message)) throw new HttpError(409, NOT_HERE); return message; };
 const TRANSLATE = {
