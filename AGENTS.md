@@ -98,10 +98,43 @@ Ejemplo, al esperar una decisión:
 y la última línea de la respuesta: `Siguiente: Elegí si el informe va en PDF o en HTML y avisame.`
 <!-- /panel:estado -->
 
-## Verificación liviana para cambios chicos
+## Política de pruebas: rápido sin perder lo crítico
 
-Decisión de la persona (4 de noviembre de 2026). No es parte de los bloques administrados de arriba y no los reemplaza: el CI en verde sigue siendo obligatorio.
+Decisión de la persona (19 de noviembre de 2026, RP253; reemplaza la «Verificación liviana» del 4 de noviembre). En este repositorio prevalece sobre dos reglas del bloque de Orquestación de arriba: «Estimá las pruebas de seguridad en unas 6 veces el código» y «Siempre: pruebas propias». El CI en verde sigue siendo obligatorio.
 
-- **Cambio chico:** texto, estilos, archivos estáticos, una constante o un mensaje, sin lógica del servidor ni de datos. Se corren las pruebas propias de la unidad y las vecinas (las que cubren los mismos archivos). La suite completa la corre el CI en Windows y Ubuntu.
-- **Cambio con riesgo** (seguridad, datos, concurrencia, lógica del servidor, contratos que otros consumen): además, la suite completa en local, la simulación de CRLF y una mutación corta de las garantías clave.
-- **No cambia:** las pruebas se escriben primero y se las ve fallar, el tamaño de la unidad, que la persona apruebe las pantallas mirándolas y que el CI quede en verde.
+**Zona crítica.** Es una lista cerrada; para sumarle algo hace falta el OK de la persona:
+- el token, el login remoto y los chequeos de Host y Origin;
+- ejecutar comandos en repos: la fusión, las órdenes `/flow-*` y las órdenes de la sala;
+- lanzar, cerrar y coordinar procesos y sesiones de pi (la concurrencia del host);
+- borrar o descartar datos: ramas, stashes, worktrees, sesiones y archivos;
+- limpiar secretos, que el token no salga del servidor y escapar el HTML que viene de afuera (XSS);
+- las tareas programadas de Windows y la bandeja.
+
+En la zona crítica:
+- las pruebas se escriben primero y se las ve fallar;
+- una prueba reproduce el abuso;
+- se corren la suite completa en local, la simulación de CRLF y una mutación corta de las garantías clave;
+- hay verificación independiente;
+- si es de RIESGO ALTO, va en un PR propio.
+
+**Lógica fuera de la zona crítica.** Son las funciones del servidor o de la página que calculan, deciden o transforman. Llevan pruebas de comportamiento:
+- escritas primero y vistas fallar;
+- pocas, sobre lo que la función hace y no sobre cómo está escrita;
+- en cantidad proporcional al riesgo, sin un múltiplo fijo del código.
+
+**Pantallas, estilos, textos y archivos estáticos.** Van sin pruebas:
+- No se escriben pruebas que lean como texto el código de `public/` (CSS, HTML o JS) y lo comparen con expresiones regulares. La garantía es que la persona apruebe la pantalla mirándola.
+- Si una pantalla necesita lógica, esa lógica va a una función pura y se prueba la función.
+- Una unidad que reemplaza una pantalla borra las pruebas de texto que quedaron de ella.
+- Las pruebas de texto que ya existen no se limpian de golpe. Cuando una falla por un cambio de pantalla, se borra en ese mismo diff y no se arregla. Si cuida algo de la zona crítica, se reescribe como prueba de comportamiento.
+
+**Ciclo de trabajo.**
+- Mientras se trabaja, se corren solo las pruebas de la unidad: `node --test test/<archivo>.test.js`.
+- La suite completa se corre en local solo en la zona crítica.
+- El CI la corre siempre, en Windows y Ubuntu.
+
+**No cambia:**
+- el tope de líneas por PR, donde las pruebas cuentan;
+- una tarea = un PR;
+- que la persona apruebe cada pantalla mirándola;
+- el CI en verde antes de fusionar.
