@@ -57,11 +57,15 @@ function launchSpec(command, platform) {
 }
 
 // The environment of the child: a COPY of baseEnv without PI_*, GENTLE_* and ENGRAM_*. The original pi gets its own data folder; Gentle
-// Shell's launcher sets its own variables when it starts (unverified here), so for it this only scrubs.
+// Shell's launcher sets its own variables when it starts (unverified here), so for it this scrubs and adds one fixed variable.
+// RP237: GENTLE_SHELL_INTERACTIVE_HOST=1 makes the question tools of Gentle Shell ask with a dialog the panel answers with buttons (measured by RP232 (d)).
+// It is always the fixed '1': a value in the panel's own environment is scrubbed above and never copied.
+const INTERACTIVE_HOST = 'GENTLE_SHELL_INTERACTIVE_HOST';
 function runtimeEnv(candidate, baseEnv) {
   const env = {};
   for (const [k, v] of Object.entries(baseEnv || {})) if (!SCRUB.test(k)) env[k] = v;
   if (candidate && candidate.id === 'pi' && candidate.agentDir) env.PI_CODING_AGENT_DIR = candidate.agentDir;
+  if (candidate && candidate.id === 'gentle-shell') env[INTERACTIVE_HOST] = '1';
   return env;
 }
 

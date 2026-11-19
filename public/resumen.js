@@ -951,6 +951,8 @@
   // RP236: what a message sent while the session works does: Alt+Enter queues it for the end of the run; Enter (and the Correct button) steers the agent now.
   const busyBehavior = ({ alt } = {}) => (alt ? 'followUp' : 'steer');
   // RP236b (B2): while the session works a command (a text that starts with /) is not a correction: pi would run it at once. The reason, or '' when the text may go.
+  // RP237: the permission and configuration commands of the runtime stay in the terminal (the server refuses them too); the text stays in the box with the reason.
+  const panelRefusal = (text) => (typeof text === 'string' && /^\/gentle:(desktop|mode|yolo)(?::\d+)?(?![\w:-])/i.test(text.trim()) ? 'Permission and configuration commands (/gentle:desktop, /gentle:mode, /gentle:yolo) are not available from the panel: use the terminal' : '');
   const steerRefusal = (text) => (typeof text === 'string' && text.trimStart().startsWith('/') ? 'Commands wait until the session is free: send it when the run ends' : '');
   // RP236: the messages waiting for the session, above the box: each with its kind and its text (escaped, on one line), and Clear queue, which puts them back in the box.
   function queueRowHtml(q) {
@@ -1295,7 +1297,8 @@
   // What the live session adds under the history: the answer being written (escaped like every message) and one card per dialog pi waits for (RPC2-3).
   // The card is how the person answers a PERMISSION, so: everything is escaped, the message (the FULL command) is shown whole, Deny comes first, and
   // the Allow of a confirm (or an option of an «Allow…» select) is NOT offered when the text may be cut or is not shown (RP81): then only the
-  // refusing answers remain. There is no «Allow always» and no key that answers; every answer is a click.
+  // refusing answers remain. The confirm has no «Allow always»; an «Allow…» select offers the options the session sends, in its order (RP237: the person chose parity
+  // with the terminal). No key answers; every answer is a click.
   const CUT_NOTE = 'The command is cut or not shown: answer it in the terminal';
   // Only what the person can SEE counts: letters, numbers, punctuation, symbols, spaces and spacing marks, plus LF and TAB. Everything else (controls, zero-width,
   // bidi, combining marks and variation selectors, unassigned and private-use characters) is hidden: a whitelist by category, so no list of "bad characters"
@@ -1311,11 +1314,21 @@
   function wholeText(m) {
     if (typeof m !== 'string' || hasHidden(m)) return false;
     const t = m.replace(/[\s\p{Mc}]+/gu, '');
-    return t !== '' && !/[\u2026\u2025\u22ef\ufe19\u22ee\u205d\u2d48\u1365]$|[.\uff0e\u2024\u3002\u00b7]{2,}$/u.test(t);
+    // RP237: a preview can also be cut at its START (Gentle Shell adds a leading «…» when the guarded action is far into the command). Only the ellipsis
+    // characters count there: a command that starts with dots (../scripts/x.sh) is legitimate.
+    return t !== '' && !/[\u2026\u2025\u22ef\ufe19\u22ee\u205d\u2d48\u1365]$|[.\uff0e\u2024\u3002\u00b7]{2,}$/u.test(t) && !/^[\u2026\u2025\u22ef\ufe19\u22ee\u205d\u2d48\u1365]/u.test(t);
+  }
+  // RP237: with the interactive variable Gentle Shell asks a guarded command as an «Allow…» select whose title carries the command preview on its second line and has no
+  // message. Read that way, the first line is the question and the rest is the command, so the same rules apply as to a confirm's message.
+  function askShape(d) {
+    if (!d || typeof d !== 'object' || !allowTitle(d) || (typeof d.message === 'string' && d.message !== '') || typeof d.title !== 'string') return d;
+    const at = d.title.indexOf('\n');
+    return at < 0 ? d : { ...d, title: d.title.slice(0, at), message: d.title.slice(at + 1) };
   }
   // Whether the card may offer an approval. A confirm needs the server not to have cut it and the whole text. A select is never answerable when it is cut or
   // shows hidden characters; an «Allow…» select also needs the whole text; any other select is a plain question.
-  function askAllowed(d) {
+  function askAllowed(raw) {
+    const d = askShape(raw);
     if (!d || typeof d !== 'object') return false;
     if (d.method === 'confirm') return d.truncated !== true && wholeText(d.message);
     if (d.method === 'select') {
@@ -1324,14 +1337,15 @@
     }
     return true;
   }
-  function askCard(d, repo, busy) {
+  function askCard(raw, repo, busy) {
+    const d = askShape(raw);
     const at = `data-act="rpc-answer" data-id="${esc(repo)}" data-request="${esc(d.requestId)}"`;
     const btn = (label, extra, tone) => `<button type="button" class="ask-btn ask-${tone}" ${at} ${extra}${busy ? ' disabled' : ''}>${esc(label)}</button>`;
     const ok = askAllowed(d);
     const field = d.method === 'editor' ? '<textarea class="ask-field" rows="5" maxlength="4000"></textarea>' : '<input type="text" class="ask-field" maxlength="4000">';
     let controls;
     if (d.method === 'confirm') controls = btn('Deny', 'data-kind="deny"', 'negative') + (ok ? btn('Allow', 'data-kind="allow"', 'affirmative') : '');
-    else if (d.method === 'select') controls = (ok ? (Array.isArray(d.options) ? d.options : []).map((o, i) => btn(visible(o), `data-kind="option" data-index="${i}"`, 'affirmative')).join('') : '') + btn('Cancel', 'data-kind="cancel"', 'negative');
+    else if (d.method === 'select') controls = (ok ? (Array.isArray(d.options) ? d.options : []).map((o, i) => btn(visible(o), `data-kind="option" data-index="${i}"`, /^\s*deny\s*$/i.test(String(o)) ? 'negative' : 'affirmative')).join('') : '') + btn('Cancel', 'data-kind="cancel"', 'negative');
     else controls = field + btn('Send', 'data-kind="send"', 'affirmative') + btn('Cancel', 'data-kind="cancel"', 'negative');
     return `<div class="ch-ask" role="alert"><div class="ch-ask-title">${esc(visible(d.title) || 'The session is asking')}</div>${d.message ? `<pre class="ch-ask-text">${esc(visible(d.message))}</pre>` : ''}<div class="ch-ask-btns">${controls}</div>${ok ? '' : `<div class="ch-ask-warn" role="status">${CUT_NOTE}</div>`}</div>`;
   }
@@ -1528,5 +1542,5 @@
     return `${ctx.failed ? '<div class="rs-note" role="status">⚠ Summary unavailable: showing the last data we have.</div>' : ''}<div class="rs-list">${body}</div>`;
   }
 
-  return { mergeSheetHtml, repoStatus, esc, mdHtml, settingsView, memoryChipHtml, ctxChipHtml, compactButtonHtml, legendHtml, listCount, blockWidths, columnView, membersView, ROOM_COLUMN_TABS, treeFolderPaths, fileView, COLUMN_TABS, columnDetail, chatMenuHtml, headChipsHtml, statusIconsHtml, composerState, askAllowed, actionMenu, actionButtonsHtml, composerMergeHtml, composerNote, chatHead, footButtons, busyBehavior, steerRefusal, queueRowHtml, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, sessionCloseHtml, sessionTerminalHtml, terminalBlockHtml, recentlyActive, chatBody, quickReplies, quickOf, quickRow, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
+  return { mergeSheetHtml, repoStatus, esc, mdHtml, settingsView, memoryChipHtml, ctxChipHtml, compactButtonHtml, legendHtml, listCount, blockWidths, columnView, membersView, ROOM_COLUMN_TABS, treeFolderPaths, fileView, COLUMN_TABS, columnDetail, chatMenuHtml, headChipsHtml, statusIconsHtml, composerState, askAllowed, askCard, actionMenu, actionButtonsHtml, composerMergeHtml, composerNote, chatHead, footButtons, busyBehavior, steerRefusal, panelRefusal, queueRowHtml, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, sessionCloseHtml, sessionTerminalHtml, terminalBlockHtml, recentlyActive, chatBody, quickReplies, quickOf, quickRow, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
 }));

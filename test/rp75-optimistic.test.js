@@ -565,6 +565,18 @@ test('C11g (RP236b, S3): a Clear queue that fails still stops the run', async ()
   assert.equal(page.fetches.filter((f) => f.method === 'POST' && f.url === '/api/rpc/abort').length, 1);
 });
 
+test('C11h (RP237): a permission command of Gentle Shell is not sent from the box, free or working; it stays there with the reason', async () => {
+  for (const state of ['idle', 'busy']) {
+    const { page } = await chatPage({ '/api/rpc/status': { state, pendingDialogs: [] } });
+    page.get('#msgBox').value = '/gentle:yolo';
+    page.run("ACTIONS['chat-send']({})");
+    await page.tick();
+    assert.equal(sendsOf(page).length, 0, state);
+    assert.equal(page.get('#msgBox').value, '/gentle:yolo', state);
+    assert.ok(page.get('#msgNote').html.includes('not available from the panel: use the terminal'), state);
+  }
+});
+
 test('C11d (RP236): the queue pi tells is drawn above the box, and Clear queue asks the server and puts the texts back in the box', async () => {
   const { page, S } = await chatPage({ '/api/rpc/status': { state: 'busy', pendingDialogs: [] }, '/api/rpc/clear-queue': { steering: ['fix the test'], followUp: ['then summarize'] } });
   page.run(`applyRpc(${JSON.stringify({ id: 'abc', kind: 'event', record: { type: 'queue', steering: ['fix the test'], followUp: ['then summarize'] } })})`);

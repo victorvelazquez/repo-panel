@@ -128,12 +128,16 @@ test('h6: the environment of the child has no PI_*, GENTLE_* or ENGRAM_* from th
     const { host, made } = hostWith();
     await host.start(a);
     const env = made[0].opts.env;
-    assert.equal(Object.keys(env).filter((k) => /^(PI_|GENTLE_|ENGRAM_)/i.test(k)).length, 0);
+    // RP237: the only one is the fixed GENTLE_SHELL_INTERACTIVE_HOST=1 the panel adds itself; nothing comes from the panel's environment.
+    assert.deepEqual(Object.keys(env).filter((k) => /^(PI_|GENTLE_|ENGRAM_)/i.test(k)), ['GENTLE_SHELL_INTERACTIVE_HOST']);
+    assert.equal(env.GENTLE_SHELL_INTERACTIVE_HOST, '1');
+    assert.equal(Object.values(env).some((v) => /^leak/.test(v)), false);
     assert.equal(env.RPC1B_KEEP, 'kept');
     const pi = hostWith({ resolve: async () => ({ active: { id: 'pi', command: 'C:\\n\\pi.cmd', agentDir: 'D:\\pi' } }) });
     await pi.host.start(a);
     assert.equal(pi.made[0].opts.env.PI_CODING_AGENT_DIR, 'D:\\pi', 'only the chosen runtime sets its own folder');
     assert.equal(pi.made[0].opts.env.GENTLE_SHELL_X, undefined);
+    assert.equal(pi.made[0].opts.env.GENTLE_SHELL_INTERACTIVE_HOST, undefined, 'RP237: the original pi does not get it');
   } finally { for (const k of Object.keys(keys)) delete process.env[k]; }
 });
 
