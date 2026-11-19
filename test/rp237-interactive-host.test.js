@@ -116,6 +116,32 @@ test('a preview cut at its START («…» prefix) only offers Cancel, in the new
   assert.equal(R.askAllowed(c), false);
 });
 
+// Third verification: the leading check must catch a cut behind whitespace, but only the ellipsis characters the session adds: a command that starts with
+// dots (../scripts/x.sh, ..\\x.ps1, ./run.sh) is legitimate and stays approvable.
+test('a leading ellipsis behind whitespace is refused; commands that start with dots stay approvable', () => {
+  for (const cmd of ['  \u2026cd /a && git push', '\t\u2026x', '\u22efx', '\u2025x']) {
+    assert.equal(R.askAllowed({ ...PUSH, title: `Allow guarded git push?\n${cmd}` }), false, cmd);
+  }
+  for (const cmd of ['./run.sh', '  ./run.sh', '.git/hooks/x', '. a.sh', 'cd .. && rm -rf build', '../scripts/x.sh', '..\\x.ps1', '. ./env.sh']) {
+    assert.equal(R.askAllowed({ ...PUSH, title: `Allow guarded git push?\n${cmd}` }), true, cmd);
+  }
+});
+
+test('numbered /gentle forms are refused in every way in, also behind whitespace; near misses are not', async () => {
+  const { host, sent } = hostFor(GS);
+  await host.start('r');
+  const api = rpcApi(host);
+  for (const text of ['  /gentle:yolo:1', '\n/gentle:desktop:3 {}', '/gentle:Yolo:007']) {
+    for (const call of [() => api.prompt({ id: 'r', text }), () => api.prompt({ id: 'r', text, behavior: 'steer' }), () => api.prompt({ id: 'r', text, behavior: 'followUp' }), () => api.steer({ id: 'r', text })]) {
+      await assert.rejects(call(), (e) => e.status === 409 && e.message === NOT_HERE, JSON.stringify(text));
+    }
+    assert.equal(R.panelRefusal(text), NOT_HERE, text);
+  }
+  assert.deepEqual(sent(), []);
+  for (const text of ['/gentle:mode:2super', '/gentle:yolo:1x']) { assert.equal(R.panelRefusal(text), '', text); await api.prompt({ id: 'r', text }); }
+  assert.equal(sent().length, 2);
+});
+
 test('pi\'s duplicate-name forms (/gentle:yolo:1) are refused too, by the server and the page', async () => {
   const { host, sent } = hostFor(GS);
   await host.start('r');

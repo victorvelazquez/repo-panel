@@ -1314,8 +1314,9 @@
   function wholeText(m) {
     if (typeof m !== 'string' || hasHidden(m)) return false;
     const t = m.replace(/[\s\p{Mc}]+/gu, '');
-    // RP237: a preview can also be cut at its START (Gentle Shell adds a leading «…» when the guarded action is far into the command).
-    return t !== '' && !/[\u2026\u2025\u22ef\ufe19\u22ee\u205d\u2d48\u1365]$|[.\uff0e\u2024\u3002\u00b7]{2,}$/u.test(t) && !/^(?:[\u2026\u2025\u22ef\ufe19\u22ee\u205d\u2d48\u1365]|[.\uff0e\u2024\u3002\u00b7]{2,})/u.test(t);
+    // RP237: a preview can also be cut at its START (Gentle Shell adds a leading «…» when the guarded action is far into the command). Only the ellipsis
+    // characters count there: a command that starts with dots (../scripts/x.sh) is legitimate.
+    return t !== '' && !/[\u2026\u2025\u22ef\ufe19\u22ee\u205d\u2d48\u1365]$|[.\uff0e\u2024\u3002\u00b7]{2,}$/u.test(t) && !/^[\u2026\u2025\u22ef\ufe19\u22ee\u205d\u2d48\u1365]/u.test(t);
   }
   // RP237: with the interactive variable Gentle Shell asks a guarded command as an «Allow…» select whose title carries the command preview on its second line and has no
   // message. Read that way, the first line is the question and the rest is the command, so the same rules apply as to a confirm's message.
