@@ -709,6 +709,8 @@ async function sendChatMessage(behavior) {
   if (!R || !id) return;
   const text = $('#msgBox').value;
   if (!text.trim()) return;
+  const blocked = R.panelRefusal(text); // RP237: a permission command of Gentle Shell stays in the terminal; the text stays in the box
+  if (blocked) { sayNote(id, blocked); draw(); return; }
   const cs = composerOf(id);
   if (!cs.canSend && cs.canSteer) {
     const refused = R.steerRefusal(text); // RP236b (B2): a command waits for the session to be free; the text stays in the box

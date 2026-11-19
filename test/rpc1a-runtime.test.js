@@ -164,7 +164,7 @@ test('e1: runtimeEnv removes every PI_*, GENTLE_* and ENGRAM_* key (any case), k
   const base = { PATH: 'p', HOME: 'h', PI_CODING_AGENT_DIR: 'x', PI_OTHER: '1', pi_lower: '2', GENTLE_SHELL_CHILD_PACKAGE_INJECTION: '1', gentle_x: '1', ENGRAM_PROJECT: 'a', Engram_Y: 'b', PIPE: 'keep', PIXEL: 'keep' };
   const copy = { ...base };
   const env = runtimeEnv(GS, base);
-  assert.deepEqual(env, { PATH: 'p', HOME: 'h', PIPE: 'keep', PIXEL: 'keep' });
+  assert.deepEqual(env, { PATH: 'p', HOME: 'h', PIPE: 'keep', PIXEL: 'keep', GENTLE_SHELL_INTERACTIVE_HOST: '1' }); // RP237: the one fixed variable Gentle Shell gets
   assert.deepEqual(base, copy);
   assert.notEqual(env, base);
 });
@@ -205,9 +205,18 @@ test('h1: handshake ok: starts `--mode rpc --no-session` in the temp dir with th
   assert.equal(m.opts.cwd, 'C:\\T');
   assert.equal(m.opts.env.PI_CODING_AGENT_DIR, 'C:\\h\\.pi\\agent');
   assert.equal('GENTLE_A' in m.opts.env, false);
+  assert.equal('GENTLE_SHELL_INTERACTIVE_HOST' in m.opts.env, false, 'RP237: the original pi does not get it');
   assert.deepEqual(JSON.parse(m.child.stdin.written.trim()), { id: '1', type: 'get_state' });
   assert.equal(m.child.stdin.written.trim().split('\n').length, 1);
   assert.ok(treeKilled(f), 'taskkill /T /F on success');
+});
+
+// RP237: the check of Gentle Shell starts it the way a session does, with the one fixed variable; a value in the panel's environment is never copied.
+test('h1b: the handshake of Gentle Shell launches it with GENTLE_SHELL_INTERACTIVE_HOST=1 and nothing else of those families', async () => {
+  const f = fakeSpawn({ onWrite: reply(OK) });
+  const r = await handshake(GS, { spawn: f.spawn, env: { PATH: 'p', GENTLE_SHELL_INTERACTIVE_HOST: '0', GENTLE_A: '1' }, timeoutMs: 2000, platform: 'win32', tmpdir: 'C:\\T' });
+  assert.deepEqual(r, { ok: true });
+  assert.deepEqual(f.main().opts.env, { PATH: 'p', GENTLE_SHELL_INTERACTIVE_HOST: '1' });
 });
 
 test('h2: a .cmd goes through the shell only on Windows and quoted; an .exe or a Linux command never does', async () => {

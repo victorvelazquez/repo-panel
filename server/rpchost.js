@@ -98,6 +98,11 @@ const allTexts = (list) => (Array.isArray(list) ? list.filter((t) => typeof t ==
 const clearedOf = (r) => ({ steering: allTexts(r && r.steering), followUp: allTexts(r && r.followUp) });
 // RP236b (B2): pi runs an extension command sent by prompt at once, even during a run; while the session works a command waits for it to be free.
 const COMMAND_WAITS = 'Commands wait until the session is free: send it when the run ends';
+// RP237 (option (a), decided by the person): with GENTLE_SHELL_INTERACTIVE_HOST=1 these commands can change the runtime's permission mode (even super-yolo, saved for new
+// sessions) and its configuration, and the panel would not show it. They stay in the terminal: refused here whatever the way the text comes in.
+const PANEL_BLOCKED = /^\/gentle:(desktop|mode|yolo)(?![\w:-])/i;
+const NOT_HERE = 'Permission and configuration commands (/gentle:desktop, /gentle:mode, /gentle:yolo) are not available from the panel: use the terminal';
+const panelOnly = (message) => { if (PANEL_BLOCKED.test(message)) throw new HttpError(409, NOT_HERE); return message; };
 const TRANSLATE = {
   queue_update: (r) => ({ type: 'queue', ...queueOf(r) }),
   agent_start: () => ({ type: 'run_start' }),
@@ -306,7 +311,7 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
     async prompt(id, value, { behavior } = {}) {
       repoOf(id);
       if (behavior !== undefined && !BEHAVIORS.includes(behavior)) throw new HttpError(400, 'behavior must be steer or followUp');
-      const message = cleanText(value);
+      const message = panelOnly(cleanText(value));
       if (behavior && message.startsWith('/')) throw new HttpError(409, COMMAND_WAITS);
       const entry = running(id);
       if (entry.compacting) throw new HttpError(409, 'The session is compacting its context: wait a moment'); // pi would refuse it too
@@ -314,7 +319,7 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
     },
     async steer(id, value) {
       repoOf(id);
-      const message = cleanText(value);
+      const message = panelOnly(cleanText(value));
       return ask(running(id), 'steer', { message });
     },
     async abort(id) { repoOf(id); return ask(running(id), 'abort', {}); },
