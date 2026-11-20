@@ -12,6 +12,11 @@ const { commandProblem, launchSpec, killTree, makeWhich, isAbs } = require('./pi
 // Five minutes (RP101): the real pi took 4 s to over 60 s to start, with no pattern (measured through the panel, RPC2-1), and on one machine a New session ran past the old
 // two-minute cap twice in a row (24 to 29 s measured here when pi has to look for the session id among a repo's sessions).
 const START_MS = 300000;
+// RP238: how long a closed pi may take to exit by itself once its stdin ends (it saves its session file first; 13.4 s measured through the .cmd launcher) before
+// its tree is killed. Decided by the person.
+const GRACE_MS = 20000;
+// RP238: after the kill, how long to wait for the child to report its exit before the close counts as done anyway (a child that never reports must not hang the shutdown).
+const KILL_WAIT_MS = 2000;
 const MAX_LINE = 8 * 1024 * 1024;
 const MAX_WAITING = 200;
 const MAX_DIALOGS = 20;
@@ -53,7 +58,7 @@ const RETRY_FACTOR = 4; // a run that will retry waits four times longer, plus t
 const REFRESH_RETRIES = 3;
 const REFRESH_RETRY_MS = 1000;
 
-function createRpcClient({ command, args = [], cwd, env, spawn = cp.spawn, platform = process.platform, kill = process.kill, startTimeoutMs = START_MS, requestTimeoutMs = 120000, settleMs = SETTLE_MS, refreshRetries = REFRESH_RETRIES, refreshRetryMs = REFRESH_RETRY_MS, onEvent = () => {}, onExit = () => {} }) {
+function createRpcClient({ command, args = [], cwd, env, spawn = cp.spawn, platform = process.platform, kill = process.kill, startTimeoutMs = START_MS, graceMs = GRACE_MS, killWaitMs = KILL_WAIT_MS, requestTimeoutMs = 120000, settleMs = SETTLE_MS, refreshRetries = REFRESH_RETRIES, refreshRetryMs = REFRESH_RETRY_MS, onEvent = () => {}, onExit = () => {} }) {
   const pending = new Map(); // id -> { type, resolve, reject, timer, ends }
   const queue = []; // commands issued before ready
   const outbox = []; // lines waiting for stdin to drain
@@ -80,6 +85,9 @@ function createRpcClient({ command, args = [], cwd, env, spawn = cp.spawn, platf
   let retryTimer = null;
   let startTimer = null;
   let lastState = 'starting';
+  let exited = false; // RP238: the child said exit or close: it is gone and never killed (its PID may already be another process)
+  let gone = null; // RP238: resolves once the child is gone (it exited, or it was killed at the end of the grace)
+  let onGone = () => {};
   const safe = (fn, arg) => { try { fn(arg); } catch { /* a listener must not break the client */ } };
   const emit = (e) => safe(onEvent, e);
 
@@ -265,9 +273,26 @@ function createRpcClient({ command, args = [], cwd, env, spawn = cp.spawn, platf
     } catch { /* a bad record never takes the client down */ }
   }
 
-  // Ends everything once: pending requests fail, dialogs go away, the whole process tree is killed (even after an exit, for what it left).
+  // RP238: an orderly end: stdin is closed (pi then saves its session file and exits by itself); only a child still alive after graceMs is killed with its tree.
+  function stop() {
+    return new Promise((resolve) => {
+      if (!child || exited) return resolve();
+      let capped = null;
+      // The child is gone when it reports its exit (taskkill takes a moment), or at the cap. The cap is armed before the kill, which may report the exit at once.
+      const timer = setTimeout(() => { capped = setTimeout(() => onGone(), killWaitMs); killTree(child, { spawn, platform, kill }); }, graceMs);
+      onGone = () => { onGone = () => {}; clearTimeout(timer); clearTimeout(capped); resolve(); };
+      try { child.stdin.end(); } catch { /* the grace still ends it */ }
+    });
+  }
+  function exit(reason) {
+    exited = true;
+    onGone();
+    teardown(reason);
+  }
+
+  // Ends everything once: pending requests fail, dialogs go away and the child is stopped (RP238: stdin first, the tree killed only after the grace).
   function teardown(reason) {
-    if (closed) return;
+    if (closed) return gone;
     closed = true;
     clearTimeout(startTimer);
     clearTimeout(settleTimer);
@@ -280,9 +305,10 @@ function createRpcClient({ command, args = [], cwd, env, spawn = cp.spawn, platf
     for (const d of dialogs.values()) clearTimeout(d.timer);
     dialogs.clear();
     buf = '';
-    if (child) killTree(child, { spawn, platform, kill });
+    gone = stop();
     safe(onExit, { reason });
     notify();
+    return gone;
   }
 
   function launch() {
@@ -298,8 +324,8 @@ function createRpcClient({ command, args = [], cwd, env, spawn = cp.spawn, platf
         child = spawn(spec.file, args, { cwd, env, shell: spec.shell, windowsHide: true, detached: platform !== 'win32', stdio: ['pipe', 'pipe', 'ignore'] });
       } catch { return refuse(); }
       child.on('error', () => teardown('error'));
-      child.on('exit', () => teardown('exit'));
-      child.on('close', () => teardown('exit'));
+      child.on('exit', () => exit('exit'));
+      child.on('close', () => exit('exit'));
       for (const stream of [child.stdout, child.stdin]) if (stream && typeof stream.on === 'function') stream.on('error', () => {});
       child.stdout.on('data', onData);
       startTimer = setTimeout(() => teardown('timeout'), startTimeoutMs);
@@ -339,8 +365,8 @@ function createRpcClient({ command, args = [], cwd, env, spawn = cp.spawn, platf
     pendingDialogs: () => [...dialogs.values()].map(publicDialog),
     state,
     outcome: () => (closed || !outcome ? null : { ...outcome }), // RP228
-    close: () => teardown('closed'),
+    close: () => teardown('closed'), // RP238: resolves once the process is gone (bounded by graceMs)
   };
 }
 
-module.exports = { createRpcClient, RpcError, START_MS };
+module.exports = { createRpcClient, RpcError, START_MS, GRACE_MS, KILL_WAIT_MS };

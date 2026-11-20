@@ -56,7 +56,7 @@ function inProcess(t, child, over = {}) {
   const events = [];
   const exits = [];
   const spawn = (file, args) => { if (file === 'taskkill') { kills.push(args); return new EventEmitter(); } return child; };
-  const client = createRpcClient({ command: 'C:\\x\\pi.exe', args: [], cwd: scratch, env: {}, spawn, platform: 'win32', onEvent: (e) => events.push(e), onExit: (e) => exits.push(e), ...over });
+  const client = createRpcClient({ command: 'C:\\x\\pi.exe', args: [], cwd: scratch, env: {}, spawn, platform: 'win32', graceMs: 50, killWaitMs: 50, onEvent: (e) => events.push(e), onExit: (e) => exits.push(e), ...over }); // RP238: a short grace, the fake never exits by itself
   t.after(() => client.close());
   return { client, kills, events, exits };
 }
@@ -124,8 +124,9 @@ test('s2: UI notices before the first answer are ignored and start resolves on t
 });
 
 test('s3: the startup timeout rejects start with an RpcError and kills the tree', async (t) => {
-  const { client, kills } = withFixture(t, { FAKE_DELAY_MS: '5000' }, { startTimeoutMs: 120 });
+  const { client, kills } = withFixture(t, { FAKE_DELAY_MS: '5000' }, { startTimeoutMs: 120, graceMs: 50, killWaitMs: 50 });
   await assert.rejects(client.start(), (e) => e instanceof RpcError);
+  await client.close(); // RP238: the tree is killed once the grace runs out
   assert.equal(kills.length, 1);
   assert.equal(client.state(), 'closed');
 });
@@ -139,19 +140,21 @@ test('s4: a spawn error rejects start and every pending request, and nothing is 
   await assert.rejects(started, (e) => e instanceof RpcError && !/secret|EPERM/.test(e.message));
   await assert.rejects(pending, (e) => e instanceof RpcError);
   assert.equal(client.state(), 'closed');
+  await client.close(); // RP238: after the grace
   assert.equal(kills.length, 1);
   const thrown = inProcess(t, null, { spawn: () => { throw new Error('boom'); } });
   await assert.rejects(thrown.client.start(), (e) => e instanceof RpcError);
 });
 
-test('s5: an early exit rejects start and the queued requests, calls onExit once and kills the tree', async (t) => {
+test('s5: an early exit rejects start and the queued requests, calls onExit once and kills nothing (RP238: the process is gone)', async (t) => {
   const { client, kills, exits } = withFixture(t, { FAKE_DIE: 'early' });
   const started = client.start();
   const queued = client.request('abort');
   await assert.rejects(started, (e) => e instanceof RpcError);
   await assert.rejects(queued, (e) => e instanceof RpcError);
   assert.equal(exits.length, 1);
-  assert.equal(kills.length, 1);
+  await client.close();
+  assert.equal(kills.length, 0);
   assert.equal(client.state(), 'closed');
 });
 
@@ -373,9 +376,10 @@ test('t4: the events of the session go to onEvent as data, in order', async (t) 
 test('x1: close() kills the tree once, rejects pending requests, is idempotent and later writes fail without throwing', async (t) => {
   const { child, client, kills, exits } = await readyClient(t);
   const pending = client.request('abort');
-  client.close();
+  const gone = client.close();
   client.close();
   await assert.rejects(pending, (e) => e instanceof RpcError);
+  await gone; // RP238: the kill comes after the grace
   assert.equal(kills.length, 1);
   assert.equal(kills[0][0], '/PID');
   assert.equal(client.state(), 'closed');
@@ -397,6 +401,6 @@ test('x2: on POSIX the tree is killed through its process group', async (t) => {
   await until(() => child.sent().length >= 1);
   child.said({ id: child.sent()[0].id, type: 'response', command: 'get_state', success: true, data: {} });
   await started;
-  client.close();
+  await client.close();
   assert.deepEqual(killed, [[-4242, 'SIGKILL']]);
 });

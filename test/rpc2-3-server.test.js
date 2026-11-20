@@ -54,7 +54,7 @@ const spawnOf = (child) => (file) => (file === 'taskkill' ? new EventEmitter() :
 async function agent(t, over = {}) {
   const child = fakeChild();
   const events = [];
-  const client = createRpcClient({ command: 'C:\\x\\pi.exe', args: [], cwd: scratch, env: {}, spawn: spawnOf(child), platform: 'win32', onEvent: (e) => events.push(e), ...over });
+  const client = createRpcClient({ command: 'C:\\x\\pi.exe', args: [], cwd: scratch, env: {}, spawn: spawnOf(child), platform: 'win32', graceMs: 50, killWaitMs: 50, onEvent: (e) => events.push(e), ...over }); // RP238: a short grace, the fake never exits by itself
   t.after(() => client.close());
   await client.start();
   return { child, client, events };
@@ -213,7 +213,7 @@ async function withRoute(fn) {
   const published = [];
   const host = createRpcHost({
     resolve: async () => ({ active: { id: 'g', command: 'C:\\x\\pi.exe', agentDir: 'C:\\a' } }), repoOf: findRepo, publish: (id, p) => published.push(p), adoptedOf: () => null,
-    createClient: (o) => createRpcClient({ ...o, spawn: spawnOf(child), platform: 'win32' }),
+    createClient: (o) => createRpcClient({ ...o, spawn: spawnOf(child), platform: 'win32', graceMs: 50, killWaitMs: 50 }),
   });
   const port = await freePort();
   const server = createServer(port, { noSummaryStore: true, rpcHost: host });

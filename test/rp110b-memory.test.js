@@ -37,7 +37,7 @@ async function readyClient(t) {
   const child = fakeChild();
   const events = [];
   const spawn = (file) => (file === 'taskkill' ? new EventEmitter() : child);
-  const client = createRpcClient({ command: 'C:\\x\\pi.exe', args: [], cwd: scratch, env: {}, spawn, platform: 'win32', onEvent: (e) => events.push(e), onExit: () => {} });
+  const client = createRpcClient({ command: 'C:\\x\\pi.exe', args: [], cwd: scratch, env: {}, spawn, platform: 'win32', graceMs: 50, killWaitMs: 50, onEvent: (e) => events.push(e), onExit: () => {} }); // RP238: a short grace, the fake never exits by itself
   t.after(() => client.close());
   const started = client.start();
   await until(() => child.sent().length >= 1);

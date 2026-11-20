@@ -46,7 +46,7 @@ const notice = (key, text) => ({ type: 'extension_ui_request', id: `u-${Math.ran
 test('client: the notice gentle:mode is kept like the memory one; the gentle:yolo badge and its widget are still dropped', async (t) => {
   const child = fakeChild();
   const events = [];
-  const client = createRpcClient({ command: 'C:\\x\\pi.exe', args: [], cwd: scratch, env: {}, spawn: (f) => (f === 'taskkill' ? new EventEmitter() : child), platform: 'win32', onEvent: (e) => events.push(e), onExit: () => {} });
+  const client = createRpcClient({ command: 'C:\\x\\pi.exe', args: [], cwd: scratch, env: {}, spawn: (f) => (f === 'taskkill' ? new EventEmitter() : child), platform: 'win32', graceMs: 50, killWaitMs: 50, onEvent: (e) => events.push(e), onExit: () => {} }); // RP238: a short grace, the fake never exits by itself
   t.after(() => client.close());
   const started = client.start();
   await until(() => child.sent().length >= 1);

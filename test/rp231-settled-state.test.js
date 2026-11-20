@@ -26,7 +26,7 @@ function fakeChild() {
 async function ready(t, opts = {}) {
   const child = fakeChild();
   const spawn = (file) => (file === 'taskkill' ? new EventEmitter() : child);
-  const client = createRpcClient({ command: 'C:\\x\\pi.exe', args: [], cwd: '.', env: {}, spawn, platform: 'win32', ...opts });
+  const client = createRpcClient({ command: 'C:\\x\\pi.exe', args: [], cwd: '.', env: {}, spawn, platform: 'win32', graceMs: 50, killWaitMs: 50, ...opts }); // RP238: a short grace, the fake never exits by itself
   t.after(() => client.close());
   const started = client.start();
   await until(() => child.sent().length >= 1);
@@ -136,7 +136,7 @@ test('s13: the fallback does not free a session while pi is compacting after a r
 test('s14: a client that starts while pi is already working keeps it busy until agent_settled', async (t) => {
   const child = fakeChild();
   const spawn = (file) => (file === 'taskkill' ? new EventEmitter() : child);
-  const client = createRpcClient({ command: 'C:\\x\\pi.exe', args: [], cwd: '.', env: {}, spawn, platform: 'win32' });
+  const client = createRpcClient({ command: 'C:\\x\\pi.exe', args: [], cwd: '.', env: {}, spawn, platform: 'win32', graceMs: 50, killWaitMs: 50 });
   t.after(() => client.close());
   const started = client.start();
   await until(() => child.sent().length >= 1);
