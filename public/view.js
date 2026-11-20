@@ -469,12 +469,30 @@
   // not open or not ready); this is what the page OFFERS. It is enabled only for a ready PR with nothing in flight (`busy`: true or 'done'), nothing held after a merge (`held`) and no command
   // running in the session (`hold`: the reason, from runningReason). Without a PR it is off and says why (`noPr`, or the default). Total: anything that is not a PR object is no PR.
   const MERGE_METHODS = ['squash', 'merge', 'rebase'];
+  // RP226 (moved here by RP227, so the page and the server share it; lib.js hands out this same function): the merge method to send. A method is allowed unless its flag is
+  // exactly false (unknown flags use the requested one); null when the repo allows none.
+  function pickMergeMethod(requested, allowed) {
+    const ok = (m) => allowed?.[m] !== false;
+    if (ok(requested)) return { method: requested, requested, fellBack: false };
+    const method = ['squash', 'rebase', 'merge'].find(ok);
+    return method ? { method, requested, fellBack: true } : null;
+  }
+  // RP227: `methods` is what /api/prs says the repo allows (repo.methods); the button shows the method the server will really use, and why when it is not the one of Settings.
+  // The method of Settings cleaned (an unknown one is squash), the one that will be used, and whether the repo allows any: the button and the phone's sheet both ask this.
+  function mergeMethodOf(pref, methods) {
+    const asked = MERGE_METHODS.includes(pref) ? pref : 'squash';
+    const pick = pickMergeMethod(asked, methods && typeof methods === 'object' ? methods : null);
+    return { method: pick ? pick.method : asked, asked, allowed: !!pick };
+  }
   function mergeButton(pr, ctx = {}) {
     const c = ctx && typeof ctx === 'object' ? ctx : {};
-    const method = MERGE_METHODS.includes(c.method) ? c.method : 'squash';
+    const { method, asked, allowed } = mergeMethodOf(c.method, c.methods);
+    const pick = allowed && method !== asked ? { fellBack: true } : allowed ? { fellBack: false } : null;
     const word = `Merge · ${method}`;
-    const hint = (why) => `${/[.…!?]$/.test(why) ? why : `${why}.`} Method: ${method}. Change it in Settings, Delivery.`; // RP147: the Merge menu left the header, so the title says where the method lives
+    const which = pick && pick.fellBack ? `${method} (this repo does not allow ${asked})` : method;
+    const hint = (why) => `${/[.…!?]$/.test(why) ? why : `${why}.`} Method: ${which}. Change it in Settings, Delivery.`; // RP147: the Merge menu left the header, so the title says where the method lives
     if (!pr || typeof pr !== 'object' || Array.isArray(pr) || typeof pr.ready !== 'boolean') return { enabled: false, label: word, title: hint(String(c.noPr || 'No open pull request for this branch')) };
+    if (!pick) return { enabled: false, label: word, title: 'This repo allows no merge method: change it on GitHub, in the settings of the repo.' };
     const hold = c.hold ? String(c.hold) : '';
     return {
       enabled: pr.ready === true && !c.busy && !c.held && !hold,
@@ -1243,5 +1261,5 @@
     const rows = Math.max(1, Math.round((sc - pd) / ln));
     return { height: Math.min(Math.max(sc, one), cap), scrolls: sc - cap > 1, rows, expandable: rows > 4 };
   };
-  return { boxFit, enterSends, STALLED_MS, stalledNow, jobsHold, deliveryHold, tasksPollDue, TASKS_REFRESH_MS, mergeWhy, mergeNote, screenOf, bandOf, NARROW_BELOW, DUO_BELOW, parseAddress, addressOf, ADDRESS_ZONES, subClock, columnTabFor, conformityTabLabel, repoModel, changeChips, prChip, ciOf, idleChip, conflictChip, sizeChip, RepoCard, stateLineHidden, usageView, usageHtml, ringGeometry, usageRemaining, boardApply, boardWait, chatCachePut, chatCacheGet, rpcWithContext, chatFromCache, API_VERSION, mergeButton, rerunButton, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, dirtyRepos, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, sentToast, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, taskPrs, matchesUnitId, isOutdated, conformityView, reqFold, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, parseSse, rpcEvent, rpcReduce, rpcFromStatus, shellInHistory, CAUSE_TEXT, endedNote, eventsPlan, eventsRetryMs, eventsStale, projectRepos, roomOfFolder, roomMembers, columnTabOf, mergeRooms };
+  return { pickMergeMethod, mergeMethodOf, boxFit, enterSends, STALLED_MS, stalledNow, jobsHold, deliveryHold, tasksPollDue, TASKS_REFRESH_MS, mergeWhy, mergeNote, screenOf, bandOf, NARROW_BELOW, DUO_BELOW, parseAddress, addressOf, ADDRESS_ZONES, subClock, columnTabFor, conformityTabLabel, repoModel, changeChips, prChip, ciOf, idleChip, conflictChip, sizeChip, RepoCard, stateLineHidden, usageView, usageHtml, ringGeometry, usageRemaining, boardApply, boardWait, chatCachePut, chatCacheGet, rpcWithContext, chatFromCache, API_VERSION, mergeButton, rerunButton, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, dirtyRepos, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, sentToast, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, taskPrs, matchesUnitId, isOutdated, conformityView, reqFold, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, parseSse, rpcEvent, rpcReduce, rpcFromStatus, shellInHistory, CAUSE_TEXT, endedNote, eventsPlan, eventsRetryMs, eventsStale, projectRepos, roomOfFolder, roomMembers, columnTabOf, mergeRooms };
 }));

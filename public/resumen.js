@@ -546,8 +546,9 @@
     const x = m && typeof m === 'object' && !Array.isArray(m) ? m : null;
     if (!x || !Number.isSafeInteger(x.n) || x.n <= 0 || typeof x.base !== 'string') return '';
     const method = ['squash', 'merge', 'rebase'].includes(x.method) ? x.method : 'squash';
+    const asked = ['squash', 'merge', 'rebase'].includes(x.asked) ? x.asked : method; // RP227: the method of Settings, when the repo does not allow it
     const title = typeof x.title === 'string' && x.title ? `<p class="ms-sub">${esc(x.title)}</p>` : '';
-    return `<div class="ms-back" data-act="merge-cancel"></div><div class="ms-card" role="dialog" aria-modal="true" aria-labelledby="ms-t"><h3 id="ms-t">Merge #${x.n} into ${esc(x.base)}?</h3>${title}<p>Method: <b>${method}</b>. ${x.del === true ? 'The branch will be deleted after the merge.' : 'The branch is kept.'}</p><div class="ms-btns"><button type="button" class="ms-cancel" id="ms-cancel" data-act="merge-cancel">Cancel</button><button type="button" class="primary ms-ok" data-act="merge-confirm">Merge · ${method}</button></div></div>`;
+    return `<div class="ms-back" data-act="merge-cancel"></div><div class="ms-card" role="dialog" aria-modal="true" aria-labelledby="ms-t"><h3 id="ms-t">Merge #${x.n} into ${esc(x.base)}?</h3>${title}<p>Method: <b>${method}</b>${asked !== method ? ` (this repo does not allow ${asked})` : ''}. ${x.del === true ? 'The branch will be deleted after the merge.' : 'The branch is kept.'}</p><div class="ms-btns"><button type="button" class="ms-cancel" id="ms-cancel" data-act="merge-cancel">Cancel</button><button type="button" class="primary ms-ok" data-act="merge-confirm">Merge · ${method}</button></div></div>`;
   }
   // RP135: what the head of the chat says about the repo under 760 px. Pure and total. `g` is what columnGit gives (branch, commits ahead, and the open PR of THAT branch, so a PR of another branch never shows here). The checks that
   // are running or failed are said, the passed ones are not; what is not a count is 0. line = the second line of the head, label = the name of the button that opens Repo, pending = the badge of the Repo button.
