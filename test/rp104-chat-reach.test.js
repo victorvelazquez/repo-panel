@@ -41,8 +41,9 @@ test('S1: a message 200 KB before the end of the file is in the history (it was 
   assert.equal(r.truncated, false);
 });
 
-test('S1: the window is still bounded: a message 600 KB before the end is out and the history says it is cut', () => {
-  putSession('w2', [header('w2', repoDir), msg('user', [text('EARLY')]), filler(300), filler(300), msg('user', [text('LATE')])]);
+// RP240 migrated this one: the history counts messages now, and its byte bound moved from 512 KB to CHAT_READ_MAX (8 MB).
+test('S1: the read is still bounded: a message 9 MB before the end is out and the history says it is cut', () => {
+  putSession('w2', [header('w2', repoDir), msg('user', [text('EARLY')]), filler(600), filler(9 * 1024), msg('user', [text('LATE')])]);
   const r = chatOf('w2');
   assert.deepEqual(r.items.map((i) => i.text), ['LATE']);
   assert.equal(r.truncated, true);

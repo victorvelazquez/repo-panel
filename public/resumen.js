@@ -1260,12 +1260,25 @@
   // RP162: a text the history cut says so under its words (`cut` is how many characters were left out; only a positive safe integer counts).
   const cutNote = (it) => (Number.isSafeInteger(it.cut) && it.cut > 0 ? `<div class="m-cut" role="note">Message cut: ${it.cut} more characters, see the rest in the terminal</div>` : '');
   const stopNote = (it) => (Object.hasOwn(STOP_NOTES, it.stop) ? `<div class="m stopnote ${it.stop}">${STOP_NOTES[it.stop]}</div>` : '');
+  // RP240: the images of a user message, at most IMG_MAX frames. A frame holds the <img> only once the page fetched it (a blob: address in `imgs`, keyed "<entry>/<n>");
+  // until then, or when it failed, or when the entry has no id, it says «Image». The fetch needs the token header, so a plain <img src> of the route could not work.
+  const IMG_MAX = 8;
+  const imagesHtml = (it, imgs) => {
+    if (!Number.isSafeInteger(it.images) || it.images < 1) return '';
+    const entry = typeof it.entry === 'string' && it.entry ? it.entry : null;
+    const frames = Array.from({ length: Math.min(it.images, IMG_MAX) }, (_, n) => {
+      const url = entry && imgs && Object.hasOwn(imgs, `${entry}/${n}`) ? imgs[`${entry}/${n}`] : null;
+      const ref = entry ? ` data-img-entry="${esc(entry)}" data-img-n="${n}"` : '';
+      return typeof url === 'string' && url.startsWith('blob:') ? `<span class="m-img"${ref}><img src="${esc(url)}" alt="Image"></span>` : `<span class="m-img m-img-off"${ref}>Image</span>`;
+    });
+    return `<div class="m-pics">${frames.join('')}</div>`;
+  };
   const bubble = (it, who, rx) => {
     const time = hhmm(it.at);
     if (it.role === 'system' && it.kind === 'shell') return shellHtml({ ...it, running: false, open: rx.open.includes(it.id), ...(typeof it.id === 'string' ? { key: it.id } : {}) }); // RP252: a ! or !! run the session file keeps
     if (it.role === 'system') return it.kind === 'compaction' ? `<div class="sysnote">↻ Context compacted${time ? ` · ${time}` : ''}</div>` : '';
     if (it.role === 'assistant' && !it.text) return `${thoughtLine(it)}${toolsLine(it.tools, it.toolInfo, rx)}${stopNote(it)}`; // RP171: no «working…» here: the tail of the thread is the one place that says the session works
-    return `${thoughtLine(it)}${toolsLine(it.tools || [], it.toolInfo, rx)}<div class="m${it.role === 'user' ? ' me' : ''}"><span class="who">${esc(it.role === 'user' ? 'You' : who)}${time ? ` · ${time}` : ''}</span>${mdHtml(it.text)}${cutNote(it)}</div>${stopNote(it)}`;
+    return `${thoughtLine(it)}${toolsLine(it.tools || [], it.toolInfo, rx)}<div class="m${it.role === 'user' ? ' me' : ''}"><span class="who">${esc(it.role === 'user' ? 'You' : who)}${time ? ` · ${time}` : ''}</span>${mdHtml(it.text)}${it.role === 'user' ? imagesHtml(it, rx.imgs) : ''}${cutNote(it)}</div>${stopNote(it)}`;
   };
 
   // Pending messages of the composer (RP75): shown after the real ones until the history has them. `base` is how many user items
@@ -1530,7 +1543,7 @@
     const who = info.adopted.name || info.adopted.id;
     if (!info.adoptedFound) return `${note}<div class="ch-state" role="status"><p>The session is loading. The history appears with its first message.</p></div>${pendingHtml(c.pending, [])}${rpcTail(c, who, [], ctx.now)}`;
     const items = c.hist && Array.isArray(c.hist.items) ? c.hist.items : []; // RP155: a history that is not a list reads as empty
-    const rx = { allow: !!c.hist && c.hist.results === true, map: c.results && typeof c.results === 'object' ? c.results : {}, id: c.id, open: c.shellOpen && Array.isArray(c.shellOpen[c.id]) ? c.shellOpen[c.id] : [] };
+    const rx = { allow: !!c.hist && c.hist.results === true, map: c.results && typeof c.results === 'object' ? c.results : {}, id: c.id, open: c.shellOpen && Array.isArray(c.shellOpen[c.id]) ? c.shellOpen[c.id] : [], imgs: ctx.imgs && typeof ctx.imgs === 'object' ? ctx.imgs : {} };
     const pending = pendingHtml(c.pending, items);
     return `${note}${c.hist && c.hist.truncated ? '<div class="rs-sub ch-older">Older messages are not shown</div>' : ''}${items.map((it) => bubble(it, who, rx)).join('') || (pending ? '' : '<div class="empty">No messages yet.</div>')}${pending}${rpcTail(c, who, items, ctx.now)}`;
   }

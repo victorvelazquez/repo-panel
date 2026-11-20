@@ -45,6 +45,36 @@ try {
   if (v && typeof v === 'object' && !Array.isArray(v)) for (const k of ['list', 'col']) if (typeof v[k] === 'number' && v[k] > 0 && v[k] < 1) layoutRatios[k] = v[k];
 } catch { /* no storage or a broken value: the default widths */ }
 
+// RP240: the images of the open chat, fetched with the token header (an <img src> of the route could not carry it) and kept as blob: addresses until another chat
+// opens, when they are released. A failed one stays «Image» and is not asked again while that chat is open.
+let chatPics = { id: null, urls: {}, busy: new Set() };
+function chatImgs(id) {
+  if (chatPics.id !== id) {
+    for (const u of Object.values(chatPics.urls)) if (u.startsWith('blob:')) URL.revokeObjectURL(u);
+    chatPics = { id, urls: {}, busy: new Set() };
+  }
+  return chatPics.urls;
+}
+function fetchChatImages(id, items) {
+  const pics = chatPics;
+  for (const it of Array.isArray(items) ? items : []) {
+    if (!it || it.role !== 'user' || typeof it.entry !== 'string' || !Number.isSafeInteger(it.images)) continue;
+    for (let n = 0; n < Math.min(it.images, 8); n++) {
+      const k = `${it.entry}/${n}`;
+      if (Object.hasOwn(pics.urls, k) || pics.busy.has(k)) continue;
+      pics.busy.add(k);
+      fetch(`/api/chat/image?id=${encodeURIComponent(id)}&entry=${encodeURIComponent(it.entry)}&n=${n}`, { headers: { 'x-token': TOKEN } })
+        .then((r) => (r.ok ? r.blob() : null)).catch(() => null)
+        .then((b) => {
+          pics.busy.delete(k);
+          if (pics !== chatPics) return; // another chat opened meanwhile
+          pics.urls[k] = b && b.type.startsWith('image/') ? URL.createObjectURL(b) : 'fail';
+          draw();
+        });
+    }
+  }
+}
+
 // Opening a card reads with priority user and a signal that the next open or close aborts; the periodic poll does neither.
 let chatCtl = null;
 async function loadChat(id, { user = false, signal } = {}) {
@@ -580,7 +610,8 @@ function drawChat() {
   const body = $('#chatBody');
   const snap = chatScrollSnap(body);
   if (chatShown !== S.chat.id) snap.stuck = true; // a different chat starts at its end
-  const bodyChanged = paint(body, R.chatBody(shown, { now: Date.now() }));
+  const bodyChanged = paint(body, R.chatBody(shown, { now: Date.now(), imgs: chatImgs(S.chat.id) }));
+  fetchChatImages(S.chat.id, shown.hist && shown.hist.items);
   if (bodyChanged || slotChanged) {
     chatScrollRestore(body, snap);
     chatNextFrame(() => chatScrollRestore(body, snap));
