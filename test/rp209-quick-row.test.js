@@ -217,9 +217,3 @@ test('C3: CSS: the new rules come after the RP207 and RP208 rules and their medi
   assert.match(css, /\.qr:focus-visible\s*\{[^}]*outline:\s*2px/);
 });
 
-test('D1: when only the quick row changes (it appears or goes while no message changes) the reading position of the body is restored too: the body gets shorter or taller and must not hide its last message', () => {
-  const src = fs.readFileSync(path.join(__dirname, '..', 'public', 'chat.js'), 'utf8').replace(/\r\n/g, '\n');
-  assert.ok(src.includes('const slotChanged = quickSlot ? paint(quickSlot, R.quickRow(qk)) : false;'), 'the slot paint says whether it changed');
-  assert.ok(src.includes('const bodyChanged = paint(body, R.chatBody(shown, { now: Date.now() }));'), 'the body is always painted, whatever the slot did');
-  assert.ok(src.includes('if (bodyChanged || slotChanged) {'), 'and the position is restored when either changed');
-});

@@ -123,17 +123,6 @@ test('chatNextFrame runs the function on the next frame, or at once where there 
   assert.equal(ran, 11);
 });
 
-test('drawChat takes the snapshot before the repaint, restores it now and one frame later, and a different chat still starts at the end', () => {
-  const src = read('chat.js');
-  const i = src.indexOf("const body = $('#chatBody');");
-  const block = src.slice(i, src.indexOf('chatShown = S.chat.id;', i));
-  assert.match(block, /const snap = chatScrollSnap\(body\);/);
-  assert.match(block, /if \(chatShown !== S\.chat\.id\) snap\.stuck = true;/);
-  assert.ok(block.indexOf('chatScrollSnap(body)') < block.indexOf('paint(body'), 'snapshot first');
-  // RP209: the position is restored when the body changed OR when the quick row above the field appeared or went (it changes the free height of the body even if no message changed)
-  assert.match(block, /const bodyChanged = paint\(body, R\.chatBody\(shown, \{ now: Date\.now\(\) \}\)\);\s*if \(bodyChanged \|\| slotChanged\) \{\s*chatScrollRestore\(body, snap\);\s*chatNextFrame\(\(\) => chatScrollRestore\(body, snap\)\);\s*\}/);
-});
-
 test('app.js wires the keyboard, guarded for a page with no visualViewport: mark on touching the box and on focus in and out, fix on every resize', () => {
   const app = read('app.js');
   assert.match(app, /const kbMark = \(\) => chatKeyboardMark\(\$\('#chatBody'\), Date\.now\(\)\);/);

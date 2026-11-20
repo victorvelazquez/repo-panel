@@ -1,6 +1,6 @@
 'use strict';
 // The ONE pi session the panel adopts per repo and per room (config.json `sessions`). Gentle Shell keeps every session
-// as a .jsonl file under <base>/--<folder>--/; a file can be 25 MB, so the listing reads only its first and last 64 KB and the chat its last 512 KB.
+// as a .jsonl file under <base>/--<folder>--/; a file can be 25 MB, so the listing reads its first 64 KB and its end up to its last message, and the chat its last messages (RP240).
 // Nothing here sends text to a session.
 const fs = require('node:fs');
 const os = require('node:os');
@@ -12,7 +12,13 @@ const { argSummary, resultText } = require('./redact.js');
 
 const CHUNK = 64 * 1024;
 // RP104: the chat reads this much of the END of the session file (the listing keeps the 64 KB of CHUNK); the first line of the window may be partial and is dropped.
+// RP240: only the tool result lookup still reads this window; the history counts messages from the end, up to CHAT_READ_MAX bytes.
 const CHAT_WINDOW = 512 * 1024;
+// RP240: pi keeps each image in base64 inside the file (118 to 262 KB per line), so the history reads by MESSAGES from the end, a STEP at a time, never past CHAT_READ_MAX
+// bytes; the listing looks for its last message up to LIST_READ_MAX. An image is counted and its base64 dropped as soon as its line is parsed.
+const STEP = 256 * 1024;
+const CHAT_READ_MAX = 8 * 1024 * 1024;
+const LIST_READ_MAX = 1024 * 1024;
 const LIMIT = 20;
 const TEXT_MAX = 200;
 // RP162: the history keeps this many characters of each text (it used to be 4000 and a long answer ended in «corr…»). The read of the history is bounded by CHAT_WINDOW anyway, so the answer of one read stays bounded.
@@ -56,6 +62,42 @@ function readChunk(fd, position, length) {
   return buf.subarray(0, n);
 }
 
+// RP240: the complete lines of a file from its END, newest first, reading at most `max` bytes; the line the ceiling cuts is dropped. `state.read` is how many bytes
+// were read so far and `state.whole` turns true when the first line of the file was given. A long line is kept as its chunks until its start is found.
+function* linesFromEnd(fd, size, max, state = {}) {
+  let pos = size;
+  let carry = [];
+  state.read = 0;
+  state.whole = false;
+  while (pos > 0 && size - pos < max) {
+    const len = Math.min(STEP, pos, max - (size - pos));
+    pos -= len;
+    const buf = readChunk(fd, pos, len);
+    state.read = size - pos;
+    let end = buf.length;
+    let i;
+    while (end > 0 && (i = buf.lastIndexOf(10, end - 1)) >= 0) {
+      const line = Buffer.concat([buf.subarray(i + 1, end), ...carry]).toString('utf8');
+      carry = [];
+      end = i;
+      if (line.trim()) yield line;
+    }
+    carry.unshift(buf.subarray(0, end));
+  }
+  if (pos > 0) return;
+  const first = Buffer.concat(carry).toString('utf8');
+  state.whole = true;
+  if (first.trim()) yield first;
+}
+
+// The parsed entry of a line with the base64 of its images dropped (an image keeps its type only), or null.
+function slimEntry(line) {
+  const e = parse(line);
+  const content = e && e.type === 'message' && e.message && Array.isArray(e.message.content) ? e.message.content : null;
+  if (content) for (let i = 0; i < content.length; i++) if (content[i] && content[i].type === 'image') content[i] = { type: 'image', mimeType: content[i].mimeType };
+  return e;
+}
+
 const textOf = (m) => (Array.isArray(m.content) ? m.content.filter((c) => c && c.type === 'text' && typeof c.text === 'string').map((c) => c.text).join(' ') : '');
 
 // The session of one file, or null when its first line is not a session header. Throws only on I/O errors.
@@ -69,17 +111,24 @@ function readSession(file, folder, mtimeMs) {
     if (nl < 0 && !whole) return null;
     const first = parse(head.subarray(0, nl < 0 ? head.length : nl).toString('utf8'));
     if (!first || first.type !== 'session' || typeof first.id !== 'string' || !SESSION_ID.test(first.id)) return null;
-    const tail = whole ? head : readChunk(fd, size - CHUNK, CHUNK);
-    const tailLines = linesOf(tail, !whole, false).map(parse).filter(Boolean);
-    const nameIn = (entries) => entries.reverse().find((e) => e.type === 'session_info' && typeof e.name === 'string' && e.name.trim());
-    const info = nameIn(tailLines.slice()) || nameIn(linesOf(head, false, !whole).map(parse).filter(Boolean));
+    // RP240: the end is read from the last line back until it holds the last message and at least the 64 KB it used to read (a 300 KB image line no longer hides it).
+    const tailLines = [];
     let lastMessage = null;
-    for (let i = tailLines.length - 1; i >= 0 && !lastMessage; i--) {
-      const m = tailLines[i].type === 'message' && tailLines[i].message;
-      if (!m || (m.role !== 'user' && m.role !== 'assistant')) continue;
-      const text = clean(textOf(m)).slice(0, TEXT_MAX);
-      if (text.trim()) lastMessage = { role: m.role, text };
+    let seen = 0; // bytes of the lines looked at (not of the chunks read: one chunk is already more than 64 KB)
+    for (const line of linesFromEnd(fd, size, LIST_READ_MAX)) {
+      seen += Buffer.byteLength(line) + 1;
+      const e = slimEntry(line);
+      if (!e) continue;
+      tailLines.push(e);
+      const m = !lastMessage && e.type === 'message' && e.message;
+      if (m && (m.role === 'user' || m.role === 'assistant')) {
+        const text = clean(textOf(m)).slice(0, TEXT_MAX);
+        if (text.trim()) lastMessage = { role: m.role, text };
+      }
+      if (lastMessage && seen >= CHUNK) break;
     }
+    const nameIn = (entries) => entries.find((e) => e.type === 'session_info' && typeof e.name === 'string' && e.name.trim());
+    const info = nameIn(tailLines) || nameIn(linesOf(head, false, !whole).map(parse).filter(Boolean).reverse());
     return {
       id: first.id, name: info ? clean(info.name).trim().slice(0, 100) : null, file,
       startedAt: typeof first.timestamp === 'string' ? first.timestamp : null,
@@ -155,6 +204,16 @@ function shellItem(m, entryId, at) {
   };
 }
 
+// RP240: whether an entry becomes an item of the history (what the reader counts): a compaction, a ! run, a user message with text or images, an answer with text or a stop.
+function isItem(e) {
+  if (e.type === 'compaction') return true;
+  const m = e.type === 'message' && e.message;
+  if (!m || typeof m !== 'object') return false;
+  if (m.role === 'bashExecution') return typeof m.command === 'string';
+  if (m.role === 'user') return !!textOf(m).trim() || blocksOf(m, 'image').length > 0;
+  return m.role === 'assistant' && (!!textOf(m).trim() || m.stopReason === 'aborted' || m.stopReason === 'error');
+}
+
 function readChat(folder, sessionId, { base = baseDir(), limit = CHAT_DEFAULT, key = null, results = false } = {}) {
   const none = { key, sessionId, found: false, items: [], truncated: false, updatedAt: null };
   let file;
@@ -165,13 +224,22 @@ function readChat(folder, sessionId, { base = baseDir(), limit = CHAT_DEFAULT, k
   try {
     fd = fs.openSync(path.join(sessionsDirFor(folder, base), file), 'r');
     const { size, mtimeMs } = fs.fstatSync(fd);
-    const start = Math.max(0, size - CHAT_WINDOW);
+    // RP240: the entries from the end until one more item than `max` (so `truncated` stays exact), the start of the file or CHAT_READ_MAX bytes.
+    const state = {};
+    const entries = [];
+    let count = 0;
+    for (const line of linesFromEnd(fd, size, CHAT_READ_MAX, state)) {
+      const e = slimEntry(line);
+      if (!e) continue;
+      entries.push(e);
+      if (isItem(e) && ++count > max) break;
+    }
     const items = [];
     let pending = [];
     let pendingInfo = [];
     const infoById = new Map(); // toolCallId -> the chip of that call, so its result (which comes later) fills ok and ms
     let thought = false;
-    for (const entry of linesOf(readChunk(fd, start, size - start), start > 0, false).map(parse)) {
+    for (const entry of entries.reverse()) {
       // RP105b: a compaction of the context is only a mark in its place (its summary is long and private and never read).
       if (entry && entry.type === 'compaction') { items.push({ role: 'system', kind: 'compaction', text: '', at: isoOf(entry.timestamp), tools: [] }); continue; }
       const m = entry && entry.type === 'message' && entry.message;
@@ -187,7 +255,14 @@ function readChat(folder, sessionId, { base = baseDir(), limit = CHAT_DEFAULT, k
         }
         continue;
       }
-      if (m.role === 'user') { pending = []; pendingInfo = []; thought = false; if (body) items.push({ role: 'user', text: body, at, tools: [], ...(cut ? { cut } : {}) }); continue; }
+      if (m.role === 'user') {
+        pending = []; pendingInfo = []; thought = false;
+        // RP240: how many images it carried (never their bytes) and the id of its entry, which GET /api/chat/image needs.
+        const images = blocksOf(m, 'image').length;
+        const ref = images && typeof entry.id === 'string' && ENTRY_ID.test(entry.id) ? { entry: entry.id } : {};
+        if (body || images) items.push({ role: 'user', text: body, at, tools: [], ...(cut ? { cut } : {}), ...(images ? { images, ...ref } : {}) });
+        continue;
+      }
       if (m.role !== 'assistant') continue;
       if (blocksOf(m, 'thinking').length) thought = true; // only THAT it reasoned: the reasoning text never leaves the server
       for (const c of blocksOf(m, 'toolCall').filter((b) => typeof b.name === 'string')) {
@@ -202,7 +277,7 @@ function readChat(folder, sessionId, { base = baseDir(), limit = CHAT_DEFAULT, k
       if (body || stop) { items.push({ role: 'assistant', text: body, at, tools: pending, ...(cut ? { cut } : {}), ...(pendingInfo.length ? { toolInfo: pendingInfo } : {}), ...(thought ? { thinking: true } : {}), ...(stop ? { stop } : {}) }); pending = []; pendingInfo = []; thought = false; }
     }
     if (pending.length || thought) items.push({ role: 'assistant', text: '', at: null, tools: pending, ...(pendingInfo.length ? { toolInfo: pendingInfo } : {}), ...(thought ? { thinking: true } : {}) });
-    return { key, sessionId, found: true, items: items.slice(-max), truncated: start > 0 || items.length > max, updatedAt: new Date(mtimeMs).toISOString() };
+    return { key, sessionId, found: true, items: items.slice(-max), truncated: !state.whole || items.length > max, updatedAt: new Date(mtimeMs).toISOString() };
   } catch { return none; } finally { if (fd !== undefined) fs.closeSync(fd); }
 }
 
@@ -272,6 +347,53 @@ function chatResult(id, call, base = baseDir()) {
   return { call, name, ok: m.isError !== true, ...resultText(body), size: textSize(m.content) };
 }
 
+// RP240: GET /api/chat/image: one image of a USER message of the adopted session, found by the id of its entry in the last CHAT_READ_MAX bytes. Never an image of a tool
+// result (a file the agent read). Only a closed list of types whose bytes start as the type says, valid base64, at most IMAGE_MAX bytes; the page never names a file.
+const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+const IMAGE_TYPES = {
+  'image/png': (b) => b.length >= 8 && b.subarray(0, 8).equals(PNG),
+  'image/jpeg': (b) => b.length >= 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff,
+  'image/gif': (b) => /^GIF8[79]a$/.test(b.subarray(0, 6).toString('latin1')),
+  'image/webp': (b) => b.subarray(0, 4).toString('latin1') === 'RIFF' && b.subarray(8, 12).toString('latin1') === 'WEBP',
+};
+const IMAGE_MAX = 5 * 1024 * 1024;
+const IMAGE_INDEX = /^[0-7]$/;
+const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
+
+function findUserMessage(folder, sessionId, entryId, base) {
+  let file;
+  try { file = fs.readdirSync(sessionsDirFor(folder, base)).sort().find((n) => isSessionFile(n, String(sessionId))); } catch { return null; }
+  if (!file) return null;
+  let fd;
+  try {
+    fd = fs.openSync(path.join(sessionsDirFor(folder, base), file), 'r');
+    for (const line of linesFromEnd(fd, fs.fstatSync(fd).size, CHAT_READ_MAX)) {
+      if (!line.includes(entryId)) continue;
+      const e = parse(line);
+      if (e && e.type === 'message' && e.id === entryId) return e.message && e.message.role === 'user' ? e.message : null;
+    }
+    return null;
+  } catch { return null; } finally { if (fd !== undefined) fs.closeSync(fd); }
+}
+
+function chatImage(id, entryId, n, base = baseDir()) {
+  if (typeof entryId !== 'string' || !ENTRY_ID.test(entryId)) throw new HttpError(400, 'Invalid entry id');
+  if (typeof n !== 'string' || !IMAGE_INDEX.test(n)) throw new HttpError(400, 'Invalid image index');
+  const { key, folder } = sessionKeyFor(id);
+  const sid = chatSessionId(key, folder, null, base);
+  const m = sid ? findUserMessage(folder, sid, entryId, base) : null;
+  const img = m ? blocksOf(m, 'image')[Number(n)] : undefined;
+  if (!img) throw new HttpError(404, 'That image is not in the recent part of the session');
+  const matches = typeof img.mimeType === 'string' && Object.hasOwn(IMAGE_TYPES, img.mimeType) ? IMAGE_TYPES[img.mimeType] : null;
+  if (!matches || typeof img.data !== 'string') throw new HttpError(415, 'Unsupported image');
+  if (img.data.length > Math.ceil(IMAGE_MAX / 3) * 4) throw new HttpError(413, 'Image too large');
+  if (img.data.length % 4 || !BASE64.test(img.data)) throw new HttpError(415, 'Unsupported image');
+  const body = Buffer.from(img.data, 'base64');
+  if (body.length > IMAGE_MAX) throw new HttpError(413, 'Image too large');
+  if (!matches(body)) throw new HttpError(415, 'Unsupported image');
+  return { type: img.mimeType, body };
+}
+
 // What an adopted-session key stands for: a repo id, or "room:<name>". Unknown keys are 404, as in the other routes.
 function sessionKeyFor(id) {
   if (typeof id === 'string' && id.startsWith('room:')) {
@@ -333,4 +455,4 @@ function adoptIfNone(key, sid) {
   return true;
 }
 
-module.exports = { SHELL_HISTORY_MAX, linesOf, readChunk, CHAT_WINDOW, isSessionFile, baseDir, sessionsDirFor, listSessions, readChat, chatState, chatResult, sessionKeyFor, sessionsState, adoptSession, releaseSession, adoptIfNone, SESSION_ID };
+module.exports = { SHELL_HISTORY_MAX, linesOf, readChunk, CHAT_WINDOW, isSessionFile, baseDir, sessionsDirFor, listSessions, readChat, chatState, chatResult, chatImage, sessionKeyFor, sessionsState, adoptSession, releaseSession, adoptIfNone, SESSION_ID };

@@ -140,25 +140,27 @@ test('a missing session is found:false; corrupt lines are skipped; a small file 
   assert.equal(r.truncated, false);
 });
 
-test('only the last 512 KB (RP104; it was 64 KB) of a ~5 MB file is read: a garbage middle and a long last line neither throw nor load the file', () => {
+// RP240 migrated this one: the history reads by messages from the end, up to CHAT_READ_MAX (8 MB) instead of a 512 KB window, so the garbage middle grew past that ceiling.
+test('at most 8 MB (RP240; it was 512 KB) of a ~9 MB file is read: a garbage middle and a long last line neither throw nor load the file', () => {
   resetDisk();
   const dir = S.sessionsDirFor(repoDir, sessionsBase);
   fs.mkdirSync(dir, { recursive: true });
   const file = path.join(dir, '2026-10-28T10-00-00-000Z_big.jsonl');
-  fs.writeFileSync(file, [header('big', repoDir), msg('user', [text('FIRST')]), 'g'.repeat(5 * 1024 * 1024)].join('\n') + '\n');
+  fs.writeFileSync(file, [header('big', repoDir), msg('user', [text('FIRST')]), 'g'.repeat(9 * 1024 * 1024)].join('\n') + '\n');
   fs.appendFileSync(file, `${msg('user', [text('before')])}\n${msg('assistant', [text('L'.repeat(30000))])}`);
   const realRead = fs.readSync;
   let bytes = 0;
   fs.readSync = (...a) => { const n = realRead(...a); bytes += n; return n; };
   let r;
   try { r = chatOf('big'); } finally { fs.readSync = realRead; }
-  assert.ok(bytes <= 530 * 1024, `read ${bytes} bytes`);
+  assert.ok(bytes <= 8 * 1024 * 1024, `read ${bytes} bytes`);
   assert.deepEqual(r.items.map((i) => i.text.length), [6, 30000], 'RP162: a 30 000 character answer arrives whole (it was cut at 4000)');
   assert.equal(r.truncated, true);
   assert.doesNotMatch(JSON.stringify(r), /FIRST/);
   fs.appendFileSync(file, `\n${msg('assistant', [text('H'.repeat(600000))])}\n`);
-  assert.deepEqual(chatOf('big').items, []);
-  assert.equal(chatOf('big').truncated, true);
+  const after = chatOf('big');
+  assert.deepEqual(after.items.map((i) => [i.text.length, i.cut || 0]), [[6, 0], [30000, 0], [50000, 550000]], 'RP240: a 600 KB answer is one message, not a window');
+  assert.equal(after.truncated, true);
 });
 
 // ---------- Part A: GET /api/chat ----------

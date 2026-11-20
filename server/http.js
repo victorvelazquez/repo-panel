@@ -33,7 +33,7 @@ const { createNotifier } = require('./notifier.js');
 const { createRpcHost, rpcApi } = require('./rpchost.js');
 const { terminalAnswer } = require('./terminal.js');
 const { readUsage, usageFile } = require('./usage.js');
-const { sessionsState, chatState, chatResult, adoptSession, releaseSession, adoptIfNone } = require('./sessions.js');
+const { sessionsState, chatState, chatResult, chatImage, adoptSession, releaseSession, adoptIfNone } = require('./sessions.js');
 const { readSettings, writeSetting } = require('./settings.js');
 const remote = require('./remote.js');
 const push = require('./push.js');
@@ -110,6 +110,8 @@ const routes = {
   'GET /api/chat': (q, b, d) => chatState(q.id, q.session, q.limit, d.sessionsDir),
   // RP106b: the cleaned start of the text of one tool result; 403 unless `chat.showResults` is true in config.json, and never for `read`.
   'GET /api/chat/result': (q, b, d) => chatResult(q.id, q.call, d.sessionsDir),
+  // RP240: the bytes of one image of a user message, not JSON (see RAW).
+  'GET /api/chat/image': (q, b, d) => ({ [RAW]: chatImage(q.id, q.entry, q.n, d.sessionsDir) }),
   // RP111b: the options the page may read and write, a CLOSED list (server/settings.js); never the whole configuration.
   'GET /api/settings': () => readSettings(),
   // RP118: the line to open the session of a repo in a normal terminal (read only; the server writes it so a folder or an id can never become another command).
@@ -232,6 +234,9 @@ function readBody(req) {
   });
 }
 
+// RP240: a route that answers bytes returns { [RAW]: { type, body } }; they go with that fixed type, nosniff and a sandbox, so a page never runs them.
+const RAW = Symbol('raw');
+const RAW_HEADERS = { 'content-security-policy': "default-src 'none'; sandbox", 'content-disposition': 'inline' };
 const send = (res, status, body, type = 'application/json; charset=utf-8', extra = {}) => {
   res.writeHead(status, { 'content-type': type, 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', ...extra });
   res.end(typeof body === 'string' || Buffer.isBuffer(body) ? body : JSON.stringify(body));
@@ -308,13 +313,13 @@ function createServer(port, deps = {}) {
     const priority = (req.method === 'POST' && !READ_ONLY_POSTS.has(key)) || (req.method === 'GET' && req.headers['x-priority'] === 'user') ? 'user' : 'background';
     let executed = true;
     // Every JSON answer is timed (errors too); GET /api/perf does not record itself.
-    const reply = (status, body, type) => {
+    const reply = (status, body, type, extra = {}) => {
       const ms = Date.now() - t0;
       const json = !type;
       // The page, its assets and /health are not API calls; only API routes (and unknown /api/ paths) are timed.
       if (key !== 'GET /api/perf' && pathname.startsWith('/api/')) perf.record({ route: routes[key] ? key : `${req.method} (other)`, ms, waitMs: ctx.waitMs, procs: ctx.procs, priority, executed });
       const timing = json ? { 'server-timing': `total;dur=${ms}${ctx.waitMs > 0 ? `, queue;dur=${ctx.waitMs}` : ''}` } : {};
-      return send(res, status, body, type, timing);
+      return send(res, status, body, type, { ...timing, ...extra });
     };
     return withContext(ctx, () => withPriority(priority, async () => {
       try {
@@ -355,7 +360,8 @@ function createServer(port, deps = {}) {
         if (req.method !== 'GET') return reply(200, await run());
         executed = false;
         // The lane is part of the key: an interactive request never joins a background one that may have waited in the queue.
-        return reply(200, await singleFlight(flights, `${priority}|${req.url}`, run));
+        const out = await singleFlight(flights, `${priority}|${req.url}`, run);
+        return out && out[RAW] ? reply(200, out[RAW].body, out[RAW].type, RAW_HEADERS) : reply(200, out);
       } catch (e) {
         return reply(e.status || 500, { error: e.message || 'Internal error' });
       }
