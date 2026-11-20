@@ -8,7 +8,7 @@ const crypto = require('node:crypto');
 const { HttpError } = require('./errors.js');
 const { loadConfig } = require('./config.js');
 const { runtimeEnv } = require('./piruntime.js');
-const { createRpcClient, RpcError } = require('./rpc.js');
+const { createRpcClient, RpcError, CAUSES } = require('./rpc.js');
 const lib = require('../lib.js');
 
 // RP233: the names of the commands pi loaded (get_commands), or null when the answer is not a list. Only string names count.
@@ -255,12 +255,19 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
         if (w) publish(id, w);
       },
       // RP98: the exit of an OLD client (closed, replaced by a new start) is not the new session's: it is published only while this entry is the live one or none is.
-      onExit: () => { const cur = live.get(id); if (cur === entry) live.delete(id); if (cur === entry || !cur) publish(id, { kind: 'exit' }); stop(id, entry); }, // RP238: a pi that ended any way may still be closing
+      onExit: (info) => {
+        const cur = live.get(id); if (cur === entry) live.delete(id); if (cur === entry || !cur) publish(id, { kind: 'exit' }); stop(id, entry); // RP238: a pi that ended any way may still be closing
+        // RP238b: a session that was up and died by itself then says why, with its category only; not when a new session of the repo started meanwhile.
+        if (entry.up && info && info.reason === 'exit' && typeof entry.client.cause === 'function') entry.client.cause().then((c) => { if (Object.hasOwn(CAUSES, c || '') && !live.has(id)) publish(id, { kind: 'ended', cause: c }); }, () => {});
+      },
     });
     try { await entry.client.start(); entry.up = true; entry.upAt = Date.now(); } catch (e) { // RP161: when the panel started this session (the jobs of an older process are gone)
       if (entry.closed) throw new HttpError(409, SESSION_CLOSED); // closed while starting: not a failure to launch
       // Fixed messages only: a start that ran out of time is not a failure to launch, and the raw error never reaches the page.
-      throw e && e.message === 'The session did not start in time' ? new HttpError(504, 'The session did not start in time') : new HttpError(502, 'The session could not be started');
+      if (e && e.message === 'The session did not start in time') throw new HttpError(504, 'The session did not start in time');
+      let c = null;
+      try { c = typeof entry.client.cause === 'function' ? await entry.client.cause() : null; } catch { /* no cause */ }
+      throw new HttpError(502, Object.hasOwn(CAUSES, c || '') ? `The session could not be started: ${CAUSES[c]}` : 'The session could not be started'); // RP238b: the cause by its fixed text only
     }
     if (entry.closed) throw new HttpError(409, SESSION_CLOSED); // the client answered but the session was closed meanwhile
     entry.commands = await loadCommands(entry);

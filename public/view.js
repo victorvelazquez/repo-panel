@@ -765,7 +765,15 @@
   const EVENT_MAX = 64 * 1024;
   const isObject = (x) => !!x && typeof x === 'object' && !Array.isArray(x);
   // RPC2-1 (S1): the `rpc` event carries what one pi session does ({ id, kind, ... }; the id is a repo id). Frames over EVENT_MAX are dropped.
-  const RPC_KINDS = ['event', 'state', 'dialog', 'dialog-closed', 'exit', 'memory', 'mode'];
+  const RPC_KINDS = ['event', 'state', 'dialog', 'dialog-closed', 'exit', 'memory', 'mode', 'ended'];
+  // RP238b: why a session that was up died by itself, as a category of the server's closed list (server/rpc.js CAUSES, the same fixed texts); the note says it.
+  const CAUSE_TEXT = {
+    'no-model': 'No model or login is set up: run pi in a terminal to sign in',
+    extension: 'An extension failed to load: start pi in a terminal to see which',
+    session: 'The session id was rejected',
+    folder: 'The repo folder no longer exists',
+  };
+  const endedNote = (p) => (isObject(p) && p.kind === 'ended' && typeof p.cause === 'string' && Object.hasOwn(CAUSE_TEXT, p.cause) ? `The session ended: ${CAUSE_TEXT[p.cause]}` : null);
   // RP245c: the permission mode of a session, from a closed list; anything else is ignored.
   const MODE_CATS = ['normal', 'auto', 'yolo', 'super-yolo'];
   // RP110b: the category of the memory plugin of a session, from a closed list; anything else is ignored.
@@ -1233,5 +1241,5 @@
     const rows = Math.max(1, Math.round((sc - pd) / ln));
     return { height: Math.min(Math.max(sc, one), cap), scrolls: sc - cap > 1, rows, expandable: rows > 4 };
   };
-  return { boxFit, enterSends, STALLED_MS, stalledNow, jobsHold, deliveryHold, tasksPollDue, TASKS_REFRESH_MS, mergeWhy, mergeNote, screenOf, bandOf, NARROW_BELOW, DUO_BELOW, parseAddress, addressOf, ADDRESS_ZONES, subClock, columnTabFor, conformityTabLabel, repoModel, changeChips, prChip, ciOf, idleChip, conflictChip, sizeChip, RepoCard, stateLineHidden, usageView, usageHtml, ringGeometry, usageRemaining, boardApply, boardWait, chatCachePut, chatCacheGet, rpcWithContext, chatFromCache, API_VERSION, mergeButton, rerunButton, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, dirtyRepos, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, sentToast, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, taskPrs, matchesUnitId, isOutdated, conformityView, reqFold, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, parseSse, rpcEvent, rpcReduce, rpcFromStatus, shellInHistory, eventsPlan, eventsRetryMs, eventsStale, projectRepos, roomOfFolder, roomMembers, columnTabOf, mergeRooms };
+  return { boxFit, enterSends, STALLED_MS, stalledNow, jobsHold, deliveryHold, tasksPollDue, TASKS_REFRESH_MS, mergeWhy, mergeNote, screenOf, bandOf, NARROW_BELOW, DUO_BELOW, parseAddress, addressOf, ADDRESS_ZONES, subClock, columnTabFor, conformityTabLabel, repoModel, changeChips, prChip, ciOf, idleChip, conflictChip, sizeChip, RepoCard, stateLineHidden, usageView, usageHtml, ringGeometry, usageRemaining, boardApply, boardWait, chatCachePut, chatCacheGet, rpcWithContext, chatFromCache, API_VERSION, mergeButton, rerunButton, isRefreshing, LOCAL_REFRESH_MS, HOT_REFRESH_MS, FULL_REFRESH_MS, SENT_POLL_MS, isHotRepo, refreshPlan, runColor, QUIET_MS, quietPeriod, dirtyRepos, sendingVerdict, ANIM_MS, animDelay, flowVerdict, runningReason, commitAllowed, commitOverrideItem, staleChipTitle, stateLine, manualAction, prAction, flowButtons, sentToast, fixPrAction, localPlacement, boardPlacement, boardColumns, isProblem, prColumn, prRank, sortPrCards, commitVerdict, queueFlags, taskPrs, matchesUnitId, isOutdated, conformityView, reqFold, cardWarning, cardMenu, roomOfRepo, roomTag, roomMenu, roomIssuesNotice, parseSse, rpcEvent, rpcReduce, rpcFromStatus, shellInHistory, CAUSE_TEXT, endedNote, eventsPlan, eventsRetryMs, eventsStale, projectRepos, roomOfFolder, roomMembers, columnTabOf, mergeRooms };
 }));

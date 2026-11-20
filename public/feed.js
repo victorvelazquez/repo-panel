@@ -17,6 +17,8 @@ function applyRpc(p) {
     const seen = p.kind === 'exit' ? 'closed' : p.kind === 'state' && entry.state !== 'starting' ? entry.state : null;
     if (seen) applyPiState(p.id, seen);
   }
+  const ended = V.endedNote(p); // RP238b: a session that died by itself says why
+  if (ended) sayNote(p.id, ended);
   if (reload && S.chat.id === p.id) settled(p.id);
   else if (reload) Object.assign(entry, { blocks: [], text: '', ...(entry.bash && entry.bash.running !== true ? { bash: null } : {}) }); // nobody is looking: the history will have it (RP252: a finished shell run too)
   draw();

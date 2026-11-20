@@ -23,6 +23,35 @@ const MAX_DIALOGS = 20;
 const STATUS_MAX = 200;
 const DIALOGS = new Set(['select', 'confirm', 'input', 'editor']);
 const SAFE_ARG = /^[A-Za-z0-9._-]+$/;
+// RP238b: what pi wrote as an error, reduced to ONE category of a closed list; its text never leaves the server. pi in --mode rpc also writes there what is
+// not an error (its stdout goes there too), so only the messages it writes before it exits count, and anything else is null.
+const CAUSES = {
+  'no-model': 'No model or login is set up: run pi in a terminal to sign in',
+  extension: 'An extension failed to load: start pi in a terminal to see which',
+  session: 'The session id was rejected',
+  folder: 'The repo folder no longer exists',
+};
+const CAUSE_RULES = [
+  ['folder', /current working directory no longer exists/i],
+  ['session', /--session-id cannot be combined|Session id must|Session already exists with id|No session found matching/i],
+  ['extension', /Failed to load extension/i],
+  ['no-model', /No models available|No API key found/i],
+];
+const CAUSE_LINES = 8;
+const ANSI = /[[0-?]*[ -/]*[@-~]/g;
+function causeOf(text) {
+  if (typeof text !== 'string' || !text) return null;
+  // Only the last lines pi wrote count (its fatal message and a hint come right before the exit; an older tool line is not the cause), and the closest to the end wins.
+  const lines = text.replace(ANSI, '').split(/\r?\n/).filter((l) => l.trim()).slice(-CAUSE_LINES);
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const hit = CAUSE_RULES.find(([, re]) => re.test(lines[i]));
+    if (hit) return hit[0];
+  }
+  return null;
+}
+// Only the end of the error output is kept (the messages that matter come right before the exit), and the cause waits at most this long for that output to end.
+const ERR_KEEP = 16384;
+const CAUSE_WAIT_MS = 1000;
 const FAILURES = { timeout: 'The session did not start in time', error: 'The session could not be started', exit: 'The session ended', closed: 'The session is closed' };
 
 class RpcError extends Error { constructor(message) { super(message); this.name = 'RpcError'; } }
@@ -58,7 +87,7 @@ const RETRY_FACTOR = 4; // a run that will retry waits four times longer, plus t
 const REFRESH_RETRIES = 3;
 const REFRESH_RETRY_MS = 1000;
 
-function createRpcClient({ command, args = [], cwd, env, spawn = cp.spawn, platform = process.platform, kill = process.kill, startTimeoutMs = START_MS, graceMs = GRACE_MS, killWaitMs = KILL_WAIT_MS, requestTimeoutMs = 120000, settleMs = SETTLE_MS, refreshRetries = REFRESH_RETRIES, refreshRetryMs = REFRESH_RETRY_MS, onEvent = () => {}, onExit = () => {} }) {
+function createRpcClient({ command, args = [], cwd, env, spawn = cp.spawn, platform = process.platform, kill = process.kill, startTimeoutMs = START_MS, graceMs = GRACE_MS, killWaitMs = KILL_WAIT_MS, causeWaitMs = CAUSE_WAIT_MS, requestTimeoutMs = 120000, settleMs = SETTLE_MS, refreshRetries = REFRESH_RETRIES, refreshRetryMs = REFRESH_RETRY_MS, onEvent = () => {}, onExit = () => {} }) {
   const pending = new Map(); // id -> { type, resolve, reject, timer, ends }
   const queue = []; // commands issued before ready
   const outbox = []; // lines waiting for stdin to drain
@@ -273,6 +302,23 @@ function createRpcClient({ command, args = [], cwd, env, spawn = cp.spawn, platf
     } catch { /* a bad record never takes the client down */ }
   }
 
+  // RP238b: the error output is ALWAYS read, also after the end (a pi that writes a lot never blocks on a full pipe), and only its last ERR_KEEP characters stay.
+  let errTail = '';
+  let errDone = Promise.resolve();
+  function keepErrors(err) {
+    if (!err || typeof err.on !== 'function') return;
+    const dec = new StringDecoder('utf8');
+    err.on('error', () => {});
+    err.on('data', (c) => { const s = typeof c === 'string' ? c : dec.write(c); errTail = s.length >= ERR_KEEP ? s.slice(-ERR_KEEP) : (errTail + s).slice(-ERR_KEEP); });
+    errDone = new Promise((r) => { err.once('end', r); err.once('close', r); });
+  }
+  // The category of what pi wrote as an error (null when nothing known), once that output ended (pi may report its exit first) or at the cap.
+  function cause() {
+    let t;
+    const cap = new Promise((r) => { t = setTimeout(r, causeWaitMs); });
+    return Promise.race([errDone, cap]).then(() => { clearTimeout(t); return causeOf(errTail); });
+  }
+
   // RP238: an orderly end: stdin is closed (pi then saves its session file and exits by itself); only a child still alive after graceMs is killed with its tree.
   function stop() {
     return new Promise((resolve) => {
@@ -321,8 +367,9 @@ function createRpcClient({ command, args = [], cwd, env, spawn = cp.spawn, platf
       try {
         const spec = launchSpec(file, platform);
         if (spec.shell && !args.every((a) => SAFE_ARG.test(a))) return refuse();
-        child = spawn(spec.file, args, { cwd, env, shell: spec.shell, windowsHide: true, detached: platform !== 'win32', stdio: ['pipe', 'pipe', 'ignore'] });
+        child = spawn(spec.file, args, { cwd, env, shell: spec.shell, windowsHide: true, detached: platform !== 'win32', stdio: ['pipe', 'pipe', 'pipe'] });
       } catch { return refuse(); }
+      keepErrors(child.stderr);
       child.on('error', () => teardown('error'));
       child.on('exit', () => exit('exit'));
       child.on('close', () => exit('exit'));
@@ -366,7 +413,8 @@ function createRpcClient({ command, args = [], cwd, env, spawn = cp.spawn, platf
     state,
     outcome: () => (closed || !outcome ? null : { ...outcome }), // RP228
     close: () => teardown('closed'), // RP238: resolves once the process is gone (bounded by graceMs)
+    cause, // RP238b
   };
 }
 
-module.exports = { createRpcClient, RpcError, START_MS, GRACE_MS, KILL_WAIT_MS };
+module.exports = { createRpcClient, RpcError, START_MS, GRACE_MS, KILL_WAIT_MS, CAUSES, causeOf };
