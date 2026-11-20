@@ -193,6 +193,15 @@ function wire(e) {
 
 function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClient, max = 6, adoptedOf = (id) => (loadConfig().sessions || {})[id], adopt = () => {}, env = process.env, contextMs = 10000, commandsMs = 5000, compactMs = 600000, suffix = () => crypto.randomBytes(3).toString('hex') }) {
   const live = new Map(); // repo id -> { client, sessionId, ready }
+  // RP238: repo id -> a promise that resolves once every pi of its closed sessions is gone (exited, or killed after the grace). A new start of the repo waits for it,
+  // so two pi never write the same session file.
+  const closing = new Map();
+  function track(id, gone) {
+    const all = Promise.all([closing.get(id), gone]).then(() => {}, () => {});
+    closing.set(id, all);
+    all.then(() => { if (closing.get(id) === all) closing.delete(id); });
+  }
+  const stop = (id, entry) => { if (entry.client) track(id, entry.client.close()); };
 
   const closedStatus = { state: 'closed', pendingDialogs: [], sessionId: null };
   // A pending dialog is named `requestId` here as in the SSE `dialog` event.
@@ -215,10 +224,12 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
 
   // closeAll bumps the epoch: a start that was waiting for the runtime when it ran must not create a client nobody owns (found by the independent verification).
   let epoch = 0;
+  let final = false; // RP238: the panel is shutting down: no start is taken any more, so no pi outlives the wait of the shutdown
   async function launch(id, repo, entry) {
     const at = epoch;
     let found;
     try { found = await resolve(); } catch { found = null; }
+    while (closing.has(id) && at === epoch && !entry.closed) await closing.get(id); // RP238: the previous pi of this repo is still closing
     if (at !== epoch) throw new HttpError(503, 'The panel is closing');
     if (entry.closed) throw new HttpError(409, SESSION_CLOSED); // RP98: closed while the host waited for the runtime: no client is created for it
     if (!found || !found.active) throw new HttpError(409, 'No pi runtime is available');
@@ -244,7 +255,7 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
         if (w) publish(id, w);
       },
       // RP98: the exit of an OLD client (closed, replaced by a new start) is not the new session's: it is published only while this entry is the live one or none is.
-      onExit: () => { const cur = live.get(id); if (cur === entry) live.delete(id); if (cur === entry || !cur) publish(id, { kind: 'exit' }); },
+      onExit: () => { const cur = live.get(id); if (cur === entry) live.delete(id); if (cur === entry || !cur) publish(id, { kind: 'exit' }); stop(id, entry); }, // RP238: a pi that ended any way may still be closing
     });
     try { await entry.client.start(); entry.up = true; entry.upAt = Date.now(); } catch (e) { // RP161: when the panel started this session (the jobs of an older process are gone)
       if (entry.closed) throw new HttpError(409, SESSION_CLOSED); // closed while starting: not a failure to launch
@@ -265,6 +276,7 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
   // RP99: `fresh` starts a NEW session with its own id. It is only for a repo with no session: a live one or an adopted one (live or not) is 409, and nothing is created.
   async function start(id, { fresh = false } = {}) {
     const repo = repoOf(id); // unknown repo: 404 before anything starts
+    if (final) throw new HttpError(503, 'The panel is shutting down');
     const current = live.get(id);
     if (fresh && (current || adoptedOf(id))) throw new HttpError(409, 'This repo already has a session: close it first');
     if (current) { await current.ready; if (current.closed) throw new HttpError(409, SESSION_CLOSED); return statusOf(live.get(id)); } // RP98: a joiner of a session that was closed meanwhile fails like the others
@@ -273,7 +285,7 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
     live.set(id, entry);
     entry.ready = launch(id, repo, entry).catch((e) => {
       if (live.get(id) === entry) live.delete(id);
-      if (entry.client) entry.client.close();
+      stop(id, entry);
       throw e;
     });
     await entry.ready;
@@ -284,14 +296,14 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
   }
 
   // RP98: closes the session of ONE repo: the slot is free at once, the process is stopped (also one that is still starting: its start then fails with 409 and adopts nothing) and the
-  // answer is the closed status. A repo with no live session answers closed too; an unknown repo is 404.
+  // answer is the closed status. A repo with no live session answers closed too; an unknown repo is 404. RP238: the answer does not wait for pi to exit; the next start of the repo does.
   async function close(id) {
     repoOf(id);
     const entry = live.get(id);
     if (!entry) return { ...closedStatus };
     live.delete(id);
     entry.closed = true;
-    if (entry.client) entry.client.close();
+    stop(id, entry);
     return { ...closedStatus };
   }
 
@@ -440,11 +452,24 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
       }
     },
     async status(id) { repoOf(id); return statusOf(live.get(id)); },
-    closeAll() {
+    // RP238: resolves once every pi is gone (each one exits by itself or is killed after its grace, all in parallel), also the ones closed just before.
+    // `final` (the shutdown of the panel) refuses every later start with 503.
+    closeAll({ final: last = false } = {}) {
+      if (last) final = true;
       epoch++;
-      for (const entry of [...live.values()]) if (entry.client) entry.client.close();
+      for (const [id, entry] of [...live]) stop(id, entry);
       live.clear();
+      return Promise.all([...closing.values()]).then(() => {});
     },
+  };
+}
+
+// RP238: the handler of the stop signals of the panel: it closes every session the orderly way and exits once they are all gone; a second signal meanwhile changes nothing.
+function shutdown(host, exit = process.exit) {
+  let once = null;
+  return () => {
+    if (!once) once = Promise.resolve().then(() => host.closeAll({ final: true })).then(() => exit(0), () => exit(0));
+    return once;
   };
 }
 
@@ -497,4 +522,4 @@ function rpcApi(host) {
   };
 }
 
-module.exports = { createRpcHost, rpcApi, cleanText, sessionIdFor, memoryOf, MEMORY, modeOf, MODES, toPanel };
+module.exports = { createRpcHost, shutdown, rpcApi, cleanText, sessionIdFor, memoryOf, MEMORY, modeOf, MODES, toPanel };

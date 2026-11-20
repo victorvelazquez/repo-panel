@@ -372,7 +372,14 @@ function createServer(port, deps = {}) {
     return send(res, 503, { error: 'Too many event streams open' });
   }
   const close = server.close.bind(server);
-  server.close = (cb) => { if (notifier) notifier.stop(); hub.closeAll(); deps.rpcHost.closeAll(); if (deps.summaryStore) deps.summaryStore.stop(); return close(cb); };
+  // RP238: the callback waits for the pi sessions too (each one gets its grace to exit by itself).
+  server.close = (cb) => {
+    if (notifier) notifier.stop();
+    hub.closeAll();
+    const gone = Promise.resolve(deps.rpcHost.closeAll({ final: true })).catch(() => {});
+    if (deps.summaryStore) deps.summaryStore.stop();
+    return close((err) => { gone.then(() => { if (cb) cb(err); }); });
+  };
   server.hub = hub;
   server.rpcHost = deps.rpcHost;
   server.summaryStore = deps.summaryStore;

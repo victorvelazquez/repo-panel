@@ -5,12 +5,15 @@ const { spawn } = require('node:child_process');
 const { loadConfig } = require('./server/config.js');
 const { createServer, isPanelRunning } = require('./server/http.js');
 const { piSend } = require('./server/pi.js');
+const { shutdown } = require('./server/rpchost.js');
 
 if (require.main === module) {
   const { port } = loadConfig();
   const server = createServer(port);
   // RPC1b: the pi sessions are children of this process; no child may outlive the panel, so they end with it (Ctrl+C, a stop, a restart).
-  for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { server.rpcHost.closeAll(); setTimeout(() => process.exit(0), 300); });
+  // RP238: the panel exits once they are gone (each one gets its grace to save its session file).
+  const onSignal = shutdown(server.rpcHost);
+  for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, onSignal);
   server.on('error', async (e) => {
     if (e.code !== 'EADDRINUSE') { console.error(e.message); process.exit(1); }
     // The URL must stay stable, so never fall back to another port.
