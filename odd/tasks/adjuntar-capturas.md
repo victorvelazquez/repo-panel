@@ -1,5 +1,5 @@
 Poder adjuntar imágenes y capturas en el chat del panel y mandárselas a la sesión. Rama base: main. Una tarea = un PR.
-Riesgo ALTO de seguridad (subida de archivos al servidor). Estado: RP215 (servidor) hecha el 2026-11-20, sin entregar; falta RP215b (la pantalla).
+Riesgo ALTO de seguridad (subida de archivos al servidor). Estado: cerrada. RP215 (servidor) fusionada en el PR #311 y RP215b (pantalla) hecha el 2026-11-20, sin entregar; falta probarla en el iPhone.
 
 ## Specs
 
@@ -7,7 +7,7 @@ Riesgo ALTO de seguridad (subida de archivos al servidor). Estado: RP215 (servid
 
 ## Tasks
 
-- [ ] **T1. RP215 y RP215b** (RP215 hecha el 2026-11-20, sin entregar, L7 y L8; falta RP215b) — S1. Adjuntar imágenes y capturas en el chat; RP215 es el servidor y RP215b la pantalla, después de RP240 (historial que aguanta imágenes). Forma decidida por la persona en L5: directo a pi. Antes: un plan que resuelva las decisiones (a) a (e) de la fila, con verificación independiente y una prueba que reproduzca el abuso. Commit: —
+- [x] **T1. RP215 y RP215b** (RP215 fusionada en el PR #311; RP215b hecha el 2026-11-20, sin entregar, L9 y L10) — S1. Adjuntar imágenes y capturas en el chat; RP215 es el servidor y RP215b la pantalla, después de RP240 (historial que aguanta imágenes). Forma decidida por la persona en L5: directo a pi. Antes: un plan que resuelva las decisiones (a) a (e) de la fila, con verificación independiente y una prueba que reproduzca el abuso. Commit: —
 
 ## Log
 
@@ -19,3 +19,5 @@ Riesgo ALTO de seguridad (subida de archivos al servidor). Estado: RP215 (servid
 - **L6.** Lectura del agente de L5. La persona aprobó la propuesta de L4: la imagen se manda directo a pi por RPC, achicada en el navegador y sin guardar ningún archivo en el servidor; no se usa una carpeta con identificador. Quedan decididas (a) a (e) de la fila: (a) verificada; (b) es RP215b; (c) achicar en el navegador y un tope en el servidor; (d) no se guarda; (e) un marcador en el historial (RP240). RP215 sigue esperando RP240 y RP235 en la tabla.
 - **L7.** La persona tomó RP215 con «siguiente» (main limpio y al día, RP240 fusionada en el PR #310). Fallaba la condición 5 (riesgo alto). El agente propuso: (1) un cuerpo de 16 MB solo en las rutas de enviar, hasta 4 imágenes de hasta 5 MB; (2) imágenes también con steer y followUp; (3) un mensaje con imagen y sin texto. La persona contestó, tal cual: «start_task».
 - **L8.** RP215 hecha el 2026-11-20, sin entregar, en la conversación principal y sin delegar la implementación. La verificación independiente pasó con notas: el tope real es de unos 12 MB de imagen por mensaje y un cuerpo sobre el tope corta la conexión sin 413 (los dos para RP215b), un `agent_end` de más de 8 MB se descarta y una letra no ASCII en el borde de un trozo de 64 KB se rompe (ya existía). Sin verificar con un pi real.
+- **L9.** La persona tomó RP215b con «siguiente» (main limpio y al día, RP215 fusionada en el PR #311). Probó en escritorio con el panel real pegando una captura y contestó, tal cual: «1. si. 2. si. 3. si. 4. todo muy bien. en el iphone probare despues, cerremos asi que ya funciona bien».
+- **L10.** RP215b hecha el 2026-11-20, sin entregar, en la conversación principal. El agente recibió la imagen y la leyó: la cadena RP240, RP215 y RP215b funciona de punta a punta. Sin verificar: el iPhone.

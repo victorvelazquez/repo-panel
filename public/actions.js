@@ -227,6 +227,8 @@ const ACTIONS = {
   },
   'chat-close': () => closeChat(),
   'chat-send': () => sendChatMessage(),
+  'chat-attach': () => { const f = $('#msgFile'); if (f && S.chat.id) f.click(); }, // RP215b: the picker (on an iPhone it offers the photo library and the camera)
+  'attach-remove': (el) => removeAttached(S.chat.id, Number(el.dataset.n)),
   'chat-steer': () => sendChatMessage('steer'), // RP236
   // RP245b: Stop of the running shell command of the open chat (pi's abort_bash); its answer then closes the bubble as cancelled.
   'shell-stop': async () => {

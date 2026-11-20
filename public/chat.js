@@ -627,6 +627,7 @@ function drawChat() {
   $('#msgBox').placeholder = note || cs.placeholder;
   footRefresh(id, cs);
   paint($('#queueRow'), R.queueRowHtml(S.rpc[id] && S.rpc[id].queue)); // RP236: what waits for the session, above the box
+  paint($('#attachRow'), R.attachStripHtml(attachedOf(id))); // RP215b: the images that go with the next message
   const row = S.summary && Array.isArray(S.summary.rows) ? S.summary.rows.find((r) => r.id === id) : null;
   const live = (S.rpc[id] && S.rpc[id].compacting ? 'working' : REASON_OF[S.rpc[id] && S.rpc[id].state]) || 'unknown'; // RP140: a compacting session takes no order either; RPC2b-1: the reason follows the session of the RPC host
   paint($('#chatActions'), R.actionButtonsHtml(R.actionMenu(row, { live, changes: summaryChanges(id), flow: summaryFlow(id) }), id, { sending: !!S.sending[id] }) + R.composerMergeHtml(columnGit(id, S.local[id]))); // RP175: Merge is not an item of the session menu: it does not wait for the session
@@ -726,7 +727,7 @@ function setMsgComposing(on, focus) {
 // RP191: Stop takes the place of Send while the session works. RP236: with text in the box it offers Correct and Queue instead. Also called on every keystroke (the text decides).
 function footRefresh(id = S.chat.id, cs = composerOf(id)) {
   const box = $('#msgBox');
-  const b = R.footButtons({ busy: !!(S.rpc[id] && S.rpc[id].state === 'busy'), canSteer: cs.canSteer, hasText: !!(box && box.value.trim()) });
+  const b = R.footButtons({ busy: !!(S.rpc[id] && S.rpc[id].state === 'busy'), canSteer: cs.canSteer, hasText: !!(box && box.value.trim()) || attachedOf(id).length > 0 }); // RP215b: attached images are something to send too
   $('#msgStop').hidden = !b.stop;
   $('#msgSend').hidden = !b.send;
   $('#msgSteer').hidden = !b.steer;
@@ -739,13 +740,15 @@ async function sendChatMessage(behavior) {
   const id = S.chat.id;
   if (!R || !id) return;
   const text = $('#msgBox').value;
-  if (!text.trim()) return;
+  const pics = attachedOf(id);
+  if (!text.trim() && !pics.length) return;
   const blocked = R.panelRefusal(text); // RP237: a permission command of Gentle Shell stays in the terminal; the text stays in the box
   if (blocked) { sayNote(id, blocked); draw(); return; }
   const cs = composerOf(id);
   const shell = R.bashOf(text); // RP245b: ! and !! run a shell command in the folder of the session; it waits for a free session, like a command with /
   if (!shell && /^!/.test(text.trim())) { sayNote(id, 'Write a command after ! or !!'); draw(); return; }
   if (shell && S.rpc[id] && S.rpc[id].bash && S.rpc[id].bash.running === true) { sayNote(id, 'A shell command is already running in this session'); draw(); return; } // the running bubble stays as it is
+  if (shell && pics.length) { sayNote(id, 'Images go with a message, not with a ! command'); draw(); return; } // RP215b
   if (shell) {
     if (!cs.canSend) { sayNote(id, cs.canSteer ? R.SHELL_WAITS : cs.reason); draw(); return; }
     return runShell(id, text, shell);
@@ -753,12 +756,72 @@ async function sendChatMessage(behavior) {
   if (!cs.canSend && cs.canSteer) {
     const refused = R.steerRefusal(text); // RP236b (B2): a command waits for the session to be free; the text stays in the box
     if (refused) { sayNote(id, refused); draw(); return; }
-    return steerChatText(id, text, behavior || 'steer'); // RP236: the session works: correct it now or queue for the end of the run
+    return steerChatText(id, text, behavior || 'steer', takeAttached(id)); // RP236: the session works: correct it now or queue for the end of the run
   }
-  return sendChatText(text, true);
+  return sendChatText(text, true, cs.canSend ? takeAttached(id) : []);
 }
+
+// ---------- RP215b: images attached to the box ----------
+// Per chat, until sent: { data (base64 JPEG), mimeType, url (a blob: address for the thumbnail) }. A failed send puts them back.
+const attachedOf = (id) => (S.attach && Array.isArray(S.attach[id]) ? S.attach[id] : []);
+function takeAttached(id) { const list = attachedOf(id); if (S.attach) delete S.attach[id]; return list; }
+function putAttachedBack(id, list) { if (list.length) (S.attach || (S.attach = {}))[id] = [...list, ...attachedOf(id)].slice(0, R.ATTACH_MAX); }
+function dropAttached(list) { for (const a of list) if (a && typeof a.url === 'string') URL.revokeObjectURL(a.url); }
+const JPEG_STEPS = [0.85, 0.7, 0.55];
+const JPEG_MAX = 3 * 1024 * 1024; // the server takes 5 MB per image and 16 MB per message (RP215): 4 of these always fit
+// One picked file shrunk to JPEG (white under any transparency), or null when the browser cannot decode it.
+async function shrinkImage(file) {
+  let bmp;
+  try { bmp = await createImageBitmap(file); } catch { return null; }
+  const size = R.fitImageSize(bmp.width, bmp.height);
+  if (!size) return null;
+  const canvas = document.createElement('canvas');
+  canvas.width = size.width;
+  canvas.height = size.height;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, size.width, size.height);
+  ctx.drawImage(bmp, 0, 0, size.width, size.height);
+  if (bmp.close) bmp.close();
+  let blob = null;
+  for (const q of JPEG_STEPS) {
+    blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', q));
+    if (blob && blob.size <= JPEG_MAX) break;
+  }
+  if (!blob || blob.size > JPEG_MAX) return null;
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return { data: btoa(bin), mimeType: 'image/jpeg', url: URL.createObjectURL(blob) };
+}
+// Files from the picker or the clipboard: the ones attachPick takes are shrunk in order and added to the chat they were picked for.
+async function attachFiles(id, files) {
+  if (!R || !id) return;
+  const list = Array.from(files || []);
+  const { take, note } = R.attachPick(list, attachedOf(id).length);
+  let failed = false;
+  for (const i of take) {
+    const img = await shrinkImage(list[i]);
+    if (!img) { failed = true; continue; }
+    const now = attachedOf(id);
+    if (now.length >= R.ATTACH_MAX) { dropAttached([img]); continue; }
+    (S.attach || (S.attach = {}))[id] = [...now, img];
+  }
+  const say = failed ? 'That image could not be read' : note;
+  if (say) sayNote(id, say);
+  draw();
+}
+function removeAttached(id, n) {
+  const list = attachedOf(id);
+  if (!Number.isInteger(n) || n < 0 || n >= list.length) return;
+  dropAttached([list[n]]);
+  S.attach[id] = list.filter((_, i) => i !== n);
+  draw();
+}
+// A send with images that never got an answer was most likely cut by the server's size cap (it resets the connection instead of answering 413).
+const sendError = (e, pics) => (pics.length && !(e && e.status) ? 'The images are too large to send' : e.message);
 // RP236: a message to a session that works. It shows in the queue row (pi tells the queue), not as a pending bubble; a failure puts the text back with the server's message.
-async function steerChatText(id, text, behavior) {
+async function steerChatText(id, text, behavior, pics = []) {
   $('#msgBox').value = '';
   S.composing = false;
   fitMsgBox();
@@ -766,7 +829,7 @@ async function steerChatText(id, text, behavior) {
   delete S.notes[id];
   delete S.recall[id];
   draw();
-  try { await api('/api/rpc/prompt', { id, text, behavior }); } catch (e) { putBack(id, text); sayNote(id, e.message); }
+  try { await api('/api/rpc/prompt', { id, text: text.trim() ? text : '', behavior, ...(pics.length ? { images: pics.map(({ data, mimeType }) => ({ data, mimeType })) } : {}) }); dropAttached(pics); } catch (e) { if (text.trim()) putBack(id, text); putAttachedBack(id, pics); sayNote(id, sendError(e, pics)); }
   draw();
 }
 // RP245b: the command runs with pi's bash order; its output streams into S.rpc[id].bash (bash_output events) and the answer closes it with the exit code.
@@ -804,12 +867,12 @@ function putBack(id, text) {
   if (S.chat.id === id) { $('#msgBox').value = back; fitMsgBox(); } else S.drafts[id] = back;
 }
 // RP166: the one path every message of the page takes (the box and the quick-reply buttons): canSend, the pending message, the session start and the error handling. `fromBox` clears the box and its draft.
-async function sendChatText(text, fromBox) {
+async function sendChatText(text, fromBox, pics = []) {
   const id = S.chat.id;
   if (!R || !id) return;
   const cs = composerOf(id);
-  if (!cs.canSend) { sayNote(id, cs.reason); draw(); return; }
-  const entry = { text, state: 'sending', base: R.userCount((S.chat.hist && S.chat.hist.items) || [], text) };
+  if (!cs.canSend) { putAttachedBack(id, pics); sayNote(id, cs.reason); draw(); return; }
+  const entry = { text, state: 'sending', base: R.userCount((S.chat.hist && S.chat.hist.items) || [], text), ...(pics.length ? { images: pics.length } : {}) };
   delete S.notes[id];
   delete S.recall[id];
   if (fromBox) {
@@ -823,15 +886,17 @@ async function sendChatText(text, fromBox) {
   draw();
   try {
     if (rpcNeedsStart(id)) await ensureRpcStarted(id);
-    await api('/api/rpc/prompt', { id, text });
+    await api('/api/rpc/prompt', { id, text: text.trim() ? text : '', ...(pics.length ? { images: pics.map(({ data, mimeType }) => ({ data, mimeType })) } : {}) });
     entry.state = 'ok';
+    dropAttached(pics);
   } catch (e) {
+    putAttachedBack(id, pics);
     S.pending[id] = (S.pending[id] || []).filter((p) => p !== entry);
     const now = S.chat.id === id ? $('#msgBox').value : S.drafts[id] || '';
-    const back = now ? `${text}
+    const back = !text.trim() ? now : now ? `${text}
 ${now}` : text;
     if (S.chat.id === id) { $('#msgBox').value = back; fitMsgBox(); } else S.drafts[id] = back;
-    sayNote(id, e.message);
+    sayNote(id, sendError(e, pics));
   }
   draw();
 }
