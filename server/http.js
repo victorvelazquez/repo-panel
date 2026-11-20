@@ -226,10 +226,13 @@ const STATIC = {
 // RP185: the same for the icons of the install (K-icon.svg is only the base and stays behind the login).
 const OPEN_STATIC = new Set(['/sw.js', '/manifest.webmanifest', '/icon.svg', '/apple-touch-icon.png', '/icon-192.png', '/icon-512.png', '/icon-maskable-512.png', '/favicon.ico']);
 
-function readBody(req) {
+// RP215: a message with images (up to 4 of 5 MB, in base64) needs more than the 1 MB of every other route; only the send routes get it.
+const BIG_BODY = new Set(['POST /api/rpc/prompt', 'POST /api/rpc/steer']);
+const BIG_BODY_MAX = 16 * 1024 * 1024;
+function readBody(req, max = 1e6) {
   return new Promise((resolve, reject) => {
     let data = '';
-    req.on('data', (c) => { data += c; if (data.length > 1e6) { reject(new HttpError(413, 'Body too large')); req.destroy(); } });
+    req.on('data', (c) => { data += c; if (data.length > max) { reject(new HttpError(413, 'Body too large')); req.destroy(); } });
     req.on('end', () => { try { resolve(data ? JSON.parse(data) : {}); } catch { reject(new HttpError(400, 'Invalid JSON')); } });
   });
 }
@@ -351,7 +354,7 @@ function createServer(port, deps = {}) {
         if (!handler && key !== 'GET /api/perf') throw new HttpError(404, 'Not found');
         if (req.headers['x-token'] !== TOKEN) throw new HttpError(401, 'Invalid token');
         if (!handler) return reply(200, { routes: perf.summary(), queue: stats() });
-        const body = req.method === 'POST' ? await readBody(req) : {};
+        const body = req.method === 'POST' ? await readBody(req, BIG_BODY.has(key) ? BIG_BODY_MAX : undefined) : {};
         const run = async () => {
           executed = true;
           try { return await handler(query(req.url), body, deps); } finally { if (CATCH_UP_POSTS.has(key)) catchUp(deps.summaryStore, body && body.id); }

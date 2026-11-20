@@ -6,6 +6,7 @@
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { HttpError } = require('./errors.js');
+const { sentImages } = require('./images.js');
 const { loadConfig } = require('./config.js');
 const { runtimeEnv } = require('./piruntime.js');
 const { createRpcClient, RpcError, CAUSES } = require('./rpc.js');
@@ -113,6 +114,8 @@ const SHELL_KEEP = 200000;
 // pi names a command registered twice `name:1`, `name:2`: those forms are the same command.
 const PANEL_BLOCKED = /^\/gentle:(desktop|mode|yolo)(?::\d+)?(?![\w:-])/i;
 const NOT_HERE = 'Permission and configuration commands (/gentle:desktop, /gentle:mode, /gentle:yolo) are not available from the panel: use the terminal';
+// RP215: a message that carries images may have no text; the text, when there is one, follows cleanText.
+const textWith = (value, pics) => (pics.length && typeof value === 'string' && !value.replace(CONTROLS, '').trim() ? '' : cleanText(value));
 const panelOnly = (message) => { if (PANEL_BLOCKED.test(message)) throw new HttpError(409, NOT_HERE); return message; };
 const TRANSLATE = {
   queue_update: (r) => ({ type: 'queue', ...queueOf(r) }),
@@ -361,19 +364,22 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
     outcomeOf,
     // RP233: the command names the live session of a repo loaded, or null (no live session, still starting, or the list is unknown). Memory only.
     commandsOf(id) { const entry = live.get(id); return entry && entry.up === true && !entry.closed && Array.isArray(entry.commands) ? [...entry.commands] : null; },
-    async prompt(id, value, { behavior } = {}) {
+    // RP215: `images` (up to 4, checked by sentImages before anything reaches pi) go in the same request; with images the text may be empty.
+    async prompt(id, value, { behavior, images } = {}) {
       repoOf(id);
       if (behavior !== undefined && !BEHAVIORS.includes(behavior)) throw new HttpError(400, 'behavior must be steer or followUp');
-      const message = panelOnly(cleanText(value));
+      const pics = sentImages(images);
+      const message = panelOnly(textWith(value, pics));
       if (behavior && message.startsWith('/')) throw new HttpError(409, COMMAND_WAITS);
       const entry = running(id);
       if (entry.compacting) throw new HttpError(409, 'The session is compacting its context: wait a moment'); // pi would refuse it too
-      return ask(entry, 'prompt', { message, ...(behavior ? { streamingBehavior: behavior } : {}) });
+      return ask(entry, 'prompt', { message, ...(behavior ? { streamingBehavior: behavior } : {}), ...(pics.length ? { images: pics } : {}) });
     },
-    async steer(id, value) {
+    async steer(id, value, { images } = {}) {
       repoOf(id);
-      const message = panelOnly(cleanText(value));
-      return ask(running(id), 'steer', { message });
+      const pics = sentImages(images);
+      const message = panelOnly(textWith(value, pics));
+      return ask(running(id), 'steer', { message, ...(pics.length ? { images: pics } : {}) });
     },
     // RP239: during an automatic retry pi's abort_retry goes first (pi's abort cuts it too, but this ends the wait at once); its failure never stops the abort.
     async abort(id) {
@@ -526,8 +532,8 @@ function rpcApi(host) {
       return host.start(id, { fresh: body.new === true });
     },
     close: (b) => host.close(idOf(bodyOf(b))),
-    prompt: (b) => host.prompt(idOf(bodyOf(b)), b.text, b.behavior === undefined ? {} : { behavior: b.behavior }),
-    steer: (b) => host.steer(idOf(bodyOf(b)), b.text),
+    prompt: (b) => host.prompt(idOf(bodyOf(b)), b.text, { ...(b.behavior === undefined ? {} : { behavior: b.behavior }), ...(b.images === undefined ? {} : { images: b.images }) }),
+    steer: (b) => host.steer(idOf(bodyOf(b)), b.text, ...(b.images === undefined ? [] : [{ images: b.images }])),
     abort: (b) => host.abort(idOf(bodyOf(b))),
     clearQueue: (b) => host.clearQueue(idOf(bodyOf(b))),
     bash: (b) => host.bash(idOf(bodyOf(b)), b.text),
