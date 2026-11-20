@@ -74,11 +74,14 @@
         <div id="termBlock" class="term-block"></div>
         <div id="quickRow" class="quick-slot"></div>
         <div id="queueRow" class="queue-slot"></div>
+        <div id="attachRow" class="attach-slot"></div>
         <div class="msg-field">
           <button id="msgExpand" class="msg-expand" type="button" data-act="msg-expand" aria-label="Expand the message box" aria-expanded="false" title="Expand the message box" hidden><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.5 2.5h4v4M13.5 2.5l-4.5 4.5M6.5 13.5h-4v-4M2.5 13.5l4.5-4.5"/></svg></button>
           <textarea id="msgBox" rows="1" enterkeyhint="enter" aria-label="Message to the session" title="Enter sends · Shift+Enter new line"></textarea>
         </div>
         <div class="c-bar">
+          <button id="msgAttach" class="c-round c-attach" type="button" data-act="chat-attach" aria-label="Attach images" title="Attach images (you can also paste them into the box)"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 7.5 8 13a3.5 3.5 0 0 1-5-5l5.8-5.8a2.3 2.3 0 0 1 3.3 3.3L6.3 11.3a1.1 1.1 0 0 1-1.6-1.6L10 4.4"/></svg></button>
+          <input id="msgFile" type="file" accept="image/*" multiple hidden>
           <div class="c-left"><div id="sessState" class="sess-state"></div></div>
           <span id="chatActions" class="c-actions"></span>
           <button id="msgStop" class="c-round c-stop" type="button" data-act="chat-stop" aria-label="Stop the run" title="Stop the run that is going on" hidden><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="3.5" y="3.5" width="9" height="9" rx="2" fill="currentColor"/></svg></button>

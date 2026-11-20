@@ -198,6 +198,15 @@ if (window.addEventListener) window.addEventListener('pagehide', () => flushNote
 const kbMark = () => chatKeyboardMark($('#chatBody'), Date.now());
 const kbFix = () => { chatKeyboardFix($('#chatBody'), Date.now()); chatNextFrame(() => chatKeyboardFix($('#chatBody'), Date.now())); };
 document.addEventListener('focusin', (e) => { if (e.target && e.target.id === 'msgBox') kbMark(); });
+// RP215b: picked files, and images pasted into the box (a paste with no image stays a plain text paste).
+document.addEventListener('change', (e) => { if (e.target && e.target.id === 'msgFile') { const files = Array.from(e.target.files || []); e.target.value = ''; attachFiles(S.chat.id, files); } });
+document.addEventListener('paste', (e) => {
+  if (!e.target || e.target.id !== 'msgBox' || !e.clipboardData) return;
+  const files = Array.from(e.clipboardData.files || []).filter((f) => f && typeof f.type === 'string' && f.type.startsWith('image/'));
+  if (!files.length) return;
+  e.preventDefault();
+  attachFiles(S.chat.id, files);
+});
 document.addEventListener('focusout', (e) => { if (e.target && e.target.id === 'msgBox') kbMark(); });
 const composerBox = $('#composer');
 if (composerBox && composerBox.addEventListener) composerBox.addEventListener('touchstart', kbMark, { passive: true });

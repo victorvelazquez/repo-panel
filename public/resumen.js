@@ -1302,7 +1302,34 @@
   };
   const PENDING_WHO = { sending: 'sending…', ok: '<span class="ok">✓</span>' };
   const pendingHtml = (pending, items) => (pending || []).filter((p) => userCount(items, p.text) <= p.base)
-    .map((p) => `<div class="m me pending"><span class="who">You · ${PENDING_WHO[p.state] || PENDING_WHO.sending}</span>${mdHtml(p.text)}</div>`).join('');
+    .map((p) => `<div class="m me pending"><span class="who">You · ${PENDING_WHO[p.state] || PENDING_WHO.sending}</span>${mdHtml(p.text)}${imagesHtml({ images: p.images }, {})}</div>`).join(''); // RP215b: its images are frames until the history has the message
+
+  // RP215b: images attached to the box. The page shrinks each one (long side IMAGE_SIDE px) and sends it as JPEG; the server (RP215) takes at most ATTACH_MAX per message.
+  const ATTACH_MAX = 4;
+  const IMAGE_SIDE = 1568;
+  // The size an image is shrunk to: the long side down to `max`, the ratio kept, never enlarged, never below one pixel; null for a size that is not two positive finite numbers.
+  function fitImageSize(w, h, max = IMAGE_SIDE) {
+    if (typeof w !== 'number' || typeof h !== 'number' || !Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) return null;
+    const k = Math.min(1, max / Math.max(w, h));
+    return { width: Math.max(1, Math.round(w * k)), height: Math.max(1, Math.round(h * k)) };
+  }
+  // Which of the picked files are taken (their indexes) and why any was left out: only raster images (an SVG is not one), and no more than ATTACH_MAX with the `have` already attached.
+  function attachPick(files, have) {
+    const take = [];
+    let note = '';
+    for (const [i, f] of (Array.isArray(files) ? files : []).entries()) {
+      const type = f && typeof f.type === 'string' ? f.type : '';
+      if (!type.startsWith('image/') || type === 'image/svg+xml') { note = note || 'Only images can be attached'; continue; }
+      if (have + take.length >= ATTACH_MAX) { note = 'At most 4 images per message'; continue; }
+      take.push(i);
+    }
+    return { take, note };
+  }
+  // The thumbnails above the box, each with its remove button; only a blob: address the page made becomes an <img>.
+  function attachStripHtml(list) {
+    if (!Array.isArray(list) || !list.length) return '';
+    return `<div class="att-row" role="list" aria-label="Attached images">${list.map((a, n) => `<span class="att" role="listitem">${a && typeof a.url === 'string' && a.url.startsWith('blob:') ? `<img src="${esc(a.url)}" alt="Attached image ${n + 1}">` : '<span class="att-off">Image</span>'}<button type="button" class="att-x" data-act="attach-remove" data-n="${n}" aria-label="Remove image ${n + 1}" title="Remove">×</button></span>`).join('')}</div>`;
+  }
 
   // RP166: options the assistant wrote as TEXT on the last line of its message (its selection tool is not available here, so it asks the person to type one). Deliberately strict: ONLY the last non-empty
   // line, which must be exactly [Siguiente:|Next:] verb [filler] 2 to 6 `options` joined by , / o or y and, with nothing else; each option is `[A-Za-z0-9_.:-]{1,40}` and distinct, and ONE bad option rejects
@@ -1622,5 +1649,5 @@
     return `${ctx.failed ? '<div class="rs-note" role="status">⚠ Summary unavailable: showing the last data we have.</div>' : ''}<div class="rs-list">${body}</div>`;
   }
 
-  return { tokensShort, yesNoOf, mergeSheetHtml, repoStatus, esc, mdHtml, settingsView, memoryChipHtml, modeChipHtml, ctxChipHtml, sessionTotals, compactButtonHtml, legendHtml, listCount, blockWidths, columnView, membersView, ROOM_COLUMN_TABS, treeFolderPaths, fileView, COLUMN_TABS, columnDetail, chatMenuHtml, headChipsHtml, statusIconsHtml, composerState, askAllowed, askCard, actionMenu, actionButtonsHtml, composerMergeHtml, composerNote, chatHead, optionCut, footButtons, busyBehavior, bashOf, shellHtml, SHELL_WAITS, steerRefusal, panelRefusal, queueRowHtml, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, sessionCloseHtml, sessionTerminalHtml, terminalBlockHtml, recentlyActive, chatBody, quickReplies, quickOf, quickRow, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
+  return { fitImageSize, attachPick, attachStripHtml, ATTACH_MAX, tokensShort, yesNoOf, mergeSheetHtml, repoStatus, esc, mdHtml, settingsView, memoryChipHtml, modeChipHtml, ctxChipHtml, sessionTotals, compactButtonHtml, legendHtml, listCount, blockWidths, columnView, membersView, ROOM_COLUMN_TABS, treeFolderPaths, fileView, COLUMN_TABS, columnDetail, chatMenuHtml, headChipsHtml, statusIconsHtml, composerState, askAllowed, askCard, actionMenu, actionButtonsHtml, composerMergeHtml, composerNote, chatHead, optionCut, footButtons, busyBehavior, bashOf, shellHtml, SHELL_WAITS, steerRefusal, panelRefusal, queueRowHtml, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, sessionCloseHtml, sessionTerminalHtml, terminalBlockHtml, recentlyActive, chatBody, quickReplies, quickOf, quickRow, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
 }));
