@@ -9,6 +9,7 @@ const { HttpError } = require('./errors.js');
 const { loadConfig, saveConfig, findRepo } = require('./config.js');
 const { chooseRuntime, findCached } = require('./piruntime.js');
 const { argSummary, resultText } = require('./redact.js');
+const { decodeImage } = require('./images.js');
 
 const CHUNK = 64 * 1024;
 // RP104: the chat reads this much of the END of the session file (the listing keeps the 64 KB of CHUNK); the first line of the window may be partial and is dropped.
@@ -348,17 +349,8 @@ function chatResult(id, call, base = baseDir()) {
 }
 
 // RP240: GET /api/chat/image: one image of a USER message of the adopted session, found by the id of its entry in the last CHAT_READ_MAX bytes. Never an image of a tool
-// result (a file the agent read). Only a closed list of types whose bytes start as the type says, valid base64, at most IMAGE_MAX bytes; the page never names a file.
-const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-const IMAGE_TYPES = {
-  'image/png': (b) => b.length >= 8 && b.subarray(0, 8).equals(PNG),
-  'image/jpeg': (b) => b.length >= 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff,
-  'image/gif': (b) => /^GIF8[79]a$/.test(b.subarray(0, 6).toString('latin1')),
-  'image/webp': (b) => b.subarray(0, 4).toString('latin1') === 'RIFF' && b.subarray(8, 12).toString('latin1') === 'WEBP',
-};
-const IMAGE_MAX = 5 * 1024 * 1024;
+// result (a file the agent read). The bytes pass decodeImage (server/images.js); the page never names a file.
 const IMAGE_INDEX = /^[0-7]$/;
-const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
 
 function findUserMessage(folder, sessionId, entryId, base) {
   let file;
@@ -384,14 +376,7 @@ function chatImage(id, entryId, n, base = baseDir()) {
   const m = sid ? findUserMessage(folder, sid, entryId, base) : null;
   const img = m ? blocksOf(m, 'image')[Number(n)] : undefined;
   if (!img) throw new HttpError(404, 'That image is not in the recent part of the session');
-  const matches = typeof img.mimeType === 'string' && Object.hasOwn(IMAGE_TYPES, img.mimeType) ? IMAGE_TYPES[img.mimeType] : null;
-  if (!matches || typeof img.data !== 'string') throw new HttpError(415, 'Unsupported image');
-  if (img.data.length > Math.ceil(IMAGE_MAX / 3) * 4) throw new HttpError(413, 'Image too large');
-  if (img.data.length % 4 || !BASE64.test(img.data)) throw new HttpError(415, 'Unsupported image');
-  const body = Buffer.from(img.data, 'base64');
-  if (body.length > IMAGE_MAX) throw new HttpError(413, 'Image too large');
-  if (!matches(body)) throw new HttpError(415, 'Unsupported image');
-  return { type: img.mimeType, body };
+  return { type: img.mimeType, body: decodeImage(img) };
 }
 
 // What an adopted-session key stands for: a repo id, or "room:<name>". Unknown keys are 404, as in the other routes.
