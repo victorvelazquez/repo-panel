@@ -887,7 +887,9 @@
     const o = isObject(a) ? a : {};
     const window = Number.isSafeInteger(o.window) && o.window > 0 ? o.window : null;
     const percent = ctxNum(o.percent);
-    return { ...rpcBlank(), ...(isObject(prev) ? prev : {}), ctx: window === null ? { tokens: null, percent: null, window: null } : { tokens: ctxNum(o.tokens), percent: percent === null ? null : Math.min(100, percent), window } };
+    // RP239: the totals of the session: a cost up to a million and a safe integer of tokens, else null.
+    const totals = { cost: ctxNum(o.cost) !== null && o.cost <= 1e6 ? o.cost : null, sessionTokens: Number.isSafeInteger(o.sessionTokens) && o.sessionTokens >= 0 ? o.sessionTokens : null };
+    return { ...rpcBlank(), ...(isObject(prev) ? prev : {}), ctx: window === null ? { tokens: null, percent: null, window: null, ...totals } : { tokens: ctxNum(o.tokens), percent: percent === null ? null : Math.min(100, percent), window, ...totals } };
   }
   // GET /api/rpc/status: the state and the pending dialogs (by `requestId`). A run that is not on any more leaves no streaming text.
   function rpcFromStatus(prev, st) {

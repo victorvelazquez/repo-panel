@@ -456,17 +456,31 @@
     if (!ok(x.percent) || !Number.isSafeInteger(x.window) || x.window <= 0) return { unknown: true, title: 'Context usage is unknown until the next answer' };
     const p = Math.min(100, x.percent);
     const [cls, kind, more] = p >= 90 ? ['mem-bad', 'bad', ' (almost full)'] : p >= 70 ? ['mem-warn', 'warn', ' (getting full)'] : ['', 'ok', '']; // RP156: the shape says the level, not only the colour
-    const used = ok(x.tokens) ? kTokens(x.tokens) : `${Math.round(p)}%`;
-    return { p: Math.round(p), cls, kind, title: `Context used by this session: ${used} of ${kTokens(x.window)} tokens${more}` };
+    const used = ok(x.tokens) ? tokensShort(x.tokens) : `${Math.round(p)}%`;
+    return { p: Math.round(p), cls, kind, title: `Context used by this session: ${used} of ${tokensShort(x.window)} tokens${more}` }; // RP239: a 1M window reads «1M», not «1000k»
   };
-  const ctxChipHtml = (c) => {
+  // RP239: the totals of the session for the chip, in this order: its tokens (`34k tok`) and its cost (`$0.12`, `<$0.01` under a cent, `$0.00` for exactly 0). A part that is not a clean number is left out.
+  // A session can reach millions of tokens: from 1M on they read as M (one decimal under 100M), never as «97428k»; `exact` (the help) gives the whole number with thousands separators.
+  function tokensShort(n) { return n >= 999500 ? `${(n / 1e6).toFixed(n >= 1e8 ? 0 : 1).replace(/\.0$/, '')}M` : kTokens(n); }
+  const sessionTotals = (x, { exact = false } = {}) => {
+    const o = x && typeof x === 'object' ? x : {};
+    const out = [];
+    if (Number.isSafeInteger(o.sessionTokens) && o.sessionTokens >= 0) out.push(exact ? `${o.sessionTokens.toLocaleString('en-US')} tokens` : `${tokensShort(o.sessionTokens)} tok`);
+    if (typeof o.cost === 'number' && Number.isFinite(o.cost) && o.cost >= 0) out.push(o.cost > 0 && o.cost < 0.01 ? '<$0.01' : `$${o.cost.toFixed(2)}`);
+    return out;
+  };
+  // RP239: `totals` (the head of the chat on a wide screen) adds the totals of the session to the chip and its help; the phone row keeps the percentage alone.
+  const ctxChipHtml = (c, { totals = false } = {}) => {
     const l = ctxLevel(c);
     if (!l) return '';
-    if (l.unknown) return '<span class="mem ctx" title="' + l.title + '"><i class="mem-ic" aria-hidden="true">' + ctxIcon('unknown', 0) + '</i> <span class="mem-word">ctx </span>—</span>';
-    return `<span class="mem ctx${l.cls ? ` ${l.cls}` : ''}" title="${esc(l.title)}"><i class="mem-ic" aria-hidden="true">${ctxIcon(l.kind, l.p)}</i> <span class="mem-word">ctx </span>${l.p}%</span>`;
+    const parts = totals ? sessionTotals(c.rpc.ctx) : [];
+    const more = parts.length ? ` · ${parts.join(' · ')}` : '';
+    const title = parts.length ? `${l.title}. This session so far: ${sessionTotals(c.rpc.ctx, { exact: true }).join(', ')}` : l.title;
+    if (l.unknown) return `<span class="mem ctx" title="${esc(title)}"><i class="mem-ic" aria-hidden="true">${ctxIcon('unknown', 0)}</i> <span class="mem-word">ctx </span>—${esc(more)}</span>`;
+    return `<span class="mem ctx${l.cls ? ` ${l.cls}` : ''}" title="${esc(title)}"><i class="mem-ic" aria-hidden="true">${ctxIcon(l.kind, l.p)}</i> <span class="mem-word">ctx </span>${l.p}%${esc(more)}</span>`;
   };
   // RP197: the chips of the head of the chat. Silence when all is well: the context (once read), the memory only when it is not ready, the checks only while they run or fail (ciOf is null on green).
-  const headChipsHtml = (c, ci) => modeChipHtml(c) + ctxChipHtml(c) + memoryChipHtml(c, { quiet: true }) + ciLabel(ci, { head: true }); // RP245c: the mode first, it changes what the session may do
+  const headChipsHtml = (c, ci) => modeChipHtml(c) + ctxChipHtml(c, { totals: true }) + memoryChipHtml(c, { quiet: true }) + ciLabel(ci, { head: true }); // RP245c: the mode first, it changes what the session may do
   // RP198: row 2 of the phone head, in a fixed order: ↑N (only when ahead > 0), the context, then the alerts (the memory when it is not ready, the checks while they run or fail). With 4 pieces the row is `ch-tight`:
   // the stylesheet drops the words of the alerts (icon + number stay); with fewer it drops them only when the central block is narrow (a container query). '' when there is nothing to say.
   const aheadChipHtml = (n) => (n > 0 ? `<span class="ch-up" title="${n} ${n === 1 ? 'commit' : 'commits'} ahead" aria-label="${n} ${n === 1 ? 'commit' : 'commits'} ahead">${svgIcon('<path d="M8 13V3M4 7l4-4 4 4"/>', 13)}${n}</span>` : '');
@@ -1595,5 +1609,5 @@
     return `${ctx.failed ? '<div class="rs-note" role="status">⚠ Summary unavailable: showing the last data we have.</div>' : ''}<div class="rs-list">${body}</div>`;
   }
 
-  return { yesNoOf, mergeSheetHtml, repoStatus, esc, mdHtml, settingsView, memoryChipHtml, modeChipHtml, ctxChipHtml, compactButtonHtml, legendHtml, listCount, blockWidths, columnView, membersView, ROOM_COLUMN_TABS, treeFolderPaths, fileView, COLUMN_TABS, columnDetail, chatMenuHtml, headChipsHtml, statusIconsHtml, composerState, askAllowed, askCard, actionMenu, actionButtonsHtml, composerMergeHtml, composerNote, chatHead, optionCut, footButtons, busyBehavior, bashOf, shellHtml, SHELL_WAITS, steerRefusal, panelRefusal, queueRowHtml, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, sessionCloseHtml, sessionTerminalHtml, terminalBlockHtml, recentlyActive, chatBody, quickReplies, quickOf, quickRow, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
+  return { tokensShort, yesNoOf, mergeSheetHtml, repoStatus, esc, mdHtml, settingsView, memoryChipHtml, modeChipHtml, ctxChipHtml, sessionTotals, compactButtonHtml, legendHtml, listCount, blockWidths, columnView, membersView, ROOM_COLUMN_TABS, treeFolderPaths, fileView, COLUMN_TABS, columnDetail, chatMenuHtml, headChipsHtml, statusIconsHtml, composerState, askAllowed, askCard, actionMenu, actionButtonsHtml, composerMergeHtml, composerNote, chatHead, optionCut, footButtons, busyBehavior, bashOf, shellHtml, SHELL_WAITS, steerRefusal, panelRefusal, queueRowHtml, notesView, notesStatus, tasksView, parseDiff, changesView, filesView, inputHistory, historyStep, canRecall, sessionState, sessionLabelHtml, sessionCloseHtml, sessionTerminalHtml, terminalBlockHtml, recentlyActive, chatBody, quickReplies, quickOf, quickRow, userCount, normalizeScope, filterRows, relativeTime, scopeBar, summaryView, summaryTools, visibleRows };
 }));
