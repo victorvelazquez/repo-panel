@@ -104,6 +104,8 @@ const SHELL_MAX = TEXT_MAX;
 const SHELL_MS = 30 * 60 * 1000;
 // The abort sent after that wait is short, so the 409 reaches the page (which waits one minute more) even when pi does not answer it.
 const SHELL_ABORT_MS = 15000;
+// RP239: how long Stop waits for abort_retry before it sends the abort anyway.
+const RETRY_ABORT_MS = 5000;
 // RP252: how much of the output of the running command the status keeps (its end).
 const SHELL_KEEP = 200000;
 // RP237 (option (a), decided by the person): with GENTLE_SHELL_INTERACTIVE_HOST=1 these commands can change the runtime's permission mode (even super-yolo, saved for new
@@ -164,14 +166,19 @@ function modeOf(text) {
 }
 
 // RP139: what the page may know of the context window of a session: three numbers, every one finite and not negative or null. Nothing else of the answer (no text, no other field) is kept.
-// A window that is not a positive integer makes the whole answer unknown; `tokens` and `percent` are null right after a compaction and stay null (never 0).
-const CONTEXT_NONE = { tokens: null, window: null, percent: null };
+// A window that is not a positive integer makes those three unknown; `tokens` and `percent` are null right after a compaction and stay null (never 0).
+// RP239: plus the totals of the session: its cost (finite, 0 to COST_MAX) and its tokens (`tokens.total`, a safe integer); either is null when it is anything else.
+const CONTEXT_NONE = { tokens: null, window: null, percent: null, cost: null, sessionTokens: null };
+const COST_MAX = 1e6;
 const nonNeg = (v) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : null);
 function contextOf(stats) {
-  const u = stats && typeof stats === 'object' ? stats.contextUsage : null;
-  if (!u || typeof u !== 'object' || Array.isArray(u) || !Number.isSafeInteger(u.contextWindow) || u.contextWindow <= 0) return { ...CONTEXT_NONE };
+  const s = stats && typeof stats === 'object' ? stats : {};
+  const total = s.tokens && typeof s.tokens === 'object' ? s.tokens.total : null;
+  const totals = { cost: nonNeg(s.cost) !== null && s.cost <= COST_MAX ? s.cost : null, sessionTokens: Number.isSafeInteger(total) && total >= 0 ? total : null };
+  const u = s.contextUsage;
+  if (!u || typeof u !== 'object' || Array.isArray(u) || !Number.isSafeInteger(u.contextWindow) || u.contextWindow <= 0) return { ...CONTEXT_NONE, ...totals };
   const percent = nonNeg(u.percent);
-  return { tokens: nonNeg(u.tokens), window: u.contextWindow, percent: percent === null ? null : Math.min(100, percent) };
+  return { tokens: nonNeg(u.tokens), window: u.contextWindow, percent: percent === null ? null : Math.min(100, percent), ...totals };
 }
 
 // RP140: after a timeout, does the session still say it is compacting? Asked once with a short wait. Any doubt (no answer, a broken answer) reads as no, so the mark never stays on for a session that cannot say.
@@ -242,6 +249,8 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
       onEvent: (e) => {
         // RP140: the compaction mark follows the events of THIS session, so one that pi starts by itself (threshold, overflow) shows too.
         if (e && e.kind === 'event' && e.record && live.get(id) === entry && (e.record.type === 'compaction_start' || e.record.type === 'compaction_end')) entry.compacting = e.record.type === 'compaction_start';
+        // RP239: pi is waiting to retry a failed request; Stop then cuts that wait too.
+        if (e && e.kind === 'event' && e.record && ['auto_retry_start', 'auto_retry_end', 'agent_settled'].includes(e.record.type)) entry.retrying = e.record.type === 'auto_retry_start';
         // RP252: the output of the running shell command is kept too (its end), so a reload or another tab shows it from the status.
         if (e && e.kind === 'event' && e.record && e.record.type === 'bash_execution_update' && entry.bash && typeof e.record.delta === 'string') entry.bash.output = (entry.bash.output + e.record.delta).slice(-SHELL_KEEP);
         if (e && e.kind === 'status') { // RP110b: only the notice of THIS session counts (an old client's is not the new one's), and only a change of category is published
@@ -366,7 +375,13 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
       const message = panelOnly(cleanText(value));
       return ask(running(id), 'steer', { message });
     },
-    async abort(id) { repoOf(id); return ask(running(id), 'abort', {}); },
+    // RP239: during an automatic retry pi's abort_retry goes first (pi's abort cuts it too, but this ends the wait at once); its failure never stops the abort.
+    async abort(id) {
+      repoOf(id);
+      const entry = running(id);
+      if (entry.retrying) { try { await entry.client.request('abort_retry', {}, { timeoutMs: RETRY_ABORT_MS }); } catch { /* the abort below cuts it as well */ } }
+      return ask(entry, 'abort', {});
+    },
     // RP245b (parity with the terminal): `!command` runs it in the folder of the session with pi's bash order and its output goes to the conversation; `!!command`
     // keeps the output from the model (excludeFromContext). It waits for a free session, like a command with /, and only one runs at a time.
     async bash(id, value) {

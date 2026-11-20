@@ -1,6 +1,6 @@
 'use strict';
 // RP139 (S28): the chat shows the percentage of the CONTEXT WINDOW the session uses, next to the state of the session and the memory chip. Read-only: it changes no setting of pi.
-// The server asks the session for `get_session_stats` and answers ONLY { tokens, percent, window } (finite non-negative numbers or null); the page asks when a chat opens, when a run
+// The server asks the session for `get_session_stats` and answers ONLY { tokens, percent, window } plus, since RP239, the cost and the total tokens of the session (finite non-negative numbers or null); the page asks when a chat opens, when a run
 // ends and when a compaction ends, never on a timer. Fake clients and a fake fetch, plus the fake pi of test/fixtures/fake-pi-rpc.js for the real client.
 // RP233: every start asks pi for its commands once, before anything else; the requests below come after it.
 const START = ['get_commands', {}];
@@ -42,7 +42,9 @@ const R = require('../public/resumen.js');
 const ID = lib.repoId(REPO);
 const ACTIVE = { id: 'gentle-shell', command: 'C:\\L\\gentle-shell.exe', agentDir: 'C:\\a' };
 const FIXTURE = path.join(__dirname, 'fixtures', 'fake-pi-rpc.js');
-const NONE = { tokens: null, window: null, percent: null };
+// RP239: the cost and the tokens of the session travel too, null when unknown.
+const NONE = { tokens: null, window: null, percent: null, cost: null, sessionTokens: null };
+const W = (o) => ({ cost: null, sessionTokens: null, ...o });
 const writeConfig = () => fs.writeFileSync(process.env.REPO_PANEL_CONFIG, JSON.stringify({ groups: [{ name: 'g', repos: [{ path: REPO }] }] }));
 const until = async (fn, ms = 4000) => { const end = Date.now() + ms; while (Date.now() < end) { const v = fn(); if (v) return v; await new Promise((r) => setTimeout(r, 10)); } throw new Error('timed out waiting'); };
 
@@ -75,20 +77,20 @@ const HOSTILE = [
   ['a huge window', stats({ tokens: 10, contextWindow: 1e300, percent: 5 }), NONE],
   ['an infinite window', stats({ tokens: 10, contextWindow: Infinity, percent: 5 }), NONE],
   ['a nested window', stats({ tokens: 10, contextWindow: { n: 1 }, percent: 5 }), NONE],
-  ['contextUsage missing', { tokens: { total: 999999 } }, NONE],
+  ['contextUsage missing (the session totals stay)', { tokens: { total: 999999 } }, { ...NONE, sessionTokens: 999999 }],
   ['contextUsage null', stats(null), NONE],
   ['contextUsage a string', stats('62%'), NONE],
   ['contextUsage an array', stats([1, 2, 3]), NONE],
   ['no data at all', null, NONE],
   ['data a string', 'hello', NONE],
-  ['negative tokens', stats({ tokens: -5, contextWindow: 200, percent: 10 }), { tokens: null, window: 200, percent: 10 }],
-  ['negative percent', stats({ tokens: 5, contextWindow: 200, percent: -10 }), { tokens: 5, window: 200, percent: null }],
-  ['percent above 100 is clamped', stats({ tokens: 500, contextWindow: 200, percent: 250 }), { tokens: 500, window: 200, percent: 100 }],
-  ['NaN and Infinity numbers', stats({ tokens: NaN, contextWindow: 200, percent: Infinity }), { tokens: null, window: 200, percent: null }],
-  ['null tokens and percent stay null (after a compaction)', stats({ tokens: null, contextWindow: 200000, percent: null }), { tokens: null, window: 200000, percent: null }],
-  ['a nested tokens', stats({ tokens: { total: 5 }, contextWindow: 200, percent: [1] }), { tokens: null, window: 200, percent: null }],
-  ['extra fields are dropped', stats({ tokens: 10, contextWindow: 200, percent: 5, model: 'secret-model', note: '/home/secret' }, { sessionFile: '/home/secret/s.jsonl', tokens: { total: 1 } }), { tokens: 10, window: 200, percent: 5 }],
-  ['a good answer', stats({ tokens: 124000, contextWindow: 200000, percent: 62 }), { tokens: 124000, window: 200000, percent: 62 }],
+  ['negative tokens', stats({ tokens: -5, contextWindow: 200, percent: 10 }), W({ tokens: null, window: 200, percent: 10 })],
+  ['negative percent', stats({ tokens: 5, contextWindow: 200, percent: -10 }), W({ tokens: 5, window: 200, percent: null })],
+  ['percent above 100 is clamped', stats({ tokens: 500, contextWindow: 200, percent: 250 }), W({ tokens: 500, window: 200, percent: 100 })],
+  ['NaN and Infinity numbers', stats({ tokens: NaN, contextWindow: 200, percent: Infinity }), W({ tokens: null, window: 200, percent: null })],
+  ['null tokens and percent stay null (after a compaction)', stats({ tokens: null, contextWindow: 200000, percent: null }), W({ tokens: null, window: 200000, percent: null })],
+  ['a nested tokens', stats({ tokens: { total: 5 }, contextWindow: 200, percent: [1] }), W({ tokens: null, window: 200, percent: null })],
+  ['extra fields are dropped', stats({ tokens: 10, contextWindow: 200, percent: 5, model: 'secret-model', note: '/home/secret' }, { sessionFile: '/home/secret/s.jsonl', tokens: { total: 1 } }), W({ tokens: 10, window: 200, percent: 5, sessionTokens: 1 })],
+  ['a good answer', stats({ tokens: 124000, contextWindow: 200000, percent: 62 }), W({ tokens: 124000, window: 200000, percent: 62 })],
 ];
 for (const [name, answer, want] of HOSTILE) {
   test(`abuse: ${name}`, async () => {
@@ -96,7 +98,7 @@ for (const [name, answer, want] of HOSTILE) {
     await host.start(ID);
     const got = await host.context(ID);
     assert.deepEqual(got, want);
-    assert.deepEqual(Object.keys(got).sort(), ['percent', 'tokens', 'window']);
+    assert.deepEqual(Object.keys(got).sort(), ['cost', 'percent', 'sessionTokens', 'tokens', 'window']);
     for (const v of Object.values(got)) assert.ok(v === null || (typeof v === 'number' && Number.isFinite(v) && v >= 0));
   });
 }
@@ -141,12 +143,12 @@ test('fake pi: the default answer is read as three numbers', async (t) => {
   const { host } = await realHost();
   t.after(() => host.closeAll());
   await host.start(ID);
-  assert.deepEqual(await host.context(ID), { tokens: 124000, percent: 62, window: 200000 });
+  assert.deepEqual(await host.context(ID), W({ tokens: 124000, percent: 62, window: 200000 }));
 });
 test('fake pi: a hostile contextUsage, success false and a command that never answers all end clean', async (t) => {
   const cases = [
     [{ FAKE_STATS: JSON.stringify({ contextUsage: { tokens: 'x', contextWindow: -1, percent: 999, extra: { a: 1 } } }) }, NONE],
-    [{ FAKE_STATS: JSON.stringify({ contextUsage: { tokens: 5, contextWindow: 100, percent: 999 } }) }, { tokens: 5, percent: 100, window: 100 }],
+    [{ FAKE_STATS: JSON.stringify({ contextUsage: { tokens: 5, contextWindow: 100, percent: 999 } }) }, W({ tokens: 5, percent: 100, window: 100 })],
     [{ FAKE_STATS_FAIL: '1' }, NONE],
     [{ FAKE_NO_ANSWER: 'get_session_stats' }, NONE],
   ];
@@ -224,7 +226,7 @@ test('http: a live session answers exactly the three numbers', async () => {
     await host.start(ID);
     const r = await get(URL_OF(ID));
     assert.equal(r.status, 200);
-    assert.deepEqual(r.json, { tokens: 124000, percent: 62, window: 200000 });
+    assert.deepEqual(r.json, W({ tokens: 124000, percent: 62, window: 200000 }));
   });
 });
 
@@ -272,7 +274,7 @@ test('chip: nothing when the session is closed or starting, has no record or no 
 test('chip: the percent is rounded and clamped, and what is drawn is escaped', () => {
   assert.match(text(chip({ tokens: 1, percent: 61.6, window: 10 })), /ctx 62%$/);
   assert.match(text(chip({ tokens: 1, percent: 500, window: 10 })), /ctx 100%$/);
-  assert.match(titleOf(chip({ tokens: 1500, percent: 1, window: 1000000 })), /2k of 1000k tokens|1k of 1000k tokens/);
+  assert.match(titleOf(chip({ tokens: 1500, percent: 1, window: 1000000 })), /2k of 1M tokens|1k of 1M tokens/); // RP239: a 1M window reads «1M», not «1000k»
 });
 
 test('reducer: a run that ends and a compaction that ends ask for a new reading; nothing else does', () => {
@@ -285,7 +287,7 @@ test('reducer: a run that ends and a compaction that ends ask for a new reading;
 });
 test('record: the context is three validated numbers, reset when the session closes', () => {
   const e = V.rpcWithContext({ state: 'idle' }, { tokens: 5, percent: 250, window: 100, text: 'SECRET', x: { a: 1 } });
-  assert.deepEqual(e.ctx, { tokens: 5, percent: 100, window: 100 });
+  assert.deepEqual(e.ctx, W({ tokens: 5, percent: 100, window: 100 }));
   assert.deepEqual(V.rpcWithContext({ state: 'idle' }, { tokens: -1, percent: 'a', window: 0 }).ctx, NONE);
   assert.deepEqual(V.rpcWithContext({ state: 'idle' }, null).ctx, NONE);
   assert.equal(V.rpcFromStatus({ state: 'idle', ctx: e.ctx }, { state: 'closed', pendingDialogs: [] }).ctx, null);
