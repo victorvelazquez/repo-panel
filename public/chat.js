@@ -435,8 +435,10 @@ function mergeCtxOf(id, n) {
   const held = !busy && mergeHeld(id, n);
   const verdict = verdictOf({ id });
   const hold = verdict && verdict.state === 'running' && V ? V.runningReason({ cmd: verdict.cmd, label: verdict.label }) : '';
-  return { method: S.prefs.method, busy, held, hold };
+  return { method: S.prefs.method, methods: methodsOf(id), busy, held, hold };
 }
+// RP227: what the repo allows (repo.methods of /api/prs), or null when not known yet.
+const methodsOf = (id) => (S.prs[id] && S.prs[id].repo && typeof S.prs[id].repo.methods === 'object' ? S.prs[id].repo.methods : null);
 const prOfId = (id, n) => ((S.prs[id] && Array.isArray(S.prs[id].prs) ? S.prs[id].prs : []).find((p) => p && p.number === n)) || null;
 // RP137: is this a phone? The width of the layout when it is measured; the Work tab hides the layout (it measures 0), so then the width of the window. A width that is not known is not a phone (today's behaviour).
 function phoneNow() {
@@ -451,7 +453,8 @@ function mergeSheetModel() {
   if (!sh || !V || !R) return null;
   const pr = prOfId(sh.id, sh.n);
   if (!pr || (S.chat.id || null) !== sh.chatId || pr.head !== sh.head || pr.title !== sh.title || V.mergeButton(pr, mergeCtxOf(sh.id, sh.n)).enabled !== true) return null;
-  return { n: pr.number, base: pr.base, title: pr.title, method: S.prefs.method, del: S.prefs.del === true };
+  const { method, asked } = V.mergeMethodOf(S.prefs.method, methodsOf(sh.id)); // RP227: the method the server will use, the same the button shows
+  return { n: pr.number, base: pr.base, title: pr.title, method, asked, del: S.prefs.del === true };
 }
 function drawMergeSheet() {
   const model = mergeSheetModel();

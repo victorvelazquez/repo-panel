@@ -363,7 +363,7 @@ function prCard(r, pr, meta, running = null) {
   const showReason = !pr.ready && pr.blockedReason && pr.checks.state !== 'pending' && pr.checks.state !== 'failed';
   const n = `data-id="${r.id}" data-n="${pr.number}"`;
   // RP129: the Merge and Re-run buttons follow the ONE rule of view.js (the footer of the right column asks it too); without view.js neither is ever offered.
-  const m = V ? V.mergeButton(pr, { method: S.prefs.method, busy, held, hold }) : { enabled: false, label: `Merge · ${S.prefs.method}`, title: 'view.js did not load' };
+  const m = V ? V.mergeButton(pr, { method: S.prefs.method, methods: S.prs[r.id] && S.prs[r.id].repo ? S.prs[r.id].repo.methods : null, busy, held, hold }) : { enabled: false, label: `Merge · ${S.prefs.method}`, title: 'view.js did not load' };
   const rr = V ? V.rerunButton(pr, { busy, held, hold }) : { show: false, enabled: false, title: '' };
   return `<div class="card ${isProblem(pr) ? 'attn' : ''} ${pr.ready ? 'ready' : ''}">
     ${cardTop(r, meta?.url, `pr${pr.number}`)}

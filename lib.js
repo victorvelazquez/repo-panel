@@ -331,7 +331,7 @@ function parseRoadmap(markdown) {
 }
 
 // RP138: the matcher lives in view.js (the page needs it too); this is the same function.
-const { matchesUnitId } = require('./public/view.js');
+const { matchesUnitId, pickMergeMethod } = require('./public/view.js'); // RP227: pickMergeMethod is the one rule the page shows too
 
 const DERIVED_ORDER = ['En revisión', 'Lista', 'En curso'];
 
@@ -455,14 +455,6 @@ function conformityReport(entries) {
 const PI_COMMANDS = { 'flow-ship': '/flow-ship', 'flow-ship-unstage': '/flow-ship --unstage', 'flow-commit': '/flow-commit', 'flow-commit-unstage': '/flow-commit --unstage', 'flow-pr': '/flow-pr', 'flow-base': '/flow-base', 'flow-base-stash': '/flow-base --stash', 'flow-next': '/flow-next' };
 // RP233: the name pi lists for the command of a key (`/flow-ship --unstage` is the command flow-ship), or null for a key that is not a fixed command.
 const piCommandName = (key) => (Object.hasOwn(PI_COMMANDS, key) ? PI_COMMANDS[key].split(' ')[0].slice(1) : null);
-
-// RP226: the merge method to send. A method is allowed unless its flag is exactly false (unknown flags use the requested one); null when the repo allows none.
-function pickMergeMethod(requested, allowed) {
-  const ok = (m) => allowed?.[m] !== false;
-  if (ok(requested)) return { method: requested, requested, fellBack: false };
-  const method = ['squash', 'rebase', 'merge'].find(ok);
-  return method ? { method, requested, fellBack: true } : null;
-}
 
 module.exports = {
   PI_COMMANDS, piCommandName, pickMergeMethod,
