@@ -201,7 +201,7 @@ function wire(e) {
   return e;
 }
 
-function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClient, max = 6, adoptedOf = (id) => (loadConfig().sessions || {})[id], adopt = () => {}, env = process.env, contextMs = 10000, commandsMs = 5000, compactMs = 600000, suffix = () => crypto.randomBytes(3).toString('hex') }) {
+function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClient, max = 6, adoptedOf = (id) => (loadConfig().sessions || {})[id], adopt = () => {}, replaceAdopted = () => {}, env = process.env, contextMs = 10000, commandsMs = 5000, compactMs = 600000, suffix = () => crypto.randomBytes(3).toString('hex') }) {
   const live = new Map(); // repo id -> { client, sessionId, ready }
   // RP238: repo id -> a promise that resolves once every pi of its closed sessions is gone (exited, or killed after the grace). A new start of the repo waits for it,
   // so two pi never write the same session file.
@@ -231,6 +231,8 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
     }
   };
   const askLong = (entry, type, fields) => ask(entry, type, fields, { timeoutMs: SHELL_MS });
+  // RP264: while pi switches to a new session nothing else reaches it (a message could land in either conversation); Stop still goes.
+  const notRenewing = (entry) => { if (entry.renewing) throw new HttpError(409, 'The session is starting a new conversation: wait a moment'); return entry; };
 
   // closeAll bumps the epoch: a start that was waiting for the runtime when it ran must not create a client nobody owns (found by the independent verification).
   let epoch = 0;
@@ -352,12 +354,49 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
       const entry = live.get(id);
       if (!entry || entry.up !== true || entry.closed || typeof entry.client.outcome !== 'function') return null;
       const o = entry.client.outcome();
+      if (o && Number.isFinite(entry.renewedAt) && !(o.at > entry.renewedAt)) return null; // RP264: that task belongs to the conversation before the new session
       return o && typeof o === 'object' && typeof o.kind === 'string' && Number.isFinite(o.at) ? { kind: o.kind, at: o.at } : null;
     } catch { return null; }
   }
 
+  // RP264: pi's own new_session on the same process (the `/new` of the terminal; over RPC a typed `/new` is not run by pi). Only a free session may do it; the new id
+  // becomes the adopted one, so a restart comes back to it, and every tab hears `renewed`. `renewing` closes the window of two simultaneous calls, like `manual` in compact.
+  async function renew(id) {
+    repoOf(id);
+    const entry = running(id);
+    if (entry.renewing) throw new HttpError(409, 'The session is already starting a new one');
+    if (entry.compacting || entry.manual) throw new HttpError(409, 'The session is compacting its context: wait a moment');
+    if (entry.bashing) throw new HttpError(409, 'A shell command is running in this session: wait for it to end');
+    if (!entry.up) throw new HttpError(409, 'The session is still starting');
+    if (entry.client.state() !== 'idle') throw new HttpError(409, COMMAND_WAITS);
+    entry.renewing = true;
+    try {
+      const r = await ask(entry, 'new_session', {});
+      if (live.get(id) !== entry || entry.closed) throw new HttpError(409, SESSION_CLOSED);
+      if (r && r.cancelled === true) throw new HttpError(409, 'The session kept the current conversation: an extension cancelled the new one');
+      let sid = null;
+      try { const s = await entry.client.request('get_state', {}, { timeoutMs: 10000 }); sid = s && typeof s.sessionId === 'string' && SESSION_ID.test(s.sessionId) ? s.sessionId : null; } catch { /* unread: closed below */ }
+      if (live.get(id) !== entry || entry.closed) throw new HttpError(409, SESSION_CLOSED);
+      if (!sid) { // pi already left the old conversation: a session whose id is unknown would write where the panel never reads, so it is closed like close() does
+        live.delete(id);
+        entry.closed = true;
+        stop(id, entry);
+        throw new HttpError(502, 'The new session started but its id could not be read: the session was closed');
+      }
+      entry.sessionId = sid;
+      entry.renewedAt = Date.now();
+      entry.retrying = false;
+      try { replaceAdopted(id, sid); } catch { /* the chat shows the old history until a session is adopted */ }
+      publish(id, { kind: 'renewed', sessionId: sid });
+      return statusOf(entry);
+    } finally {
+      entry.renewing = false;
+    }
+  }
+
   return {
     start,
+    renew,
     close,
     stateOf,
     startedAtOf,
@@ -371,7 +410,8 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
       const pics = sentImages(images);
       const message = panelOnly(textWith(value, pics));
       if (behavior && message.startsWith('/')) throw new HttpError(409, COMMAND_WAITS);
-      const entry = running(id);
+      if (!pics.length && message === '/new') return renew(id); // RP264: pi does not run a typed /new over RPC
+      const entry = notRenewing(running(id));
       if (entry.compacting) throw new HttpError(409, 'The session is compacting its context: wait a moment'); // pi would refuse it too
       return ask(entry, 'prompt', { message, ...(behavior ? { streamingBehavior: behavior } : {}), ...(pics.length ? { images: pics } : {}) });
     },
@@ -379,7 +419,7 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
       repoOf(id);
       const pics = sentImages(images);
       const message = panelOnly(textWith(value, pics));
-      return ask(running(id), 'steer', { message, ...(pics.length ? { images: pics } : {}) });
+      return ask(notRenewing(running(id)), 'steer', { message, ...(pics.length ? { images: pics } : {}) });
     },
     // RP239: during an automatic retry pi's abort_retry goes first (pi's abort cuts it too, but this ends the wait at once); its failure never stops the abort.
     async abort(id) {
@@ -399,7 +439,7 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
       const command = m[2].trim();
       if (!command) throw new HttpError(400, 'Write a command after ! or !!');
       if (command.length > SHELL_MAX) throw new HttpError(400, `The command is longer than ${SHELL_MAX} characters`);
-      const entry = running(id);
+      const entry = notRenewing(running(id));
       if (entry.compacting) throw new HttpError(409, 'The session is compacting its context: wait a moment');
       if (entry.bashing) throw new HttpError(409, 'A shell command is already running in this session');
       if (!entry.up || entry.client.state() !== 'idle') throw new HttpError(409, SHELL_WAITS);
@@ -454,7 +494,7 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
     // starting and closed get nothing). `manual` closes the window of two simultaneous calls: the check and the mark are one synchronous step. No text of the page or of the session goes in or out.
     async compact(id, { force = false } = {}) {
       repoOf(id);
-      const entry = running(id);
+      const entry = notRenewing(running(id));
       const state = stateOf(id);
       if (entry.compacting || entry.manual) throw new HttpError(409, 'The session is already compacting its context');
       if (state === 'asking') throw new HttpError(409, 'A question is waiting for your answer: answer it before compacting');
@@ -547,6 +587,7 @@ function rpcApi(host) {
     context: (q) => host.context(idOf(bodyOf(q))),
     // RP140: `force` is a strict boolean; nothing else of the body is read (no instructions for the compaction come from the page).
     compact: (b) => host.compact(idOf(bodyOf(b)), { force: b.force === true }),
+    renew: (b) => host.renew(idOf(bodyOf(b))), // RP264
   };
 }
 

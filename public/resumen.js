@@ -380,18 +380,19 @@
   const SUB_ICON = svgIcon('<path d="M4 2.5v6.5a2 2 0 0 0 2 2h6"/><path d="M9.6 8.2l2.6 2.8-2.6 2.8"/>');
   const SESS_TITLE = {
     loading: 'Loading the session', unknown: 'The session state is unknown', none: 'The session is not started: sending a message starts it', starting: 'The session is starting; this can take half a minute',
-    free: 'The session is idle: you can write to it', working: 'The session is working', compacting: 'The session is compacting its context: wait a moment', waiting: 'pi is asking something: answer it in the card of the chat',
+    free: 'The session is idle: you can write to it', working: 'The session is working', renewing: 'The session is starting a new conversation with a clean context', compacting: 'The session is compacting its context: wait a moment', waiting: 'pi is asking something: answer it in the card of the chat',
   };
   const SESS_VIEW = {
     loading: ['gray', SI.loading, 'Loading…'], unknown: ['gray', SI.unknown, 'Unknown'], none: ['gray', SI.none, 'Not started'], starting: ['yellow', SI.starting, 'Starting…'], free: ['gray', SI.free, 'Idle'],
-    working: ['green', SI.working, 'Working…'], compacting: ['yellow', SI.compacting, 'Compacting…'], waiting: ['yellow', SI.waiting, 'Asking you something'],
+    working: ['green', SI.working, 'Working…'], renewing: ['yellow', SI.starting, 'New session…'], compacting: ['yellow', SI.compacting, 'Compacting…'], waiting: ['yellow', SI.waiting, 'Asking you something'],
   };
   const SESS_OF = { closed: 'none', starting: 'starting', idle: 'free', busy: 'working', asking: 'waiting' };
   function sessionState(c) {
     const compacting = !!(c.rpc && c.rpc.compacting === true && c.rpc.state !== 'closed' && c.rpc.state !== 'starting'); // RP140: the mark is not a state of the machine; it wins over Idle and Working…
-    const key = !c.info ? 'loading' : compacting ? 'compacting' : SESS_OF[c.rpc && c.rpc.state] || 'unknown'; // no rpc entry yet: the status read has not answered
+    const renewing = !!(c.rpc && c.rpc.renewing === true && c.rpc.state !== 'closed'); // RP264: the page's own mark while pi switches to a new session (the person saw nothing happen)
+    const key = !c.info ? 'loading' : renewing ? 'renewing' : compacting ? 'compacting' : SESS_OF[c.rpc && c.rpc.state] || 'unknown'; // no rpc entry yet: the status read has not answered
     const [tone, icon, word] = SESS_VIEW[key];
-    return { key, tone, icon, word, title: SESS_TITLE[key], animate: key === 'working' || key === 'starting' || key === 'compacting' };
+    return { key, tone, icon, word, title: SESS_TITLE[key], animate: key === 'working' || key === 'starting' || key === 'compacting' || key === 'renewing' };
   }
   // RP170: while the session is IDLE and the PR of the current branch has checks running (or failed), the label says the CI instead of «Idle»: `c.ci` is what V.ciOf answers for that PR. Only the words are `ss-word` (a narrow chat hides
   // them); the numbers stay visible. Running turns (the spinner of the CI); failed does not (the person must act). Any other state of the session, or an input that is not a CI, leaves the label as it was.
@@ -514,6 +515,12 @@
 
   // RP98: "Close session" stops the pi process of the repo and releases its adoption (the chat goes back to the list of sessions). It lives next to the session state in the composer frame (RP72 keeps the
   // chat header to the repo name and the ✕, which only hides the chat) and is there while the repo has a session: adopted or live.
+  // RP264: "New session" asks the same pi for a new conversation (the `/new` of the terminal). Only a free session may: the server decides anyway.
+  const sessionNewHtml = (c, busy) => {
+    const r = c && c.info && c.rpc && typeof c.rpc === 'object' ? c.rpc : null;
+    if (!r || r.state !== 'idle' || r.compacting === true) return '';
+    return `<button type="button" class="ch-mi" role="menuitem" data-act="session-new"${busy ? ' disabled' : ''} title="Start a new conversation in this session, with a clean context. The current one stays in the list of sessions">New session</button>`;
+  };
   const sessionCloseHtml = (show, closing) => (show ? `<button type="button" class="ch-mi" role="menuitem" data-act="session-close"${closing ? ' disabled' : ''} title="Stop this session and go back to the list of sessions">Close session</button>` : ''); // RP195: an item of the ⋮ menu of the head of the chat (it was a button of the foot)
 
   // RP118: "Terminal" next to "Close session" shows the line to open this session in a normal terminal. The server writes the line (GET /api/terminal); the page only shows it, escaped, and copies it from its
@@ -523,7 +530,7 @@
   // With nothing to offer (no session) there is no button at all. The list is in the page only while it is open.
   const chatMenuHtml = (m) => {
     const o = m && typeof m === 'object' ? m : {};
-    const items = compactButtonHtml(o.session) + sessionTerminalHtml(!!o.hasSession, o.terminal) + sessionCloseHtml(!!o.hasSession, !!o.closing);
+    const items = compactButtonHtml(o.session) + sessionTerminalHtml(!!o.hasSession, o.terminal) + sessionNewHtml(o.session, !!o.renewing || !!o.closing) + sessionCloseHtml(!!o.hasSession, !!o.closing);
     const status = statusIconsHtml(o.session, o.git); // RP197: the states, as icons, at the top of the list
     if (!items) return '';
     const open = o.open === true;
@@ -962,12 +969,12 @@
     starting: 'The session is starting…', busy: 'The session is working: wait until it is idle, or press Stop',
     asking: 'pi is asking something: answer it in the card of the chat',
   };
-  const rpcWait = (c) => (c.rpc && c.rpc.compacting === true && c.rpc.state !== 'closed' ? 'The session is compacting its context: wait a moment' : '') || (c.rpc && COMPOSER_WAIT[c.rpc.state]) || (!c.rpc ? REASON.unknown : '');
+  const rpcWait = (c) => (c.rpc && c.rpc.renewing === true && c.rpc.state !== 'closed' ? 'Starting a new session: wait a moment' : '') || (c.rpc && c.rpc.compacting === true && c.rpc.state !== 'closed' ? 'The session is compacting its context: wait a moment' : '') || (c.rpc && COMPOSER_WAIT[c.rpc.state]) || (!c.rpc ? REASON.unknown : '');
   function composerState(c, ctx = {}) {
     // RP99: with no session adopted (the list is in view) nothing can be sent: it would start and adopt a new session without telling. Open one or start a new one first.
     const reason = !c.info ? 'Loading the chat…' : !c.info.adopted ? 'Open a session or start a new one to write' : c.sending ? 'Sending…' : rpcWait(c);
     // RP236: a session that works (not one that starts, asks or compacts) still takes a message: as a correction on the fly or queued for when the run ends. `canSend` keeps its meaning (a new run).
-    const canSteer = !!reason && !!c.info && !!c.info.adopted && !c.sending && !!c.rpc && c.rpc.state === 'busy' && c.rpc.compacting !== true;
+    const canSteer = !!reason && !!c.info && !!c.info.adopted && !c.sending && !!c.rpc && c.rpc.state === 'busy' && c.rpc.compacting !== true && c.rpc.renewing !== true;
     const placeholder = canSteer ? 'Correct the agent, or queue a message for later…' : reason ? (c.info && !c.info.adopted ? 'Start a session to write' : '') : 'Message…'; // RP207: quiet; the state line and the title of Send say why it is blocked
     return { canSend: !reason, canSteer, reason, placeholder };
   }

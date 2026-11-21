@@ -12,6 +12,7 @@ function applyRpc(p) {
   const { entry, reload, ctx } = V.rpcReduce(S.rpc[p.id], p, Date.now());
   S.rpc[p.id] = entry;
   if (ctx) loadContext(p.id);
+  if (p.kind === 'renewed' && S.chat.id === p.id) S.chat.terminal = null; // RP264: the terminal line names the old conversation's id
   // RPC2-2: the verdict of a command sent from this page follows the session at once (the poll of /api/pi-status stays as the fallback).
   if (S.sent[p.id]) {
     const seen = p.kind === 'exit' ? 'closed' : p.kind === 'state' && entry.state !== 'starting' ? entry.state : null;

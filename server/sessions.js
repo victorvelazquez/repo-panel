@@ -440,4 +440,11 @@ function adoptIfNone(key, sid) {
   return true;
 }
 
-module.exports = { SHELL_HISTORY_MAX, linesOf, readChunk, CHAT_WINDOW, isSessionFile, baseDir, sessionsDirFor, listSessions, readChat, chatState, chatResult, chatImage, sessionKeyFor, sessionsState, adoptSession, releaseSession, adoptIfNone, SESSION_ID };
+// RP264: a new session of the same pi (`/new`) replaces the adopted one, so a restart comes back to it. The file need not exist yet (pi writes it on the first message).
+function replaceAdopted(key, sid) {
+  if (typeof sid !== 'string' || !SESSION_ID.test(sid)) return false;
+  store(key, { id: sid, name: sid, adoptedAt: new Date().toISOString() });
+  return true;
+}
+
+module.exports = { SHELL_HISTORY_MAX, linesOf, readChunk, CHAT_WINDOW, isSessionFile, baseDir, sessionsDirFor, listSessions, readChat, chatState, chatResult, chatImage, sessionKeyFor, sessionsState, adoptSession, releaseSession, adoptIfNone, replaceAdopted, SESSION_ID };

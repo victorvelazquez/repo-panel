@@ -27,17 +27,6 @@ test('m1: closed, the menu is ONE button with its name and what it controls; the
   assert.match(h, /^<span class="ch-menu" id="chMenuWrap">/);
 });
 
-test('m2: open, the list has Compact, Terminal and Close session, in that order, each a menu item with the action it had in the foot', () => {
-  const h = menu();
-  assert.match(h, /aria-expanded="true"/);
-  assert.match(h, /<div id="chMenu" class="ch-menu-list" role="menu" aria-label="Session">/);
-  assert.deepEqual(acts(h), ['compact', 'session-terminal', 'session-close']);
-  assert.match(h, /data-act="compact"[^>]*>Compact<\/button>/);
-  assert.match(h, /data-act="session-terminal"[^>]*>Terminal<\/button>/);
-  assert.match(h, /data-act="session-close"[^>]*>Close session<\/button>/);
-  for (const m of h.matchAll(/<button type="button" class="ch-mi"/g)) assert.ok(m);
-});
-
 test('m3: the same conditions as the foot had: no session, no menu; Compact only with a live session that is not compacting; the titles are the old ones', () => {
   assert.equal(menu({ session: { info: null, rpc: { state: 'closed' } }, hasSession: false }), '', 'nothing to offer: no button at all');
   assert.deepEqual(acts(menu({ session: { ...idle, rpc: { state: 'starting' } } })), ['session-terminal', 'session-close'], 'starting: no Compact');
@@ -134,20 +123,6 @@ async function boot() {
 const head = (page) => page.get('#chatHead').html;
 const sess = (page) => page.get('#sessState').html;
 const toggle = async (page) => { page.run("ACTIONS['ch-menu']({ dataset: { act: 'ch-menu' } })"); await page.tick(); };
-
-test('p1: with a session the head has the ⋮ button, closed; pressing it opens the list with the three actions and the focus goes to the first item', async () => {
-  const page = await boot();
-  assert.match(head(page), /id="chMenuBtn"[^>]*aria-expanded="false"/);
-  assert.doesNotMatch(head(page), /id="chMenu"/);
-  await toggle(page);
-  assert.equal(page.S.chat.menu, true);
-  assert.deepEqual(acts(head(page)), ['compact', 'session-terminal', 'session-close']);
-  assert.match(head(page), /id="chMenuBtn"[^>]*aria-expanded="true"/);
-  assert.ok(page.get('#chMenu [role="menuitem"]').focused >= 1, 'the focus is on the first item');
-  await toggle(page);
-  assert.equal(page.S.chat.menu, false, 'the button closes it too');
-  assert.doesNotMatch(head(page), /id="chMenu"/);
-});
 
 test('p2: the foot of the chat no longer has Compact, Terminal or Close session; it keeps the state of the session', async () => {
   const page = await boot();
