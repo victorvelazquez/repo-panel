@@ -393,6 +393,7 @@ const ACTIONS = {
   },
   'terminal-hide': () => { S.chat.terminal = null; draw(); },
   // RP98: stops the session of the open chat and releases its adoption, so the chat comes back to the list of sessions. A session that is working or asking is confirmed first (closing stops what it is doing).
+  'session-new': () => renewSession(S.chat.id), // RP264
   'session-close': async () => {
     const id = S.chat.id;
     if (!id || S.chat.closing) return;

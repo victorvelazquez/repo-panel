@@ -547,7 +547,7 @@ function drawChat() {
   // RP195: the ⋮ menu of the head holds Compact, Terminal and Close session (they were buttons of the foot); the head is painted before the rest of the chat, so it gets the view of the session here.
   const headGit = columnGit(S.chat.id, facts);
   const headView = chatView();
-  paint($('#chatHead'), R.chatHead(S.chat, { name: nameOf(S.chat.id), column, narrow: narrowOn(), git: headGit, session: headView, ci: V ? V.ciOf(headGit.pr) : null, menu: { open: !!S.chat.menu, session: headView, git: headGit, hasSession, terminal: S.chat.terminal, closing: !!S.chat.closing } })); // RP197: the indicators are in the head, and the icons of the menu need the git (the checks)
+  paint($('#chatHead'), R.chatHead(S.chat, { name: nameOf(S.chat.id), column, narrow: narrowOn(), git: headGit, session: headView, ci: V ? V.ciOf(headGit.pr) : null, menu: { open: !!S.chat.menu, session: headView, git: headGit, hasSession, terminal: S.chat.terminal, closing: !!S.chat.closing, renewing: !!S.chat.renewing } })); // RP197: the indicators are in the head, and the icons of the menu need the git (the checks)
   if (S.chat.menuFocus) { const to = S.chat.menuFocus === 'item' ? $('#chMenu [role="menuitem"]') : $('#chMenuBtn'); S.chat.menuFocus = ''; if (to && to.focus) to.focus(); } // the repaint of the head drops the focus: it goes to the first item when the menu opens, back to the button when it closes
   const tasksTab = S.chat.tab === 'tasks' && !column;
   const changesTab = S.chat.tab === 'changes' && !column; // RP92: with the column in, the files card replaces the tab
@@ -862,6 +862,24 @@ async function runShell(id, text, shell) {
   draw();
   if (S.rpc[id] && S.rpc[id].bash && S.rpc[id].bash.running !== true && S.chat.id === id) settled(id); // RP252: the run is in the session file now: the history shows it and the live bubble goes
 }
+// RP264: a new conversation of the same pi (`/new` or New session). The `renewed` event of the server reads the history and the context again in every tab; a refusal says why and
+// puts a typed `/new` back in the box.
+async function renewSession(id, typed) {
+  if (!id || S.chat.renewing) return;
+  S.chat.renewing = true;
+  S.chat.menu = false;
+  delete S.notes[id];
+  setRpc(id, { renewing: true }); // the label reads New session… and the box waits until the answer
+  draw();
+  try {
+    S.rpc[id] = V.rpcFromStatus(S.rpc[id], await api('/api/rpc/renew', { id }));
+    S.chat.terminal = null; // the line of the old conversation's id is never shown again
+  } catch (e) { if (typed) putBack(id, typed); sayNote(id, e.message); }
+  setRpc(id, { renewing: false });
+  S.chat.renewing = false;
+  if (S.chat.id === id) loadChat(id);
+  draw();
+}
 const SHELL_WAIT_MS = 31 * 60 * 1000; // RP245b: a minute more than the server's 30, so its own answer arrives first
 // The text goes back into the box of its chat, before what the person already wrote again.
 function putBack(id, text) {
@@ -873,6 +891,7 @@ function putBack(id, text) {
 async function sendChatText(text, fromBox, pics = []) {
   const id = S.chat.id;
   if (!R || !id) return;
+  if (!pics.length && text.trim() === '/new') { if (fromBox) { $('#msgBox').value = ''; fitMsgBox(); delete S.drafts[id]; } return renewSession(id, text); } // RP264: never a message: pi does not run a typed /new over RPC
   const cs = composerOf(id);
   if (!cs.canSend) { putAttachedBack(id, pics); sayNote(id, cs.reason); draw(); return; }
   const entry = { text, state: 'sending', base: R.userCount((S.chat.hist && S.chat.hist.items) || [], text), ...(pics.length ? { images: pics.length } : {}) };

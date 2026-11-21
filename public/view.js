@@ -857,6 +857,8 @@
     if (!isObject(p)) return { entry: e, reload, ctx };
     if (p.kind === 'state' && RPC_STATES.includes(p.state)) { e.state = p.state; if (p.state === 'busy') e.streaming = true; if (p.state !== 'busy' && p.state !== 'asking') Object.assign(e, { subs: 0, subSince: 0, queue: rpcNoQueue() }); } // RP236b (S2): a free session has nothing waiting
     else if (p.kind === 'exit') Object.assign(e, { state: 'closed', blocks: [], text: '', streaming: false, thinking: false, retry: null, memory: null, mode: null, ctx: null, compacting: false, asks: [], subs: 0, subSince: 0, queue: rpcNoQueue(), bash: null });
+    // RP264: the same pi started a new session (`/new` or New session): nothing live of the old conversation stays; its history and context are read again.
+    else if (p.kind === 'renewed') { Object.assign(e, { blocks: [], text: '', streaming: false, thinking: false, retry: null, ctx: null, asks: [], subs: 0, subSince: 0, queue: rpcNoQueue(), bash: null }); reload = true; ctx = true; }
     else if (p.kind === 'memory') { if (MEMORY_CATS.includes(p.memory)) e.memory = p.memory; }
     else if (p.kind === 'mode') { if (MODE_CATS.includes(p.mode)) e.mode = p.mode; } // RP245c
     else if (p.kind === 'dialog') e.asks = rpcAsks(e.asks, rpcAskOf(p));

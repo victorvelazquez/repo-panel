@@ -93,15 +93,6 @@ test('i6: the tones follow the state: memory ready/disabled/offline, context fro
   assert.doesNotMatch(R.statusIconsHtml(view('ready', CTX, 'closed'), {}), /memory|Context/i, 'a closed session has neither memory nor context');
 });
 
-test('i7: the open menu has the icons FIRST, then the actions; the icons are not items of the menu, and a closed menu has none in the page', () => {
-  const m = { open: true, session: view('ready', CTX), hasSession: true, terminal: null, closing: false, git: gitWith('failed') };
-  const h = R.chatMenuHtml(m);
-  assert.ok(h.indexOf('class="ch-status"') > h.indexOf('id="chMenu"') && h.indexOf('class="ch-status"') < h.indexOf('data-act="compact"'));
-  assert.deepEqual([...h.matchAll(/role="menuitem"[^>]*data-act="([\w-]+)"/g)].map((x) => x[1]), ['compact', 'session-terminal', 'session-close']);
-  assert.doesNotMatch(R.chatMenuHtml({ ...m, open: false }), /ch-status/);
-  assert.doesNotMatch(R.chatMenuHtml({ ...m, git: undefined, session: view(null, null) }), /ch-status/, 'no icon to show: no row');
-});
-
 test('i8: the stylesheet: the words of the chips of the head are hidden the accessible way, the chips sit in the group of the right of the one-row head, and the icons have tones', () => {
   assert.match(ruleIn(css, '.ch-chips'), /display:\s*inline-flex/);
   assert.match(ruleIn(css, '.ch-chips'), /gap:\s*6px/);

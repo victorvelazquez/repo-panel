@@ -33,7 +33,7 @@ const { createNotifier } = require('./notifier.js');
 const { createRpcHost, rpcApi } = require('./rpchost.js');
 const { terminalAnswer } = require('./terminal.js');
 const { readUsage, usageFile } = require('./usage.js');
-const { sessionsState, chatState, chatResult, chatImage, adoptSession, releaseSession, adoptIfNone } = require('./sessions.js');
+const { sessionsState, chatState, chatResult, chatImage, adoptSession, releaseSession, adoptIfNone, replaceAdopted } = require('./sessions.js');
 const { readSettings, writeSetting } = require('./settings.js');
 const remote = require('./remote.js');
 const push = require('./push.js');
@@ -174,6 +174,7 @@ const routes = {
   'POST /api/rpc/clear-queue': (q, b, d) => rpcApi(d.rpcHost).clearQueue(b), // RP236
   'POST /api/rpc/bash': (q, b, d) => rpcApi(d.rpcHost).bash(b), // RP245b: ! and !! from the chat
   'POST /api/rpc/abort-bash': (q, b, d) => rpcApi(d.rpcHost).abortBash(b), // RP245b: Stop of a running shell command
+  'POST /api/rpc/renew': (q, b, d) => rpcApi(d.rpcHost).renew(b), // RP264: a new session on the same pi
   'POST /api/rpc/dialog': (q, b, d) => rpcApi(d.rpcHost).dialog(b),
   // RPC2b-1: the state of EVERY configured repo (closed by default), from the host's memory: nothing starts and nothing is read.
   'GET /api/rpc/states': (q, b, d) => ({ states: Object.fromEntries(loadConfig().groups.flatMap((g) => g.repos).map((r) => { const id = lib.repoId(r.path); return [id, d.rpcHost.stateOf(id)]; })) }),
@@ -287,7 +288,7 @@ function createServer(port, deps = {}) {
   const flights = new Map();
   const hub = deps.hub || createEventHub();
   // RPC1b: the pi sessions live in this process (a restart ends them; they come back with the same --session-id). Their events go to the hub as `rpc`.
-  if (!deps.rpcHost) deps.rpcHost = createRpcHost({ resolve: deps.rpcResolve || (() => resolveRuntime(deps.piRuntime)), repoOf: findRepo, publish: (id, payload) => hub.emit('rpc', id, payload), adopt: adoptIfNone, createClient: deps.rpcClient });
+  if (!deps.rpcHost) deps.rpcHost = createRpcHost({ resolve: deps.rpcResolve || (() => resolveRuntime(deps.piRuntime)), repoOf: findRepo, publish: (id, payload) => hub.emit('rpc', id, payload), adopt: adoptIfNone, replaceAdopted, createClient: deps.rpcClient });
   // RPC2b-1: the session state of every repo is the host's (a synchronous read of memory); an injected host with no stateOf leaves the session `unknown`.
   if (!deps.sessionOf && typeof deps.rpcHost.stateOf === 'function') deps.sessionOf = (id) => deps.rpcHost.stateOf(id);
   // RP161: the background jobs a session waits for, counted from its session file; only for a session the panel started (`startedAtOf`); an injected host with none leaves them out.
