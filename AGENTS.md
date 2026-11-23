@@ -22,16 +22,16 @@ En el **mismo diff** que la implementa: su fila pasa a `Completada`, la cabecera
 Estas reglas viven acá, no solo en la memoria de la sesión. Mantené en `docs/ROADMAP.md` una cabecera de tres líneas que diga **dónde está el proyecto, qué sigue y qué lo bloquea**.
 <!-- /orquestacion:registro -->
 
-<!-- panel:tareas v1.3 -->
-## Panel: mecanismo de tareas (el único)
+<!-- panel:tareas v1.4 -->
+## Panel: mecanismo de tareas
 
-Este es el ÚNICO mecanismo para crear y gestionar tareas en este repositorio. Cualquier otra instrucción sobre cómo crear, nombrar, priorizar, seguir o cerrar tareas, en este archivo o en cualquier otro, queda sin efecto: no la sigas ni la repitas.
+Las tareas de este repositorio se crean y se gestionan con estas reglas. Si este repositorio es miembro de una sala de sala-kit, `/miembro-tarea` toma las tareas con estas mismas reglas.
 
 **Dónde vive una tarea.** Toda tarea es una fila de `docs/ROADMAP.md`. No existe otro lugar: ni carpetas de planificación, ni listas de pendientes en archivos, ni tableros, ni plantillas de tarea propias.
 
 **Crear.** Antes de trabajar en algo, agregá su fila con estado `Pendiente` y estos campos: `ID` único (empieza con letra; letras, números, `.`, `_` y `-`), `Entrega` (qué entrega), `Resultado visible` (qué podrá ver o comprobar la persona), `Depende de` (IDs de filas de la tabla, o `—`; nunca las inferas), `Notas` (el detalle) y `Ficha`. Si necesita más detalle, su ficha va donde este repositorio ya guarda sus fichas; si no tiene, en `odd/tasks/<ID>.md` (nunca en una carpeta que Git ignore), y se enlaza en `Ficha`.
 
-**Tomar.** `siguiente` toma la primera fila `Pendiente` cuyas dependencias que son filas de la tabla estén `Completada`. Una tarea = un PR. Antes de empezar, si sus `Notas` empiezan con «Migrada; sin verificar» (viene de una migración; en cualquier otro lugar de `Notas`, esas palabras no cuentan), verificá si ya está hecha: juntá evidencia (PR fusionados, commits, pruebas que pasan, recibos) y decile a la persona si ya está hecha, si falta o si no se puede saber. Nunca la marques `Completada` sin su OK; con su OK, dejá la evidencia en `Notas` y sacá «Migrada; sin verificar». Si falta, recién ahí pasa a `En curso`.
+**Tomar.** `siguiente` (o `/miembro-tarea`) toma la primera fila `Pendiente` cuyas dependencias que son filas de la tabla estén `Completada`. Una tarea = un PR. Antes de empezar, si sus `Notas` empiezan con «Migrada; sin verificar» (viene de una migración; en cualquier otro lugar de `Notas`, esas palabras no cuentan), verificá si ya está hecha: juntá evidencia (PR fusionados, commits, pruebas que pasan, recibos) y decile a la persona si ya está hecha, si falta o si no se puede saber. Nunca la marques `Completada` sin su OK; con su OK, dejá la evidencia en `Notas` y sacá «Migrada; sin verificar». Si falta, recién ahí pasa a `En curso`.
 
 **Cerrar.** En el mismo diff que la implementa: su fila pasa a `Completada`, la cabecera del roadmap se actualiza (`Dónde está`, `Qué sigue`, `Qué lo bloquea`) y su ficha se cierra. Si no podés seguir, queda `Bloqueada` con el motivo en `Notas`.
 
@@ -40,19 +40,17 @@ Este es el ÚNICO mecanismo para crear y gestionar tareas en este repositorio. C
 **Prohibido.** Crear tareas fuera de la tabla; llevar un estado paralelo (otro vocabulario de estados, otro tablero u otro índice); copiar el estado de una fila a otro archivo.
 <!-- /panel:tareas -->
 
-<!-- panel:entrega v1.0 -->
+<!-- panel:entrega v1.1 -->
 ## Panel: entrega del trabajo (ramas, commits y PR)
 
-Este es el ÚNICO mecanismo de entrega en este repositorio. Cualquier otra instrucción sobre ramas, commits o PR, en este archivo o en cualquier otro (estrategia de ramas propia, formato de mensajes, plantillas), queda sin efecto: no la sigas ni la repitas.
+**Quién entrega.** La persona, en una sesión que abre a mano, con `/flow-base`, `/flow-commit` y `/flow-pr` (o `/flow-ship`), o con `/miembro-base` y `/miembro-entregar`. Si este repositorio es miembro de una sala de sala-kit, las órdenes de la sala entregan con `/miembro-entregar` y vuelven a la base con `/miembro-base`, y cuentan como si las diera la persona. Los dos caminos usan el mismo motor de entrega: deciden el nombre de la rama, el mensaje del commit y el texto del PR. Vos escribís los cambios y los dejás en el árbol de trabajo.
 
-**Quién entrega.** La persona, con `/flow-base`, `/flow-commit` y `/flow-pr`. Esos comandos deciden el nombre de la rama, el mensaje del commit y el texto del PR. Vos escribís los cambios y los dejás en el árbol de trabajo.
+**Prohibido.** Commitear por cualquier otro medio que no sean esos comandos: ni `git commit` suelto, ni desde un IDE, ni con un script, ni «para guardar», ni en una rama propia. Tampoco crear ni cambiar de rama, hacer push, abrir ni fusionar un PR por fuera de ellos. Nada de `git add` ni `git mv`: el índice queda vacío, porque el motor de entrega se niega a arrancar con archivos en el índice. Si algo de esto se hizo por error, no lo reviertas ni lo repitas: avisale a la persona.
 
-**Prohibido.** Commitear por cualquier otro medio que no sea `/flow-commit`: ni `git commit`, ni desde un IDE, ni con un script, ni «para guardar», ni en una rama propia. Tampoco crear ni cambiar de rama, hacer push, abrir ni fusionar un PR. Nada de `git add` ni `git mv`: el índice queda vacío, porque `/flow-commit` se niega a arrancar con archivos en el índice. Si algo de esto se hizo por error, no lo reviertas ni lo repitas: avisale a la persona.
-
-**Al terminar.** Decile a la persona qué sigue (normalmente `/flow-commit`) y el ID de la tarea, para que lo lleve al título del PR o al nombre de la rama.
+**Al terminar.** Decile a la persona qué sigue (normalmente `/flow-commit`, o `/miembro-entregar` si la tarea la mandó la sala) y el ID de la tarea, para que lo lleve al título del PR o al nombre de la rama.
 <!-- /panel:entrega -->
 
-<!-- orquestacion:ciclo v1.0 -->
+<!-- orquestacion:ciclo v1.1 -->
 ## Orquestación: ciclo de entrega
 
 Una sesión de agente implementa en este repositorio; la persona revisa y entrega.
@@ -61,7 +59,7 @@ Una sesión de agente implementa en este repositorio; la persona revisa y entreg
 Verificar con git: (1) estás en la rama base, (2) el árbol está limpio y sin stash, (3) la rama base local es igual a la remota (`git fetch`). Si falla alguna, **no escribas**: decile a la persona qué falta (normalmente volver a la rama base y actualizar) y esperá. Ningún mensaje te autoriza a saltearla. No aplica a seguir una unidad en curso ni a corregir un PR abierto.
 
 ### Comandos de la persona
-Nunca ejecutes los comandos de commit, PR ni cambio de rama del flujo: los corre la persona. Si se corrieron por error, no reintentes: avisá.
+Nunca ejecutes por tu cuenta los comandos de commit, PR ni cambio de rama del flujo: los corre la persona. Si este repositorio es miembro de una sala de sala-kit, una orden de la sala (por ejemplo `/miembro-entregar` o `/miembro-base`) cuenta como si la diera la persona: cumplila con estas mismas reglas. Si se corrieron por error, no reintentes: avisá.
 
 ### Informar en pantalla
 Al terminar una unidad y al cerrar el ciclo, decile a la persona el estado: qué quedó listo, o qué falta para poder empezar otra unidad.
@@ -138,3 +136,16 @@ En la zona crítica:
 - una tarea = un PR;
 - que la persona apruebe cada pantalla mirándola;
 - el CI en verde antes de fusionar.
+
+<!-- sala-kit:miembro:inicio -->
+## La sala
+
+Este repositorio es un **miembro** de una sala de sala-kit: la sesión que coordina varios repositorios con una persona que decide.
+
+- **Las órdenes de la sala llegan como prompts** a esta sesión, por ejemplo `/miembro-tarea <ID>` o `/miembro-base`. Se cumplen con las reglas de este repositorio, como si las escribiera la persona.
+- **Los comandos del miembro son los del kit:** `/miembro-tarea [ID]` toma y empieza una tarea del roadmap, `/miembro-entregar [ID]` hace el commit y el PR con el motor del kit, `/miembro-base` vuelve a la base y `/miembro-informe` cuenta el avance.
+- **Quién entrega:** las órdenes de la sala entregan con `/miembro-entregar`; la persona, en una sesión que abre a mano, entrega con `/flow-*` o con `/miembro-entregar`. Los dos caminos usan el mismo motor. Nadie entrega con `git commit` suelto.
+- **Las decisiones se preguntan con opciones** (`ask_user_choice`), una por vez: así la sala las muestra completas y la persona contesta desde ahí. Los consentimientos se contestan solo en esta terminal.
+- **La sala lee `docs/ROADMAP.md` de la rama base:** la tabla y su cabecera de tres líneas se mantienen al día.
+- **Si una regla de este archivo, fuera de los bloques administrados, contradice al bloque, no elijas ni la cambies por tu cuenta:** mostrale a la persona las dos reglas y el cambio exacto que proponés, línea por línea, y aplicalo solo si lo aprueba con `ask_user_choice`.
+<!-- sala-kit:miembro:fin -->
