@@ -10,6 +10,7 @@ const { sentImages } = require('./images.js');
 const { loadConfig } = require('./config.js');
 const { runtimeEnv } = require('./piruntime.js');
 const { createRpcClient, RpcError, CAUSES } = require('./rpc.js');
+const { createQueueStore, OLD_MS, isCommand } = require('./queuestore.js');
 const lib = require('../lib.js');
 
 // RP233: the names of the commands pi loaded (get_commands), or null when the answer is not a list. Only string names count.
@@ -97,6 +98,14 @@ const queueOf = (r) => ({ steering: texts(r && r.steering), followUp: texts(r &&
 // RP236b (B1): what clear_queue gives back goes into the box, and pi has already dropped it: every text, whole. Only what is not a text is left out.
 const allTexts = (list) => (Array.isArray(list) ? list.filter((t) => typeof t === 'string') : []);
 const clearedOf = (r) => ({ steering: allTexts(r && r.steering), followUp: allTexts(r && r.followUp) });
+// F3: a queue with when each message entered; a text pi already had keeps its time (matched by text in `pool`), a new one is now.
+const NO_QUEUE = { steering: [], followUp: [] };
+function stamped(pool, q) {
+  const left = [...pool];
+  const take = (text) => { const i = left.findIndex((m) => m.text === text); return i < 0 ? { text, at: Date.now() } : left.splice(i, 1)[0]; };
+  return { steering: q.steering.map(take), followUp: q.followUp.map(take) };
+}
+const textsOf = (q) => ({ steering: q.steering.map((m) => m.text), followUp: q.followUp.map((m) => m.text) });
 // RP236b (B2): pi runs an extension command sent by prompt at once, even during a run; while the session works a command waits for it to be free.
 const COMMAND_WAITS = 'Commands wait until the session is free: send it when the run ends';
 // RP245b: a shell command (! or !!) waits for a free session too; it may run long, so it waits longer than an ordinary request.
@@ -117,6 +126,10 @@ const NOT_HERE = 'Permission and configuration commands (/gentle:desktop, /gentl
 // RP215: a message that carries images may have no text; the text, when there is one, follows cleanText.
 const textWith = (value, pics) => (pics.length && typeof value === 'string' && !value.replace(CONTROLS, '').trim() ? '' : cleanText(value));
 const panelOnly = (message) => { if (PANEL_BLOCKED.test(message)) throw new HttpError(409, NOT_HERE); return message; };
+// F3: a saved text goes through the same guards as a new prompt (sent as a followUp unless it is the first); what they refuse is null and never reaches pi.
+function guarded(text, follow) {
+  try { const message = panelOnly(cleanText(text)); return follow && message.startsWith('/') ? null : message; } catch { return null; }
+}
 const TRANSLATE = {
   queue_update: (r) => ({ type: 'queue', ...queueOf(r) }),
   // RP245b: one chunk of the output of a shell command the person ran with ! or !! (only one runs at a time per session).
@@ -201,8 +214,76 @@ function wire(e) {
   return e;
 }
 
-function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClient, max = 6, adoptedOf = (id) => (loadConfig().sessions || {})[id], adopt = () => {}, replaceAdopted = () => {}, env = process.env, contextMs = 10000, commandsMs = 5000, compactMs = 600000, suffix = () => crypto.randomBytes(3).toString('hex') }) {
+function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClient, max = 6, adoptedOf = (id) => (loadConfig().sessions || {})[id], adopt = () => {}, replaceAdopted = () => {}, env = process.env, contextMs = 10000, commandsMs = 5000, compactMs = 600000, suffix = () => crypto.randomBytes(3).toString('hex'), queues = createQueueStore() }) {
   const live = new Map(); // repo id -> { client, sessionId, ready }
+  // F3: `held` (repo id -> { steering, followUp, confirmed }) is the saved queue that is not in pi: left by an earlier panel or by a session that ended without the person.
+  // The store always holds, in order, pi's queue of the live session (`entry.queue`), what was sent to pi and pi has not shown it took (`entry.pending`), and `held`;
+  // it is written on every change and read once per repo. Before anything was delivered to this session, `held` is older than pi's queue and goes first.
+  const held = new Map();
+  const heldOf = (id) => { if (!held.has(id)) held.set(id, queues.get(id) || { steering: [], followUp: [], confirmed: false }); return held.get(id); };
+  const heldCount = (id) => heldOf(id).steering.length + heldOf(id).followUp.length;
+  function ordered(id, entry) {
+    const h = heldOf(id);
+    const q = (entry && entry.queue) || NO_QUEUE;
+    const p = (entry && entry.pending) || [];
+    const sent = { steering: p.filter((x) => x.kind === 'steering').map((x) => x.m), followUp: p.filter((x) => x.kind === 'followUp').map((x) => x.m) };
+    const parts = entry && entry.delivered ? [q, sent, h] : [h, q, sent];
+    return { steering: parts.flatMap((x) => x.steering), followUp: parts.flatMap((x) => x.followUp) };
+  }
+  function persist(id) {
+    try { queues.put(id, { ...ordered(id, live.get(id)), confirmed: heldOf(id).confirmed }); } catch { /* a failing store never cuts the session */ }
+  }
+  // Empties `held` in place (a delivery that is running sees it) and answers its texts.
+  const dropHeld = (id) => { const h = heldOf(id); const out = textsOf(h); h.steering.length = 0; h.followUp.length = 0; h.confirmed = false; return out; };
+  // A session that ends without the person (a crash, the shutdown of the panel) loses pi's queue and what pi never showed it took: they become held, in the same order.
+  const lose = (id, entry) => {
+    const h = heldOf(id);
+    const all = ordered(id, entry);
+    h.steering.splice(0, h.steering.length, ...all.steering);
+    h.followUp.splice(0, h.followUp.length, ...all.followUp);
+    entry.queue = null;
+    entry.pending = [];
+  };
+  // Stops a delivery that is running: nothing more is sent (a close, a clear, a new conversation).
+  const cancel = (entry) => { entry.run = (entry.run || 0) + 1; };
+  // S5, S6: a held queue goes to a live, free session in its order (the first as a prompt, the rest as followUp), unless a message is older than 12 h or a command and nobody
+  // confirmed it. The host never starts a session for it, and waits while the session renews, compacts or runs a shell command. A sent message stays saved (`pending`) until
+  // pi shows it took it; when pi refuses it, it goes back to `held`.
+  function deliver(id, entry) {
+    const h = heldOf(id);
+    if (entry.delivering || live.get(id) !== entry || entry.closed || !entry.up || entry.renewing || entry.compacting || entry.manual || entry.bashing || !heldCount(id) || entry.client.state() !== 'idle') return;
+    if (!h.confirmed && [...h.steering, ...h.followUp].some((m) => Date.now() - m.at > OLD_MS || isCommand(m.text))) return;
+    cancel(entry);
+    const run = entry.run;
+    const going = () => live.get(id) === entry && !entry.closed && entry.run === run;
+    entry.restored = true; // until the run of the queue settles, a new message goes behind it
+    entry.delivering = (async () => {
+      let first = true;
+      while (going() && heldCount(id)) {
+        const kind = h.steering.length ? 'steering' : 'followUp';
+        const m = h[kind].shift();
+        const message = guarded(m.text, !first);
+        if (message === null) { persist(id); continue; } // refused by the guards: dropped, never sent
+        const sent = { m, kind, acked: false };
+        entry.pending.push(sent);
+        entry.delivered = true;
+        try {
+          const r = await ask(entry, 'prompt', { message, ...(first ? {} : { streamingBehavior: 'followUp' }) });
+          sent.acked = true;
+          if (r && r.disposition === 'handled') { entry.pending = entry.pending.filter((p) => p !== sent); persist(id); continue; } // done at once: no run, so the next one still starts it
+          first = false;
+        } catch (e) {
+          // A timeout is not a refusal: pi may have taken it, so it stays saved until a run ends. A refusal puts it back (a death, a close or a clear already took it out).
+          if (e && e.message === 'The agent did not answer in time') { sent.unsure = true; first = false; break; }
+          const i = entry.pending.indexOf(sent);
+          if (i >= 0) { entry.pending.splice(i, 1); h[kind].unshift(m); persist(id); }
+          break;
+        }
+      }
+      if (first) entry.restored = false; // no run of the queue started: there is nothing to wait for
+      if (!heldCount(id)) h.confirmed = false;
+    })().finally(() => { entry.delivering = null; });
+  }
   const dead = new Map(); // F1: repo id -> { cause, at } of a session that was up and died by itself; cleared when the repo starts again
   // RP238: repo id -> a promise that resolves once every pi of its closed sessions is gone (exited, or killed after the grace). A new start of the repo waits for it,
   // so two pi never write the same session file.
@@ -254,6 +335,18 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
       env: runtimeEnv(found.active, env),
       onEvent: (e) => {
         if (e && e.kind === 'state' && live.get(id) === entry) entry.stateAt = Date.now(); // F1: since when the session is in its state
+        if (e && e.kind === 'state' && e.state === 'idle' && !entry.delivering) entry.restored = false; // F3: a free session has no run of the queue left
+        if (e && e.kind === 'state' && e.state === 'idle') deliver(id, entry); // F3: a confirmed queue waits for a free session
+        // F3 (S1, S2, S8): pi's queue is saved before anything else; agent_settled ends the run of a delivered queue and saves what pi still holds.
+        if (e && e.kind === 'event' && e.record && e.record.type === 'queue_update' && live.get(id) === entry) {
+          const prev = entry.queue || NO_QUEUE;
+          entry.queue = stamped([...prev.steering, ...prev.followUp, ...entry.pending.filter((p) => !p.acked).map((p) => p.m)], queueOf(e.record)); // an answered one is running, not queued
+          const inPi = new Set([...entry.queue.steering, ...entry.queue.followUp]);
+          entry.pending = entry.pending.filter((p) => !p.acked && !inPi.has(p.m)); // S8: an answered prompt was taken; one still on its way is taken once pi lists it
+          persist(id);
+        }
+        if (e && e.kind === 'event' && e.record && e.record.type === 'agent_settled' && live.get(id) === entry) { entry.restored = false; entry.pending = entry.pending.filter((p) => !p.acked && !p.unsure); persist(id); }
+        if (e && e.kind === 'event' && e.record && e.record.type === 'compaction_end') deliver(id, entry); // F3: a delivery waits for a compaction to end
         // RP140: the compaction mark follows the events of THIS session, so one that pi starts by itself (threshold, overflow) shows too.
         if (e && e.kind === 'event' && e.record && live.get(id) === entry && (e.record.type === 'compaction_start' || e.record.type === 'compaction_end')) entry.compacting = e.record.type === 'compaction_start';
         // RP239: pi is waiting to retry a failed request; Stop then cuts that wait too.
@@ -273,6 +366,7 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
       // RP98: the exit of an OLD client (closed, replaced by a new start) is not the new session's: it is published only while this entry is the live one or none is.
       onExit: (info) => {
         const cur = live.get(id); if (cur === entry) live.delete(id); if (cur === entry || !cur) publish(id, { kind: 'exit' }); stop(id, entry); // RP238: a pi that ended any way may still be closing
+        if (!entry.closed) { lose(id, entry); persist(id); } // F3
         // RP238b: a session that was up and died by itself then says why, with its category only; not when a new session of the repo started meanwhile.
         const mark = entry.up && !entry.closed && info && info.reason === 'exit' && !live.has(id) ? { cause: null, at: Date.now() } : null; // F1: kept for GET /api/attention
         if (mark) dead.set(id, mark);
@@ -306,7 +400,7 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
     if (fresh && (current || adoptedOf(id))) throw new HttpError(409, 'This repo already has a session: close it first');
     if (current) { await current.ready; if (current.closed) throw new HttpError(409, SESSION_CLOSED); return statusOf(live.get(id)); } // RP98: a joiner of a session that was closed meanwhile fails like the others
     if (live.size >= max) throw new HttpError(409, `Too many live sessions (at most ${max})`);
-    const entry = { client: null, sessionId: null, ready: null, fresh };
+    const entry = { client: null, sessionId: null, ready: null, fresh, pending: [] };
     live.set(id, entry);
     dead.delete(id);
     entry.ready = launch(id, repo, entry).catch((e) => {
@@ -318,6 +412,7 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
     if (entry.closed) throw new HttpError(409, SESSION_CLOSED); // RP98: a session that was closed is never adopted, so the chat does not come back to it
     // The session id it used becomes the adopted one when the repo has none (the history is read from the adopted id); never fails the start.
     try { adopt(id, entry.sessionId); } catch { /* the chat shows no history until a session is adopted */ }
+    deliver(id, entry); // F3 (S5): the saved queue goes first; the answer does not wait for it
     return statusOf(live.get(id));
   }
 
@@ -330,6 +425,10 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
     live.delete(id);
     entry.closed = true;
     stop(id, entry);
+    entry.queue = null; // F3 (S2): the person closed it: the delivery ends (it checks closed) and the saved queue goes too
+    entry.pending = [];
+    dropHeld(id);
+    persist(id);
     return { ...closedStatus };
   }
 
@@ -373,7 +472,7 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
     if (entry.compacting || entry.manual) throw new HttpError(409, 'The session is compacting its context: wait a moment');
     if (entry.bashing) throw new HttpError(409, 'A shell command is running in this session: wait for it to end');
     if (!entry.up) throw new HttpError(409, 'The session is still starting');
-    if (entry.client.state() !== 'idle') throw new HttpError(409, COMMAND_WAITS);
+    if (entry.client.state() !== 'idle' || entry.restored) throw new HttpError(409, COMMAND_WAITS);
     entry.renewing = true;
     try {
       const r = await ask(entry, 'new_session', {});
@@ -391,11 +490,18 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
       entry.sessionId = sid;
       entry.renewedAt = Date.now();
       entry.retrying = false;
+      cancel(entry); // F3 (S2): a new conversation starts with no saved queue
+      entry.queue = null;
+      entry.pending = [];
+      entry.delivered = false;
+      dropHeld(id);
+      persist(id);
       try { replaceAdopted(id, sid); } catch { /* the chat shows the old history until a session is adopted */ }
       publish(id, { kind: 'renewed', sessionId: sid });
       return statusOf(entry);
     } finally {
       entry.renewing = false;
+      deliver(id, entry); // F3: a queue confirmed meanwhile goes now (a cancelled renewal kept it)
     }
   }
 
@@ -414,7 +520,9 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
       let dialogs = [];
       try { dialogs = up && state === 'asking' ? entry.client.pendingDialogs().map((d) => ({ requestId: d.id, method: d.method, title: d.title, options: d.options })) : []; } catch { dialogs = []; }
       const ended = !entry && dead.has(id) ? { ...dead.get(id) } : null;
-      return { state, since: up && Number.isFinite(entry.stateAt) ? entry.stateAt : null, mode: up && entry.mode ? entry.mode : null, ended, dialogs };
+      let queued = [];
+      try { const h = heldOf(id); queued = [...h.steering, ...h.followUp].map((m) => ({ ...m })); } catch { queued = []; } // F3 (S3): the saved queue not in pi yet
+      return { state, since: up && Number.isFinite(entry.stateAt) ? entry.stateAt : null, mode: up && entry.mode ? entry.mode : null, ended, dialogs, ...(queued.length ? { queued } : {}) };
     },
     // RP233: the command names the live session of a repo loaded, or null (no live session, still starting, or the list is unknown). Memory only.
     commandsOf(id) { const entry = live.get(id); return entry && entry.up === true && !entry.closed && Array.isArray(entry.commands) ? [...entry.commands] : null; },
@@ -428,13 +536,21 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
       if (!pics.length && message === '/new') return renew(id); // RP264: pi does not run a typed /new over RPC
       const entry = notRenewing(running(id));
       if (entry.compacting) throw new HttpError(409, 'The session is compacting its context: wait a moment'); // pi would refuse it too
-      return ask(entry, 'prompt', { message, ...(behavior ? { streamingBehavior: behavior } : {}), ...(pics.length ? { images: pics } : {}) });
+      deliver(id, entry); // F3 (S5): a saved queue that may go goes first, also while start() still loads the commands
+      if (entry.delivering) await entry.delivering; // a new message goes behind it
+      const how = entry.restored ? 'followUp' : behavior;
+      if (how && message.startsWith('/')) throw new HttpError(409, COMMAND_WAITS);
+      return ask(entry, 'prompt', { message, ...(how ? { streamingBehavior: how } : {}), ...(pics.length ? { images: pics } : {}) });
     },
     async steer(id, value, { images } = {}) {
       repoOf(id);
       const pics = sentImages(images);
       const message = panelOnly(textWith(value, pics));
-      return ask(notRenewing(running(id)), 'steer', { message, ...(pics.length ? { images: pics } : {}) });
+      const entry = notRenewing(running(id));
+      deliver(id, entry); // F3 (S5): behind the saved queue, never before it
+      if (entry.delivering) await entry.delivering;
+      if (entry.restored) return ask(entry, 'prompt', { message, streamingBehavior: 'followUp', ...(pics.length ? { images: pics } : {}) });
+      return ask(entry, 'steer', { message, ...(pics.length ? { images: pics } : {}) });
     },
     // RP239: during an automatic retry pi's abort_retry goes first (pi's abort cuts it too, but this ends the wait at once); its failure never stops the abort.
     async abort(id) {
@@ -473,12 +589,43 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
         entry.bashing = false;
         entry.bash = null;
         if (live.get(id) === entry) publish(id, { kind: 'event', record: { type: 'bash_end' } });
+        deliver(id, entry); // F3: a delivery waits for a shell command to end
       }
     },
     // RP245b: Stop of a running shell command (pi's abort_bash; its answer then says cancelled).
     async abortBash(id) { repoOf(id); await ask(running(id), 'abort_bash', {}); return { ok: true }; },
     // RP236: takes the queued messages back (pi answers their texts, which the page puts back in the box).
-    async clearQueue(id) { repoOf(id); return clearedOf(await ask(running(id), 'clear_queue', {})); },
+    // F3 (S4): it empties the saved copy too, and with no live session only that copy (still 409 when there is none).
+    async clearQueue(id) {
+      repoOf(id);
+      const entry = live.get(id);
+      if (!entry && !heldCount(id)) throw new HttpError(409, 'The session is not started');
+      if (entry) cancel(entry); // a delivery that is running sends nothing more
+      const got = entry ? clearedOf(await ask(entry, 'clear_queue', {})) : NO_QUEUE;
+      if (entry) { entry.queue = null; entry.pending = []; }
+      const kept = dropHeld(id);
+      persist(id);
+      const [a, b] = entry && entry.delivered ? [got, kept] : [kept, got]; // the order they were in
+      return { steering: [...a.steering, ...b.steering], followUp: [...a.followUp, ...b.followUp] };
+    },
+    // F3 (S6): the saved queue of a repo may go even with messages older than 12 h: at once to a live, free session, else when it is.
+    async queueConfirm(id) {
+      repoOf(id);
+      if (!heldCount(id)) throw new HttpError(409, 'There is no saved queue for this repo');
+      // What the guards of a prompt would refuse is dropped here and told back (its first line); the first kept one goes as a plain prompt, the rest as followUp.
+      const h = heldOf(id);
+      const refused = [];
+      let first = true;
+      for (const list of [h.steering, h.followUp]) {
+        const kept = list.filter((m) => { const ok = guarded(m.text, !first) !== null; if (ok) first = false; else refused.push(String(m.text).trim().split('\n')[0].slice(0, 200)); return ok; });
+        list.splice(0, list.length, ...kept);
+      }
+      const count = heldCount(id); // before the delivery takes its first message
+      h.confirmed = count > 0;
+      persist(id);
+      if (live.has(id)) deliver(id, live.get(id));
+      return { confirmed: true, count, refused };
+    },
     async answer(id, requestId, answer) {
       repoOf(id);
       const { client } = running(id);
@@ -532,6 +679,7 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
         entry.manual = false;
         // No end event arrived (it timed out or failed): the mark goes and the page is told with the event it already reads.
         if (entry.compacting && !keep) { entry.compacting = false; if (live.get(id) === entry) publish(id, { kind: 'event', record: { type: 'compact_end', reason: 'manual' } }); }
+        deliver(id, entry); // F3: and for a compaction
       }
     },
     async status(id) { repoOf(id); return statusOf(live.get(id)); },
@@ -540,8 +688,10 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
     closeAll({ final: last = false } = {}) {
       if (last) final = true;
       epoch++;
-      for (const [id, entry] of [...live]) stop(id, entry);
+      const ids = [...live.keys()];
+      for (const [id, entry] of [...live]) { stop(id, entry); lose(id, entry); }
       live.clear();
+      for (const id of ids) persist(id); // F3: what the sessions held stays saved
       return Promise.all([...closing.values()]).then(() => {});
     },
   };
@@ -591,6 +741,7 @@ function rpcApi(host) {
     steer: (b) => host.steer(idOf(bodyOf(b)), b.text, ...(b.images === undefined ? [] : [{ images: b.images }])),
     abort: (b) => host.abort(idOf(bodyOf(b))),
     clearQueue: (b) => host.clearQueue(idOf(bodyOf(b))),
+    queueConfirm: (b) => host.queueConfirm(idOf(bodyOf(b))), // F3
     bash: (b) => host.bash(idOf(bodyOf(b)), b.text),
     abortBash: (b) => host.abortBash(idOf(bodyOf(b))),
     dialog: (b) => {
