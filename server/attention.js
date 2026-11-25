@@ -87,18 +87,20 @@ function createSeq() {
 
 const CLOSED = { state: 'closed', since: null, mode: null, ended: null, dialogs: [] };
 
-// Gathers the input of buildAttention for one request. Scope: the members of ?room=, else cfg.attentionRepos, else the repos with an open (or dead) session.
+// Gathers the input of buildAttention for one request. Scope: the members of ?room= plus cfg.attentionRepos (F1b: a repo outside the room, such as
+// repo-panel, joins the director's round), else cfg.attentionRepos, else the repos with an open (or dead) session.
 function collect({ cfg, room, host, store, lastOf, repoId, now }) {
   const all = cfg.groups.flatMap((g) => g.repos).map((r) => ({ id: repoId(r.path), name: r.name || path.basename(r.path) }));
   const sessionOf = (id) => {
     try { return typeof host.attentionOf === 'function' ? host.attentionOf(id) : { ...CLOSED, state: host.stateOf(id) }; } catch { return CLOSED; }
   };
+  const listed = Array.isArray(cfg.attentionRepos) ? cfg.attentionRepos : [];
   let ids;
   if (room !== undefined) {
     const found = (cfg.rooms || []).find((x) => x.name === room);
     if (!found) throw new HttpError(404, 'Unknown room');
-    ids = new Set(found.repos);
-  } else if (Array.isArray(cfg.attentionRepos) && cfg.attentionRepos.length) ids = new Set(cfg.attentionRepos);
+    ids = new Set([...found.repos, ...listed]);
+  } else if (listed.length) ids = new Set(listed);
   else ids = new Set(all.filter((r) => { const s = sessionOf(r.id); return s.state !== 'closed' || !!s.ended || !!(s.queued && s.queued.length); }).map((r) => r.id));
   const repos = [];
   const sessions = {};

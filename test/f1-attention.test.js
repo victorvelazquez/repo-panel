@@ -129,6 +129,26 @@ test('f1-e: scope is ?room= members, else attentionRepos, else repos with an ope
   });
 });
 
+test('F1b: ?room= also covers the repos of attentionRepos, each repo once; no room and an unknown room behave as before', async () => {
+  const states = { [IA]: 'idle', [IB]: 'idle', [IC]: 'busy' };
+  const host = fakeHost({
+    stateOf: (id) => states[id] || 'closed',
+    attentionOf: (id) => ({ state: states[id] || 'closed', since: Date.now() - 10 * MIN, mode: 'super-yolo', ended: null, dialogs: [] }),
+  });
+  const scope = async (get, p) => (await get(p)).json.items.map((i) => [i.kind, i.id]).sort((x, y) => x[1].localeCompare(y[1]));
+  const both = [['idle-no-order', IA], ['idle-no-order', IB]].sort((x, y) => x[1].localeCompare(y[1]));
+  await withServer(host, async ({ get }) => {
+    writeConfig({ rooms: [{ name: 'erp', path: scratch, repos: [IB] }], attentionRepos: [IA] });
+    assert.deepEqual(await scope(get, '/api/attention?room=erp'), both); // the member and the repo outside the room
+    assert.deepEqual(await scope(get, '/api/attention'), [['idle-no-order', IA]]); // without a room: only attentionRepos, as before
+    assert.equal((await get('/api/attention?room=nope')).status, 404);
+    writeConfig({ rooms: [{ name: 'erp', path: scratch, repos: [IA, IB] }], attentionRepos: [IA] });
+    assert.deepEqual(await scope(get, '/api/attention?room=erp'), both); // a repo in both lists counts once
+    writeConfig({ rooms: [{ name: 'erp', path: scratch, repos: [IB] }] });
+    assert.deepEqual(await scope(get, '/api/attention?room=erp'), [['idle-no-order', IB]]); // no attentionRepos: only the members
+  });
+});
+
 // ---- The pure rules ----
 
 test('f1-f: nextLine reads the last «Siguiente:» line of an agent message, cut to 200 characters', () => {
