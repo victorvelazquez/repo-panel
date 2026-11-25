@@ -17,7 +17,12 @@ const PR_FIELDS = [
 const NO_ANSWER = 'GitHub did not answer in time: check the PR on GitHub before retrying';
 const NOT_CONFIRMED = 'GitHub did not confirm the merge: check the PR on GitHub before retrying';
 const NO_ANSWER_RE = /unexpected end of JSON input|server error|HTTP 5\d\d|timeout|deadline exceeded/i;
-const noAnswer = (r) => r.code < 0 || NO_ANSWER_RE.test(`${r.stderr}\n${r.stdout}`);
+// A 4xx is GitHub's own clear refusal, even when its text says "timeout" (a check or branch may be named so).
+const CLEAR_RE = /\(HTTP 4\d\d\)|"status":\s*"4\d\d"/;
+const noAnswer = (r) => {
+  const text = `${r.stderr}\n${r.stdout}`;
+  return r.code < 0 || (!CLEAR_RE.test(text) && NO_ANSWER_RE.test(text));
+};
 const READ = { timeout: 20000, waitMs: 20000 };
 const PUT = { timeout: 30000, waitMs: 20000 };
 const mergeTiming = { tries: 3, gapMs: 2000, sleep: (ms) => new Promise((r) => setTimeout(r, ms)) };
@@ -96,20 +101,21 @@ async function prState(repo) {
   return { repo: meta, prs, stale: await staleState(repo, prs) };
 }
 
+// Its errors keep gh's own text, as the re-run expects; `noAnswer` marks the ones the merge turns into NO_ANSWER (readPr).
 async function viewPr(repo, number, opts) {
   const r = await gh(repo.path, ['pr', 'view', String(number), '--json', `${PR_FIELDS},state`], opts);
-  if (r.code !== 0) throw new HttpError(502, noAnswer(r) ? NO_ANSWER : firstLine(r.stderr) || 'gh pr view failed');
-  let j;
-  try { j = parseJson(r); } catch { throw new HttpError(502, NO_ANSWER); }
+  if (r.code !== 0) throw Object.assign(new HttpError(502, firstLine(r.stderr) || 'gh pr view failed'), { noAnswer: noAnswer(r) });
+  const j = parseJson(r);
   return { ...lib.enrichPr(j), state: j.state };
 }
+const readPr = (repo, number) => viewPr(repo, number, READ).catch((e) => { throw e.noAnswer ? new HttpError(502, NO_ANSWER) : e; });
 
 // The state of the PR after a failed PUT, read up to `tries` times a few seconds apart; null when no read worked.
 async function rereadState(repo, number, tries) {
   let state = null;
   for (let i = 0; i < tries; i++) {
     if (i) await mergeTiming.sleep(mergeTiming.gapMs);
-    const after = await viewPr(repo, number, READ).catch(() => null);
+    const after = await readPr(repo, number).catch(() => null);
     if (after) state = after.state;
     if (state === 'MERGED') break;
   }
@@ -123,7 +129,7 @@ async function mergePr(repo, number, method, deleteBranch) {
   if (meta.noRemote) throw new HttpError(400, 'Repository has no GitHub remote');
   const pick = lib.pickMergeMethod(method, meta.methods);
   if (!pick) throw new HttpError(409, 'This repository allows no merge method');
-  const pr = await viewPr(repo, number, READ);
+  const pr = await readPr(repo, number);
   if (pr.state !== 'OPEN') throw new HttpError(409, `PR is ${pr.state}`);
   if (!pr.ready) throw new HttpError(409, `Not ready to merge: ${pr.blockedReason}`);
 

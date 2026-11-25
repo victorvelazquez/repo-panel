@@ -132,6 +132,21 @@ test('S1 PRESERVE: a clear refusal (405) still shows its real first line, with t
   assert.deepEqual(out.sleeps, []);
 });
 
+test('S1 PRESERVE: a 405 refusal whose text mentions "timeout" is still a clear refusal (one re-read, its own first line)', async () => {
+  const msg = 'Required status check "ci / timeout" is expected.';
+  const out = await merge({ put: { code: 1, stdout: JSON.stringify({ message: msg, status: '405' }), stderr: `gh: ${msg} (HTTP 405)\n` } });
+  rejects(out, 502, msg);
+  assert.deepEqual(out.g.kinds(), [...PRE, PUT_KIND, 'pr view 7']);
+  assert.deepEqual(out.sleeps, []);
+});
+
+test('S1 PRESERVE: the re-run of failed checks keeps gh\'s own first line when pr view fails (only the merge maps it)', async () => {
+  const { github, restore } = loadGithub(async () => ({ code: 1, stdout: '', stderr: 'HTTP 502: Bad Gateway\n' }));
+  try {
+    await assert.rejects(github.rerunFailed({ id: `rp278-${n++}`, path: __dirname }, 7), (e) => e.status === 502 && e.message === 'HTTP 502: Bad Gateway');
+  } finally { restore(); }
+});
+
 test('S2: every gh call of the merge path carries its own short bound (20 s reads and DELETE, 30 s PUT, 20 s slot wait)', async () => {
   const out = await merge({ views: [prView('OPEN'), { code: 1, stdout: '', stderr: 'HTTP 502' }, prView('MERGED')], put: { code: 1, stdout: '{"message":"Server Error"}', stderr: '' } }, true);
   assert.deepEqual(out.r, { merged: true, branch: 'deleted' });
@@ -211,6 +226,30 @@ test('S4: a call that gets a slot before its bound runs normally', async () => {
   const r = await exec.run(node, writeMarker('inTime'), { waitMs: 10000 });
   assert.equal(r.code, 0);
   assert.equal(fs.existsSync(marker('inTime')), true);
+  await holder;
+  assert.deepEqual(exec.stats(), { active: 0, max: 1, waitingBackground: 0, waitingUser: 0 });
+});
+
+test('S4: a bounded call whose slot is free at once never evicts a job queued after it', async () => {
+  const first = exec.run(node, ['-e', 'setTimeout(() => {}, 600)'], { timeout: 30000, waitMs: 100 }); // the slot is free: it starts now
+  const behind = exec.run(node, writeMarker('notEvicted'));
+  const evicted = new Promise((r) => setTimeout(() => r({ code: 'evicted' }), 10000));
+  assert.equal((await Promise.race([behind, evicted])).code, 0);
+  assert.equal(fs.existsSync(marker('notEvicted')), true);
+  await first;
+  assert.deepEqual(exec.stats(), { active: 0, max: 1, waitingBackground: 0, waitingUser: 0 });
+});
+
+test('S4: a bounded call that got its slot in time never touches the queue when its bound would have expired (another waiting job still runs)', async () => {
+  const holder = holdFor(50);
+  // It waits for the holder (a short wait, so its timer is armed), starts long before its bound and is still running when the bound
+  // would expire; the wide bound keeps a loaded machine (a slow child start) from making it give up.
+  const first = exec.run(node, ['-e', 'setTimeout(() => {}, 7000)'], { timeout: 30000, waitMs: 5000 });
+  const behind = exec.run(node, writeMarker('behind')); // waits behind it, with no bound
+  const gaveUp = new Promise((r) => setTimeout(() => r('never ran'), 20000));
+  assert.equal((await Promise.race([behind, gaveUp])).code, 0);
+  assert.equal(fs.existsSync(marker('behind')), true);
+  assert.equal((await first).code, 0);
   await holder;
   assert.deepEqual(exec.stats(), { active: 0, max: 1, waitingBackground: 0, waitingUser: 0 });
 });
