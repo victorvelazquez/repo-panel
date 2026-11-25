@@ -38,4 +38,7 @@ function sentImages(value) {
   return value.map((img) => ({ type: 'image', data: img.data, mimeType: img.mimeType }));
 }
 
-module.exports = { decodeImage, sentImages, IMAGE_MAX, SEND_MAX };
+// RP268: the type of the bytes of a file, from the same closed list, or '' (SVG and every other type are never images here).
+const imageType = (buf) => (Buffer.isBuffer(buf) ? Object.keys(IMAGE_TYPES).find((t) => IMAGE_TYPES[t](buf)) || '' : '');
+
+module.exports = { decodeImage, sentImages, imageType, IMAGE_MAX, SEND_MAX };

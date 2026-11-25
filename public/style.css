@@ -728,6 +728,9 @@ button.tk-gh:hover:not(:disabled) { background: var(--panel2); color: var(--text
 .cv-file { flex: none; border: 1px solid var(--line); border-radius: 6px; margin-bottom: 10px; overflow: hidden; }
 .cv-title { margin: 0; padding: 6px 10px; background: var(--panel); font: 12px/1.4 ui-monospace, Consolas, monospace; overflow-wrap: anywhere; }
 .cv-note { padding: 6px 10px; }
+/* RP268: an image of the repo in the file viewer, at most its own size and the width of the viewer. */
+.cv-pic { padding: 8px 10px; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.cv-pic img { max-width: 100%; height: auto; border: 1px solid var(--line); border-radius: 4px; background: repeating-conic-gradient(#8882 0% 25%, transparent 0% 50%) 0 0 / 16px 16px; }
 .cv-code { overflow-x: auto; font: 12px/1.45 ui-monospace, Consolas, monospace; }
 .cv-l { display: flex; min-height: 1.45em; white-space: pre; }
 .cv-n { flex: none; box-sizing: content-box; min-width: 4ch; padding: 0 6px; text-align: right; color: var(--muted); user-select: none; border-right: 1px solid var(--line); }
