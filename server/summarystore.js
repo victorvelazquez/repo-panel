@@ -256,7 +256,15 @@ const outcome = (fact) => JSON.stringify([fact.failed, fact.error, fact.value ==
   function start() { if (started) return; started = true; arm(FIRST_DELAY_MS); }
   function stop() { started = false; if (timer) { clearTimer(timer); timer = null; } for (const t of catching.values()) clearTimer(t); catching.clear(); }
 
-  return { snapshot, board, refreshRepo, catchUp, refreshAll, touch, awake, start, stop, tick };
+  // F1: the cached open PRs and current branch of a repo, as held now; it never reads anything nor wakes the store.
+  function cachedOf(id) {
+    const f = facts.get(id);
+    if (!f) return null;
+    const prs = f.prs.value && Array.isArray(f.prs.value.prs) ? f.prs.value.prs : null;
+    return { prs, branch: f.local.value && typeof f.local.value.branch === 'string' ? f.local.value.branch : null };
+  }
+
+  return { snapshot, board, cachedOf, refreshRepo, catchUp, refreshAll, touch, awake, start, stop, tick };
 }
 
 module.exports = { createSummaryStore };

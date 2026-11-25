@@ -31,6 +31,7 @@ const { createCodeWatch } = require('./codewatch.js'); // RP201
 const { createEventHub } = require('./events.js');
 const { createNotifier } = require('./notifier.js');
 const { createRpcHost, rpcApi } = require('./rpchost.js');
+const { buildAttention, collect, createSeq } = require('./attention.js'); // F1
 const { terminalAnswer } = require('./terminal.js');
 const { readUsage, usageFile } = require('./usage.js');
 const { sessionsState, chatState, chatResult, chatImage, adoptSession, releaseSession, adoptIfNone, replaceAdopted } = require('./sessions.js');
@@ -47,6 +48,8 @@ const READ_ONLY_POSTS = new Set(['POST /api/queue', 'POST /api/conformity']);
 const CATCH_UP_POSTS = new Set(['POST /api/merge', 'POST /api/rerun', 'POST /api/fetch', 'POST /api/pi']);
 // No client, no work: a store that has never been asked (awake() false) is left alone; a store without awake() is always called.
 const catchUp = (store, id) => { if (store && (typeof store.awake !== 'function' || store.awake())) Promise.resolve().then(() => store.catchUp(id)).catch(() => {}); };
+// F1: the text of the last agent message of a repo's chat, or null.
+const lastAgentText = (id, base) => { const items = chatState(id, undefined, 5, base).items || []; for (let i = items.length - 1; i >= 0; i -= 1) if (items[i].role === 'assistant') return items[i].text; return null; };
 const query = (u) => Object.fromEntries(new URL(u, 'http://x').searchParams);
 
 // What the page may know of the runtimes: ids, labels, versions and state; never a command or a folder.
@@ -71,6 +74,13 @@ async function setPiRuntime(b, deps) {
 const routes = {
   // RP201: ONE boolean (never the fingerprint): true when the files of the server on disk are not the code it started with. It only informs; it is behind the token and the login like every API route.
   'GET /api/server-state': (q, b, d) => ({ stale: d.codeWatch.stale() === true }),
+  // F1: everything a director must act on in one call, from memory only. The token is scrubbed from the answer, even when a session printed it.
+  'GET /api/attention': (q, b, d) => {
+    const input = collect({ cfg: loadConfig(), room: q.room, host: d.rpcHost, store: d.summaryStore, lastOf: (id) => lastAgentText(id, d.sessionsDir), repoId: lib.repoId, now: Date.now() });
+    const scrub = (s) => s.split(TOKEN).join('[token]');
+    const content = JSON.parse(scrub(JSON.stringify(buildAttention({ ...input, stale: d.codeWatch.stale() === true, scrub }))));
+    return { seq: d.attentionSeq(content, q.room === undefined ? '' : `room:${q.room}`), at: new Date().toISOString(), ...content };
+  },
   'GET /api/config': () => {
     const cfg = loadConfig();
     return {
@@ -293,6 +303,7 @@ function createServer(port, deps = {}) {
   if (!deps.rpcHost) deps.rpcHost = createRpcHost({ resolve: deps.rpcResolve || (() => resolveRuntime(deps.piRuntime)), repoOf: findRepo, publish: (id, payload) => hub.emit('rpc', id, payload), adopt: adoptIfNone, replaceAdopted, createClient: deps.rpcClient });
   // RPC2b-1: the session state of every repo is the host's (a synchronous read of memory); an injected host with no stateOf leaves the session `unknown`.
   if (!deps.sessionOf && typeof deps.rpcHost.stateOf === 'function') deps.sessionOf = (id) => deps.rpcHost.stateOf(id);
+  deps.attentionSeq = createSeq(); // F1: one counter per server
   // RP161: the background jobs a session waits for, counted from its session file; only for a session the panel started (`startedAtOf`); an injected host with none leaves them out.
   if (!deps.jobsOf && typeof deps.rpcHost.startedAtOf === 'function') deps.jobsOf = (id) => jobsOf(id, deps.rpcHost.startedAtOf(id), deps.sessionsDir);
   // RP164: what the subagents of that session do, read from the presence folder next to the sessions one (shown only, never a hold); only for a session the panel started, like the jobs.
