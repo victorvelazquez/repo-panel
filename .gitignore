@@ -3,3 +3,5 @@ config.json
 config.json.tmp
 .atl/
 push.json
+queues.json
+queues.json.tmp

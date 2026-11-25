@@ -38,9 +38,13 @@ const { sessionsState, chatState, chatResult, chatImage, adoptSession, releaseSe
 const { readSettings, writeSetting } = require('./settings.js');
 const remote = require('./remote.js');
 const push = require('./push.js');
+const { createQueueStore } = require('./queuestore.js'); // F3
 
 const ROOT = path.join(__dirname, '..');
 const TOKEN = crypto.randomBytes(24).toString('hex');
+// F1, F3: an answer that carries text a session or a person wrote never carries the token.
+const scrub = (s) => s.split(TOKEN).join('[token]');
+const scrubbed = (v) => JSON.parse(scrub(JSON.stringify(v)));
 
 // RP76: these POSTs only calculate; every other POST is an action of the person and goes through the interactive lane.
 const READ_ONLY_POSTS = new Set(['POST /api/queue', 'POST /api/conformity']);
@@ -77,7 +81,6 @@ const routes = {
   // F1: everything a director must act on in one call, from memory only. The token is scrubbed from the answer, even when a session printed it.
   'GET /api/attention': (q, b, d) => {
     const input = collect({ cfg: loadConfig(), room: q.room, host: d.rpcHost, store: d.summaryStore, lastOf: (id) => lastAgentText(id, d.sessionsDir), repoId: lib.repoId, now: Date.now() });
-    const scrub = (s) => s.split(TOKEN).join('[token]');
     const content = JSON.parse(scrub(JSON.stringify(buildAttention({ ...input, stale: d.codeWatch.stale() === true, scrub }))));
     return { seq: d.attentionSeq(content, q.room === undefined ? '' : `room:${q.room}`), at: new Date().toISOString(), ...content };
   },
@@ -183,7 +186,8 @@ const routes = {
   'POST /api/rpc/prompt': (q, b, d) => rpcApi(d.rpcHost).prompt(b),
   'POST /api/rpc/steer': (q, b, d) => rpcApi(d.rpcHost).steer(b),
   'POST /api/rpc/abort': (q, b, d) => rpcApi(d.rpcHost).abort(b),
-  'POST /api/rpc/clear-queue': (q, b, d) => rpcApi(d.rpcHost).clearQueue(b), // RP236
+  'POST /api/rpc/clear-queue': async (q, b, d) => scrubbed(await rpcApi(d.rpcHost).clearQueue(b)), // RP236; F3: with the session closed it empties the saved queue
+  'POST /api/rpc/queue-confirm': async (q, b, d) => scrubbed(await rpcApi(d.rpcHost).queueConfirm(b)), // F3: a saved queue with messages older than 12 h may go
   'POST /api/rpc/bash': (q, b, d) => rpcApi(d.rpcHost).bash(b), // RP245b: ! and !! from the chat
   'POST /api/rpc/abort-bash': (q, b, d) => rpcApi(d.rpcHost).abortBash(b), // RP245b: Stop of a running shell command
   'POST /api/rpc/renew': (q, b, d) => rpcApi(d.rpcHost).renew(b), // RP264: a new session on the same pi
@@ -300,7 +304,9 @@ function createServer(port, deps = {}) {
   const flights = new Map();
   const hub = deps.hub || createEventHub();
   // RPC1b: the pi sessions live in this process (a restart ends them; they come back with the same --session-id). Their events go to the hub as `rpc`.
-  if (!deps.rpcHost) deps.rpcHost = createRpcHost({ resolve: deps.rpcResolve || (() => resolveRuntime(deps.piRuntime)), repoOf: findRepo, publish: (id, payload) => hub.emit('rpc', id, payload), adopt: adoptIfNone, replaceAdopted, createClient: deps.rpcClient });
+  // F3: their queues are saved in queues.json, next to config.json like push.json, so «Restart panel» does not lose them.
+  const configDir = process.env.REPO_PANEL_CONFIG ? path.dirname(process.env.REPO_PANEL_CONFIG) : ROOT;
+  if (!deps.rpcHost) deps.rpcHost = createRpcHost({ resolve: deps.rpcResolve || (() => resolveRuntime(deps.piRuntime)), repoOf: findRepo, publish: (id, payload) => hub.emit('rpc', id, payload), adopt: adoptIfNone, replaceAdopted, createClient: deps.rpcClient, queues: createQueueStore({ file: path.join(configDir, 'queues.json') }) });
   // RPC2b-1: the session state of every repo is the host's (a synchronous read of memory); an injected host with no stateOf leaves the session `unknown`.
   if (!deps.sessionOf && typeof deps.rpcHost.stateOf === 'function') deps.sessionOf = (id) => deps.rpcHost.stateOf(id);
   deps.attentionSeq = createSeq(); // F1: one counter per server
@@ -314,7 +320,7 @@ function createServer(port, deps = {}) {
   if (!deps.summaryStore && !deps.noSummaryStore) deps.summaryStore = createSummaryStore({ deps, now: deps.now, sessionOf: deps.sessionOf, jobsOf: deps.jobsOf, subagentsOf: deps.subagentsOf, outcomeOf: deps.outcomeOf });
   // RP178: tells the connected pages when a repo starts to need the person; started with the store by server.js, so a test server runs no timer.
   // RP179: push.json lives next to config.json; while a device is subscribed the notifier keeps reading with no page open.
-  const pushFile = path.join(process.env.REPO_PANEL_CONFIG ? path.dirname(process.env.REPO_PANEL_CONFIG) : ROOT, 'push.json');
+  const pushFile = path.join(configDir, 'push.json');
   const pusher = push.createPusher({ store: push.createPushStore({ file: pushFile, now: deps.now }), post: deps.pushPost || push.post, now: deps.now, sub: () => { const r = remoteCfg(); return r ? `https://${r.host}` : undefined; } });
   deps.pusher = pusher;
   const notifier = deps.summaryStore ? createNotifier({ store: deps.summaryStore, hub, hasSubscribers: () => pusher.store.count() > 0, onNotice: (id, n) => { pusher.notify(id, n); } }) : null;

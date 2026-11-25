@@ -5,6 +5,7 @@
 const path = require('node:path');
 const { redact } = require('./redact.js');
 const { HttpError } = require('./errors.js');
+const { OLD_MS, isCommand } = require('./queuestore.js');
 
 const MAX_ITEMS = 20;
 const TEXT_MAX = 200;
@@ -12,7 +13,7 @@ const TITLE_MAX = 90;
 const IDLE_MS = 5 * 60000; // a free session without an order counts only after this long
 const EXPECTED_MODE = 'super-yolo'; // fixed until F2 makes it configurable
 // The order a director attends to them (the strategy's round): questions, green PRs, idle lanes with their next step, then the rest.
-const ORDER = ['asking', 'pr-green', 'waiting', 'idle-no-order', 'session-dead', 'pr-red', 'mode-not-super-yolo'];
+const ORDER = ['asking', 'queue-lost', 'pr-green', 'waiting', 'idle-no-order', 'session-dead', 'pr-red', 'mode-not-super-yolo'];
 
 // `scrub` runs on the raw text, before redact and the cut: a secret cut in half would no longer be found whole.
 const cutWith = (scrub) => (s, n = TEXT_MAX) => redact(scrub(String(s == null ? '' : s))).slice(0, n);
@@ -39,6 +40,9 @@ function buildAttention({ repos, sessions, prs, last, now, stale, ok = true, sno
     if (!s) continue;
     const who = { id: r.id, name: r.name };
     for (const d of s.dialogs || []) items.push({ kind: 'asking', ...who, requestId: cut(d.requestId), method: cut(d.method), title: cut(d.title), options: (Array.isArray(d.options) ? d.options : []).map((o) => cut(o)), since: isoOf(s.since) });
+    // F3 (S3, S6): a saved queue that is not in pi yet, with the first line of each message; one older than 12 h or a command waits for queue-confirm.
+    const queued = Array.isArray(s.queued) ? s.queued : [];
+    if (queued.length) items.push({ kind: 'queue-lost', ...who, count: queued.length, lines: queued.map((m) => ({ text: cut(String(m.text).split('\n')[0]), ...(now - m.at > OLD_MS ? { old: true } : {}), ...(isCommand(m.text) ? { command: true } : {}) })) });
     if (s.state === 'idle') {
       const next = typeof last[r.id] === 'string' ? nextLine(scrub(last[r.id])) : null;
       if (next) items.push({ kind: 'waiting', ...who, next, since: isoOf(s.since) });
@@ -95,7 +99,7 @@ function collect({ cfg, room, host, store, lastOf, repoId, now }) {
     if (!found) throw new HttpError(404, 'Unknown room');
     ids = new Set(found.repos);
   } else if (Array.isArray(cfg.attentionRepos) && cfg.attentionRepos.length) ids = new Set(cfg.attentionRepos);
-  else ids = new Set(all.filter((r) => { const s = sessionOf(r.id); return s.state !== 'closed' || !!s.ended; }).map((r) => r.id));
+  else ids = new Set(all.filter((r) => { const s = sessionOf(r.id); return s.state !== 'closed' || !!s.ended || !!(s.queued && s.queued.length); }).map((r) => r.id));
   const repos = [];
   const sessions = {};
   const prs = {};
