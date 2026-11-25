@@ -12,6 +12,26 @@ const PR_FIELDS = [
   'additions', 'deletions', 'changedFiles', // RP94d: the size of the PR (additive; the Summary card flags a large one)
 ].join(',');
 
+// RP278: GitHub did not really answer when gh was killed (its timeout), printed the Go JSON error or a 5xx of GitHub; a merge then
+// answers one fixed message instead of a raw SyntaxError or 500. Each gh call of the merge carries its own short bound.
+const NO_ANSWER = 'GitHub did not answer in time: check the PR on GitHub before retrying';
+const NOT_CONFIRMED = 'GitHub did not confirm the merge: check the PR on GitHub before retrying';
+const NO_ANSWER_RE = /unexpected end of JSON input|server error|HTTP 5\d\d|timeout|deadline exceeded/i;
+// A 4xx is GitHub's own clear refusal, even when its text says "timeout" (a check or branch may be named so).
+const CLEAR_RE = /\(HTTP 4\d\d\)|"status":\s*"4\d\d"/;
+const noAnswer = (r) => {
+  const text = `${r.stderr}\n${r.stdout}`;
+  return r.code < 0 || (!CLEAR_RE.test(text) && NO_ANSWER_RE.test(text));
+};
+const READ = { timeout: 20000, waitMs: 20000 };
+const PUT = { timeout: 30000, waitMs: 20000 };
+const mergeTiming = { tries: 3, gapMs: 2000, sleep: (ms) => new Promise((r) => setTimeout(r, ms)) };
+
+// The JSON of a gh answer; output that is not JSON is marked as no answer, keeping its message.
+function parseJson(r) {
+  try { return JSON.parse(r.stdout); } catch (e) { e.noAnswer = true; throw e; }
+}
+
 function ghError(r) {
   try { const j = JSON.parse(r.stdout); if (j.message) return j.message; } catch { /* not json */ }
   return firstLine(r.stderr) || firstLine(r.stdout) || `exit code ${r.code}`;
@@ -20,16 +40,16 @@ function ghError(r) {
 const metaCache = new Map();
 const NO_REMOTE = /no git remotes|none of the git remotes|not a git repository|could not determine|unable to determine/i;
 
-async function repoMeta(repo) {
+async function repoMeta(repo, opts) {
   const hit = metaCache.get(repo.id);
   if (hit && Date.now() - hit.t < 10 * 60 * 1000) return hit.data;
-  const r = await gh(repo.path, ['repo', 'view', '--json', 'nameWithOwner,url,deleteBranchOnMerge,mergeCommitAllowed,squashMergeAllowed,rebaseMergeAllowed']);
+  const r = await gh(repo.path, ['repo', 'view', '--json', 'nameWithOwner,url,deleteBranchOnMerge,mergeCommitAllowed,squashMergeAllowed,rebaseMergeAllowed'], opts);
   if (r.code !== 0) {
     const msg = firstLine(r.stderr);
     if (NO_REMOTE.test(r.stderr)) return { noRemote: true };
-    throw new Error(msg || 'gh repo view failed');
+    throw Object.assign(new Error(msg || 'gh repo view failed'), { noAnswer: noAnswer(r) });
   }
-  const j = JSON.parse(r.stdout);
+  const j = parseJson(r);
   // RP226: the methods the repo allows; null when gh said none of them, which means "use the requested one". A flag gh did not answer counts as allowed, one that says false is honored.
   const flags = [j.mergeCommitAllowed, j.squashMergeAllowed, j.rebaseMergeAllowed];
   const methods = flags.some((f) => typeof f === 'boolean') ? { merge: flags[0], squash: flags[1], rebase: flags[2] } : null;
@@ -81,21 +101,35 @@ async function prState(repo) {
   return { repo: meta, prs, stale: await staleState(repo, prs) };
 }
 
-async function viewPr(repo, number) {
-  const r = await gh(repo.path, ['pr', 'view', String(number), '--json', `${PR_FIELDS},state`]);
-  if (r.code !== 0) throw new HttpError(502, firstLine(r.stderr) || 'gh pr view failed');
-  const j = JSON.parse(r.stdout);
+// Its errors keep gh's own text, as the re-run expects; `noAnswer` marks the ones the merge turns into NO_ANSWER (readPr).
+async function viewPr(repo, number, opts) {
+  const r = await gh(repo.path, ['pr', 'view', String(number), '--json', `${PR_FIELDS},state`], opts);
+  if (r.code !== 0) throw Object.assign(new HttpError(502, firstLine(r.stderr) || 'gh pr view failed'), { noAnswer: noAnswer(r) });
+  const j = parseJson(r);
   return { ...lib.enrichPr(j), state: j.state };
+}
+const readPr = (repo, number) => viewPr(repo, number, READ).catch((e) => { throw e.noAnswer ? new HttpError(502, NO_ANSWER) : e; });
+
+// The state of the PR after a failed PUT, read up to `tries` times a few seconds apart; null when no read worked.
+async function rereadState(repo, number, tries) {
+  let state = null;
+  for (let i = 0; i < tries; i++) {
+    if (i) await mergeTiming.sleep(mergeTiming.gapMs);
+    const after = await readPr(repo, number).catch(() => null);
+    if (after) state = after.state;
+    if (state === 'MERGED') break;
+  }
+  return state;
 }
 
 async function mergePr(repo, number, method, deleteBranch) {
   if (!['squash', 'merge', 'rebase'].includes(method)) throw new HttpError(400, 'Invalid merge method');
   if (!Number.isInteger(number)) throw new HttpError(400, 'Invalid PR number');
-  const meta = await repoMeta(repo);
+  const meta = await repoMeta(repo, READ).catch((e) => { throw e.status ? e : new HttpError(502, e.noAnswer ? NO_ANSWER : e.message); });
   if (meta.noRemote) throw new HttpError(400, 'Repository has no GitHub remote');
   const pick = lib.pickMergeMethod(method, meta.methods);
   if (!pick) throw new HttpError(409, 'This repository allows no merge method');
-  const pr = await viewPr(repo, number);
+  const pr = await readPr(repo, number);
   if (pr.state !== 'OPEN') throw new HttpError(409, `PR is ${pr.state}`);
   if (!pr.ready) throw new HttpError(409, `Not ready to merge: ${pr.blockedReason}`);
 
@@ -103,10 +137,12 @@ async function mergePr(repo, number, method, deleteBranch) {
   const m = await gh(repo.path, [
     'api', '-X', 'PUT', `repos/${meta.slug}/pulls/${number}/merge`,
     '-f', `merge_method=${pick.method}`, '-f', `sha=${pr.headOid}`,
-  ]);
+  ], PUT);
   if (m.code !== 0) {
-    const after = await viewPr(repo, number).catch(() => null);
-    if (!after || after.state !== 'MERGED') throw new HttpError(502, ghError(m));
+    // A clear refusal is read once, as before; an unclear failure is read a few times before saying it is not confirmed.
+    const clear = !noAnswer(m);
+    const state = await rereadState(repo, number, clear ? 1 : mergeTiming.tries);
+    if (state !== 'MERGED') throw new HttpError(502, clear ? ghError(m) : state ? NO_ANSWER : NOT_CONFIRMED);
   }
   // The branch has a merged PR now: forget a cached "none" so the next /api/prs reports it at once.
   mergedCache.delete(`${repo.id}:${pr.head}`);
@@ -115,7 +151,7 @@ async function mergePr(repo, number, method, deleteBranch) {
   let branch = 'kept';
   if (meta.deleteBranchOnMerge) branch = 'auto';
   else if (deleteBranch && !pr.isCrossRepository) {
-    const d = await gh(repo.path, ['api', '-X', 'DELETE', `repos/${meta.slug}/git/refs/heads/${lib.encodeRef(pr.head)}`]);
+    const d = await gh(repo.path, ['api', '-X', 'DELETE', `repos/${meta.slug}/git/refs/heads/${lib.encodeRef(pr.head)}`], READ).catch(() => ({ code: 1, stdout: '', stderr: '' }));
     branch = d.code === 0 || /reference does not exist/i.test(d.stdout + d.stderr) ? 'deleted' : 'kept';
   }
   return pick.fellBack ? { merged: true, branch, method: pick.method, requested: pick.requested } : { merged: true, branch };
@@ -135,4 +171,4 @@ async function rerunFailed(repo, number) {
   return { rerun: ok };
 }
 
-module.exports = { MERGED_TTL_FOUND, MERGED_TTL_NONE, mergedPrFor, prState, mergePr, rerunFailed, forgetMeta: (id) => metaCache.delete(id) };
+module.exports = { MERGED_TTL_FOUND, MERGED_TTL_NONE, mergeTiming, mergedPrFor, prState, mergePr, rerunFailed, forgetMeta: (id) => metaCache.delete(id) };

@@ -3,6 +3,7 @@
 const { execFile } = require('node:child_process');
 
 const { AsyncLocalStorage } = require('node:async_hooks');
+const { HttpError } = require('./errors.js');
 
 // RP76: REPO_PANEL_MAX_PARALLEL caps the child processes (a positive integer, else 8). A request of the person (lane 'user') may use
 // URGENT_EXTRA places over the cap, and waiting user jobs go before waiting background ones (FIFO inside each lane).
@@ -23,10 +24,18 @@ function dispatch() {
     lane.shift()();
   }
 }
-function slot(user) {
-  return new Promise((resolve) => {
-    lanes[user ? 'user' : 'background'].push(() => { active++; resolve(() => { active--; dispatch(); }); });
+// RP278: `waitMs` (optional) bounds the wait for a place: when it expires the job leaves its lane, never runs, and the caller gets a 503.
+const BUSY = 'The panel is busy with other GitHub and Git work: try the merge again in a minute';
+function slot(user, waitMs) {
+  return new Promise((resolve, reject) => {
+    const lane = lanes[user ? 'user' : 'background'];
+    let timer = null;
+    const start = () => { clearTimeout(timer); active++; resolve(() => { active--; dispatch(); }); };
+    lane.push(start);
     dispatch();
+    if (waitMs > 0 && lane.includes(start)) {
+      timer = setTimeout(() => { lane.splice(lane.indexOf(start), 1); reject(new HttpError(503, BUSY)); }, waitMs);
+    }
   });
 }
 
@@ -40,11 +49,11 @@ function singleFlight(map, key, fn) {
   return p;
 }
 
-// `env` (optional) is merged over the base environment of the child.
-async function run(cmd, args, { cwd, timeout = 60000, env } = {}) {
+// `env` (optional) is merged over the base environment of the child; `waitMs` (optional) bounds the wait for a place (see slot).
+async function run(cmd, args, { cwd, timeout = 60000, env, waitMs } = {}) {
   const st = als.getStore() || {};
   const t0 = Date.now();
-  const release = await slot(st.priority === 'user');
+  const release = await slot(st.priority === 'user', waitMs);
   if (st.ctx) { st.ctx.procs += 1; st.ctx.waitMs += Date.now() - t0; }
   try {
     return await new Promise((resolve) => {
