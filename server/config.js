@@ -129,6 +129,8 @@ function loadConfig() {
     ...(Array.isArray(cfg.dismissed) ? { dismissed: cleanIds(cfg.dismissed) } : {}),
     // Rooms the user declared by hand; written back only when present.
     ...(cleaned ? { rooms: cleaned.rooms } : {}),
+    // F1: the repos GET /api/attention looks at when no room is named; written back only when present.
+    ...(cfg.attentionRepos !== undefined ? { attentionRepos: Array.isArray(cfg.attentionRepos) ? cleanIds(cfg.attentionRepos) : [] } : {}),
     // The pi session the panel adopted per repo and room; written back only when present.
     ...(cfg.sessions !== undefined ? { sessions: cleanSessions(cfg.sessions) } : {}),
     // Which pi the panel runs; written back only when present.

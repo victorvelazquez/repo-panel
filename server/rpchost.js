@@ -203,6 +203,7 @@ function wire(e) {
 
 function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClient, max = 6, adoptedOf = (id) => (loadConfig().sessions || {})[id], adopt = () => {}, replaceAdopted = () => {}, env = process.env, contextMs = 10000, commandsMs = 5000, compactMs = 600000, suffix = () => crypto.randomBytes(3).toString('hex') }) {
   const live = new Map(); // repo id -> { client, sessionId, ready }
+  const dead = new Map(); // F1: repo id -> { cause, at } of a session that was up and died by itself; cleared when the repo starts again
   // RP238: repo id -> a promise that resolves once every pi of its closed sessions is gone (exited, or killed after the grace). A new start of the repo waits for it,
   // so two pi never write the same session file.
   const closing = new Map();
@@ -252,6 +253,7 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
       cwd: repo.path,
       env: runtimeEnv(found.active, env),
       onEvent: (e) => {
+        if (e && e.kind === 'state' && live.get(id) === entry) entry.stateAt = Date.now(); // F1: since when the session is in its state
         // RP140: the compaction mark follows the events of THIS session, so one that pi starts by itself (threshold, overflow) shows too.
         if (e && e.kind === 'event' && e.record && live.get(id) === entry && (e.record.type === 'compaction_start' || e.record.type === 'compaction_end')) entry.compacting = e.record.type === 'compaction_start';
         // RP239: pi is waiting to retry a failed request; Stop then cuts that wait too.
@@ -272,10 +274,12 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
       onExit: (info) => {
         const cur = live.get(id); if (cur === entry) live.delete(id); if (cur === entry || !cur) publish(id, { kind: 'exit' }); stop(id, entry); // RP238: a pi that ended any way may still be closing
         // RP238b: a session that was up and died by itself then says why, with its category only; not when a new session of the repo started meanwhile.
-        if (entry.up && info && info.reason === 'exit' && typeof entry.client.cause === 'function') entry.client.cause().then((c) => { if (Object.hasOwn(CAUSES, c || '') && !live.has(id)) publish(id, { kind: 'ended', cause: c }); }, () => {});
+        const mark = entry.up && !entry.closed && info && info.reason === 'exit' && !live.has(id) ? { cause: null, at: Date.now() } : null; // F1: kept for GET /api/attention
+        if (mark) dead.set(id, mark);
+        if (entry.up && info && info.reason === 'exit' && typeof entry.client.cause === 'function') entry.client.cause().then((c) => { if (Object.hasOwn(CAUSES, c || '')) { if (mark && dead.get(id) === mark) mark.cause = c; if (!live.has(id)) publish(id, { kind: 'ended', cause: c }); } }, () => {});
       },
     });
-    try { await entry.client.start(); entry.up = true; entry.upAt = Date.now(); } catch (e) { // RP161: when the panel started this session (the jobs of an older process are gone)
+    try { await entry.client.start(); entry.up = true; entry.upAt = Date.now(); entry.stateAt = entry.upAt; } catch (e) { // RP161: when the panel started this session (the jobs of an older process are gone)
       if (entry.closed) throw new HttpError(409, SESSION_CLOSED); // closed while starting: not a failure to launch
       // Fixed messages only: a start that ran out of time is not a failure to launch, and the raw error never reaches the page.
       if (e && e.message === 'The session did not start in time') throw new HttpError(504, 'The session did not start in time');
@@ -304,6 +308,7 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
     if (live.size >= max) throw new HttpError(409, `Too many live sessions (at most ${max})`);
     const entry = { client: null, sessionId: null, ready: null, fresh };
     live.set(id, entry);
+    dead.delete(id);
     entry.ready = launch(id, repo, entry).catch((e) => {
       if (live.get(id) === entry) live.delete(id);
       stop(id, entry);
@@ -401,6 +406,16 @@ function createRpcHost({ resolve, repoOf, publish, createClient = createRpcClien
     stateOf,
     startedAtOf,
     outcomeOf,
+    // F1: what GET /api/attention needs of a repo, synchronous and total, from memory only: the state and since when, the open dialogs, the permission mode and a death by itself.
+    attentionOf(id) {
+      const state = stateOf(id);
+      const entry = live.get(id);
+      const up = entry && entry.up === true && !entry.closed;
+      let dialogs = [];
+      try { dialogs = up && state === 'asking' ? entry.client.pendingDialogs().map((d) => ({ requestId: d.id, method: d.method, title: d.title, options: d.options })) : []; } catch { dialogs = []; }
+      const ended = !entry && dead.has(id) ? { ...dead.get(id) } : null;
+      return { state, since: up && Number.isFinite(entry.stateAt) ? entry.stateAt : null, mode: up && entry.mode ? entry.mode : null, ended, dialogs };
+    },
     // RP233: the command names the live session of a repo loaded, or null (no live session, still starting, or the list is unknown). Memory only.
     commandsOf(id) { const entry = live.get(id); return entry && entry.up === true && !entry.closed && Array.isArray(entry.commands) ? [...entry.commands] : null; },
     // RP215: `images` (up to 4, checked by sentImages before anything reaches pi) go in the same request; with images the text may be empty.
