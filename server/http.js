@@ -13,7 +13,7 @@ const { fetchRepo } = require('./fetcher.js');
 const { loadConfig, saveConfig, findRepo, roomIssues } = require('./config.js');
 const { resolveRuntime, handshake } = require('./piruntime.js');
 const { localState, diffText } = require('./local.js');
-const { listFiles, readFile } = require('./files.js');
+const { listFiles, readFile, readImage } = require('./files.js');
 const { readNotes, saveNotes } = require('./notes.js');
 const { prState, mergePr, rerunFailed } = require('./github.js');
 const { roadmapState } = require('./roadmap.js');
@@ -144,6 +144,8 @@ const routes = {
   // RP65: the file explorer; the repo comes only from the config by id, the path is validated and matched against git's own listing.
   'GET /api/files': (q) => listFiles(findRepo(q.id)),
   'GET /api/file': (q) => readFile(findRepo(q.id), q.path),
+  // RP268: the bytes of one image of the repo (same guards as GET /api/file), not JSON (see RAW).
+  'GET /api/file/image': async (q) => ({ [RAW]: await readImage(findRepo(q.id), q.path) }),
   // RP93: the notes of a repo, one fixed file (see server/notes.js); the repo comes from the config by id, never a path from the page.
   'GET /api/notes': (q) => readNotes(findRepo(q.id)),
   'POST /api/notes': (q, b) => saveNotes(findRepo(b && b.id), b),

@@ -295,6 +295,12 @@ async function loadFiles() {
   const again = chat.ffile || chat.fpath; // RP130: the file open in the centre is read again with the tree
   if (chat.filesReq === req && again) loadFile(again);
 }
+// RP268: the bytes of an image of the repo, fetched with the token header (an <img src> of the route could not carry it), as a blob: address; '' when they fail.
+function fileImage(id, p) {
+  return fetch(`/api/file/image?id=${encodeURIComponent(id)}&path=${encodeURIComponent(p)}`, { headers: { 'x-token': TOKEN } })
+    .then((r) => (r.ok ? r.blob() : null)).catch(() => null)
+    .then((b) => (b && b.type.startsWith('image/') ? URL.createObjectURL(b) : ''));
+}
 async function loadFile(p) {
   const chat = S.chat;
   const { id, seq } = chat;
@@ -306,7 +312,11 @@ async function loadFile(p) {
   draw();
   try {
     const d = await api(`/api/file?id=${id}&path=${encodeURIComponent(p)}`);
-    if (chat.fileReq === req) S.fileData[id] = d;
+    if (d && d.image && chat.fileReq === req) d.url = await fileImage(id, p);
+    if (chat.fileReq === req) {
+      if (S.fileData[id] && S.fileData[id].url && S.fileData[id].url !== (d && d.url)) URL.revokeObjectURL(S.fileData[id].url);
+      S.fileData[id] = d;
+    } else if (d && d.url) URL.revokeObjectURL(d.url);
   } catch (e) {
     if (chat.fileReq === req && S.chat.seq === seq) chat.fileFailed = e.message || 'File unavailable';
   }

@@ -9,6 +9,7 @@ const fsp = require('node:fs/promises');
 const path = require('node:path');
 const { git } = require('./exec.js');
 const { HttpError } = require('./errors.js');
+const { imageType, IMAGE_MAX } = require('./images.js');
 
 const MAX_FILES = 5000;
 const MAX_PATH = 1024;
@@ -69,7 +70,8 @@ function hunks(diff) {
 
 const lineCount = (text) => (text ? text.split('\n').length - (text.endsWith('\n') ? 1 : 0) : 0);
 
-async function readFile(repo, rel, { git: run = git } = {}) {
+// The file of the repo a path names, with every guard of RP65: an entry of git's listing, a regular file, not a symlink, its real path inside the repo.
+async function locate(repo, rel, run) {
   const file = cleanPath(rel);
   const untracked = (await listing(repo, run)).get(file);
   if (untracked === undefined) throw new HttpError(404, NOT_FOUND);
@@ -82,9 +84,30 @@ async function readFile(repo, rel, { git: run = git } = {}) {
     [real, root] = await Promise.all([fsp.realpath(full), fsp.realpath(repo.path)]);
   } catch { throw new HttpError(404, NOT_FOUND); }
   if (!st.isFile() || st.isSymbolicLink() || (real !== root && !real.startsWith(root + path.sep))) throw new HttpError(404, NOT_FOUND);
+  return { file, full, st, untracked };
+}
+
+// RP268: the first bytes of a file, enough to tell its image type.
+async function head(full) {
+  const fh = await fsp.open(full, 'r').catch(() => { throw new HttpError(404, NOT_FOUND); });
+  try {
+    const buf = Buffer.alloc(16);
+    const { bytesRead } = await fh.read(buf, 0, 16, 0);
+    return buf.subarray(0, bytesRead);
+  } finally { await fh.close(); }
+}
+
+async function readFile(repo, rel, { git: run = git } = {}) {
+  const { file, full, st, untracked } = await locate(repo, rel, run);
   const base = { path: file, size: st.size, changed: [], binary: false, tooLarge: false };
-  if (st.size > MAX_BYTES) return { ...base, tooLarge: true };
+  // RP268: an image (by its bytes) says its type and carries no text; GET /api/file/image answers its bytes, up to IMAGE_MAX.
+  if (st.size > MAX_BYTES) {
+    const type = st.size <= IMAGE_MAX ? imageType(await head(full)) : '';
+    return type ? { ...base, binary: true, image: type } : { ...base, tooLarge: true };
+  }
   const buf = await fsp.readFile(full).catch(() => { throw new HttpError(404, NOT_FOUND); });
+  const type = imageType(buf);
+  if (type) return { ...base, binary: true, image: type };
   if (buf.subarray(0, BINARY_PROBE).includes(0)) return { ...base, binary: true };
   const text = buf.toString('utf8');
   let changed = [];
@@ -97,4 +120,14 @@ async function readFile(repo, rel, { git: run = git } = {}) {
   return { ...base, text, changed };
 }
 
-module.exports = { listFiles, readFile };
+// RP268: the bytes of an image of the repo, with the guards of readFile; 415 when the bytes are not one of the image types, 413 over IMAGE_MAX.
+async function readImage(repo, rel, { git: run = git } = {}) {
+  const { full, st } = await locate(repo, rel, run);
+  if (st.size > IMAGE_MAX) throw new HttpError(413, 'Image too large');
+  const body = await fsp.readFile(full).catch(() => { throw new HttpError(404, NOT_FOUND); });
+  const type = imageType(body);
+  if (!type) throw new HttpError(415, 'Unsupported image');
+  return { type, body };
+}
+
+module.exports = { listFiles, readFile, readImage };

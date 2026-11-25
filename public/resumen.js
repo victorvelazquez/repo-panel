@@ -896,6 +896,12 @@
     if (!file || ctx.fileLoading || file.path !== sel) return note('Loading file…');
     const head = `<h3 class="cv-title" title="${esc(sel)}">${esc(sel)}</h3>`;
     const wrap = (inner) => `<section class="cv-file">${head}${inner}</section>`;
+    // RP268: an image is shown only from the blob: address the page made from GET /api/file/image; any other address is never put in the page.
+    if (file.image) {
+      const url = typeof file.url === 'string' && file.url.startsWith('blob:') ? file.url : '';
+      if (!url) return wrap('<div class="cv-note rs-sub">Image unavailable</div>');
+      return wrap(`<div class="cv-pic"><a class="cv-open" href="${esc(url)}" target="_blank" rel="noopener noreferrer">Open in new tab</a><img src="${esc(url)}" alt="${esc(sel)}"></div>`);
+    }
     if (file.binary) return wrap('<div class="cv-note rs-sub">Binary file, not shown</div>');
     if (file.tooLarge) return wrap(`<div class="cv-note rs-sub">File too large to show (${(num(file.size) / MB).toFixed(1)} MB)</div>`);
     if (typeof file.text !== 'string') return note('File unavailable');
