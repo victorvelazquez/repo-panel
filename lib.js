@@ -235,8 +235,10 @@ const rmById = (rows) => {
 };
 
 // Parses the docs/ROADMAP.md contract: header lines plus the units table. Never throws.
+// Only CRLF and LF end a line; a lone CR is cell text, so it cannot split a row.
 function parseRoadmap(markdown) {
-  const lines = (typeof markdown === 'string' ? markdown : '').replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n')
+  const lines = (typeof markdown === 'string' ? markdown : '').replace(/^\uFEFF/, '').replace(/\r\n/g, '\n')
+    .replace(/\r/g, ' ')
     .replace(/<!--[\s\S]*?-->/g, (c) => c.replace(/[^\n]/g, '')).split('\n');
   const problems = [];
   const add = (line, severity, code, message) => problems.push({ line, severity, code, message });
@@ -318,6 +320,13 @@ function parseRoadmap(markdown) {
   const cyclic = rmFindCycles(byId, (dep, cycle) => {
     add(dep.line, 'error', 'circular-dependency', `Circular dependency: ${[...cycle, dep].map((r) => r.id).join(' -> ')}`);
   });
+
+  // A table that ends at a text line was cut, usually by a line break inside a row.
+  if (table.end < lines.length && lines[table.end].trim() !== '') {
+    const after = blocks.find((b) => b.start === table.end + 1);
+    const lost = after ? `; ${after.end - after.start} rows after it are ignored` : '';
+    add(table.end + 1, 'error', 'table-cut', `Table ends at a line that is not a row (a line break inside a row?)${lost}`);
+  }
 
   // A table separated from the chosen one by a blank line must itself be a valid table.
   let k = table.end;
