@@ -180,8 +180,43 @@ test('f1-h: a free session with «Siguiente:» is waiting at once; without it, i
 
 test('f1-i: a session that died by itself is session-dead; a mode other than super-yolo is mode-not-super-yolo', () => {
   assert.deepEqual(one({ ...quiet, ended: { cause: 'crashed', at: NOW - MIN } }).items, [{ kind: 'session-dead', id: IA, name: 'alpha', cause: 'crashed', since: iso(NOW - MIN) }]);
-  assert.deepEqual(one({ state: 'busy', since: NOW, mode: 'normal', ended: null, dialogs: [] }).items, [{ kind: 'mode-not-super-yolo', id: IA, name: 'alpha', mode: 'normal' }]);
+  assert.deepEqual(one({ state: 'busy', since: NOW, mode: 'normal', ended: null, dialogs: [] }).items, [{ kind: 'mode-not-super-yolo', id: IA, name: 'alpha', mode: 'normal', expected: 'super-yolo', fix: fixFor('super-yolo') }]);
   assert.deepEqual(one({ state: 'busy', since: NOW, mode: null, ended: null, dialogs: [] }).items, []);
+});
+
+const fixFor = (m) => `Set the default permission mode to ${m} in a terminal, then restart this session`;
+
+test('F2: the expected mode is configurable; the kind keeps its name and the item says what was expected and how to fix it', () => {
+  const at = (mode) => ({ state: 'busy', since: NOW, mode, ended: null, dialogs: [] });
+  assert.deepEqual(one(at('yolo'), { expectedMode: 'yolo' }).items, []);
+  assert.deepEqual(one(at('super-yolo'), { expectedMode: 'yolo' }).items, [{ kind: 'mode-not-super-yolo', id: IA, name: 'alpha', mode: 'super-yolo', expected: 'yolo', fix: fixFor('yolo') }]);
+  assert.deepEqual(one(at('normal'), { expectedMode: undefined }).items.map((i) => i.expected), ['super-yolo']); // no setting: super-yolo, as before
+  assert.deepEqual(one({ ...at('normal'), state: 'closed' }, { expectedMode: 'yolo' }).items, []); // a closed session is never flagged
+});
+
+test('F2: config.json keeps pi.permissionMode only when it is a known mode; a save keeps it', () => {
+  const { loadConfig, saveConfig } = require('../server/config.js');
+  writeConfig({ pi: { runtime: 'gentle-shell', permissionMode: 'yolo' } });
+  assert.deepEqual(loadConfig().pi, { runtime: 'gentle-shell', permissionMode: 'yolo' });
+  saveConfig(loadConfig());
+  assert.equal(JSON.parse(fs.readFileSync(process.env.REPO_PANEL_CONFIG, 'utf8')).pi.permissionMode, 'yolo');
+  for (const bad of ['root', 'SUPER-YOLO', 5, null, ['yolo']]) {
+    writeConfig({ pi: { runtime: 'gentle-shell', permissionMode: bad } });
+    assert.deepEqual(loadConfig().pi, { runtime: 'gentle-shell' }, String(bad));
+  }
+});
+
+test('F2: through the route, the item follows pi.permissionMode of config.json', async () => {
+  let mode = 'yolo';
+  const host = fakeHost({ stateOf: () => 'busy', attentionOf: (id) => (id === IA ? { state: 'busy', since: Date.now(), mode, ended: null, dialogs: [] } : { state: 'closed', since: null, mode: null, ended: null, dialogs: [] }) });
+  await withServer(host, async ({ get }) => {
+    writeConfig({ attentionRepos: [IA], pi: { permissionMode: 'yolo' } });
+    assert.deepEqual((await get('/api/attention')).json.items, []);
+    mode = 'normal';
+    assert.deepEqual((await get('/api/attention')).json.items.map((i) => [i.kind, i.mode, i.expected]), [['mode-not-super-yolo', 'normal', 'yolo']]);
+    writeConfig({ attentionRepos: [IA] });
+    assert.deepEqual((await get('/api/attention')).json.items.map((i) => i.expected), ['super-yolo']);
+  });
 });
 
 test('f1-j: PRs: ready is pr-green with the clone whose branch is its head, failed checks are pr-red, a PR seen by two clones counts once', () => {

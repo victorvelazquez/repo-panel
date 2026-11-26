@@ -11,7 +11,9 @@ const MAX_ITEMS = 20;
 const TEXT_MAX = 200;
 const TITLE_MAX = 90;
 const IDLE_MS = 5 * 60000; // a free session without an order counts only after this long
-const EXPECTED_MODE = 'super-yolo'; // fixed until F2 makes it configurable
+const EXPECTED_MODE = 'super-yolo'; // the default; F2: pi.permissionMode of config.json replaces it
+// F2: the panel never sets a mode (RP237); the person sets the default once and a session takes it when it starts again.
+const fixFor = (mode) => `Set the default permission mode to ${mode} in a terminal, then restart this session`;
 // The order a director attends to them (the strategy's round): questions, green PRs, idle lanes with their next step, then the rest.
 const ORDER = ['asking', 'queue-lost', 'pr-green', 'waiting', 'idle-no-order', 'session-dead', 'pr-red', 'mode-not-super-yolo'];
 
@@ -29,7 +31,7 @@ function nextLine(text) {
 
 // repos: [{ id, name, branch }] in scope order; sessions: id -> attentionOf(id); prs: id -> enriched PRs (or null); last: id -> last agent text;
 // snoozed: "<repoId>:<number>" keys the person parked; scrub: applied to every text first (the server replaces its token there).
-function buildAttention({ repos, sessions, prs, last, now, stale, ok = true, snoozed = [], scrub = (s) => s }) {
+function buildAttention({ repos, sessions, prs, last, now, stale, ok = true, snoozed = [], scrub = (s) => s, expectedMode = EXPECTED_MODE }) {
   const cut = cutWith(scrub);
   const items = [];
   const parked = new Set(snoozed);
@@ -49,7 +51,7 @@ function buildAttention({ repos, sessions, prs, last, now, stale, ok = true, sno
       else if (Number.isFinite(s.since) && now - s.since > IDLE_MS) items.push({ kind: 'idle-no-order', ...who, since: isoOf(s.since) });
     }
     if (s.state === 'closed' && s.ended) items.push({ kind: 'session-dead', ...who, cause: s.ended.cause ? cut(s.ended.cause) : null, since: isoOf(s.ended.at) });
-    if (s.state !== 'closed' && s.mode && s.mode !== EXPECTED_MODE) items.push({ kind: 'mode-not-super-yolo', ...who, mode: cut(s.mode) });
+    if (s.state !== 'closed' && s.mode && s.mode !== expectedMode) items.push({ kind: 'mode-not-super-yolo', ...who, mode: cut(s.mode), expected: expectedMode, fix: fixFor(expectedMode) });
   }
   // Clones of one remote list the same PRs: each counts once, under the clone whose branch is its head when there is one.
   const seen = new Set();
@@ -114,7 +116,7 @@ function collect({ cfg, room, host, store, lastOf, repoId, now }) {
     sessions[r.id] = sessionOf(r.id);
     if (sessions[r.id].state === 'idle') { try { last[r.id] = lastOf(r.id); } catch { last[r.id] = null; } }
   }
-  return { repos, sessions, prs, last, now, snoozed: cfg.snoozed || [] };
+  return { repos, sessions, prs, last, now, snoozed: cfg.snoozed || [], expectedMode: (cfg.pi && cfg.pi.permissionMode) || EXPECTED_MODE };
 }
 
 module.exports = { buildAttention, nextLine, createSeq, collect, MAX_ITEMS, IDLE_MS, EXPECTED_MODE };
