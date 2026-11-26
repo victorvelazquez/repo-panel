@@ -541,7 +541,7 @@ function drawChat() {
   const phone = narrowOn(); // RP196: under 760 px Notes is a tab of the column and a file or a diff opens as its detail screen
   const colTab = V ? V.columnTabOf(S.chat.colTab, { room: !!room, phone }) : 'changes'; // RP220
   const detail = column && phone ? (S.chat.detail === 'diff' && S.chat.dfile ? 'diff' : S.chat.detail === 'file' && S.chat.ffile ? 'file' : '') : '';
-  const detailHtml = () => R.columnDetail({ title: detail === 'diff' ? S.chat.dfile : S.chat.ffile, html: detail === 'diff' ? R.changesView(S.changes[S.chat.id] || null, { selected: S.chat.dfile, only: true, split: !!S.prefs.split, loading: !!S.chat.changesLoading, failed: !!S.chat.changesFailed }) : R.fileView(S.fileData[S.chat.id] || null, { selected: S.chat.ffile, fileLoading: !!S.chat.fileLoading, fileFailed: S.chat.fileFailed || '' }) });
+  const detailHtml = () => R.columnDetail({ title: detail === 'diff' ? S.chat.dfile : S.chat.ffile, html: detail === 'diff' ? R.changesView(S.changes[S.chat.id] || null, { selected: S.chat.dfile, only: true, split: !!S.prefs.split, loading: !!S.chat.changesLoading, failed: !!S.chat.changesFailed }) : R.fileView(S.fileData[S.chat.id] || null, { selected: S.chat.ffile, fileLoading: !!S.chat.fileLoading, fileFailed: S.chat.fileFailed || '', mdSource: !!S.prefs.mdSource }) });
   paint($('#colBody'), detail ? detailHtml() : !column ? '' : R.columnView({ notes: phone, back: narrowOn(), name: nameOf(S.chat.id), tab: colTab, room: !!room, members: room ? V.roomMembers(room, { repos: allRepos(), rows: S.summary && Array.isArray(S.summary.rows) ? S.summary.rows : [], prsFor: summaryPrs, liveFor: summaryLive }) : null, now: Date.now(), fold: S.chat.colFold, git: columnGit(S.chat.id, facts), files: facts && !facts.error && Array.isArray(facts.files) ? facts.files : null, failed: !!(facts && facts.error), selected: S.chat.dfile || '', tree: colTab === 'files' ? S.files[S.chat.id] || null : null, changed: colTab === 'files' ? changedOf(S.chat.id) : null, fselected: S.chat.ffile || '', fopen: S.filesOpen[S.chat.id] || {}, filesFailed: !!S.chat.filesFailed, tasksHtml: colTab === 'tasks' ? R.tasksView(S.tasks[S.chat.id] || null, { compact: true, open: S.tasksFold, more: S.tasksMore, readAt: S.chat.tasksAt, now: Date.now(), refreshing: !!S.chat.tasksRefreshing, refreshFailed: !!S.chat.tasksRefreshFailed, loading: !!S.chat.tasksLoading, failed: !!S.chat.tasksFailed }) : '' }));
   // What the person touched in the column keeps the focus across the repaint: a tab by its id, a folder or a fold by its button.
   const want = S.chat.colFocus;
@@ -591,14 +591,14 @@ function drawChat() {
     return;
   }
   if (fileTab) {
-    paint($('#chatBody'), R.fileView(S.fileData[S.chat.id] || null, { selected: S.chat.ffile, fileLoading: !!S.chat.fileLoading, fileFailed: S.chat.fileFailed || '' }));
+    paint($('#chatBody'), R.fileView(S.fileData[S.chat.id] || null, { selected: S.chat.ffile, fileLoading: !!S.chat.fileLoading, fileFailed: S.chat.fileFailed || '', mdSource: !!S.prefs.mdSource }));
     chatShown = null;
     return;
   }
   if (filesTab) {
     const id = S.chat.id;
     const changed = changedOf(id);
-    paint($('#chatBody'), R.filesView(S.files[id] || null, { selected: S.chat.fpath || '', open: S.filesOpen[id] || {}, changed, loading: !!S.chat.filesLoading, failed: !!S.chat.filesFailed, fileLoading: !!S.chat.fileLoading, fileFailed: S.chat.fileFailed || '' }, S.fileData[id] || null));
+    paint($('#chatBody'), R.filesView(S.files[id] || null, { selected: S.chat.fpath || '', open: S.filesOpen[id] || {}, changed, loading: !!S.chat.filesLoading, failed: !!S.chat.filesFailed, fileLoading: !!S.chat.fileLoading, fileFailed: S.chat.fileFailed || '', mdSource: !!S.prefs.mdSource }, S.fileData[id] || null));
     chatShown = null;
     return;
   }

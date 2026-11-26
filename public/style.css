@@ -814,16 +814,19 @@ button.tk-gh:hover:not(:disabled) { background: var(--panel2); color: var(--text
 .m.stopnote.error { color: #e07a7a; border-color: #6b2c2c; }
 .sysnote { align-self: center; color: var(--muted); font-size: 12px; padding: 2px 10px; }
 #msgSend[hidden], #msgStop[hidden] { display: none; } /* RP191: the author display of the round buttons beats the attribute */
-.m p, .m ul, .m ol, .m pre, .m blockquote, .m h3, .m h4, .m h5 { margin: 6px 0; }
+/* RP269: a Markdown file rendered in the file viewer reads like a chat message, in its own padded box. */
+.cv-md { padding: 4px 12px 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.m p, .m ul, .m ol, .m pre, .m blockquote, .m h3, .m h4, .m h5, .cv-md p, .cv-md ul, .cv-md ol, .cv-md pre, .cv-md blockquote, .cv-md h3, .cv-md h4, .cv-md h5 { margin: 6px 0; }
 .m > .who + *, .m > :first-child:not(.who) { margin-top: 0; }
 .m > :last-child { margin-bottom: 0; }
-.m h3 { font-size: 16px; } .m h4 { font-size: 15px; } .m h5 { font-size: 14px; }
-.m ul, .m ol { padding-left: 22px; }
-.m blockquote { padding-left: 10px; border-left: 3px solid var(--line); color: var(--muted); }
-.m pre { max-height: none; overflow-x: auto; padding: 8px 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; overflow-wrap: normal; }
-.m code { font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
-.m :not(pre) > code { padding: 1px 4px; border-radius: 4px; background: rgba(110, 118, 129, .2); }
-.m pre code { white-space: pre; }
+.m h3, .cv-md h3 { font-size: 16px; } .m h4, .cv-md h4 { font-size: 15px; } .m h5, .cv-md h5 { font-size: 14px; }
+.m ul, .m ol, .cv-md ul, .cv-md ol { padding-left: 22px; }
+.m blockquote, .cv-md blockquote { padding-left: 10px; border-left: 3px solid var(--line); color: var(--muted); }
+.m pre, .cv-md pre { max-height: none; overflow-x: auto; padding: 8px 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; overflow-wrap: normal; }
+.m code, .cv-md code { font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
+.m :not(pre) > code, .cv-md :not(pre) > code { padding: 1px 4px; border-radius: 4px; background: rgba(110, 118, 129, .2); }
+.m pre code, .cv-md pre code { white-space: pre; }
+.cv-bar .cv-split-btn + .cv-split-btn { margin-left: 4px; }
 /* RP124: a Markdown table: thin rows with a muted head and no background of its own; a wide table scrolls inside its own box instead of stretching the chat. */
 .md-table { overflow-x: auto; margin: 8px 0; max-width: 100%; }
 .md-table table { border-collapse: collapse; width: max-content; min-width: 100%; font-size: 13px; }
