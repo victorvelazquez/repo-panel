@@ -273,6 +273,7 @@ async function loadSummary() {
   try {
     // The whole-board build takes 20 to 30 s on a slow machine until RP78 serves it from memory: a 25 s limit would show a false failure.
     const d = await api('/api/summary', undefined, { timeoutMs: SUMMARY_TIMEOUT_MS });
+    S.failSince.summary = null;
     if (seq < summaryApplied) return;
     summaryApplied = seq;
     const key = JSON.stringify({ ...d, generatedAt: null });
@@ -286,6 +287,7 @@ async function loadSummary() {
     // RP78: rows the store has not read yet are `loading`: ask again soon instead of waiting for the 20 s tick.
     if (Array.isArray(d.rows) && d.rows.some((r) => r.loading)) setTimeout(summaryTick, SUMMARY_LOADING_MS);
   } catch {
+    if (S.failSince.summary === null) S.failSince.summary = Date.now(); // F4
     if (seq >= summaryApplied && !S.summaryFailed) { S.summaryFailed = true; draw(); }
   }
 }

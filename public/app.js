@@ -24,6 +24,8 @@ function paint(el, html) {
 
 const S = {
   aliveAt: Date.now(), visibleAt: Date.now(),
+  // F4: since when each read of the page keeps failing (null while it answers), and what the server said of its Summary (null = unknown).
+  failSince: { summary: null, board: null }, serverOk: null,
   groups: [], local: {}, prs: {}, roadmap: {}, rmOpen: {}, loading: {}, busy: {},
   snoozed: new Set(), keepSnoozed: new Set(), snoozedOpen: {}, onlyProblems: false,
   dismissed: new Set(), menu: null, reqPassOpen: {},
@@ -184,6 +186,9 @@ setInterval(quietTick, 10000);
 // RP181: the quiet "not updating" notice; coming back to the app asks for the Summary and the chat at once.
 function stalledTick() { $('#stalled').hidden = !(V ? V.stalledNow({ now: Date.now(), aliveAt: S.aliveAt, visibleAt: S.visibleAt, hidden: document.hidden }) : false); }
 setInterval(stalledTick, 5000);
+// F4: the strong notice of a panel that stopped updating (the server says so, or the page's own reads keep failing).
+function downTick() { $('#down').hidden = !(V && V.panelDown({ now: Date.now(), serverOk: S.serverOk, failSince: S.failSince })); }
+setInterval(downTick, 5000);
 function comeBack() { S.visibleAt = Date.now(); summaryTick(); chatTick(); stalledTick(); }
 if (typeof addEventListener === 'function') {
   addEventListener('pageshow', (e) => { if (e.persisted) comeBack(); });

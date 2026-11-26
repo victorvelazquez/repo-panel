@@ -250,8 +250,10 @@ async function checkHealth() {
   $('#outdated').hidden = V ? !V.isOutdated(health) : false; // no view.js: the server cannot be current
   // RP201: and whether it runs older code than the files on disk (one boolean, behind the token). Nothing to say when the question fails or the server does not know the route yet.
   let stale = false;
-  try { stale = (await api('/api/server-state')).stale === true; } catch { /* unreachable, or an old server without the route */ }
+  let ok = null; // F4: unknown when the question fails or the server is older than the field
+  try { const st = await api('/api/server-state'); stale = st.stale === true; ok = typeof st.ok === 'boolean' ? st.ok : null; } catch { /* unreachable, or an old server without the route */ }
   $('#stale').hidden = !stale;
+  S.serverOk = ok;
 }
 
 // ---------- board (RP80) ----------
@@ -282,7 +284,8 @@ async function loadBoard() {
   if (!V) return null;
   const seq = ++board.seq;
   let b;
-  try { b = await api(`/api/board?since=${S.boardRev}`); } catch (e) {
+  try { b = await api(`/api/board?since=${S.boardRev}`); S.failSince.board = null; } catch (e) {
+    if (S.failSince.board === null) S.failSince.board = Date.now(); // F4
     board.failures = e.status === 404 ? BOARD_DOWN_AFTER : board.failures + 1;
     if (!boardWorks() && S.boardRefreshing.length) { S.boardRefreshing = []; draw(); }
     return null;
