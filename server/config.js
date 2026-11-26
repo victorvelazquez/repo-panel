@@ -88,6 +88,8 @@ function cleanSessions(map) {
 }
 
 const PI_RUNTIMES = ['auto', 'gentle-shell', 'pi'];
+// F2: the permission mode GET /api/attention expects of every open session (the modes a session reports); the panel never sets it.
+const PERMISSION_MODES = ['normal', 'auto', 'yolo', 'super-yolo'];
 
 // The `pi` setting: which pi the panel runs. `runtime` is one of PI_RUNTIMES; `command` and `agentDir` are only ever written by hand in
 // the file (the browser cannot set them) and are validated again before use. Anything else is dropped.
@@ -101,6 +103,7 @@ function cleanPi(v) {
   if (PI_RUNTIMES.includes(v.runtime)) out.runtime = v.runtime;
   if (typeof v.command === 'string') out.command = v.command;
   if (typeof v.agentDir === 'string') out.agentDir = v.agentDir;
+  if (PERMISSION_MODES.includes(v.permissionMode)) out.permissionMode = v.permissionMode;
   return out;
 }
 
@@ -199,4 +202,4 @@ function repoByPath(p) {
   return null;
 }
 
-module.exports = { loadConfig, saveConfig, findRepo, roomOf, roomByPath, repoByPath, roomIssues, PI_RUNTIMES, nameProblem, pathProblem, ROOM_NAME_MAX, ROOMS_NOT_LIST };
+module.exports = { loadConfig, saveConfig, findRepo, roomOf, roomByPath, repoByPath, roomIssues, PI_RUNTIMES, PERMISSION_MODES, nameProblem, pathProblem, ROOM_NAME_MAX, ROOMS_NOT_LIST };
