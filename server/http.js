@@ -75,13 +75,17 @@ async function setPiRuntime(b, deps) {
   return piState(await resolveRuntime(deps));
 }
 
+// F4: never throws; a store that cannot say is taken as working.
+const storeOk = (store) => { try { return !store || typeof store.health !== 'function' || store.health().ok !== false; } catch { return true; } };
+
 const routes = {
   // RP201: ONE boolean (never the fingerprint): true when the files of the server on disk are not the code it started with. It only informs; it is behind the token and the login like every API route.
-  'GET /api/server-state': (q, b, d) => ({ stale: d.codeWatch.stale() === true }),
+  // F4: and `ok`, false when the Summary store has not ended a sweep well for more than 2 minutes (true without a store).
+  'GET /api/server-state': (q, b, d) => ({ stale: d.codeWatch.stale() === true, ok: storeOk(d.summaryStore) }),
   // F1: everything a director must act on in one call, from memory only. The token is scrubbed from the answer, even when a session printed it.
   'GET /api/attention': (q, b, d) => {
     const input = collect({ cfg: loadConfig(), room: q.room, host: d.rpcHost, store: d.summaryStore, lastOf: (id) => lastAgentText(id, d.sessionsDir), repoId: lib.repoId, now: Date.now() });
-    const content = JSON.parse(scrub(JSON.stringify(buildAttention({ ...input, stale: d.codeWatch.stale() === true, scrub }))));
+    const content = JSON.parse(scrub(JSON.stringify(buildAttention({ ...input, stale: d.codeWatch.stale() === true, ok: storeOk(d.summaryStore), scrub }))));
     return { seq: d.attentionSeq(content, q.room === undefined ? '' : `room:${q.room}`), at: new Date().toISOString(), ...content };
   },
   'GET /api/config': () => {

@@ -219,15 +219,15 @@ test('r1: with the token the route answers { stale: false } for a server that ha
     const r = await call(port, '/api/server-state', { token });
     assert.equal(r.status, 200);
     assert.match(r.headers['content-type'], /application\/json/);
-    assert.deepEqual(JSON.parse(r.body), { stale: false });
+    assert.deepEqual(JSON.parse(r.body), { stale: false, ok: true }); // F4 added ok
   });
 });
 
-test('r2: it answers { stale: true } when the watch says so, and the answer is ONE key: the fingerprint is never sent', async () => {
+test('r2: it answers { stale: true } when the watch says so, and the answer holds only stale and ok (F4): the fingerprint is never sent', async () => {
   await withServer({ codeWatch: { stale: () => true } }, async ({ port, token }) => {
     const r = await call(port, '/api/server-state', { token });
-    assert.deepEqual(JSON.parse(r.body), { stale: true });
-    assert.deepEqual(Object.keys(JSON.parse(r.body)), ['stale']);
+    assert.deepEqual(JSON.parse(r.body), { stale: true, ok: true });
+    assert.deepEqual(Object.keys(JSON.parse(r.body)), ['stale', 'ok']);
     assert.doesNotMatch(r.body, /[0-9a-f]{40}/);
   });
 });
@@ -259,7 +259,6 @@ test('r6: server.js builds the watch right after it has loaded its modules, so t
   const http = fs.readFileSync(path.join(ROOT, 'server', 'http.js'), 'utf8');
   assert.match(http, /require\('\.\/codewatch\.js'\)/);
   assert.match(http, /deps\.codeWatch\s*=\s*createCodeWatch\(\{ root: ROOT \}\)/);
-  assert.match(http, /'GET \/api\/server-state': \(q, b, d\) => \(\{ stale: d\.codeWatch\.stale\(\) === true \}\)/);
 });
 
 // ---------- the page ----------

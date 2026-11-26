@@ -37,6 +37,7 @@ const IDLE_AFTER_MS = 60000;
 const POOL = 3;
 const FIRST_DELAY_MS = 100;
 const LOOP_MS = 1000;
+const DOWN_MS = 2 * 60000; // F4: no sweep that ended well for this long means the panel is not updating
 
 const READERS = {
   local: (d, repo) => (d.local || localState)(repo),
@@ -81,7 +82,8 @@ function createSummaryStore({
   const fetchEvery = (f, idle, hot) => Math.min(FETCH_MAX_MS, (idle ? iv.idleSlow : hot ? iv.hotFetch : iv.fetch) * 2 ** f.fetch.fails);
   const isHot = (f) => !!view.isHotRepo({ local: f.local.value, prs: f.prs.value });
   const isIdle = () => now() - lastTouch >= idleAfterMs;
-  const touch = () => { lastTouch = now(); };
+  let firstTouchAt = -Infinity;
+  const touch = () => { lastTouch = now(); if (firstTouchAt === -Infinity) firstTouchAt = lastTouch; };
   // Has any client (a snapshot, a board read or a touch) ever asked? Explicit reads and the loop do not count. The action hooks of the server
   // use it: no client, no work (a server nobody asked must not start reads after an action).
   const awake = () => lastTouch !== -Infinity;
@@ -181,8 +183,17 @@ const outcome = (fact) => JSON.stringify([fact.failed, fact.error, fact.value ==
   // launch stays passive; refreshRepo and refreshAll are explicit and always read.
   function tick() {
     if (waitForClient && lastTouch === -Infinity) return Promise.resolve();
-    if (!ticking) ticking = run(false).catch(() => {}).finally(() => { ticking = null; });
+    if (!ticking) ticking = run(false).then(() => { sweptAt = now(); }, () => {}).finally(() => { ticking = null; });
     return ticking;
+  }
+  // F4: down when no sweep ended well for more than DOWN_MS since the work began (a failing or a hung sweep); a store still waiting for
+  // its first page is not down.
+  let sweptAt = null;
+  const bornAt = now();
+  function health() {
+    if (waitForClient && lastTouch === -Infinity) return { ok: true };
+    const since = Math.max(sweptAt === null ? -Infinity : sweptAt, bornAt, waitForClient ? firstTouchAt : -Infinity);
+    return { ok: now() - since <= DOWN_MS };
   }
 
   // Facts that failed their last read, or whose last success is older than 3 times their (active) interval.
@@ -264,7 +275,7 @@ const outcome = (fact) => JSON.stringify([fact.failed, fact.error, fact.value ==
     return { prs, branch: f.local.value && typeof f.local.value.branch === 'string' ? f.local.value.branch : null };
   }
 
-  return { snapshot, board, cachedOf, refreshRepo, catchUp, refreshAll, touch, awake, start, stop, tick };
+  return { snapshot, board, cachedOf, health, refreshRepo, catchUp, refreshAll, touch, awake, start, stop, tick };
 }
 
-module.exports = { createSummaryStore };
+module.exports = { createSummaryStore, DOWN_MS };
