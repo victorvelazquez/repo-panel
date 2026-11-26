@@ -887,6 +887,7 @@
   // /api/file answer. A folder is open by default only when a changed file is inside it. Pure and total; every name and text goes through `esc`.
   const TREE_MAX = 1500;
   const MB = 1024 * 1024;
+  const MD_FILE = /\.(md|markdown)$/i;
   const byName = (a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
   function fileSection(file, ctx) {
     const note = (t) => `<div class="empty" role="status">${t}</div>`;
@@ -908,13 +909,19 @@
     const lines = file.text.split('\n');
     if (lines[lines.length - 1] === '') lines.pop();
     if (!lines.length) return wrap('<div class="cv-note rs-sub">Empty file</div>');
+    // RP269: a Markdown file reads rendered by default (the chat's escaped renderer); the switch shows its source. The choice is a browser preference.
+    const md = MD_FILE.test(sel);
+    const src = !md || ctx.mdSource === true;
+    const pick = (v, label) => `<button type="button" class="cv-split-btn" data-act="md-source" data-v="${v}" aria-pressed="${(v === 'source') === src}">${label}</button>`;
+    const bar = md ? `<div class="cv-bar" role="group" aria-label="Markdown view">${pick('rendered', 'Rendered')}${pick('source', 'Source')}</div>` : '';
+    if (!src) return wrap(`${bar}<div class="cv-md">${mdHtml(file.text)}</div>`);
     const marks = (Array.isArray(file.changed) ? file.changed : []).filter(Array.isArray).map(([s, n]) => [Math.floor(Number(s)), Math.floor(Number(n))]).filter(([s, n]) => s >= 1 && n >= 1);
     const hit = (i) => marks.some(([s, n]) => i >= s && i < s + n);
     const text = lines.map((ln) => ln.replace(/\r$/, ''));
     const h = highlighter();
     const colored = h && h.languageOf(sel) ? h.highlightLines(text, h.languageOf(sel)) : null;
     const rows = text.slice(0, CODE_MAX).map((ln, i) => `<div class="cv-l${hit(i + 1) ? ' e' : ''}"><span class="cv-n">${i + 1}</span><span class="cv-t">${colored ? colored[i] : esc(ln)}</span></div>`);
-    return wrap(`<div class="cv-code">${rows.join('')}</div>${lines.length > CODE_MAX ? `<div class="cv-more rs-sub">+${lines.length - CODE_MAX} more lines</div>` : ''}`);
+    return wrap(`${bar}<div class="cv-code">${rows.join('')}</div>${lines.length > CODE_MAX ? `<div class="cv-more rs-sub">+${lines.length - CODE_MAX} more lines</div>` : ''}`);
   }
   // RP130: the tree alone (what the right column shows) and the file alone (what the centre shows); the narrow chat still has both in its Files tab (filesView).
   function treeHtml(tree, ctx = {}) {

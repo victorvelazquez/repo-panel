@@ -103,6 +103,7 @@ const ACTIONS = {
   // RP90: touching a file of the Changes list opens it in the ONE diff tab of the centre (reused for every file); RP92 will open it from the files card.
   'changes-file': (el) => { const p = el.dataset.path || ''; if (!p) { draw(); return; } S.chat.dfile = p; S.chat.ffile = ''; if (narrowOn()) { loadChanges(); showDetail('diff'); } else setChatTab('diff'); }, // RP130: the viewer tab is ONE, a diff or a file; RP196: under 760 px it is the detail screen of the column
   'diff-split': () => setPref('split', !S.prefs.split), // RP66c: the side-by-side diff on or off, kept with the other preferences
+  'md-source': (el) => setPref('mdSource', el.dataset.v === 'source'), // RP269: a Markdown file rendered or as its source, remembered for the next one
   'ch-menu': () => { S.chat.menu = !S.chat.menu; S.chat.menuFocus = S.chat.menu ? 'item' : 'btn'; draw(); }, // RP195: the ⋮ menu of the head of the chat
   'detail-close': () => { S.chat.detail = ''; draw(); }, // RP196: the arrow of the detail screen of the column: back to its list
   'diff-close': () => { S.chat.dfile = ''; S.chat.ffile = ''; if (S.chat.tab === 'diff' || S.chat.tab === 'file') S.chat.tab = 'chat'; draw(); },
